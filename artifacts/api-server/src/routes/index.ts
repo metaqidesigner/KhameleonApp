@@ -1,8 +1,40 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import dashboardRouter from "./dashboard";
+import agentsRouter from "./agents";
+import inboxRouter from "./inbox";
+import projectsRouter from "./projects";
+import tasksRouter from "./tasks";
+import calendarRouter from "./calendar";
+import communicationsRouter from "./communications";
+import automationsRouter from "./automations";
+import securityRouter from "./security";
+import vaultRouter from "./vault";
+import researchRouter from "./research";
+import memoryRouter from "./memory";
+import approvalsRouter from "./approvals";
+import insightsRouter from "./insights";
+import modesRouter from "./modes";
+import marketplaceRouter from "./marketplace";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use("/dashboard", dashboardRouter);
+router.use("/agents", agentsRouter);
+router.use("/inbox", inboxRouter);
+router.use("/projects", projectsRouter);
+router.use("/tasks", tasksRouter);
+router.use("/calendar", calendarRouter);
+router.use("/communications", communicationsRouter);
+router.use("/automations", automationsRouter);
+router.use("/security", securityRouter);
+router.use("/vault", vaultRouter);
+router.use("/research", researchRouter);
+router.use("/memory", memoryRouter);
+router.use("/approvals", approvalsRouter);
+router.use("/insights", insightsRouter);
+router.use("/modes", modesRouter);
+router.use("/marketplace", marketplaceRouter);
 
 export default router;

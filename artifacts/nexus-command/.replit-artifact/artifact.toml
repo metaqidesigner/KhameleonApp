@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Nexus Command"
+version = "1.0.0"
+id = "artifacts/nexus-command"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20596
+
+[services.development]
+run = "pnpm --filter @workspace/nexus-command run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/nexus-command", "run", "build" ]
+publicDir = "artifacts/nexus-command/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20596"
+BASE_PATH = "/"

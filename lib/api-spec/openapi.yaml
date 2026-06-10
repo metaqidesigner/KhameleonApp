@@ -1,22 +1,53 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Nexus Command API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Dashboard and executive summary
+  - name: agents
+    description: AI Agent orchestration
+  - name: inbox
+    description: Unified inbox
+  - name: projects
+    description: Project command centre
+  - name: tasks
+    description: Project tasks
+  - name: calendar
+    description: Calendar events
+  - name: communications
+    description: Communications hub
+  - name: automations
+    description: Automation engine
+  - name: security
+    description: Security command
+  - name: vault
+    description: Nexus vault
+  - name: research
+    description: Research centre
+  - name: memory
+    description: Digital memory
+  - name: approvals
+    description: Approval system
+  - name: insights
+    description: Executive insights
+  - name: modes
+    description: Operating modes
+  - name: marketplace
+    description: AI Marketplace
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +55,1303 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/analytics:
+    get:
+      operationId: getDashboardAnalytics
+      tags: [dashboard]
+      summary: Get analytics data for charts
+      responses:
+        "200":
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsData"
+
+  /agents:
+    get:
+      operationId: listAgents
+      tags: [agents]
+      summary: List all AI agents
+      responses:
+        "200":
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Agent"
+
+  /agents/{id}:
+    get:
+      operationId: getAgent
+      tags: [agents]
+      summary: Get agent by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Agent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+
+  /agents/route:
+    post:
+      operationId: routeTask
+      tags: [agents]
+      summary: Route a task to the best agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskRouteInput"
+      responses:
+        "200":
+          description: Routing result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskRouteResult"
+
+  /inbox:
+    get:
+      operationId: listInboxItems
+      tags: [inbox]
+      summary: List inbox items
+      responses:
+        "200":
+          description: Inbox items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InboxItem"
+
+  /inbox/{id}:
+    patch:
+      operationId: updateInboxItem
+      tags: [inbox]
+      summary: Update inbox item (mark read, archive, etc.)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InboxItemUpdate"
+      responses:
+        "200":
+          description: Updated inbox item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboxItem"
+
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List all projects
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get project by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}/tasks:
+    get:
+      operationId: listProjectTasks
+      tags: [tasks]
+      summary: List tasks for a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: List all tasks
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/{id}:
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskUpdate"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /calendar/events:
+    get:
+      operationId: listCalendarEvents
+      tags: [calendar]
+      summary: List calendar events
+      responses:
+        "200":
+          description: Calendar events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEvent"
+
+  /calendar/events/{id}:
+    get:
+      operationId: getCalendarEvent
+      tags: [calendar]
+      summary: Get calendar event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Calendar event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarEvent"
+
+  /communications:
+    get:
+      operationId: listCommunications
+      tags: [communications]
+      summary: List all communications
+      responses:
+        "200":
+          description: Communications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Communication"
+
+  /communications/analytics:
+    get:
+      operationId: getCommunicationAnalytics
+      tags: [communications]
+      summary: Get communication analytics
+      responses:
+        "200":
+          description: Communication analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommunicationAnalytics"
+
+  /automations:
+    get:
+      operationId: listAutomations
+      tags: [automations]
+      summary: List all automations
+      responses:
+        "200":
+          description: Automations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Automation"
+
+  /automations/{id}/run:
+    post:
+      operationId: runAutomation
+      tags: [automations]
+      summary: Run an automation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Run result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomationRunResult"
+
+  /security/status:
+    get:
+      operationId: getSecurityStatus
+      tags: [security]
+      summary: Get security status overview
+      responses:
+        "200":
+          description: Security status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityStatus"
+
+  /security/events:
+    get:
+      operationId: listSecurityEvents
+      tags: [security]
+      summary: List security events
+      responses:
+        "200":
+          description: Security events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SecurityEvent"
+
+  /vault:
+    get:
+      operationId: listVaultItems
+      tags: [vault]
+      summary: List vault items (mock only - no real secrets)
+      responses:
+        "200":
+          description: Vault items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VaultItem"
+
+  /research:
+    get:
+      operationId: listResearchItems
+      tags: [research]
+      summary: List research items
+      responses:
+        "200":
+          description: Research items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResearchItem"
+
+  /memory:
+    get:
+      operationId: listMemoryItems
+      tags: [memory]
+      summary: List memory items
+      responses:
+        "200":
+          description: Memory items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MemoryItem"
+    post:
+      operationId: createMemoryItem
+      tags: [memory]
+      summary: Create a memory item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemoryItemInput"
+      responses:
+        "201":
+          description: Created memory item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoryItem"
+
+  /memory/{id}:
+    delete:
+      operationId: deleteMemoryItem
+      tags: [memory]
+      summary: Delete (forget) a memory item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /approvals:
+    get:
+      operationId: listApprovals
+      tags: [approvals]
+      summary: List pending approvals
+      responses:
+        "200":
+          description: Approvals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Approval"
+
+  /approvals/{id}/approve:
+    post:
+      operationId: approveRequest
+      tags: [approvals]
+      summary: Approve a request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated approval
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approval"
+
+  /approvals/{id}/reject:
+    post:
+      operationId: rejectRequest
+      tags: [approvals]
+      summary: Reject a request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated approval
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approval"
+
+  /insights:
+    get:
+      operationId: listInsights
+      tags: [insights]
+      summary: List executive insights
+      responses:
+        "200":
+          description: Insights
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Insight"
+
+  /modes:
+    get:
+      operationId: listModes
+      tags: [modes]
+      summary: List all operating modes
+      responses:
+        "200":
+          description: Operating modes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OperatingMode"
+
+  /modes/current:
+    get:
+      operationId: getCurrentMode
+      tags: [modes]
+      summary: Get current operating mode
+      responses:
+        "200":
+          description: Current mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperatingMode"
+    put:
+      operationId: setCurrentMode
+      tags: [modes]
+      summary: Set current operating mode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetModeInput"
+      responses:
+        "200":
+          description: Updated mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperatingMode"
+
+  /marketplace/agents:
+    get:
+      operationId: listMarketplaceAgents
+      tags: [marketplace]
+      summary: List marketplace AI agents
+      responses:
+        "200":
+          description: Marketplace agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MarketplaceAgent"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    DashboardSummary:
+      type: object
+      required: [systemHealth, activeProjects, pendingTasks, pendingApprovals, securityScore, activeAgents, unreadMessages, todayMeetings, currentMode]
+      properties:
+        systemHealth:
+          type: integer
+        activeProjects:
+          type: integer
+        pendingTasks:
+          type: integer
+        pendingApprovals:
+          type: integer
+        securityScore:
+          type: integer
+        activeAgents:
+          type: integer
+        unreadMessages:
+          type: integer
+        todayMeetings:
+          type: integer
+        currentMode:
+          type: string
+
+    AnalyticsData:
+      type: object
+      required: [taskCompletion, agentPerformance, communicationVolume, securityTrends, timeAllocation, projectProgress]
+      properties:
+        taskCompletion:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChartDataPoint"
+        agentPerformance:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentPerformancePoint"
+        communicationVolume:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChartDataPoint"
+        securityTrends:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChartDataPoint"
+        timeAllocation:
+          type: array
+          items:
+            $ref: "#/components/schemas/PieDataPoint"
+        projectProgress:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectProgressPoint"
+
+    ChartDataPoint:
+      type: object
+      required: [label, value]
+      properties:
+        label:
+          type: string
+        value:
+          type: number
+
+    AgentPerformancePoint:
+      type: object
+      required: [name, reliability, tasks, cost]
+      properties:
+        name:
+          type: string
+        reliability:
+          type: number
+        tasks:
+          type: integer
+        cost:
+          type: number
+
+    PieDataPoint:
+      type: object
+      required: [name, value, color]
+      properties:
+        name:
+          type: string
+        value:
+          type: number
+        color:
+          type: string
+
+    ProjectProgressPoint:
+      type: object
+      required: [name, progress, status]
+      properties:
+        name:
+          type: string
+        progress:
+          type: number
+        status:
+          type: string
+
+    Agent:
+      type: object
+      required: [id, name, description, category, reliabilityScore, costScore, status, supportedModels, strengths, useCases]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        reliabilityScore:
+          type: number
+        costScore:
+          type: number
+        status:
+          type: string
+        supportedModels:
+          type: array
+          items:
+            type: string
+        strengths:
+          type: array
+          items:
+            type: string
+        useCases:
+          type: array
+          items:
+            type: string
+        lastUpdated:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        tasksCompleted:
+          type: integer
+        avgResponseTime:
+          type: number
+
+    TaskRouteInput:
+      type: object
+      required: [task]
+      properties:
+        task:
+          type: string
+
+    TaskRouteResult:
+      type: object
+      required: [primaryAgent, secondaryAgent, estimatedCost, confidenceScore, reasoning]
+      properties:
+        primaryAgent:
+          $ref: "#/components/schemas/Agent"
+        secondaryAgent:
+          $ref: "#/components/schemas/Agent"
+        estimatedCost:
+          type: number
+        confidenceScore:
+          type: number
+        reasoning:
+          type: string
+
+    InboxItem:
+      type: object
+      required: [id, source, subject, summary, priority, classification, isRead, createdAt]
+      properties:
+        id:
+          type: integer
+        source:
+          type: string
+        sourceIcon:
+          type: string
+        sender:
+          type: string
+        subject:
+          type: string
+        summary:
+          type: string
+        priority:
+          type: string
+        classification:
+          type: string
+        aiRecommendation:
+          type: string
+        relatedProject:
+          type: string
+        priorityScore:
+          type: integer
+        isRead:
+          type: boolean
+        isArchived:
+          type: boolean
+        createdAt:
+          type: string
+
+    InboxItemUpdate:
+      type: object
+      properties:
+        isRead:
+          type: boolean
+        isArchived:
+          type: boolean
+        classification:
+          type: string
+
+    Project:
+      type: object
+      required: [id, name, description, owner, status, priority, progress, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        owner:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        progress:
+          type: integer
+        risks:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        dueDate:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        taskCount:
+          type: integer
+        completedTaskCount:
+          type: integer
+
+    ProjectInput:
+      type: object
+      required: [name, description, owner, status, priority]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        owner:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        dueDate:
+          type: ["string", "null"]
+        tags:
+          type: array
+          items:
+            type: string
+
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        progress:
+          type: integer
+        dueDate:
+          type: ["string", "null"]
+
+    Task:
+      type: object
+      required: [id, title, status, priority, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        projectId:
+          type: ["integer", "null"]
+        projectName:
+          type: ["string", "null"]
+        assignee:
+          type: string
+        dueDate:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        aiRecommendation:
+          type: string
+
+    TaskInput:
+      type: object
+      required: [title, status, priority]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        projectId:
+          type: ["integer", "null"]
+        assignee:
+          type: string
+        dueDate:
+          type: ["string", "null"]
+
+    TaskUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        dueDate:
+          type: ["string", "null"]
+
+    CalendarEvent:
+      type: object
+      required: [id, title, startTime, endTime, type]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+        type:
+          type: string
+        attendees:
+          type: array
+          items:
+            type: string
+        location:
+          type: string
+        aiPrep:
+          type: string
+        relatedProject:
+          type: string
+        actionItems:
+          type: array
+          items:
+            type: string
+
+    Communication:
+      type: object
+      required: [id, sender, subject, source, summary, sentiment, priority, createdAt]
+      properties:
+        id:
+          type: integer
+        sender:
+          type: string
+        senderEmail:
+          type: string
+        subject:
+          type: string
+        source:
+          type: string
+        summary:
+          type: string
+        sentiment:
+          type: string
+        priority:
+          type: string
+        suggestedResponse:
+          type: string
+        relatedProject:
+          type: string
+        requiredActions:
+          type: array
+          items:
+            type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+
+    CommunicationAnalytics:
+      type: object
+      required: [totalMessages, responseRate, avgResponseTime, bySource, bySentiment]
+      properties:
+        totalMessages:
+          type: integer
+        responseRate:
+          type: number
+        avgResponseTime:
+          type: number
+        bySource:
+          type: array
+          items:
+            $ref: "#/components/schemas/PieDataPoint"
+        bySentiment:
+          type: array
+          items:
+            $ref: "#/components/schemas/PieDataPoint"
+
+    Automation:
+      type: object
+      required: [id, name, description, trigger, status, lastExecution]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        trigger:
+          type: string
+        status:
+          type: string
+        applicationsUsed:
+          type: array
+          items:
+            type: string
+        requiredPermissions:
+          type: array
+          items:
+            type: string
+        requiresApproval:
+          type: boolean
+        lastExecution:
+          type: string
+        timeSaved:
+          type: number
+        runsCount:
+          type: integer
+
+    AutomationRunResult:
+      type: object
+      required: [success, message, executedAt]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        executedAt:
+          type: string
+
+    SecurityStatus:
+      type: object
+      required: [overallScore, threatLevel, layers]
+      properties:
+        overallScore:
+          type: integer
+        threatLevel:
+          type: string
+        activeThreats:
+          type: integer
+        vulnerabilities:
+          type: integer
+        complianceStatus:
+          type: string
+        vaultStatus:
+          type: string
+        layers:
+          type: array
+          items:
+            $ref: "#/components/schemas/SecurityLayer"
+
+    SecurityLayer:
+      type: object
+      required: [id, name, description, status, score]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        score:
+          type: integer
+        lastScan:
+          type: string
+
+    SecurityEvent:
+      type: object
+      required: [id, type, severity, description, timestamp]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        severity:
+          type: string
+        description:
+          type: string
+        timestamp:
+          type: string
+        resolved:
+          type: boolean
+
+    VaultItem:
+      type: object
+      required: [id, name, category, permissionLevel, lastAccessed, owner]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+        permissionLevel:
+          type: string
+        lastAccessed:
+          type: string
+        owner:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+
+    ResearchItem:
+      type: object
+      required: [id, title, type, status, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        sources:
+          type: integer
+        credibilityScore:
+          type: number
+        aiSummary:
+          type: string
+        createdAt:
+          type: string
+
+    MemoryItem:
+      type: object
+      required: [id, category, key, value, createdAt]
+      properties:
+        id:
+          type: integer
+        category:
+          type: string
+        key:
+          type: string
+        value:
+          type: string
+        isProtected:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    MemoryItemInput:
+      type: object
+      required: [category, key, value]
+      properties:
+        category:
+          type: string
+        key:
+          type: string
+        value:
+          type: string
+        isProtected:
+          type: boolean
+
+    Approval:
+      type: object
+      required: [id, action, requestingAgent, reason, riskLevel, status, createdAt]
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+        requestingAgent:
+          type: string
+        reason:
+          type: string
+        riskLevel:
+          type: string
+        dataInvolved:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+        resolvedAt:
+          type: ["string", "null"]
+
+    Insight:
+      type: object
+      required: [id, message, category, confidenceScore, createdAt]
+      properties:
+        id:
+          type: integer
+        message:
+          type: string
+        category:
+          type: string
+        confidenceScore:
+          type: number
+        priority:
+          type: string
+        actionRequired:
+          type: boolean
+        relatedProject:
+          type: string
+        createdAt:
+          type: string
+
+    OperatingMode:
+      type: object
+      required: [id, name, description, icon, isActive]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        isActive:
+          type: boolean
+        color:
+          type: string
+
+    SetModeInput:
+      type: object
+      required: [modeId]
+      properties:
+        modeId:
+          type: integer
+
+    MarketplaceAgent:
+      type: object
+      required: [id, name, description, provider, category, accuracyScore, costScore, speedScore, reliabilityScore, privacyScore, isInstalled]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        provider:
+          type: string
+        category:
+          type: string
+        accuracyScore:
+          type: number
+        costScore:
+          type: number
+        speedScore:
+          type: number
+        reliabilityScore:
+          type: number
+        privacyScore:
+          type: number
+        isInstalled:
+          type: boolean
+        version:
+          type: string
+        pricing:
+          type: string

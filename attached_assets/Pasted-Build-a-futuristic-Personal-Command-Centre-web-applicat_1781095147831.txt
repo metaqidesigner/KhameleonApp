@@ -1,0 +1,729 @@
+Build a futuristic Personal Command Centre web application called:
+
+NEXUS COMMAND
+
+Vision:
+Nexus Command is the central operating system for an individual's professional and personal digital life.
+
+Think:
+- Jarvis from Iron Man
+- Mission Control
+- AI Chief of Staff
+- Personal Operating System
+- Multi-Agent AI Command Centre
+
+The platform should become the single interface through which a user manages work, business, personal life, communications, projects, knowledge, security, research, automation, and AI agents.
+
+The system should feel intelligent, proactive, secure, elegant, and futuristic.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PRIMARY OBJECTIVE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create a premium AI-powered command centre that:
+
+• Brings together all major digital activities
+• Uses the best AI agent for each task
+• Continuously evolves and can support future AI models
+• Provides one location for all information and actions
+• Protects privacy and corporate information
+• Becomes the user's AI-powered executive assistant
+• Acts as a central hub for all connected applications
+
+The long-term goal is for Nexus Command to become the "operating system above all operating systems."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TECH STACK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Frontend:
+- React
+- TypeScript
+- Tailwind CSS
+- Framer Motion
+- Recharts
+
+Backend:
+- Node.js
+- Express
+- TypeScript
+
+Database:
+- PostgreSQL
+- Prisma ORM
+
+Authentication:
+- Placeholder authentication system
+- Future support:
+  - Microsoft Entra ID
+  - Google
+  - Apple
+  - Passkeys
+  - MFA
+
+Architecture:
+- Modular
+- Enterprise-grade
+- API-first
+- Future microservice friendly
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESIGN LANGUAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Style inspiration:
+- Jarvis
+- Tony Stark HUD
+- Apple
+- Tesla
+- Bloomberg Terminal (cleaner)
+- Modern command centres
+
+Requirements:
+
+Dark theme
+
+Colours:
+- Deep black
+- Midnight blue
+- Electric cyan
+- White
+- Subtle gold highlights
+
+Visual style:
+- Glassmorphism
+- Holographic effects
+- Smooth animations
+- Premium UI
+- Professional
+- Not gaming themed
+- Not cyberpunk cliché
+
+The interface should feel like:
+"An AI-powered executive cockpit."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MAIN DASHBOARD LAYOUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CENTER OF SCREEN
+
+Create a large animated:
+
+NEXUS CORE
+
+The Nexus Core represents the brain of the platform.
+
+Display:
+- System health
+- AI activity
+- Connected systems
+- Active projects
+- User status
+- Current mode
+
+The core should pulse subtly and display system intelligence metrics.
+
+Include:
+
+Command input box
+
+User can type:
+
+"Prepare me for tomorrow"
+
+"Summarise today's emails"
+
+"Show project risks"
+
+"Research competitors"
+
+"Draft response"
+
+etc.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+LEFT PANEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Today's Priorities
+
+Display:
+- High priority tasks
+- Upcoming deadlines
+- Urgent communications
+- AI recommendations
+
+Calendar Snapshot
+
+Display:
+- Next meetings
+- Travel
+- Personal events
+
+Projects Overview
+
+Display:
+- Active projects
+- Status indicators
+- Progress bars
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RIGHT PANEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Security Overview
+
+Display:
+- Security score
+- Threat status
+- Vault status
+- Compliance status
+
+Connected Applications
+
+Display:
+- Microsoft 365
+- Google Workspace
+- Apple
+- Slack
+- Teams
+- Xero
+- GitHub
+- Replit
+- Custom Apps
+
+AI Agent Status
+
+Display:
+- Active agents
+- Resource usage
+- Reliability
+- Cost indicators
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BOTTOM DASHBOARD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Charts and Analytics
+
+Create visual dashboards:
+
+- Project progress
+- Task completion
+- Communication volume
+- Agent performance
+- Security trends
+- Automation savings
+- Time allocation
+- Workload analysis
+
+Use Recharts.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 1
+AI AGENT ORCHESTRATION ENGINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This is the most important module.
+
+Build an Agent Registry.
+
+Sample agents:
+
+Email Agent
+Calendar Agent
+Research Agent
+Coding Agent
+Design Agent
+Legal Agent
+Compliance Agent
+Finance Agent
+Project Agent
+Security Agent
+Automation Agent
+
+Each agent contains:
+
+- Name
+- Description
+- Strengths
+- Reliability score
+- Cost score
+- Last updated
+- Permissions
+- Supported models
+- Recommended use cases
+
+Create logic that:
+
+Receives a task
+
+Determines:
+- Best agent
+- Secondary agent
+- Estimated cost
+- Confidence score
+
+Display reasoning.
+
+Future-ready architecture:
+Support OpenAI, Anthropic, Google, Meta, open-source models, and future providers.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 2
+UNIFIED INBOX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create a unified feed that combines:
+
+- Email
+- Teams
+- Slack
+- Calendar invites
+- Project updates
+- AI alerts
+- Approval requests
+- System notifications
+
+Classification:
+
+- Task
+- Reminder
+- Decision
+- Archive
+- Urgent
+
+Each card displays:
+
+- Source
+- Summary
+- AI recommendation
+- Related project
+- Priority score
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 3
+PROJECT COMMAND CENTRE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Every project receives its own workspace.
+
+Fields:
+
+- Project name
+- Description
+- Owner
+- Status
+- Priority
+- Progress
+- Risks
+- Tasks
+- Files
+- Notes
+- Decisions
+- Calendar events
+- Emails
+- AI suggestions
+
+Create demo projects:
+
+1. AITradingMarket
+2. Chameleon
+3. Property Governance Platform
+4. Economic Simulator
+5. Nexus Command
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 4
+CALENDAR COMMAND
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Features:
+
+- Daily agenda
+- Weekly agenda
+- Meeting preparation
+- AI briefings
+- Action items
+- Follow-up suggestions
+
+Display:
+- Upcoming meetings
+- Related documents
+- Relevant emails
+- Relevant projects
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 5
+COMMUNICATION HUB
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Modern alternative to traditional email view.
+
+Each communication card displays:
+
+- Sender
+- Subject
+- AI summary
+- Sentiment
+- Priority
+- Suggested response
+- Related projects
+- Required actions
+
+Include communication analytics.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 6
+AUTOMATION ENGINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create automation templates:
+
+Prepare Me For Tomorrow
+
+Inbox Summary
+
+Weekly Report
+
+Project Health Check
+
+Regulatory Monitoring
+
+Meeting Preparation
+
+Task Follow-up
+
+Risk Review
+
+Security Scan
+
+Each automation contains:
+
+- Trigger
+- Applications used
+- Required permissions
+- Human approval requirement
+- Last execution
+- Status
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 7
+SECURITY COMMAND
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create enterprise-grade security dashboards.
+
+Security Score
+
+Display:
+- Overall score
+- Threat status
+- Vulnerabilities
+- Recent events
+
+Security Layers:
+
+Layer 1
+Personal Data Protection
+
+Layer 2
+Corporate Confidential Data
+
+Layer 3
+Password & Credential Vault
+
+Layer 4
+AI Access Controls
+
+Layer 5
+Audit & Compliance
+
+Display all layers visually.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 8
+NEXUS VAULT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dedicated secure vault area.
+
+Store mock entries only.
+
+Do NOT store real passwords.
+
+Display:
+
+- Connected applications
+- API keys
+- Credentials
+- Tokens
+- Certificates
+
+Each item contains:
+
+- Name
+- Category
+- Permission level
+- Last accessed
+- Owner
+
+Add TODO comments:
+
+Future implementation:
+- Encryption
+- Secrets management
+- HSM support
+- Zero trust architecture
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 9
+BROWSER & RESEARCH CENTRE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create an integrated research workspace.
+
+Features:
+
+- Search
+- Saved sources
+- Notes
+- AI summaries
+- Citation tracking
+- Source credibility ratings
+- Website monitoring
+
+Display:
+- Research projects
+- Knowledge graph
+- Topic relationships
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 10
+DIGITAL MEMORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create a Memory Centre.
+
+User controls:
+
+Remember:
+- Preferences
+- Contacts
+- Workflows
+- Writing styles
+- Business goals
+
+Forget:
+- Temporary information
+- Outdated information
+
+Never access:
+- Protected topics
+- Protected folders
+- Sensitive data
+
+Allow complete user control.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 11
+OPERATING MODES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Modes:
+
+Work Mode
+
+Founder Mode
+
+Family Mode
+
+Finance Mode
+
+Travel Mode
+
+Meeting Mode
+
+Deep Focus Mode
+
+Private Mode
+
+Changing modes should dynamically update:
+
+- Dashboard
+- Priorities
+- Recommendations
+- Agents
+- Notifications
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 12
+APPROVAL SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create an Approval Centre.
+
+Actions requiring approval:
+
+- Send email
+- Share file
+- Connect application
+- Run automation
+- Access vault
+- Export data
+- Invite user
+
+Display:
+
+- Risk level
+- Requesting agent
+- Reason
+- Data involved
+- Approve
+- Reject
+
+Maintain audit history.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 13
+KNOWLEDGE GRAPH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create a visual knowledge graph.
+
+Connect:
+
+- People
+- Projects
+- Emails
+- Meetings
+- Files
+- Tasks
+- AI agents
+
+Allow relationship visualisation.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 14
+EXECUTIVE INSIGHTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create AI-generated executive insights.
+
+Examples:
+
+"Project Chameleon is at risk of delay."
+
+"You have 12 approvals pending."
+
+"Meeting preparation incomplete."
+
+"Property Governance Platform has unresolved decisions."
+
+Display confidence scores.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE 15
+FUTURE AI MARKETPLACE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create placeholder architecture for:
+
+AI Marketplace
+
+Users can:
+- Install agents
+- Upgrade agents
+- Compare agents
+- View performance
+
+Agent scorecard:
+
+- Accuracy
+- Cost
+- Speed
+- Reliability
+- Privacy
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NAVIGATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dashboard
+Agents
+Inbox
+Projects
+Calendar
+Communications
+Automations
+Security
+Vault
+Research
+Memory
+Knowledge Graph
+Analytics
+Settings
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DEMO DATA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Populate all modules with realistic demo data.
+
+Create:
+- Projects
+- Tasks
+- Emails
+- Meetings
+- Security alerts
+- AI agents
+- Automations
+
+Ensure all dashboards appear fully functional.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DEVELOPER REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use:
+- Strong TypeScript typing
+- Clean architecture
+- Reusable components
+- Well-documented code
+- Mock APIs
+- Future integration placeholders
+
+Add TODO comments showing future integrations for:
+
+- Microsoft 365
+- Google Workspace
+- Apple ecosystem
+- Slack
+- Teams
+- Xero
+- GitHub
+- Replit
+- CRM platforms
+- ERP systems
+- AI providers
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FINAL GOAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The finished product should feel like:
+
+"A premium AI-powered operating system sitting above all other applications."
+
+Nexus Command should function as:
+
+- AI Chief of Staff
+- Personal Command Centre
+- Executive Dashboard
+- AI Agent Orchestrator
+- Knowledge Hub
+- Security Centre
+- Productivity Operating System
+
+Deliver a visually impressive, fully navigable, enterprise-quality application with realistic data, beautiful charts, modular architecture, and a futuristic Jarvis-inspired experience suitable for future commercialisation.
