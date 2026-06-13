@@ -1,219 +1,166 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { Settings as SettingsIcon } from 'lucide-react';
+import JPanel from '@/components/JPanel';
+import { useJarvisStore } from '@/store/jarvisStore';
+import { getHealth } from '@/lib/jarvisApi';
 
-type Section = 'general' | 'engine' | 'appearance' | 'memory' | 'telemetry' | 'advanced';
+type Section = 'GENERAL'|'ENGINE'|'APPEARANCE'|'MEMORY'|'TELEMETRY'|'ADVANCED';
+const SECTIONS: Section[] = ['GENERAL','ENGINE','APPEARANCE','MEMORY','TELEMETRY','ADVANCED'];
 
-const SECTIONS: { id: Section; label: string }[] = [
-  { id: 'general',    label: 'General' },
-  { id: 'engine',     label: 'Engine' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'memory',     label: 'Memory' },
-  { id: 'telemetry',  label: 'Telemetry' },
-  { id: 'advanced',   label: 'Advanced' },
-];
-
-function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #30363d', gap: 16 }}>
-      <span style={{ fontSize: 13, color: '#e6edf3', flex: 1 }}>{label}</span>
-      <div style={{ flexShrink: 0 }}>{children}</div>
-    </div>
-  );
+function Label({ children }: { children: React.ReactNode }) {
+  return <label style={{ fontFamily:'var(--j-font-ui)', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.12em', color:'var(--j-text-muted)', display:'block', marginBottom:4 }}>{children}</label>;
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Row({ children }: { children: React.ReactNode }) {
+  return <div style={{ marginBottom:16 }}>{children}</div>;
+}
+
+function Toggle({ value, onChange }: { value:boolean; onChange:(v:boolean)=>void }) {
   return (
-    <button
-      onClick={() => onChange(!checked)}
-      style={{
-        width: 36, height: 20, borderRadius: 10,
-        background: checked ? 'rgba(88,166,255,0.3)' : '#21262d',
-        border: `1px solid ${checked ? '#58a6ff' : '#30363d'}`,
-        cursor: 'pointer', padding: 0, position: 'relative', transition: 'background 0.2s',
-      }}
-    >
-      <span style={{
-        position: 'absolute', top: 2,
-        left: checked ? 16 : 2, width: 14, height: 14,
-        background: checked ? '#58a6ff' : '#484f58',
-        borderRadius: '50%', transition: 'left 0.2s',
-      }} />
+    <button onClick={() => onChange(!value)} style={{ width:40, height:20, background: value ? 'rgba(0,212,255,0.2)' : 'rgba(0,0,0,0.5)', border:`1px solid ${value ? 'var(--j-cyan)' : 'rgba(0,212,255,0.2)'}`, cursor:'pointer', position:'relative', flexShrink:0 }}>
+      <span style={{ position:'absolute', top:3, left: value ? 22 : 3, width:12, height:12, background: value ? 'var(--j-cyan)' : 'var(--j-text-faint)', transition:'left 0.15s' }} />
     </button>
   );
 }
 
-export default function Settings() {
-  const [section, setSection] = useState<Section>('general');
-  const [mode, setMode] = useState('work');
-  const [engine, setEngine] = useState('ollama');
-  const [model, setModel] = useState('llama3.2');
-  const [baseUrl, setBaseUrl] = useState('http://localhost:11434');
-  const [fontSize, setFontSize] = useState<12 | 13 | 14>(13);
-  const [railExpanded, setRailExpandedLocal] = useState(true);
-  const [indexPath, setIndexPath] = useState('');
-  const [autoIndex, setAutoIndex] = useState(false);
-  const [chunkSize, setChunkSize] = useState(512);
-  const [anonymousTelemetry, setAnonymousTelemetry] = useState(false);
-  const [showCost, setShowCost] = useState(true);
-  const [showEnergy, setShowEnergy] = useState(true);
-  const [connResult, setConnResult] = useState<string | null>(null);
-
-  const testConnection = async () => {
-    try {
-      const r = await fetch('/api/health');
-      const d = await r.json() as { status: string; engine: string; model: string };
-      setConnResult(`✓ ${d.status} — ${d.engine} / ${d.model}`);
-    } catch {
-      setConnResult('✗ Connection failed — backend unreachable');
-    }
+function EngineSection({ health }: { health: string }) {
+  const [result, setResult] = useState<string|null>(null);
+  const test = async () => {
+    const h = await getHealth();
+    setResult(h.status === 'offline' ? '✕ OFFLINE — Check engine configuration' : `● CONNECTED — ${h.engine} · ${h.model}`);
   };
+  return (
+    <>
+      <Row>
+        <Label>ENGINE</Label>
+        <select className="j-input" defaultValue="ollama">
+          {['ollama','vllm','sglang','llama.cpp','openai','anthropic'].map(e => (
+            <option key={e} value={e} style={{ background:'#020c14' }}>{e.toUpperCase()}</option>
+          ))}
+        </select>
+      </Row>
+      <Row>
+        <Label>MODEL</Label>
+        <input className="j-input" defaultValue="llama3.2" />
+      </Row>
+      <Row>
+        <Label>BASE URL</Label>
+        <input className="j-input" defaultValue="http://localhost:11434" />
+      </Row>
+      <button className="j-btn-primary" style={{ height:36, padding:'0 16px', fontSize:11 }} onClick={test}>
+        ▶ TEST CONNECTION
+      </button>
+      {result && (
+        <div style={{ marginTop:10, fontFamily:'var(--j-font-mono)', fontSize:11, color: result.startsWith('●') ? 'var(--j-green)' : 'var(--j-red)', animation:'jarvis-fadein 0.2s ease both' }}>{result}</div>
+      )}
+    </>
+  );
+}
+
+function AppearanceSection() {
+  const { scanLinesEnabled, setScanLines, cornerBracketsEnabled, setCornerBrackets, tickerSpeed, setTickerSpeed } = useJarvisStore();
+  return (
+    <>
+      <Row>
+        <Label>THEME</Label>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', background:'rgba(0,4,8,0.6)', border:'1px solid rgba(0,212,255,0.15)' }}>
+          <span style={{ fontFamily:'var(--j-font-ui)', fontSize:12, color:'var(--j-text-muted)' }}>JARVIS REQUIRES DARK MODE</span>
+          <Toggle value={true} onChange={() => {}} />
+        </div>
+      </Row>
+      <Row>
+        <Label>FONT SIZE</Label>
+        <div style={{ display:'flex', gap:8 }}>
+          {[12,13,14].map(s => (
+            <label key={s} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontFamily:'var(--j-font-ui)', fontSize:12, color:'var(--j-text-muted)' }}>
+              <input type="radio" name="fontsize" defaultChecked={s===13} style={{ accentColor:'var(--j-cyan)' }}/> {s}px
+            </label>
+          ))}
+        </div>
+      </Row>
+      <Row>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <Label>SCAN LINES</Label>
+          <Toggle value={scanLinesEnabled} onChange={setScanLines} />
+        </div>
+      </Row>
+      <Row>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <Label>PANEL CORNERS</Label>
+          <Toggle value={cornerBracketsEnabled} onChange={setCornerBrackets} />
+        </div>
+      </Row>
+      <Row>
+        <Label>TICKER SPEED — {tickerSpeed}s</Label>
+        <input type="range" min={30} max={120} value={tickerSpeed} onChange={e => setTickerSpeed(Number(e.target.value))} style={{ width:'100%', accentColor:'var(--j-cyan)' }} />
+        <div style={{ display:'flex', justifyContent:'space-between', fontFamily:'var(--j-font-mono)', fontSize:9, color:'var(--j-text-faint)', marginTop:2 }}>
+          <span>30s (FAST)</span><span>120s (SLOW)</span>
+        </div>
+      </Row>
+    </>
+  );
+}
+
+function GenericSection({ section }: { section:Section }) {
+  const fields: Record<string, string[][]> = {
+    GENERAL: [['WORKSPACE NAME','My JARVIS'], ['DEFAULT AGENT','simple'], ['LANGUAGE','en']],
+    MEMORY: [['MAX CHUNKS','10000'], ['CHUNK SIZE','512'], ['OVERLAP','50']],
+    TELEMETRY: [['RETENTION DAYS','30'], ['EXPORT FORMAT','json']],
+    ADVANCED: [['API TIMEOUT (ms)','30000'], ['STREAM BUFFER','2048'], ['LOG LEVEL','info']],
+  };
+  const rows = fields[section] ?? [];
+  return (
+    <>
+      {rows.map(([label, def]) => (
+        <Row key={label}>
+          <Label>{label}</Label>
+          <input className="j-input" defaultValue={def} />
+        </Row>
+      ))}
+    </>
+  );
+}
+
+export default function Settings() {
+  const [active, setActive] = useState<Section>('GENERAL');
+  const { data: health } = { data: undefined } as { data?: { engine?: string } };
 
   return (
-    <div className="j-page">
-      <div className="j-page-header">
-        <div>
-          <h1>Settings</h1>
-          <p>Configure Jarvis behaviour and connections</p>
-        </div>
-      </div>
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Left nav */}
-        <div style={{
-          width: 160, flexShrink: 0, padding: '12px 0',
-          borderRight: '1px solid #30363d', background: '#0d1117',
-          overflow: 'auto',
-        }}>
+    <div style={{ display:'grid', gridTemplateColumns:'30% 70%', gap:6, height:'100%', padding:8 }}>
+      {/* Nav */}
+      <JPanel title="CONFIGURATION MENU" icon={<SettingsIcon size={13}/>}>
+        <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
           {SECTIONS.map(s => (
             <button
-              key={s.id}
-              onClick={() => setSection(s.id)}
+              key={s}
+              onClick={() => setActive(s)}
               style={{
-                width: '100%', height: 34, display: 'flex', alignItems: 'center',
-                padding: '0 14px', background: section === s.id ? '#21262d' : 'none',
-                border: 'none', borderLeft: section === s.id ? '2px solid #58a6ff' : '2px solid transparent',
-                color: section === s.id ? '#e6edf3' : '#8b949e',
-                fontSize: 13, cursor: 'pointer', textAlign: 'left',
+                display:'flex', alignItems:'center', height:40,
+                padding:'0 12px',
+                background: active === s ? 'rgba(0,212,255,0.06)' : 'transparent',
+                border:'none',
+                borderLeft: `3px solid ${active === s ? 'var(--j-cyan)' : 'transparent'}`,
+                color: active === s ? 'var(--j-cyan)' : 'var(--j-text-muted)',
+                fontFamily:'var(--j-font-ui)', fontSize:12, fontWeight:600,
+                textTransform:'uppercase', letterSpacing:'0.1em',
+                cursor:'pointer', width:'100%', textAlign:'left',
+                transition:'color 0.15s, background 0.15s',
               }}
             >
-              {s.label}
+              {s}
             </button>
           ))}
         </div>
+      </JPanel>
 
-        {/* Content */}
-        <div style={{ flex: 1, padding: 24, overflowY: 'auto' }} className="scrollbar-thin">
-          {section === 'general' && (
-            <div>
-              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>General</h2>
-              <SettingRow label="Mode">
-                <select className="j-input" value={mode} onChange={e => setMode(e.target.value)} style={{ width: 140 }}>
-                  {['work', 'research', 'creative', 'focused'].map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </SettingRow>
-              <SettingRow label="Username">
-                <input className="j-input" style={{ width: 180 }} defaultValue="Jarvis User" />
-              </SettingRow>
-            </div>
-          )}
-
-          {section === 'engine' && (
-            <div>
-              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>Engine</h2>
-              <SettingRow label="Engine">
-                <select className="j-input" value={engine} onChange={e => setEngine(e.target.value)} style={{ width: 160 }}>
-                  {['ollama', 'vllm', 'sglang', 'llama.cpp', 'openai', 'anthropic'].map(e => <option key={e} value={e}>{e}</option>)}
-                </select>
-              </SettingRow>
-              <SettingRow label="Model">
-                <input className="j-input" value={model} onChange={e => setModel(e.target.value)} style={{ width: 180 }} />
-              </SettingRow>
-              <SettingRow label="Base URL">
-                <input className="j-input" value={baseUrl} onChange={e => setBaseUrl(e.target.value)} style={{ width: 240 }} />
-              </SettingRow>
-              <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button onClick={testConnection} className="j-btn j-btn-primary">Test Connection</button>
-                {connResult && (
-                  <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: connResult.startsWith('✓') ? '#3fb950' : '#f85149' }}>
-                    {connResult}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {section === 'appearance' && (
-            <div>
-              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>Appearance</h2>
-              <SettingRow label="Theme">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className="j-badge j-badge-blue">Dark</span>
-                  <span style={{ fontSize: 11, color: '#484f58' }}>OpenJarvis is dark by design</span>
-                </div>
-              </SettingRow>
-              <SettingRow label="Font size">
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {([12, 13, 14] as const).map(s => (
-                    <button key={s} onClick={() => setFontSize(s)} className={`j-pill ${fontSize === s ? 'j-pill-active' : ''}`}>
-                      {s}px
-                    </button>
-                  ))}
-                </div>
-              </SettingRow>
-              <SettingRow label="Rail expanded by default">
-                <Toggle checked={railExpanded} onChange={setRailExpandedLocal} />
-              </SettingRow>
-            </div>
-          )}
-
-          {section === 'memory' && (
-            <div>
-              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>Memory</h2>
-              <SettingRow label="Default index path">
-                <input className="j-input" value={indexPath} onChange={e => setIndexPath(e.target.value)} placeholder="~/documents" style={{ width: 220 }} />
-              </SettingRow>
-              <SettingRow label="Auto-index on startup">
-                <Toggle checked={autoIndex} onChange={setAutoIndex} />
-              </SettingRow>
-              <SettingRow label="Chunk size">
-                <input type="number" className="j-input" value={chunkSize} onChange={e => setChunkSize(+e.target.value)} min={128} max={4096} style={{ width: 80 }} />
-              </SettingRow>
-            </div>
-          )}
-
-          {section === 'telemetry' && (
-            <div>
-              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>Telemetry</h2>
-              <SettingRow label="Send anonymous telemetry">
-                <Toggle checked={anonymousTelemetry} onChange={setAnonymousTelemetry} />
-              </SettingRow>
-              <SettingRow label="Show cost estimates">
-                <Toggle checked={showCost} onChange={setShowCost} />
-              </SettingRow>
-              <SettingRow label="Show energy estimates">
-                <Toggle checked={showEnergy} onChange={setShowEnergy} />
-              </SettingRow>
-            </div>
-          )}
-
-          {section === 'advanced' && (
-            <div>
-              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>Advanced</h2>
-              <p style={{ fontSize: 12, color: '#8b949e', marginBottom: 16 }}>
-                Advanced configuration options for Jarvis runtime behaviour.
-              </p>
-              <SettingRow label="Max concurrent agents">
-                <input type="number" className="j-input" defaultValue={3} min={1} max={10} style={{ width: 80 }} />
-              </SettingRow>
-              <SettingRow label="WebSocket reconnect interval">
-                <input type="number" className="j-input" defaultValue={5000} style={{ width: 100 }} />
-                <span style={{ fontSize: 11, color: '#484f58', marginLeft: 6 }}>ms</span>
-              </SettingRow>
-              <SettingRow label="Debug logging">
-                <Toggle checked={false} onChange={() => {}} />
-              </SettingRow>
-            </div>
-          )}
+      {/* Content */}
+      <JPanel title={`SETTINGS — ${active}`} icon={<SettingsIcon size={13}/>}>
+        <div style={{ maxWidth:480 }}>
+          {active === 'ENGINE'     && <EngineSection health={health?.engine ?? ''} />}
+          {active === 'APPEARANCE' && <AppearanceSection />}
+          {(active !== 'ENGINE' && active !== 'APPEARANCE') && <GenericSection section={active} />}
         </div>
-      </div>
+      </JPanel>
     </div>
   );
 }

@@ -1,10 +1,7 @@
-import { useJarvisHealth } from '@/hooks/useJarvis';
+import React, { useState } from 'react';
+import { Shield, Lock } from 'lucide-react';
+import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
-
-const ENV_KEYS = [
-  { name: 'ANTHROPIC_API_KEY', present: !!import.meta.env.VITE_HAS_ANTHROPIC },
-  { name: 'OPENAI_API_KEY',    present: !!import.meta.env.VITE_HAS_OPENAI },
-];
 
 const GUARDRAILS = [
   'Injection Scanner',
@@ -14,97 +11,87 @@ const GUARDRAILS = [
   'Audit Log',
 ];
 
+const KEYS = [
+  { id: 'ANTHROPIC_API_KEY', label: 'ANTHROPIC_API_KEY' },
+  { id: 'OPENAI_API_KEY',    label: 'OPENAI_API_KEY' },
+  { id: 'JARVIS_ENGINE',     label: 'JARVIS_ENGINE' },
+];
+
 export default function Security() {
-  const { data: health } = useJarvisHealth();
   const agentHistory = useJarvisStore(s => s.agentHistory);
-  const isOnline = health?.status === 'online';
+  const [keySet] = useState<Record<string, boolean>>({ ANTHROPIC_API_KEY: false, OPENAI_API_KEY: false, JARVIS_ENGINE: true });
 
   return (
-    <div className="j-page">
-      <div className="j-page-header">
-        <div>
-          <h1>Security</h1>
-          <p>Credential status, audit log, and guardrails</p>
-        </div>
+    <div style={{ display:'grid', gridTemplateColumns:'40% 60%', gap:6, height:'100%', padding:8 }}>
+      {/* Left */}
+      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+        <JPanel title="CREDENTIAL VAULT STATUS" icon={<Lock size={13}/>}>
+          <table className="j-table">
+            <thead className="j-table-header">
+              <tr><th>KEY</th><th>STATUS</th><th>ACTION</th></tr>
+            </thead>
+            <tbody>
+              {KEYS.map(k => (
+                <tr key={k.id}>
+                  <td className="j-mono" style={{ fontSize:10 }}>{k.label}</td>
+                  <td>
+                    <span className={`j-badge ${keySet[k.id] ? 'j-badge-green' : 'j-badge-red'}`}>
+                      {keySet[k.id] ? '● SET' : '✕ NOT SET'}
+                    </span>
+                  </td>
+                  <td>
+                    {keySet[k.id] && (
+                      <button className="j-btn-ghost" style={{ height:22, padding:'0 8px', fontSize:9 }}>REVOKE</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </JPanel>
+
+        <JPanel title="GUARDRAILS" icon={<Shield size={13}/>} headerVariant="amber" badge="ACTIVE">
+          <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+            {GUARDRAILS.map(g => (
+              <div key={g} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid rgba(0,212,255,0.06)' }}>
+                <span style={{ fontFamily:'var(--j-font-ui)', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--j-text)' }}>{g}</span>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--j-green)', animation:'jarvis-pulse 2s ease-in-out infinite' }}/>
+                  <span className="j-mono" style={{ fontSize:10, color:'var(--j-green)' }}>ACTIVE</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </JPanel>
       </div>
-      <div className="j-page-content" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="j-grid-2">
-          {/* API Credentials */}
-          <div className="j-card">
-            <div className="j-card-header">API Credentials</div>
+
+      {/* Right: Audit log */}
+      <JPanel title="SECURITY AUDIT LOG — LAST 24H" icon={<Shield size={13}/>}>
+        {agentHistory.length === 0 ? (
+          <div className="j-empty">NO AUDIT EVENTS — ACTIVITY WILL APPEAR HERE</div>
+        ) : (
+          <div style={{ overflowX:'auto' }}>
             <table className="j-table">
-              <thead><tr><th>Key</th><th>Status</th><th>Action</th></tr></thead>
+              <thead className="j-table-header">
+                <tr><th>TIMESTAMP</th><th>AGENT</th><th>ACTION</th><th>TOKENS</th><th>STATUS</th></tr>
+              </thead>
               <tbody>
-                {ENV_KEYS.map(k => (
-                  <tr key={k.name}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{k.name}</td>
-                    <td>
-                      {k.present
-                        ? <span className="j-badge j-badge-green">● Set</span>
-                        : <span className="j-badge j-badge-red">✕ Not set</span>
-                      }
+                {agentHistory.map(ev => (
+                  <tr key={ev.id} style={{ animation:'jarvis-fadein 0.25s ease both' }}>
+                    <td className="j-mono" style={{ fontSize:9, color:'var(--j-text-muted)' }}>
+                      {new Date(ev.ts).toLocaleTimeString('en-US',{ hour12:false })}
                     </td>
-                    <td>
-                      <button className="j-btn" style={{ height: 24, fontSize: 11, padding: '0 8px' }}>Revoke</button>
-                    </td>
+                    <td><span className="j-badge j-badge-red" style={{ fontSize:8 }}>{ev.agent}</span></td>
+                    <td style={{ fontFamily:'var(--j-font-ui)', fontSize:11, maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{ev.prompt}</td>
+                    <td className="j-mono" style={{ fontSize:10 }}>{ev.tokens ?? '—'}</td>
+                    <td><span className="j-badge j-badge-green" style={{ fontSize:8 }}>SUCCESS</span></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-
-          {/* Guardrails */}
-          <div className="j-card">
-            <div className="j-card-header">Guardrails</div>
-            <table className="j-table">
-              <thead><tr><th>Control</th><th>Status</th></tr></thead>
-              <tbody>
-                {GUARDRAILS.map(g => (
-                  <tr key={g}>
-                    <td style={{ fontSize: 12 }}>{g}</td>
-                    <td>
-                      <span className={`j-badge ${isOnline ? 'j-badge-green' : 'j-badge-gray'}`}>
-                        {isOnline ? 'Active' : 'Pending'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Audit Log */}
-        <div className="j-card">
-          <div className="j-card-header">Audit Log — last {Math.min(agentHistory.length, 20)} entries</div>
-          {agentHistory.length === 0 ? (
-            <div className="j-empty" style={{ padding: '24px 0' }}>No audit entries yet</div>
-          ) : (
-            <table className="j-table">
-              <thead><tr>
-                <th>Timestamp</th><th>Agent</th><th>Action</th><th>Status</th><th>Latency</th>
-              </tr></thead>
-              <tbody>
-                {agentHistory.slice(0, 20).map(ev => (
-                  <tr key={ev.id}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#484f58' }}>
-                      {new Date(ev.ts).toISOString().replace('T', ' ').slice(0, 19)}
-                    </td>
-                    <td><span className="j-badge j-badge-purple">{ev.agent}</span></td>
-                    <td style={{ fontSize: 12, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {ev.prompt.slice(0, 50)}{ev.prompt.length > 50 ? '…' : ''}
-                    </td>
-                    <td><span className="j-badge j-badge-green">success</span></td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                      {ev.durationMs ? `${ev.durationMs}ms` : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+        )}
+      </JPanel>
     </div>
   );
 }

@@ -31,7 +31,6 @@ export interface JarvisConnector {
   name: string;
   connected: boolean;
   last_sync?: string;
-  icon?: string;
 }
 
 export interface JarvisSkill {
@@ -53,8 +52,11 @@ export interface AskResponse {
 
 export interface AgentStats {
   queries: number;
+  avg_latency: number;
+  avg_tokens: number;
   avg_cost: number;
   total_cost: number;
+  p95_latency?: number;
 }
 
 export interface JarvisTelemetry {
@@ -67,19 +69,22 @@ export interface JarvisTelemetry {
   memory_chunks?: number;
 }
 
-// ── Fallbacks ──────────────────────────────────────────────
-const OFFLINE_HEALTH: JarvisHealth = {
-  status: 'offline',
-  engine: 'none',
-  model: '—',
-  uptime: 0,
-  gpu: '—',
-  vram_gb: 0,
-  tokens_per_sec: 0,
-  watt_per_query: 0,
-  total_queries: 0,
-  total_cost_usd: 0,
-  avg_latency_ms: 0,
+export interface FeedItem {
+  id: string;
+  ts: number;
+  agent: string;
+  prompt: string;
+  latency_ms?: number;
+  tokens?: number;
+  cost_usd?: number;
+}
+
+// ── Fallbacks / Mock data ──────────────────────────────────
+export const OFFLINE_HEALTH: JarvisHealth = {
+  status: 'offline', engine: 'none', model: '—',
+  uptime: 0, gpu: '—', vram_gb: 0,
+  tokens_per_sec: 0, watt_per_query: 0,
+  total_queries: 0, total_cost_usd: 0, avg_latency_ms: 0,
 };
 
 export const KNOWN_AGENTS = [
@@ -90,26 +95,42 @@ export const KNOWN_AGENTS = [
 
 const MOCK_CONNECTORS: JarvisConnector[] = [
   { id: 'gmail', name: 'Gmail', connected: false },
-  { id: 'gcalendar', name: 'Google Calendar', connected: false },
-  { id: 'slack', name: 'Slack', connected: false },
-  { id: 'notion', name: 'Notion', connected: false },
+  { id: 'gcal', name: 'Google Calendar', connected: false },
   { id: 'gdrive', name: 'Google Drive', connected: false },
-  { id: 'github', name: 'GitHub', connected: false },
-  { id: 'discord', name: 'Discord', connected: false },
-  { id: 'telegram', name: 'Telegram', connected: false },
-  { id: 'whatsapp', name: 'WhatsApp', connected: false },
-  { id: 'ticktick', name: 'TickTick', connected: false },
+  { id: 'gcontacts', name: 'Google Contacts', connected: false },
+  { id: 'notion', name: 'Notion', connected: false },
+  { id: 'slack', name: 'Slack', connected: false },
   { id: 'obsidian', name: 'Obsidian', connected: false },
+  { id: 'github', name: 'GitHub', connected: false },
+  { id: 'spotify', name: 'Spotify', connected: false },
+  { id: 'strava', name: 'Strava', connected: false },
+  { id: 'oura', name: 'Oura', connected: false },
+  { id: 'apple_health', name: 'Apple Health', connected: false },
+  { id: 'apple_notes', name: 'Apple Notes', connected: false },
+  { id: 'hn', name: 'HackerNews', connected: false },
+  { id: 'outlook', name: 'Outlook', connected: false },
+  { id: 'weather', name: 'Weather', connected: false },
   { id: 'dropbox', name: 'Dropbox', connected: false },
+  { id: 'ticktick', name: 'TickTick', connected: false },
+  { id: 'whatsapp', name: 'WhatsApp', connected: false },
+  { id: 'imessage', name: 'iMessage', connected: false },
+  { id: 'granola', name: 'Granola', connected: false },
+  { id: 'newsrss', name: 'News RSS', connected: false },
 ];
 
-const MOCK_SKILLS: JarvisSkill[] = [
-  { id: 'arxiv', name: 'ArXiv', description: 'Search academic papers', source: 'hermes:arxiv' },
-  { id: 'weather', name: 'Weather', description: 'Real-time weather data', source: 'hermes:weather' },
-  { id: 'news', name: 'News Digest', description: 'Top news summary', source: 'hermes:news' },
+const MOCK_CHANNELS = [
+  'Discord', 'Telegram', 'Slack', 'WhatsApp', 'Gmail',
+  'Signal', 'Matrix', 'Mattermost', 'IRC', 'Reddit',
+  'LINE', 'Webhook', 'Webchat', 'Zulip',
 ];
 
-const MOCK_TELEMETRY: JarvisTelemetry = {
+const MOCK_FEED: FeedItem[] = [
+  { id: '1', ts: Date.now() - 60000, agent: 'simple',        prompt: 'Summarise my emails', latency_ms: 312, tokens: 450, cost_usd: 0 },
+  { id: '2', ts: Date.now() - 180000, agent: 'deep_research', prompt: 'Research AI safety trends', latency_ms: 4200, tokens: 3200, cost_usd: 0.0003 },
+  { id: '3', ts: Date.now() - 600000, agent: 'morning_digest', prompt: 'Morning briefing', latency_ms: 890, tokens: 820, cost_usd: 0 },
+];
+
+export const MOCK_TELEMETRY: JarvisTelemetry = {
   queries: [],
   energy_wh: 0,
   cost_usd: 0,
@@ -118,6 +139,8 @@ const MOCK_TELEMETRY: JarvisTelemetry = {
   total_queries: 0,
   memory_chunks: 0,
 };
+
+export { MOCK_CHANNELS };
 
 // ── API functions ──────────────────────────────────────────
 export async function getHealth(): Promise<JarvisHealth> {
@@ -137,44 +160,40 @@ export async function getConnectors(): Promise<JarvisConnector[]> {
 }
 
 export async function getSkills(): Promise<JarvisSkill[]> {
-  return safeFetch<JarvisSkill[]>(`${BASE}/skills`, undefined, MOCK_SKILLS);
+  return safeFetch<JarvisSkill[]>(`${BASE}/skills`, undefined, []);
 }
 
 export async function getCurrentMode(): Promise<{ name: string }> {
-  return safeFetch<{ name: string }>(`${BASE}/modes/current`, undefined, { name: 'work' });
+  return safeFetch<{ name: string }>(`${BASE}/modes/current`, undefined, { name: 'WORK' });
 }
 
-export async function askJarvis(
-  prompt: string,
-  agent?: string,
-  tools?: string[],
-): Promise<AskResponse> {
+export async function getAgentFeed(): Promise<FeedItem[]> {
+  return safeFetch<FeedItem[]>(`${BASE}/feed`, undefined, MOCK_FEED);
+}
+
+export async function askJarvis(prompt: string, agent?: string): Promise<AskResponse> {
   return safeFetch<AskResponse>(
     `${BASE}/ask`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, agent, tools }),
+      body: JSON.stringify({ prompt, agent }),
     },
     {
-      content: `[offline] "${prompt}"\n\nConnect a Jarvis backend — set ANTHROPIC_API_KEY or OPENAI_API_KEY, then restart.`,
+      content: `JARVIS OFFLINE — Configure engine in Settings.\n\nYour query: "${prompt}"`,
       tool_results: [],
-      model: 'demo',
-      latency_ms: 0,
-      tokens: 0,
-      cost_usd: 0,
-      energy_wh: 0,
+      model: 'offline',
     },
   );
 }
 
-export async function searchMemory(q: string): Promise<{ content: string; source: string; score: number; chunk_id?: string; ts?: string }[]> {
-  return safeFetch(
+export async function searchMemory(q: string) {
+  return safeFetch<{ content: string; source: string; score: number; chunk_id?: string; ts?: string }[]>(
     `${BASE}/memory/search?q=${encodeURIComponent(q)}`,
     undefined,
     [
-      { content: `Demo memory result for "${q}"`, source: '/demo/path.txt', score: 0.92, chunk_id: 'c001', ts: new Date().toISOString() },
-      { content: 'Another cached fact from your knowledge base.', source: '/demo/notes.md', score: 0.78, chunk_id: 'c002', ts: new Date().toISOString() },
+      { content: `Demo result for "${q}"`, source: '/demo/sample.txt', score: 0.91, chunk_id: 'c001', ts: new Date().toISOString() },
+      { content: 'Another knowledge base fragment.', source: '/demo/notes.md', score: 0.74, chunk_id: 'c002', ts: new Date().toISOString() },
     ],
   );
 }
@@ -182,11 +201,7 @@ export async function searchMemory(q: string): Promise<{ content: string; source
 export async function indexMemoryPath(path: string): Promise<{ ok: boolean; chunks?: number }> {
   return safeFetch(
     `${BASE}/memory/index`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path }),
-    },
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) },
     { ok: true, chunks: 42 },
   );
 }
@@ -194,11 +209,7 @@ export async function indexMemoryPath(path: string): Promise<{ ok: boolean; chun
 export async function installSkill(source: string): Promise<{ ok: boolean }> {
   return safeFetch(
     `${BASE}/skills/install`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source }),
-    },
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source }) },
     { ok: true },
   );
 }
@@ -206,19 +217,11 @@ export async function installSkill(source: string): Promise<{ ok: boolean }> {
 export async function runResearch(query: string, opts?: { max_iterations?: number; web_search?: boolean }): Promise<AskResponse> {
   return safeFetch(
     `${BASE}/research`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, ...opts }) },
     {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, ...opts }),
-    },
-    {
-      content: `## Research: ${query}\n\nThis is demo research output. Connect a Jarvis backend with an API key to run real deep-research queries.\n\n### Key findings\n- Query received.\n- No live backend connected.\n- Install Ollama or set an API key to proceed.`,
+      content: `## RESEARCH INITIATED: ${query}\n\nJARVIS is offline. Connect a backend with API keys to run deep research.\n\n### Status\n- Engine: OFFLINE\n- Reason: No backend connected\n- Action: Configure engine in Settings`,
       tool_results: [],
-      model: 'demo',
-      latency_ms: 0,
-      tokens: 0,
-      cost_usd: 0,
-      energy_wh: 0,
+      model: 'offline',
     },
   );
 }
@@ -232,64 +235,40 @@ export interface StreamDonePayload {
   energy_wh?: number;
 }
 
-type WsCleanup = () => void;
-
 export function streamChat(
   prompt: string,
   agent: string,
-  onToken: (token: string) => void,
-  onDone: (payload: StreamDonePayload) => void,
-): WsCleanup {
-  const origin = window.location.origin.replace(/^http/, 'ws');
-  const wsBase = `${origin}/api`;
-
+  onToken: (t: string) => void,
+  onDone: (p: StreamDonePayload) => void,
+): () => void {
+  const wsBase = window.location.origin.replace(/^http/, 'ws') + '/api';
   let ws: WebSocket | null = null;
   let closed = false;
 
-  const fallback = (reason?: string) => {
+  const fallback = () => {
     if (closed) return;
     closed = true;
-    const txt = `[offline — ${reason ?? 'no backend'}] You asked: "${prompt}"\n\nConfigure a Jarvis backend to get real responses.`;
+    const txt = `JARVIS OFFLINE — RUN \`jarvis serve\` OR SET API KEYS\n\nYour query: "${prompt}"\n\nConfigure your engine in the Settings panel.`;
     let i = 0;
     const id = setInterval(() => {
-      if (i < txt.length) onToken(txt[i++]);
-      else { clearInterval(id); onDone({ model: 'demo', latency_ms: 0, tokens: txt.length, cost_usd: 0, energy_wh: 0 }); }
-    }, 14);
+      if (i < txt.length) { onToken(txt[i++]); }
+      else { clearInterval(id); onDone({ model: 'offline', latency_ms: 0, tokens: txt.length, cost_usd: 0 }); }
+    }, 12);
     return () => clearInterval(id);
   };
 
   try {
     ws = new WebSocket(`${wsBase}/ws/chat`);
-
-    ws.onopen = () => {
-      if (!closed && ws) ws.send(JSON.stringify({ prompt, agent }));
-    };
-
+    ws.onopen = () => { if (!closed && ws) ws.send(JSON.stringify({ prompt, agent })); };
     ws.onmessage = (e) => {
       try {
         const d = JSON.parse(e.data as string) as Record<string, unknown>;
         if (d.token) onToken(d.token as string);
-        if (d.done) {
-          onDone({
-            model: (d.model as string) ?? null,
-            latency_ms: d.latency_ms as number | undefined,
-            tokens: d.tokens as number | undefined,
-            cost_usd: d.cost_usd as number | undefined,
-            energy_wh: d.energy_wh as number | undefined,
-          });
-          ws?.close();
-        }
-      } catch { /* ignore parse errors */ }
+        if (d.done) { onDone({ model: d.model as string | null, latency_ms: d.latency_ms as number, tokens: d.tokens as number, cost_usd: d.cost_usd as number, energy_wh: d.energy_wh as number }); ws?.close(); }
+      } catch { /* ignore */ }
     };
+    ws.onerror = () => fallback();
+  } catch { fallback(); }
 
-    ws.onerror = () => fallback('WS error');
-    ws.onclose = () => { /* handled by onDone */ };
-  } catch {
-    fallback('WS unavailable');
-  }
-
-  return () => {
-    closed = true;
-    ws?.close();
-  };
+  return () => { closed = true; ws?.close(); };
 }

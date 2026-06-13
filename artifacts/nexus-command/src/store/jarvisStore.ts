@@ -1,14 +1,15 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export type AgentType =
-  | 'simple'
-  | 'orchestrator'
-  | 'deep_research'
-  | 'morning_digest'
-  | 'code_assistant'
-  | 'channel_agent'
-  | 'proactive_agent'
-  | 'operative';
+  | 'simple' | 'orchestrator' | 'deep_research'
+  | 'morning_digest' | 'code_assistant'
+  | 'channel_agent' | 'proactive_agent' | 'operative';
+
+export type TabId =
+  | 'overview' | 'agents' | 'research' | 'memory'
+  | 'comms' | 'analytics' | 'security' | 'vault'
+  | 'skills' | 'settings';
 
 export interface ChatMessage {
   id: string;
@@ -23,13 +24,6 @@ export interface ChatMessage {
   energyWh?: number;
 }
 
-export interface ChatSession {
-  id: string;
-  messages: ChatMessage[];
-  agentType: AgentType;
-  createdAt: number;
-}
-
 export interface AgentEvent {
   id: string;
   prompt: string;
@@ -38,87 +32,94 @@ export interface AgentEvent {
   agent: string;
   ts: number;
   durationMs?: number;
+  tokens?: number;
+  costUsd?: number;
 }
 
-export type ModuleId =
-  | 'dashboard' | 'chat' | 'inbox' | 'projects' | 'approvals' | 'calendar'
-  | 'research' | 'memory' | 'knowledge' | 'analytics'
-  | 'automations' | 'agents' | 'skills' | 'security' | 'vault'
-  | 'communications' | 'marketplace' | 'settings';
+export interface PanelLayout {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  maxW?: number;
+  minH?: number;
+  maxH?: number;
+}
 
 interface JarvisStore {
-  activeModule: ModuleId;
-  railExpanded: boolean;
-  commandPaletteOpen: boolean;
+  activeTab: TabId;
+  chatOpen: boolean;
+  chatMessages: ChatMessage[];
   isStreaming: boolean;
   selectedAgent: AgentType;
-  chatSessions: ChatSession[];
-  activeSessionId: string;
   agentHistory: AgentEvent[];
+  panelLayouts: Record<string, PanelLayout[]>;
+  commandPaletteOpen: boolean;
+  scanLinesEnabled: boolean;
+  cornerBracketsEnabled: boolean;
+  tickerSpeed: number;
 
-  setActiveModule: (m: ModuleId) => void;
-  setRailExpanded: (v: boolean) => void;
-  setCommandPaletteOpen: (v: boolean) => void;
+  setActiveTab: (t: TabId) => void;
+  setChatOpen: (v: boolean) => void;
   setStreaming: (v: boolean) => void;
   setSelectedAgent: (a: AgentType) => void;
-  newSession: (agentType?: AgentType) => string;
-  setActiveSession: (id: string) => void;
-  appendMessage: (sessionId: string, msg: ChatMessage) => void;
-  updateLastMessage: (sessionId: string, patch: Partial<ChatMessage>) => void;
+  appendMessage: (msg: ChatMessage) => void;
+  updateLastMessage: (patch: Partial<ChatMessage>) => void;
+  clearChat: () => void;
   pushAgentEvent: (e: AgentEvent) => void;
+  setPanelLayout: (tab: string, layout: PanelLayout[]) => void;
+  setCommandPaletteOpen: (v: boolean) => void;
+  setScanLines: (v: boolean) => void;
+  setCornerBrackets: (v: boolean) => void;
+  setTickerSpeed: (v: number) => void;
 }
 
-const newSession = (agentType: AgentType = 'simple'): ChatSession => ({
-  id: crypto.randomUUID(),
-  messages: [],
-  agentType,
-  createdAt: Date.now(),
-});
+export const useJarvisStore = create<JarvisStore>()(
+  persist(
+    (set) => ({
+      activeTab: 'overview',
+      chatOpen: false,
+      chatMessages: [],
+      isStreaming: false,
+      selectedAgent: 'simple',
+      agentHistory: [],
+      panelLayouts: {},
+      commandPaletteOpen: false,
+      scanLinesEnabled: true,
+      cornerBracketsEnabled: true,
+      tickerSpeed: 60,
 
-const defaultSession = newSession();
-
-export const useJarvisStore = create<JarvisStore>((set, get) => ({
-  activeModule: 'dashboard',
-  railExpanded: true,
-  commandPaletteOpen: false,
-  isStreaming: false,
-  selectedAgent: 'simple',
-  chatSessions: [defaultSession],
-  activeSessionId: defaultSession.id,
-  agentHistory: [],
-
-  setActiveModule: (m) => set({ activeModule: m }),
-  setRailExpanded: (v) => set({ railExpanded: v }),
-  setCommandPaletteOpen: (v) => set({ commandPaletteOpen: v }),
-  setStreaming: (v) => set({ isStreaming: v }),
-  setSelectedAgent: (a) => set({ selectedAgent: a }),
-
-  newSession: (agentType = 'simple') => {
-    const s = newSession(agentType);
-    set(st => ({ chatSessions: [...st.chatSessions, s], activeSessionId: s.id }));
-    return s.id;
-  },
-
-  setActiveSession: (id) => set({ activeSessionId: id }),
-
-  appendMessage: (sessionId, msg) =>
-    set(st => ({
-      chatSessions: st.chatSessions.map(s =>
-        s.id === sessionId ? { ...s, messages: [...s.messages, msg] } : s
-      ),
-    })),
-
-  updateLastMessage: (sessionId, patch) =>
-    set(st => ({
-      chatSessions: st.chatSessions.map(s => {
-        if (s.id !== sessionId) return s;
-        const msgs = [...s.messages];
+      setActiveTab:          (t)      => set({ activeTab: t }),
+      setChatOpen:           (v)      => set({ chatOpen: v }),
+      setStreaming:          (v)      => set({ isStreaming: v }),
+      setSelectedAgent:      (a)      => set({ selectedAgent: a }),
+      appendMessage:         (msg)    => set(s => ({ chatMessages: [...s.chatMessages, msg] })),
+      updateLastMessage:     (patch)  => set(s => {
+        const msgs = [...s.chatMessages];
         const last = msgs[msgs.length - 1];
         if (last) msgs[msgs.length - 1] = { ...last, ...patch };
-        return { ...s, messages: msgs };
+        return { chatMessages: msgs };
       }),
-    })),
-
-  pushAgentEvent: (e) =>
-    set(st => ({ agentHistory: [e, ...st.agentHistory].slice(0, 50) })),
-}));
+      clearChat:             ()       => set({ chatMessages: [] }),
+      pushAgentEvent:        (e)      => set(s => ({ agentHistory: [e, ...s.agentHistory].slice(0, 50) })),
+      setPanelLayout:        (tab, l) => set(s => ({ panelLayouts: { ...s.panelLayouts, [tab]: l } })),
+      setCommandPaletteOpen: (v)      => set({ commandPaletteOpen: v }),
+      setScanLines:          (v)      => set({ scanLinesEnabled: v }),
+      setCornerBrackets:     (v)      => set({ cornerBracketsEnabled: v }),
+      setTickerSpeed:        (v)      => set({ tickerSpeed: v }),
+    }),
+    {
+      name: 'jarvis-ui',
+      partialize: (s) => ({
+        activeTab: s.activeTab,
+        panelLayouts: s.panelLayouts,
+        scanLinesEnabled: s.scanLinesEnabled,
+        cornerBracketsEnabled: s.cornerBracketsEnabled,
+        tickerSpeed: s.tickerSpeed,
+        selectedAgent: s.selectedAgent,
+      }),
+    }
+  )
+);

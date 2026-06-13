@@ -1,21 +1,10 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+import React from 'react';
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardContent className="pt-6">
-          <div className="flex mb-4 gap-2">
-            <AlertCircle className="h-8 w-8 text-red-500" />
-            <h1 className="text-2xl font-bold text-gray-900">404 Page Not Found</h1>
-          </div>
-
-          <p className="mt-4 text-sm text-gray-600">
-            Did you forget to add the page to the router?
-          </p>
-        </CardContent>
-      </Card>
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:20 }}>
+      <div style={{ fontFamily:'var(--j-font-head)', fontSize:48, color:'var(--j-red)', letterSpacing:'0.1em', textShadow:'0 0 20px rgba(192,21,42,0.5)' }}>404</div>
+      <div style={{ fontFamily:'var(--j-font-mono)', fontSize:13, color:'var(--j-text-muted)', letterSpacing:'0.15em' }}>MODULE NOT FOUND</div>
     </div>
   );
 }

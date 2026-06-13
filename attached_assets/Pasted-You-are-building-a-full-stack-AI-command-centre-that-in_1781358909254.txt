@@ -1,0 +1,704 @@
+You are building a full-stack AI command centre that integrates OpenJarvis
+(https://github.com/open-jarvis/OpenJarvis) as its AI backbone. The entire
+UI must be built to look and feel exactly like JARVIS from Iron Man 2:
+a multi-monitor, multi-panel holographic dark OS with glowing data panels,
+animated circular HUD elements, red accent headers, cyan orbital rings,
+and a live news ticker at the bottom.
+
+═══════════════════════════════════════════════════════
+VISUAL IDENTITY — READ THIS FIRST
+═══════════════════════════════════════════════════════
+
+Reference: Iron Man 2 (2010) — Tony Stark's JARVIS interface
+
+Mandatory visual rules:
+  - Deep space black backgrounds: #000408 base, #020c14 panels
+  - Primary accent: cyan/teal #00d4ff for borders, rings, scan lines
+  - Alert/data accent: crimson red #c0152a for panel headers and warnings
+  - Secondary data: electric blue #1a4a7a for mid-tones and inactive rings
+  - Text: #b8d4e8 primary, #5a8ab0 secondary/muted, #ffffff for key values
+  - Gold/amber #c9a84c for selected states and highlights
+  - All panels have a glowing cyan border: box-shadow 0 0 8px rgba(0,212,255,0.4)
+  - Panel headers: dark red bar (#8b0000 to #c0152a gradient) with white
+    uppercase text, small badge reading "CLASSIFIED" or module type
+  - Thin scan-line overlay on the whole UI:
+      repeating-linear-gradient(transparent 0px, transparent 3px,
+      rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px)
+  - Subtle vignette on outer edges of the viewport
+  - All fonts: "Rajdhani", "Orbitron" (for headings), "Share Tech Mono"
+    (for data values) — import all three from Google Fonts
+  - Uppercase text for all labels, panel titles, and nav items
+  - Numeric data always in Share Tech Mono
+  - Corner brackets on panels: CSS ::before ::after with cyan L-shaped borders
+  - Animated elements: rotating rings, pulsing dots, scrolling data streams
+  - HUD circular elements on Dashboard: CSS/canvas orbital rings with tick marks
+
+═══════════════════════════════════════════════════════
+BACKEND  (/backend)
+═══════════════════════════════════════════════════════
+
+FastAPI bridging OpenJarvis. Endpoints:
+
+  POST /api/ask
+    Body: { prompt, agent?, tools? }
+    Response: { content, tool_results, model, latency_ms, tokens, cost_usd }
+
+  GET  /api/agents
+    → ["simple","orchestrator","deep_research","morning_digest",
+       "code_assistant","channel_agent","proactive_agent","operative"]
+
+  GET  /api/health
+    → { status, engine, model, uptime, gpu, vram_gb, tokens_per_sec,
+        watt_per_query, total_queries, total_cost_usd, avg_latency_ms }
+
+  GET  /api/memory/search?q=
+  POST /api/memory/index   { path }
+  GET  /api/connectors     → [{ id, name, connected, last_sync }]
+  POST /api/connectors/connect  { connector }
+  POST /api/research       { query }
+  GET  /api/mode           → { name }
+  GET  /api/skills
+  POST /api/skills/install { source }
+  GET  /api/telemetry      → { queries, energy_wh, cost_usd, avg_latency_ms,
+                               by_agent: Record<string,AgentStats> }
+  GET  /api/feed           → last 20 agent events for ticker
+  WebSocket /ws/chat       → { token } chunks then
+                             { done, model, latency_ms, tokens, cost_usd }
+
+  CORS: allow all origins in dev
+
+requirements.txt:
+  fastapi, uvicorn[standard],
+  git+https://github.com/open-jarvis/OpenJarvis.git,
+  python-dotenv, websockets
+
+.env.example:
+  ANTHROPIC_API_KEY=
+  OPENAI_API_KEY=
+  JARVIS_ENGINE=ollama
+  JARVIS_MODEL=llama3.2
+
+═══════════════════════════════════════════════════════
+FRONTEND — GLOBAL SHELL  (/frontend)
+═══════════════════════════════════════════════════════
+
+Complete rewrite. Three layers:
+
+  Layer 1 (z-index 0):  Full-viewport background effects
+  Layer 2 (z-index 10): Content panels grid
+  Layer 3 (z-index 50): Top bar + bottom ticker
+
+──────────────────────────────────────────────────────
+BACKGROUND LAYER
+──────────────────────────────────────────────────────
+
+Full viewport, position fixed, pointer-events none:
+
+  1. Base: background #000408
+  2. Radial vignette:
+       radial-gradient(ellipse at 50% 50%,
+         transparent 40%, rgba(0,0,0,0.7) 100%)
+  3. Scan lines:
+       repeating-linear-gradient(
+         0deg, transparent 0px, transparent 3px,
+         rgba(0,180,220,0.03) 3px, rgba(0,180,220,0.03) 4px)
+  4. Animated vertical scan sweep:
+       A single 2px wide vertical line, rgba(0,212,255,0.08),
+       animating left to right across the full viewport over 8s,
+       repeating infinitely (CSS keyframe on translateX)
+  5. Grid overlay:
+       linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+       linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px)
+       background-size: 48px 48px
+
+──────────────────────────────────────────────────────
+TOP BAR  (src/components/TopBar.tsx)
+──────────────────────────────────────────────────────
+
+Height: 44px
+Background: rgba(0,4,8,0.95)
+Border-bottom: 1px solid rgba(0,212,255,0.3)
+Box-shadow: 0 2px 20px rgba(0,212,255,0.15)
+
+Left section:
+  - Three-dot status indicator (pulsing cyan circles, small)
+  - "J.A.R.V.I.S" in Orbitron, 16px, #00d4ff, letter-spacing 0.3em
+  - Divider pipe
+  - Current mode badge (e.g. "WORK MODE") in Share Tech Mono 11px,
+    background rgba(0,212,255,0.1), border 1px solid rgba(0,212,255,0.3),
+    color #00d4ff, padding 2px 10px, border-radius 2px
+
+Center section (navigation tabs — like the film's AP PRESS / JARVIS tabs):
+  Tab bar with these tabs:
+    OVERVIEW | AGENTS | RESEARCH | MEMORY | COMMS | ANALYTICS |
+    SECURITY | VAULT | SETTINGS
+  Each tab:
+    - Inactive: color #5a8ab0, border-bottom 2px solid transparent
+    - Active: color #00d4ff, border-bottom 2px solid #00d4ff,
+              background rgba(0,212,255,0.06)
+    - Hover: color #b8d4e8, background rgba(0,212,255,0.04)
+    - Font: Rajdhani 13px 600 uppercase letter-spacing 0.15em
+    - No rounded corners — flat rectangular tabs
+
+Right section:
+  - System clock: Share Tech Mono 13px #00d4ff — "MON 02:09" format
+    updates every second with live time
+  - Divider
+  - Engine status: "● OLLAMA · LLAMA3.2" — dot is green if online, red if not
+    Share Tech Mono 11px #5a8ab0
+  - Notification bell icon with red count badge
+  - Settings gear icon
+
+──────────────────────────────────────────────────────
+BOTTOM TICKER  (src/components/NewsTicker.tsx)
+──────────────────────────────────────────────────────
+
+Height: 32px
+Background: rgba(0,4,8,0.98)
+Border-top: 1px solid rgba(192,21,42,0.6)
+Position: fixed, bottom 0, full width, z-index 50
+
+Left badge:
+  "JARVIS FEED" — background #8b0000, color white,
+  Rajdhani 11px 700 uppercase, padding 0 12px, height 100%,
+  border-right 1px solid rgba(192,21,42,0.6)
+
+Scrolling content:
+  Continuous right-to-left marquee of agent activity events
+  Feed format: "◈ [TIMESTAMP]  [AGENT TYPE]  →  [PROMPT SUMMARY]  |  ⚡ [LATENCY]ms  ·  [TOKENS] tok  ·  $[COST]"
+  Separator between items: "  ///  "
+  Color: #b8d4e8, Share Tech Mono 11px
+  Highlight keywords in cyan
+
+Animation: CSS infinite marquee, 60s duration, linear
+Data source: useJarvisAgentFeed() hook polling /api/feed every 30s
+Default content when offline: mock status messages like the film
+
+──────────────────────────────────────────────────────
+MAIN CONTENT — PANEL GRID SYSTEM
+──────────────────────────────────────────────────────
+
+Between top bar (44px) and ticker (32px).
+The layout uses a CSS grid of draggable, resizable panels.
+Use react-grid-layout for drag/resize.
+
+Default panel grid (configurable per page):
+  Dashboard: 3-column, 2-row layout
+  Other pages: defined per page below
+
+Panel component  (src/components/Panel.tsx):
+  Each panel is a draggable, resizable container with:
+
+  Outer wrapper:
+    background: rgba(2,12,20,0.92)
+    border: 1px solid rgba(0,212,255,0.25)
+    box-shadow: 0 0 12px rgba(0,212,255,0.12), inset 0 0 40px rgba(0,0,0,0.4)
+    border-radius: 0  ← sharp corners only, no radius
+    position: relative
+
+  Corner brackets (CSS only, no extra HTML):
+    ::before — top-left corner: 2px cyan L-bracket (12px × 12px)
+    ::after  — bottom-right corner: 2px cyan L-bracket (12px × 12px)
+    Both positioned absolute, color #00d4ff
+
+  Panel header bar:
+    Height: 30px
+    Background: linear-gradient(90deg, #6b0000 0%, #3d0000 60%, transparent 100%)
+    Border-bottom: 1px solid rgba(192,21,42,0.5)
+    Padding: 0 12px
+    Display: flex, align-items center, justify-content space-between
+
+    Left: panel title in Rajdhani 12px 700 uppercase #ffffff letter-spacing 0.2em
+          + small icon (lucide, 14px, #c0152a)
+    Right: "CLASSIFIED" badge — background rgba(192,21,42,0.3),
+           border 1px solid rgba(192,21,42,0.5), color #c0152a,
+           Share Tech Mono 9px, padding 1px 6px
+           + minimize / close buttons (small, subtle)
+
+  Panel body:
+    Padding: 12px
+    Overflow: hidden (per panel)
+
+  Resize handle: subtle cyan dot pattern on bottom-right corner
+
+User can customize panels:
+  - Right-click panel header → context menu:
+      "Change Module" (opens module picker modal)
+      "Resize to..."  (S / M / L / Full presets)
+      "Remove Panel"
+      "Duplicate Panel"
+  - Drag panel header to reorder
+  - Layout is saved to localStorage per page
+
+"Add Panel" button:
+  Fixed position bottom-right (above ticker), cyan + icon
+  Opens module picker modal:
+    Grid of all available modules, each as an icon tile
+    Click to add panel to current layout
+
+──────────────────────────────────────────────────────
+COMMAND PALETTE  (src/components/CommandPalette.tsx)
+──────────────────────────────────────────────────────
+
+Triggered by ⌘K.
+Centered overlay, 600px wide, JARVIS-styled:
+  Background: rgba(0,4,12,0.97)
+  Border: 1px solid rgba(0,212,255,0.4)
+  Box-shadow: 0 0 40px rgba(0,212,255,0.2), 0 24px 60px rgba(0,0,0,0.8)
+  No border-radius
+
+Input:
+  Orbitron 14px, #00d4ff, background transparent
+  Border-bottom: 1px solid rgba(0,212,255,0.3)
+  Placeholder: "QUERY JARVIS..."
+  Cursor: blinking block ▌ in cyan
+
+Results:
+  Same red-header-bar pattern as panels
+  Group labels: "RECENT QUERIES" / "MODULES" / "AGENTS" / "ACTIONS"
+  Each result: cyan arrow → + text in Rajdhani
+
+Agent selector pills at bottom:
+  SIMPLE | ORCHESTRATOR | RESEARCH | CODE | MORNING DIGEST
+  Active: background #c0152a, color white
+  Inactive: transparent, border rgba(0,212,255,0.2)
+
+──────────────────────────────────────────────────────
+OVERVIEW PAGE (Dashboard)
+──────────────────────────────────────────────────────
+
+Default layout — 4 panels:
+
+Panel 1 (top-left, 2/3 width): "SYSTEM STATUS"
+  HUD circular display — canvas element:
+    Outer ring: slowly rotating, tick marks every 5°, cyan
+    Middle ring: counter-rotating, segmented by agent type, colored arcs
+    Inner ring: pulsing based on current tokens/s
+    Center: large number (total queries today), "QUERIES" label below
+    4 radial stat labels at N/E/S/W positions:
+      N: current tokens/s
+      E: avg latency ms
+      S: engine name
+      W: uptime
+
+  Below HUD — 4 metric tiles in a row:
+    Each tile: red header bar + value in Share Tech Mono 20px white
+    TOTAL QUERIES | AVG LATENCY | TOTAL COST | ENERGY (Wh)
+
+Panel 2 (top-right, 1/3 width): "AGENT ACTIVITY"
+  Scrollable list of last 15 agentHistory events
+  Each row:
+    [timestamp Share Tech Mono 10px #5a8ab0] 
+    [agent badge — small red pill]
+    [prompt truncated 50 chars #b8d4e8 Rajdhani 12px]
+  Alternating row backgrounds: transparent / rgba(0,212,255,0.03)
+  Auto-scrolls to bottom, new events animate in from right
+
+Panel 3 (bottom-left, 1/3 width): "CONNECTED SOURCES"
+  Grid of connector tiles (3 columns):
+    Each tile: icon + name + status dot
+    Connected: cyan dot + "ONLINE" in #3fb950 Share Tech Mono 9px
+    Disconnected: gray dot + "OFFLINE" #5a8ab0
+    Tile background: rgba(0,212,255,0.04), border rgba(0,212,255,0.1)
+
+Panel 4 (bottom-right, 2/3 width): "QUICK ACTIONS"
+  4 large action buttons stacked:
+    [▶ MORNING DIGEST]    → askJarvis agent="morning_digest"
+    [▶ DEEP RESEARCH]     → navigate to Research tab
+    [▶ INDEX MEMORY]      → open memory index dialog
+    [▶ RUN DIAGNOSTICS]   → call /api/health inline
+  Each button:
+    Height 44px, full width
+    Background rgba(0,212,255,0.05)
+    Border: 1px solid rgba(0,212,255,0.2)
+    Left border: 3px solid #00d4ff
+    Hover: background rgba(0,212,255,0.12), left border color #c0152a
+    Text: Rajdhani 13px 600 uppercase #00d4ff
+    Icon: lucide 16px left-aligned
+
+──────────────────────────────────────────────────────
+CHAT / ASK JARVIS  (accessible from any panel)
+──────────────────────────────────────────────────────
+
+When user opens the command palette and hits Enter on a typed query,
+or clicks "Ask Jarvis" from any panel, a CHAT PANEL slides up from
+the bottom-center:
+
+  Width: 560px, positioned center-bottom (above ticker)
+  Max-height: 60vh
+  Background, border, corner-brackets: same panel aesthetic
+  Header: "JARVIS INTERFACE" in red header bar
+          + agent selector pills on the right of the header
+
+  Messages area (scrollable):
+    User message: right-aligned, background rgba(192,21,42,0.15),
+                  border 1px solid rgba(192,21,42,0.3), Rajdhani 13px
+    JARVIS message: left-aligned, left border 2px solid #00d4ff,
+                    background transparent, Rajdhani 13px #b8d4e8
+    Streaming: cyan block cursor ▌ blinking after last char
+    Message footer: Share Tech Mono 10px #5a8ab0 —
+      model · latency · tokens · cost · energy
+
+  Input row:
+    Background rgba(0,4,8,0.9), border-top 1px solid rgba(0,212,255,0.2)
+    Input: Rajdhani 13px #b8d4e8, placeholder "QUERY JARVIS..."
+    Send button: "TRANSMIT ▶" — red header style button
+
+──────────────────────────────────────────────────────
+AGENTS PAGE
+──────────────────────────────────────────────────────
+
+Default layout — 2 panels:
+
+Panel 1 (left 40%): "AGENT REGISTRY"
+  List of all 8 agent types, each as a row:
+    [icon 20px cyan] [agent name Orbitron 13px] [type badge]
+    [description Rajdhani 12px #5a8ab0 below]
+    [LAUNCH ▶] button right-aligned — opens chat panel with that agent
+
+  Agent descriptions:
+    simple          → "Single-turn reasoning with tool use"
+    orchestrator    → "Multi-step planning and task delegation"
+    deep_research   → "Extended research with web retrieval"
+    morning_digest  → "Overnight summary and briefing"
+    code_assistant  → "Code review, generation, debugging"
+    channel_agent   → "Messaging channel monitor and responder"
+    proactive_agent → "Background monitor with scheduled alerts"
+    operative       → "Autonomous multi-tool task execution"
+
+Panel 2 (right 60%): "AGENT TELEMETRY"
+  Bar chart (recharts): queries per agent type, last 7 days
+    Bar color: gradient from #c0152a (0%) to #00d4ff (100%)
+    Background: transparent, grid lines rgba(0,212,255,0.1)
+    Axes: Share Tech Mono 10px #5a8ab0
+  Below: table of agent stats
+    Agent | Queries | Avg Latency | Avg Tokens | Total Cost
+    Styled as data table with red header row
+
+──────────────────────────────────────────────────────
+RESEARCH PAGE
+──────────────────────────────────────────────────────
+
+Default layout — 2 panels:
+
+Panel 1 (left 35%): "RESEARCH QUERY"
+  JARVIS-styled form:
+    Textarea: "RESEARCH QUERY" label above, full-width, dark bg,
+              cyan border, Rajdhani 13px, min-height 120px
+    Options (collapsible section with red header):
+      Max iterations: number input
+      Web search: toggle (cyan when active)
+      Save to memory: toggle
+    [▶ INITIATE RESEARCH] button:
+      Full width, 44px, background linear-gradient(90deg, #6b0000, #3d0000)
+      Color white, Rajdhani 14px 700 uppercase, border 1px solid #c0152a
+      Hover: border-color #00d4ff, color #00d4ff, glow effect
+
+Panel 2 (right 65%): "RESEARCH OUTPUT"
+  Header shows: current query (truncated) + agent badge "DEEP_RESEARCH"
+  Empty state: animated concentric cyan rings with "AWAITING QUERY" center
+  During stream:
+    Collapsible "TRACE LOG" sub-header (red bar, closed by default):
+      Each tool call: "→ [tool] : [result summary]" in Share Tech Mono 11px
+    Markdown rendered below, progressive
+    Animated scan line sweeping down as content arrives
+  After completion:
+    Full markdown (use marked.js)
+    Footer stats: model · latency · tokens · cost · energy in Share Tech Mono
+    Two buttons: [💾 ARCHIVE TO MEMORY] [📋 COPY REPORT]
+
+──────────────────────────────────────────────────────
+MEMORY PAGE
+──────────────────────────────────────────────────────
+
+Default layout — 2 panels:
+
+Panel 1 (top, full width): "MEMORY INDEX CONTROL"
+  Row: Path input + [▶ INDEX] button + progress bar
+  Stats row: Share Tech Mono — [N chunks] · [M sources] · [X MB] · [last indexed]
+
+Panel 2 (bottom, full width): "MEMORY RETRIEVAL"
+  Search input full-width, large, Orbitron placeholder "SEARCH INDEXED MEMORY..."
+  Results list:
+    Each result:
+      Top row: [source path in cyan mono] [relevance % right-aligned green]
+      Snippet: Rajdhani 13px #b8d4e8, 3 lines max
+      Relevance bar: thin cyan fill bar
+      Bottom: [chunk ID] [timestamp] in Share Tech Mono 10px #5a8ab0
+    Row border-bottom: 1px solid rgba(0,212,255,0.08)
+
+──────────────────────────────────────────────────────
+COMMS PAGE
+──────────────────────────────────────────────────────
+
+Default layout — 2 panels:
+
+Panel 1 (left 50%): "CHANNELS"
+  Section header "JARVIS CHANNEL NETWORK" red bar
+  Grid 3-col of channel tiles:
+    Each tile: icon + name + status indicator
+    Status: "ACTIVE" green / "STANDBY" amber / "OFFLINE" gray
+    Tile: background rgba(0,212,255,0.04), border rgba(0,212,255,0.12)
+    Hover: border-color rgba(0,212,255,0.4), subtle glow
+    [CONNECT] / [CONNECTED ✓] button below name
+  Channels: Discord, Telegram, Slack, WhatsApp, Gmail, Signal,
+    Matrix, Mattermost, IRC, Reddit, LINE, Webhook, Webchat, Zulip
+
+Panel 2 (right 50%): "DATA CONNECTORS"
+  Same tile layout as channels
+  Section header different color: use amber #c9a84c header bar instead
+  Connectors: Gmail, Google Calendar, Google Drive, Google Contacts,
+    Notion, Slack, Obsidian, GitHub, Spotify, Strava, Oura,
+    Apple Health, Apple Notes, HackerNews, News RSS, Outlook, Weather,
+    Granola, Dropbox, TickTick, WhatsApp, iMessage
+
+──────────────────────────────────────────────────────
+ANALYTICS PAGE
+──────────────────────────────────────────────────────
+
+Default layout — 3 panels:
+
+Panel 1 (top-left 50%): "QUERY VOLUME"
+  recharts AreaChart, 14-day rolling
+  Fill: rgba(0,212,255,0.15), stroke #00d4ff 1.5px
+  Background: transparent, gridlines rgba(0,212,255,0.08)
+  Axes: Share Tech Mono 10px #5a8ab0
+
+Panel 2 (top-right 50%): "LATENCY DISTRIBUTION"
+  recharts BarChart, buckets <100ms / 100-300ms / 300-1s / >1s
+  Bar colors: green / cyan / amber / red
+
+Panel 3 (bottom 100%): "AGENT PERFORMANCE MATRIX"
+  Full-width table:
+    Agent | Queries | Avg Latency | P95 Latency | Avg Tokens | Cost/Query | Total Cost
+  Red header row, alternating row bg, Share Tech Mono for numbers
+
+  Below table: two mini charts side-by-side
+    Cost over time (line) | Energy over time (line)
+    Both 180px height, same JARVIS dark styling
+
+──────────────────────────────────────────────────────
+SECURITY PAGE
+──────────────────────────────────────────────────────
+
+Default layout — 2 panels:
+
+Panel 1 (left 40%): "CREDENTIAL VAULT STATUS"
+  Table with red header: KEY | STATUS | ACTION
+  ANTHROPIC_API_KEY: ● SET / ✕ NOT SET + [REVOKE] stub
+  OPENAI_API_KEY:    ● SET / ✕ NOT SET
+  Each row: monospace, status colored green/red
+
+  Below: "GUARDRAILS" sub-panel (amber header bar):
+    Injection Scanner  → ACTIVE ●
+    Rate Limiter       → ACTIVE ● (N req/min)
+    File Policy        → ACTIVE ●
+    SSRF Protection    → ACTIVE ●
+    Audit Log          → ACTIVE ●
+
+Panel 2 (right 60%): "AUDIT LOG"
+  Red header: "SECURITY AUDIT LOG — LAST 24H"
+  Auto-scrolling table:
+    Timestamp | Agent | Action | Tokens | Status
+    Green badge for success, red for errors
+    New rows flash cyan on entry (CSS animation)
+
+──────────────────────────────────────────────────────
+VAULT PAGE
+──────────────────────────────────────────────────────
+
+Single panel full-width: "SECURE VAULT"
+  Center: large lock icon (lucide Lock, 64px, #c0152a)
+  Below: "ENCRYPTED LOCAL VAULT" in Orbitron 18px #00d4ff
+  Subtitle: "On-device secret storage · Coming in next release"
+  Env var list: show set keys only (names, never values)
+    Each: Share Tech Mono, cyan bullet, key name #b8d4e8
+
+──────────────────────────────────────────────────────
+SKILLS PAGE
+──────────────────────────────────────────────────────
+
+Default layout — 2 panels:
+
+Panel 1 (top, full width): "INSTALL SKILL"
+  Input: "SKILL SOURCE" placeholder "hermes:arxiv"
+  [▶ INSTALL] button (red style) + status indicator
+
+Panel 2 (bottom, full width): "INSTALLED SKILLS"
+  Table: Name | Source | Status | Installed | Actions
+  [REMOVE] button per row (red ghost style)
+  Empty state: "NO SKILLS INSTALLED — Use Hermes registry to extend JARVIS"
+
+──────────────────────────────────────────────────────
+SETTINGS PAGE
+──────────────────────────────────────────────────────
+
+Two panels side by side:
+
+Panel 1 (left 30%): "CONFIGURATION MENU"
+  Vertical nav list:
+    GENERAL | ENGINE | APPEARANCE | MEMORY | TELEMETRY | ADVANCED
+  Each item: Rajdhani 13px uppercase, left border 3px on active
+  Active: left-border #00d4ff, color #00d4ff
+  Inactive: color #5a8ab0
+
+Panel 2 (right 70%): "SETTINGS — [SECTION NAME]"
+  Renders the active settings section
+
+  Engine section:
+    ENGINE:   dropdown (ollama, vllm, sglang, llama.cpp, openai, anthropic)
+    MODEL:    text input
+    BASE URL: text input (e.g. http://localhost:11434)
+    [▶ TEST CONNECTION] → calls /api/health, shows result inline
+
+  Appearance section:
+    THEME: fixed dark (toggle disabled, label "JARVIS REQUIRES DARK MODE")
+    FONT SIZE: 12 / 13 / 14 radio options in Rajdhani
+    SCAN LINES: toggle — enables/disables scan-line overlay
+    PANEL CORNERS: toggle — corner bracket decorations on/off
+    TICKER SPEED: slider 30s–120s marquee duration
+
+  General, Memory, Telemetry, Advanced: standard form fields,
+    all JARVIS-styled (dark inputs, cyan focus ring, Rajdhani labels)
+
+──────────────────────────────────────────────────────
+STUB PAGES (Inbox, Projects, Calendar, Approvals, Marketplace, Knowledge)
+──────────────────────────────────────────────────────
+
+Each gets a single panel:
+  Header: module name + "CONNECTING TO JARVIS NETWORK..."
+  Animated radar circle (CSS, slowly rotating arc, cyan)
+  Below: "REQUIRED CONNECTORS:" list with [CONNECT] buttons
+  Below: 3 shimmer skeleton cards
+
+═══════════════════════════════════════════════════════
+CSS DESIGN TOKENS  (src/index.css)
+═══════════════════════════════════════════════════════
+
+Import from Google Fonts:
+  Orbitron:400,600,700
+  Rajdhani:400,500,600,700
+  Share+Tech+Mono
+
+CSS variables:
+  --j-bg:           #000408
+  --j-surface:      #020c14
+  --j-surface-alt:  #030f1c
+  --j-border:       rgba(0,212,255,0.25)
+  --j-border-dim:   rgba(0,212,255,0.12)
+  --j-cyan:         #00d4ff
+  --j-red:          #c0152a
+  --j-red-dark:     #8b0000
+  --j-amber:        #c9a84c
+  --j-green:        #3fb950
+  --j-text:         #b8d4e8
+  --j-text-muted:   #5a8ab0
+  --j-text-faint:   #2a4a6a
+
+Utility classes:
+  .j-panel          the panel style (border, bg, box-shadow, position relative)
+  .j-panel-header   the red gradient header bar
+  .j-panel-title    Rajdhani 12px 700 uppercase letter-spacing 0.2em white
+  .j-corner         ::before/::after corner bracket pseudo-elements
+  .j-badge-classified  small "CLASSIFIED" badge style
+  .j-badge-red      red pill badge
+  .j-badge-cyan     cyan pill badge
+  .j-badge-green    green pill badge
+  .j-badge-amber    amber pill badge
+  .j-btn-primary    red gradient button (TRANSMIT / INITIATE etc.)
+  .j-btn-ghost      transparent button with cyan border
+  .j-input          dark input, cyan focus border
+  .j-mono           Share Tech Mono font
+  .j-orbitron       Orbitron font
+  .j-rajdhani       Rajdhani font
+  .j-scan-overlay   the scan-line pseudo-element mixin
+  .j-glow           box-shadow: 0 0 12px rgba(0,212,255,0.4)
+  .j-glow-red       box-shadow: 0 0 12px rgba(192,21,42,0.4)
+  .j-shimmer        loading skeleton animation in JARVIS colors
+  .j-blink          blinking cursor animation (0.7s steps(1))
+  .scrollbar-jarvis custom scrollbar — thin, cyan thumb, dark track
+
+Keyframes:
+  @keyframes jarvis-scan    { 0%{transform:translateX(-100vw)} 100%{translateX(100vw)} }
+  @keyframes jarvis-spin    { 0%{transform:rotate(0deg)} 100%{rotate(360deg)} }
+  @keyframes jarvis-spin-r  { 0%{transform:rotate(360deg)} 100%{rotate(0deg)} }
+  @keyframes jarvis-pulse   { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  @keyframes jarvis-blink   { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+  @keyframes jarvis-shimmer { 0%{background-position:-400px 0} 100%{1000px 0} }
+  @keyframes jarvis-flicker { 0%,98%,100%{opacity:1} 99%{opacity:0.92} }
+  @keyframes jarvis-fadein  { from{opacity:0;transform:translateY(8px)} to{opacity:1;translateY(0)} }
+  @keyframes marquee        { 0%{transform:translateX(100%)} 100%{translateX(-100%)} }
+
+═══════════════════════════════════════════════════════
+PACKAGES
+═══════════════════════════════════════════════════════
+
+  zustand
+  marked
+  recharts
+  react-grid-layout     ← drag/resize panels
+  @tanstack/react-query (already present)
+  framer-motion         (use only for chat panel slide-up, 300ms)
+  lucide-react          (already present)
+
+Remove: all old nexus-* classes, BrainCanvas, orbital rings, CanvasLayout
+
+═══════════════════════════════════════════════════════
+STATE  (src/store/jarvisStore.ts)
+═══════════════════════════════════════════════════════
+
+Zustand:
+  activeTab: string
+  chatOpen: boolean
+  chatMessages: Message[]
+  isStreaming: boolean
+  selectedAgent: AgentType
+  agentHistory: AgentEvent[]   // last 50
+  panelLayouts: Record<string, Layout[]>  // react-grid-layout per tab
+  commandPaletteOpen: boolean
+  railExpanded: boolean
+  scanLinesEnabled: boolean
+  cornerBracketsEnabled: boolean
+  tickerSpeed: number
+
+═══════════════════════════════════════════════════════
+OFFLINE / FALLBACK
+═══════════════════════════════════════════════════════
+
+When backend unreachable:
+  - Status dot in top bar turns red, engine shows "OFFLINE"
+  - Ticker shows: "/// JARVIS OFFLINE — RUN `jarvis serve` OR SET API KEYS ///"
+  - Dashboard HUD center shows "STANDBY" instead of query count
+  - All stat tiles show "—" in Share Tech Mono
+  - Chat responds: "JARVIS OFFLINE — CONFIGURE ENGINE IN SETTINGS"
+  - Never crash, never show blank panels
+  - All panels still render with skeleton shimmer
+
+═══════════════════════════════════════════════════════
+REPLIT CONFIGURATION
+═══════════════════════════════════════════════════════
+
+.replit:
+  backend:  uvicorn main:app --host 0.0.0.0 --port 8000
+  frontend: vite --host 0.0.0.0
+  VITE_API_URL = Replit slug URL
+
+.env.example (frontend):
+  VITE_API_URL=http://localhost:8000
+
+═══════════════════════════════════════════════════════
+QUALITY REQUIREMENTS
+═══════════════════════════════════════════════════════
+
+- The UI must LOOK like Iron Man 2 JARVIS — dark, red headers, cyan accents,
+  monospace data, corner brackets, scan lines, rotating HUD rings
+- Every panel is drag/resizable and the layout persists to localStorage
+- Users can add, remove, move, and replace any panel on any tab
+- Zero TypeScript errors (strict mode)
+- Mobile (375px): single panel stacked scroll, tab bar wraps to 2 rows,
+  ticker still visible, no panel drag (static layout)
+- prefers-reduced-motion: disable scan sweep, slow all animations to 0
+- Every numeric value uses Share Tech Mono font
+- Efficiency metrics visible in ticker and dashboard at all times
+- The words "CLASSIFIED", "ONLINE", "STANDBY", "OFFLINE", "TRANSMIT",
+  "INITIATE", "ARCHIVE" are preferred over generic equivalents

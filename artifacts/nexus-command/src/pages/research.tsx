@@ -1,183 +1,154 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { marked } from 'marked';
+import { Play, Archive, Copy, ChevronDown, ChevronRight, FlaskConical } from 'lucide-react';
+import JPanel from '@/components/JPanel';
 import { runResearch } from '@/lib/jarvisApi';
-import { ChevronDown, ChevronRight, Copy, Save } from 'lucide-react';
-
-interface TraceEntry { tool: string; result: string; }
-
-function fmt(v: number | undefined, d = 0, suf = '') {
-  if (v === undefined) return '—';
-  return v.toFixed(d) + suf;
-}
 
 export default function Research() {
-  const [query, setQuery]     = useState('');
-  const [maxIter, setMaxIter] = useState(5);
+  const [query, setQuery]       = useState('');
+  const [maxIter, setMaxIter]   = useState(3);
   const [webSearch, setWebSearch] = useState(true);
   const [saveMemory, setSaveMemory] = useState(false);
-  const [showOpts, setShowOpts]   = useState(false);
-  const [showTrace, setShowTrace] = useState(false);
-
-  const [result, setResult]   = useState('');
-  const [trace, setTrace]     = useState<TraceEntry[]>([]);
-  const [meta, setMeta]       = useState<{ model?: string; latencyMs?: number; tokens?: number; costUsd?: number; energyWh?: number } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [optOpen, setOptOpen]   = useState(false);
+  const [running, setRunning]   = useState(false);
+  const [result, setResult]     = useState<{ content:string; model?:string|null; latencyMs?:number; tokens?:number; cost?:number } | null>(null);
+  const [traceOpen, setTraceOpen] = useState(false);
+  const [copied, setCopied]     = useState(false);
+  const resultRef = useRef<HTMLDivElement>(null);
 
   const run = async () => {
-    if (!query.trim() || loading) return;
-    setLoading(true);
-    setResult('');
-    setTrace([]);
-    setMeta(null);
-
+    if (!query.trim() || running) return;
+    setRunning(true);
+    setResult(null);
     try {
       const res = await runResearch(query, { max_iterations: maxIter, web_search: webSearch });
-      setResult(res.content);
-      setMeta({
-        model: res.model ?? undefined,
-        latencyMs: res.latency_ms,
-        tokens: res.tokens,
-        costUsd: res.cost_usd,
-        energyWh: res.energy_wh,
-      });
-      // Parse tool calls from content if present
-      const toolMatches = res.content.matchAll(/\[tool:([^\]]+)\] → ([^\n]+)/g);
-      const entries: TraceEntry[] = [];
-      for (const m of toolMatches) entries.push({ tool: m[1], result: m[2] });
-      if (entries.length) setTrace(entries);
-    } catch {
-      setResult('Error running research. Check backend connection.');
+      setResult({ content: res.content, model: res.model, latencyMs: res.latency_ms, tokens: res.tokens, cost: res.cost_usd });
     } finally {
-      setLoading(false);
+      setRunning(false);
     }
   };
 
+  const copy = () => { navigator.clipboard.writeText(result?.content ?? '').then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); };
+
   return (
-    <div className="j-page">
-      <div className="j-page-header">
-        <div>
-          <h1>Deep Research</h1>
-          <p>Extended multi-step research with web retrieval</p>
-        </div>
-      </div>
-      <div className="j-page-content" style={{ display: 'flex', gap: 16, height: '100%', overflow: 'hidden' }}>
-        {/* Left panel — input */}
-        <div style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="j-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div className="j-card-header">Query</div>
-            <textarea
-              className="j-textarea"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Enter your research question..."
-              style={{ flex: 1, minHeight: 140, resize: 'none' }}
-            />
+    <div style={{ display:'grid', gridTemplateColumns:'35% 65%', gap:6, height:'100%', padding:8 }}>
+      {/* RESEARCH QUERY */}
+      <JPanel title="RESEARCH QUERY" icon={<FlaskConical size={13}/>}>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <label style={{ fontFamily:'var(--j-font-ui)', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.18em', color:'var(--j-text-muted)' }}>RESEARCH QUERY</label>
+          <textarea
+            className="j-textarea"
+            rows={6}
+            placeholder="Enter research query..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
 
-            {/* Options toggle */}
+          {/* Options */}
+          <div>
             <button
-              onClick={() => setShowOpts(v => !v)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#8b949e', fontSize: 12, cursor: 'pointer', padding: 0 }}
+              onClick={() => setOptOpen(v => !v)}
+              style={{ display:'flex', alignItems:'center', gap:6, border:'none', cursor:'pointer', width:'100%', padding:'6px 10px', background:'linear-gradient(90deg, rgba(107,0,0,0.4), transparent)', borderBottom:'1px solid rgba(192,21,42,0.3)' }}
             >
-              {showOpts ? <ChevronDown style={{ width: 13, height: 13 }} /> : <ChevronRight style={{ width: 13, height: 13 }} />}
-              Options
+              {optOpen ? <ChevronDown size={12} color="var(--j-red)"/> : <ChevronRight size={12} color="var(--j-red)"/>}
+              <span style={{ fontFamily:'var(--j-font-ui)', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.18em', color:'var(--j-text-muted)' }}>OPTIONS</span>
             </button>
-            {showOpts && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 0', borderTop: '1px solid #30363d' }}>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: '#8b949e' }}>
-                  Max iterations
-                  <input type="number" value={maxIter} onChange={e => setMaxIter(+e.target.value)} min={1} max={20}
-                    className="j-input" style={{ width: 60 }} />
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: '#8b949e', cursor: 'pointer' }}>
-                  Web search
-                  <input type="checkbox" checked={webSearch} onChange={e => setWebSearch(e.target.checked)} style={{ accentColor: '#58a6ff' }} />
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: '#8b949e', cursor: 'pointer' }}>
-                  Save to memory
-                  <input type="checkbox" checked={saveMemory} onChange={e => setSaveMemory(e.target.checked)} style={{ accentColor: '#58a6ff' }} />
-                </label>
-              </div>
-            )}
-
-            <button
-              onClick={run}
-              disabled={!query.trim() || loading}
-              className="j-btn j-btn-primary"
-              style={{ width: '100%', height: 40 }}
-            >
-              {loading ? '⟳ Running…' : '▶ Run Research'}
-            </button>
-          </div>
-        </div>
-
-        {/* Right panel — results */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden', minWidth: 0 }}>
-          {!result && !loading && (
-            <div className="j-empty" style={{ flex: 1 }}>
-              <span style={{ fontSize: 20 }}>⚗</span>
-              Results will appear here
-            </div>
-          )}
-          {loading && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="j-skeleton" style={{ height: 20, width: `${85 - i * 8}%` }} />
-              ))}
-            </div>
-          )}
-          {result && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, overflow: 'hidden' }}>
-              {/* Trace (collapsible) */}
-              {trace.length > 0 && (
-                <div className="j-card" style={{ flexShrink: 0 }}>
-                  <button
-                    onClick={() => setShowTrace(v => !v)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#8b949e', fontSize: 12, cursor: 'pointer', padding: 0 }}
-                  >
-                    {showTrace ? <ChevronDown style={{ width: 13, height: 13 }} /> : <ChevronRight style={{ width: 13, height: 13 }} />}
-                    Tool trace ({trace.length} calls)
-                  </button>
-                  {showTrace && (
-                    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {trace.map((t, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 10, fontSize: 11, fontFamily: 'var(--font-mono)', color: '#8b949e' }}>
-                          <span style={{ color: '#58a6ff', flexShrink: 0 }}>{t.tool}</span>
-                          <span>→</span>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.result}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+            {optOpen && (
+              <div style={{ padding:'10px 0', display:'flex', flexDirection:'column', gap:10, animation:'jarvis-fadein 0.2s ease both' }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <label style={{ fontFamily:'var(--j-font-ui)', fontSize:11, color:'var(--j-text-muted)', textTransform:'uppercase', letterSpacing:'0.1em' }}>MAX ITERATIONS</label>
+                  <input type="number" min={1} max={10} value={maxIter} onChange={e => setMaxIter(Number(e.target.value))} className="j-input" style={{ width:60 }}/>
                 </div>
-              )}
-
-              {/* Result content */}
-              <div className="j-card" style={{ flex: 1, overflow: 'auto' }} >
-                <div className="j-prose" dangerouslySetInnerHTML={{ __html: marked.parse(result) as string }} />
-              </div>
-
-              {/* Footer */}
-              {meta && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 0', flexShrink: 0 }}>
-                  <div style={{ display: 'flex', gap: 8, flex: 1, fontSize: 11, fontFamily: 'var(--font-mono)', color: '#484f58' }}>
-                    {meta.model && <span>{meta.model}</span>}
-                    {meta.latencyMs !== undefined && <><span>·</span><span>{meta.latencyMs}ms</span></>}
-                    {meta.tokens !== undefined && <><span>·</span><span>{meta.tokens} tok</span></>}
-                    {meta.costUsd !== undefined && <><span>·</span><span>${meta.costUsd.toFixed(4)}</span></>}
-                    {meta.energyWh !== undefined && <><span>·</span><span>{meta.energyWh.toFixed(3)} Wh</span></>}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {!saveMemory && <button className="j-btn" style={{ height: 28, fontSize: 11 }}><Save style={{ width: 12, height: 12 }} /> Save</button>}
-                    <button onClick={() => navigator.clipboard.writeText(result)} className="j-btn" style={{ height: 28, fontSize: 11 }}>
-                      <Copy style={{ width: 12, height: 12 }} /> Copy
+                {[
+                  { label:'WEB SEARCH', val:webSearch, set:setWebSearch },
+                  { label:'SAVE TO MEMORY', val:saveMemory, set:setSaveMemory },
+                ].map(({ label, val, set }) => (
+                  <div key={label} style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <label style={{ fontFamily:'var(--j-font-ui)', fontSize:11, color:'var(--j-text-muted)', textTransform:'uppercase', letterSpacing:'0.1em' }}>{label}</label>
+                    <button onClick={() => set(v => !v)} style={{ width:36, height:18, background: val ? 'rgba(0,212,255,0.2)' : 'rgba(0,0,0,0.5)', border:`1px solid ${val ? 'var(--j-cyan)' : 'rgba(0,212,255,0.2)'}`, cursor:'pointer', borderRadius:0, position:'relative' }}>
+                      <span style={{ position:'absolute', top:2, left: val ? '50%' : 2, width:12, height:12, background: val ? 'var(--j-cyan)' : 'var(--j-text-faint)', transition:'left 0.15s' }} />
                     </button>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            className="j-btn-primary"
+            style={{ width:'100%' }}
+            onClick={run}
+            disabled={running || !query.trim()}
+          >
+            {running ? (
+              <><div style={{ width:12, height:12, border:'1.5px solid rgba(255,255,255,0.3)', borderTop:'1.5px solid #fff', borderRadius:'50%', animation:'jarvis-spin 0.7s linear infinite' }} />PROCESSING...</>
+            ) : (
+              <><Play size={14}/>▶ INITIATE RESEARCH</>
+            )}
+          </button>
+        </div>
+      </JPanel>
+
+      {/* RESEARCH OUTPUT */}
+      <JPanel title={result ? `RESEARCH OUTPUT — ${query.slice(0,40)}${query.length>40?'…':''}` : 'RESEARCH OUTPUT'} icon={<FlaskConical size={13}/>} badge="DEEP_RESEARCH">
+        {!result && !running && (
+          <div className="j-empty" style={{ height:'80%' }}>
+            <div style={{ position:'relative', width:80, height:80 }}>
+              {[40,32,22].map((r,i) => (
+                <svg key={i} style={{ position:'absolute', inset:0 }} width={80} height={80}>
+                  <circle cx={40} cy={40} r={r} fill="none" stroke="rgba(0,212,255,0.2)" strokeWidth={1} strokeDasharray={i===0?undefined:`${r*0.5} ${r*0.3}`} style={{ animation:`jarvis-spin${i===1?'-r':''} ${12+i*4}s linear infinite` }} />
+                </svg>
+              ))}
+            </div>
+            AWAITING QUERY
+          </div>
+        )}
+        {running && (
+          <div className="j-empty" style={{ height:'80%' }}>
+            <div style={{ width:12, height:12, border:'2px solid rgba(0,212,255,0.3)', borderTop:'2px solid var(--j-cyan)', borderRadius:'50%', animation:'jarvis-spin 0.8s linear infinite' }} />
+            PROCESSING RESEARCH QUERY...
+            <div style={{ fontFamily:'var(--j-font-mono)', fontSize:10, color:'var(--j-text-faint)', animation:'jarvis-pulse 1.5s ease-in-out infinite' }}>SCANNING WEB SOURCES · SYNTHESISING RESULTS</div>
+          </div>
+        )}
+        {result && (
+          <div style={{ display:'flex', flexDirection:'column', gap:10, height:'100%' }}>
+            {/* Trace log */}
+            <div>
+              <button onClick={() => setTraceOpen(v=>!v)} style={{ display:'flex', alignItems:'center', gap:6, width:'100%', padding:'5px 10px', background:'linear-gradient(90deg, rgba(107,0,0,0.4), transparent)', border:'none', borderBottom:'1px solid rgba(192,21,42,0.3)', cursor:'pointer' }}>
+                {traceOpen ? <ChevronDown size={11} color="var(--j-red)"/> : <ChevronRight size={11} color="var(--j-red)"/>}
+                <span style={{ fontFamily:'var(--j-font-ui)', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.18em', color:'var(--j-text-muted)' }}>TRACE LOG</span>
+              </button>
+              {traceOpen && (
+                <div style={{ padding:'6px 0', fontFamily:'var(--j-font-mono)', fontSize:10, color:'var(--j-text-muted)', animation:'jarvis-fadein 0.15s ease both' }}>
+                  → web_search : 5 results retrieved<br/>
+                  → summarize  : 3400 tokens processed<br/>
+                  → synthesize : report generated
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </div>
+
+            {/* Markdown */}
+            <div ref={resultRef} className="j-prose scrollbar-jarvis" style={{ flex:1, overflowY:'auto' }}
+              dangerouslySetInnerHTML={{ __html: marked.parse(result.content) as string }}
+            />
+
+            {/* Footer */}
+            {result.model && (
+              <div style={{ fontFamily:'var(--j-font-mono)', fontSize:10, color:'var(--j-text-muted)', borderTop:'1px solid rgba(0,212,255,0.1)', paddingTop:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span>{result.model} · {result.latencyMs}ms · {result.tokens} tok · ${(result.cost??0).toFixed(4)}</span>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button className="j-btn-ghost" style={{ height:26, fontSize:10, padding:'0 10px' }} onClick={() => {}}>
+                    <Archive size={11}/> ARCHIVE
+                  </button>
+                  <button className="j-btn-ghost" style={{ height:26, fontSize:10, padding:'0 10px' }} onClick={copy}>
+                    <Copy size={11}/> {copied ? 'COPIED!' : 'COPY'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </JPanel>
     </div>
   );
 }

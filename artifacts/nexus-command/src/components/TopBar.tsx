@@ -1,149 +1,124 @@
-import { Search, Bell, Settings, } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, Settings } from 'lucide-react';
+import { useJarvisStore, type TabId } from '@/store/jarvisStore';
 import { useJarvisHealth, useGetCurrentMode } from '@/hooks/useJarvis';
-import { useJarvisStore } from '@/store/jarvisStore';
 
-export function TopBar() {
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'overview',   label: 'OVERVIEW' },
+  { id: 'agents',     label: 'AGENTS' },
+  { id: 'research',   label: 'RESEARCH' },
+  { id: 'memory',     label: 'MEMORY' },
+  { id: 'comms',      label: 'COMMS' },
+  { id: 'analytics',  label: 'ANALYTICS' },
+  { id: 'security',   label: 'SECURITY' },
+  { id: 'vault',      label: 'VAULT' },
+  { id: 'skills',     label: 'SKILLS' },
+  { id: 'settings',   label: 'SETTINGS' },
+];
+
+function LiveClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const d = days[now.getDay()];
+  const t = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return (
+    <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 13, color: 'var(--j-cyan)', letterSpacing: '0.08em' }}>
+      {d} {t}
+    </span>
+  );
+}
+
+export default function TopBar() {
+  const { activeTab, setActiveTab, setCommandPaletteOpen } = useJarvisStore();
   const { data: health } = useJarvisHealth();
   const { data: mode } = useGetCurrentMode();
-  const { setCommandPaletteOpen, setActiveModule } = useJarvisStore();
 
-  const status = health?.status ?? 'offline';
-  const isOnline = status === 'online';
+  const isOnline = health?.status !== 'offline' && health != null;
+  const engine = health?.engine ?? 'OFFLINE';
+  const model  = health?.model  ?? '—';
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [setCommandPaletteOpen]);
 
   return (
     <div style={{
-      height: 40,
-      background: '#161b22',
-      borderBottom: '1px solid #30363d',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '0 12px',
-      gap: 12,
-      flexShrink: 0,
+      height: 44, flexShrink: 0,
+      background: 'rgba(0,4,8,0.97)',
+      borderBottom: '1px solid rgba(0,212,255,0.28)',
+      boxShadow: '0 2px 20px rgba(0,212,255,0.12)',
+      display: 'flex', alignItems: 'stretch',
+      position: 'relative', zIndex: 20,
     }}>
-      {/* Left — wordmark + mode */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 13,
-          fontWeight: 600,
-          color: '#58a6ff',
-          letterSpacing: '0.02em',
-          whiteSpace: 'nowrap',
-        }}>
-          ⬡ JARVIS
+      {/* Left */}
+      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'0 16px', borderRight:'1px solid rgba(0,212,255,0.12)', flexShrink:0 }}>
+        <div style={{ display:'flex', gap:4 }}>
+          {[0,80,160].map(delay => (
+            <div key={delay} style={{ width:6, height:6, borderRadius:'50%', background:'var(--j-cyan)', animation:`jarvis-pulse 1.8s ease-in-out ${delay}ms infinite` }} />
+          ))}
+        </div>
+        <span style={{ fontFamily:'var(--j-font-head)', fontSize:15, fontWeight:700, color:'var(--j-cyan)', letterSpacing:'0.32em', animation:'jarvis-flicker 10s linear infinite' }}>
+          J.A.R.V.I.S
         </span>
-        {mode?.name && (
-          <span style={{
-            fontSize: 11,
-            fontFamily: 'var(--font-mono)',
-            color: '#8b949e',
-            background: '#21262d',
-            border: '1px solid #30363d',
-            borderRadius: 10,
-            padding: '1px 7px',
-            whiteSpace: 'nowrap',
-          }}>
-            {mode.name}
-          </span>
-        )}
+        <span style={{ color:'rgba(0,212,255,0.22)', fontSize:20 }}>|</span>
+        <span className="j-badge j-badge-cyan" style={{ fontFamily:'var(--j-font-mono)', fontSize:10 }}>
+          {(mode?.name ?? 'WORK').toUpperCase()} MODE
+        </span>
       </div>
 
-      {/* Center — command palette trigger */}
-      <button
-        onClick={() => setCommandPaletteOpen(true)}
-        style={{
-          flex: 1,
-          maxWidth: 400,
-          height: 28,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          background: '#21262d',
-          border: '1px solid #30363d',
-          borderRadius: 4,
-          padding: '0 10px',
-          cursor: 'text',
-          color: '#484f58',
-          fontSize: 12,
-          fontFamily: 'var(--font-ui)',
-        }}
-      >
-        <Search style={{ width: 13, height: 13, flexShrink: 0 }} />
-        <span style={{ flex: 1, textAlign: 'left' }}>Search or ask Jarvis...</span>
-        <kbd style={{
-          fontSize: 10,
-          fontFamily: 'var(--font-mono)',
-          color: '#484f58',
-          background: '#0d1117',
-          border: '1px solid #30363d',
-          borderRadius: 3,
-          padding: '0 5px',
-          lineHeight: '18px',
-        }}>⌘K</kbd>
-      </button>
+      {/* Center tabs */}
+      <div style={{ flex:1, display:'flex', alignItems:'stretch', overflowX:'auto' }}>
+        {TABS.map(tab => {
+          const active = activeTab === tab.id;
+          return (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+              height:'100%', padding:'0 13px',
+              background: active ? 'rgba(0,212,255,0.06)' : 'transparent',
+              border:'none',
+              borderBottom: active ? '2px solid var(--j-cyan)' : '2px solid transparent',
+              color: active ? 'var(--j-cyan)' : 'var(--j-text-muted)',
+              fontFamily:'var(--j-font-ui)', fontSize:12, fontWeight:600,
+              textTransform:'uppercase', letterSpacing:'0.15em',
+              cursor:'pointer', whiteSpace:'nowrap',
+              transition:'color 0.15s, background 0.15s',
+              flexShrink:0,
+            }}>
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-      {/* Right — engine + status + icons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-        {/* Engine badge */}
-        <span style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          color: '#8b949e',
-          whiteSpace: 'nowrap',
-        }}>
-          {health?.engine && health.engine !== 'none' && health.engine !== 'offline'
-            ? `${health.engine} · ${health.model}`
-            : 'no engine'}
+      {/* Right */}
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'0 12px', borderLeft:'1px solid rgba(0,212,255,0.12)', flexShrink:0 }}>
+        <LiveClock />
+        <span style={{ color:'rgba(0,212,255,0.2)', fontSize:18 }}>|</span>
+        <span style={{ fontFamily:'var(--j-font-mono)', fontSize:11, color:'var(--j-text-muted)', letterSpacing:'0.04em', whiteSpace:'nowrap' }}>
+          <span style={{ color: isOnline ? 'var(--j-green)' : 'var(--j-red)' }}>●</span>{' '}
+          {engine.toUpperCase()} · {model.toUpperCase()}
         </span>
-
-        <span style={{ width: 1, height: 14, background: '#30363d', flexShrink: 0 }} />
-
-        {/* Status dot */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{
-            width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-            background: isOnline ? '#3fb950' : status === 'degraded' ? '#d29922' : '#f85149',
-          }} />
-          <span style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: isOnline ? '#3fb950' : status === 'degraded' ? '#d29922' : '#f85149',
-          }}>
-            {status}
-          </span>
-        </div>
-
-        <span style={{ width: 1, height: 14, background: '#30363d', flexShrink: 0 }} />
-
-        {/* Bell */}
-        <button
-          style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}
-          onClick={() => {}}
-        >
-          <Bell style={{ width: 15, height: 15 }} />
+        <span style={{ color:'rgba(0,212,255,0.2)', fontSize:18 }}>|</span>
+        <button onClick={() => setCommandPaletteOpen(true)} style={{ background:'rgba(0,212,255,0.08)', border:'1px solid rgba(0,212,255,0.2)', color:'var(--j-text-muted)', fontFamily:'var(--j-font-mono)', fontSize:10, padding:'3px 8px', cursor:'pointer', letterSpacing:'0.06em' }}>
+          ⌘K
         </button>
-
-        {/* Settings */}
-        <button
-          style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}
-          onClick={() => setActiveModule('settings')}
-        >
-          <Settings style={{ width: 15, height: 15 }} />
+        <button style={{ background:'none', border:'none', cursor:'pointer', color:'var(--j-text-muted)', padding:0, position:'relative' }}>
+          <Bell size={16} />
+          <span style={{ position:'absolute', top:-4, right:-4, width:14, height:14, background:'var(--j-red)', borderRadius:'50%', fontFamily:'var(--j-font-mono)', fontSize:8, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>3</span>
         </button>
-
-        {/* Avatar */}
-        <div style={{
-          width: 28, height: 28, borderRadius: '50%',
-          background: '#21262d',
-          border: '1px solid #30363d',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 10, fontFamily: 'var(--font-mono)', color: '#8b949e',
-          flexShrink: 0,
-        }}>
-          JV
-        </div>
+        <button onClick={() => setActiveTab('settings')} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--j-text-muted)', padding:0 }}>
+          <Settings size={15} />
+        </button>
       </div>
     </div>
   );

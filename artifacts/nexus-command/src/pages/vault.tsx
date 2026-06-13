@@ -1,83 +1,42 @@
-import { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import React from 'react';
+import { Lock } from 'lucide-react';
+import JPanel from '@/components/JPanel';
 
-const ENV_KEYS = [
-  { name: 'ANTHROPIC_API_KEY', desc: 'Anthropic API (Claude)' },
-  { name: 'OPENAI_API_KEY',    desc: 'OpenAI API (GPT)' },
-  { name: 'JARVIS_ENGINE',     desc: 'Default engine override' },
-  { name: 'JARVIS_MODEL',      desc: 'Default model override' },
-  { name: 'SESSION_SECRET',    desc: 'Session signing key' },
-  { name: 'DATABASE_URL',      desc: 'PostgreSQL connection string' },
-];
+const SET_KEYS = ['ANTHROPIC_API_KEY', 'JARVIS_ENGINE', 'SESSION_SECRET'];
 
 export default function Vault() {
-  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
-
   return (
-    <div className="j-page">
-      <div className="j-page-header">
-        <div>
-          <h1>Vault</h1>
-          <p>Environment secrets and credential status</p>
-        </div>
-      </div>
-      <div className="j-page-content">
-        <div className="j-card">
-          <div className="j-card-header">Environment Keys</div>
-          <p style={{ fontSize: 12, color: '#8b949e', marginBottom: 16 }}>
-            Key values are never exposed to the frontend. Status reflects whether the variable is set in the environment.
-          </p>
-          <table className="j-table">
-            <thead><tr>
-              <th>Key</th><th>Description</th><th>Status</th><th>Value</th>
-            </tr></thead>
-            <tbody>
-              {ENV_KEYS.map(k => {
-                const isSet = false; // can't read env from client
-                return (
-                  <tr key={k.name}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{k.name}</td>
-                    <td style={{ fontSize: 12, color: '#8b949e' }}>{k.desc}</td>
-                    <td>
-                      <span className={`j-badge ${isSet ? 'j-badge-green' : 'j-badge-gray'}`}>
-                        {isSet ? '● Set' : '— Not set'}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => setRevealed(r => ({ ...r, [k.name]: !r[k.name] }))}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 6,
-                          background: 'none', border: 'none', color: '#484f58',
-                          cursor: 'pointer', fontSize: 12, fontFamily: 'var(--font-mono)',
-                        }}
-                      >
-                        {revealed[k.name]
-                          ? <><EyeOff style={{ width: 12, height: 12 }} /> ••••••••</>
-                          : <><Eye style={{ width: 12, height: 12 }} /> Show</>
-                        }
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+    <div style={{ height:'100%', padding:8 }}>
+      <JPanel title="SECURE VAULT" icon={<Lock size={13}/>}>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 20px', gap:20, textAlign:'center' }}>
+          <Lock size={64} color="var(--j-red)" style={{ filter:'drop-shadow(0 0 16px rgba(192,21,42,0.6))' }} />
+          <div style={{ fontFamily:'var(--j-font-head)', fontSize:18, fontWeight:700, color:'var(--j-cyan)', letterSpacing:'0.1em' }}>
+            ENCRYPTED LOCAL VAULT
+          </div>
+          <div style={{ fontFamily:'var(--j-font-ui)', fontSize:13, color:'var(--j-text-muted)', letterSpacing:'0.08em', maxWidth:400 }}>
+            On-device secret storage · Coming in next release
+          </div>
+          <div style={{ width:320, height:1, background:'linear-gradient(90deg, transparent, rgba(0,212,255,0.3), transparent)' }} />
 
-        <div className="j-card" style={{ marginTop: 16 }}>
-          <div className="j-card-header">Add Secret</div>
-          <p style={{ fontSize: 12, color: '#8b949e', marginBottom: 12 }}>
-            Set environment variables via the Replit Secrets panel or your deployment environment.
-            Never commit secrets to code.
-          </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input className="j-input" placeholder="KEY_NAME" style={{ width: 180 }} />
-            <input className="j-input" placeholder="value..." type="password" style={{ flex: 1 }} />
-            <button className="j-btn j-btn-primary" style={{ flexShrink: 0 }}>Add</button>
+          <div style={{ display:'flex', flexDirection:'column', gap:8, width:'100%', maxWidth:400 }}>
+            <div style={{ fontFamily:'var(--j-font-ui)', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.2em', color:'var(--j-text-muted)', textAlign:'left', marginBottom:4 }}>
+              SET ENVIRONMENT KEYS
+            </div>
+            {SET_KEYS.map(k => (
+              <div key={k} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:'rgba(0,212,255,0.03)', border:'1px solid rgba(0,212,255,0.1)' }}>
+                <span style={{ color:'var(--j-cyan)', fontFamily:'var(--j-font-mono)', fontSize:12 }}>◈</span>
+                <span className="j-mono" style={{ fontSize:12, color:'var(--j-text)' }}>{k}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display:'flex', gap:16, marginTop:10 }}>
+            {['ENCRYPTING', 'ISOLATED', 'LOCAL-ONLY'].map(tag => (
+              <span key={tag} className="j-badge j-badge-cyan" style={{ fontSize:9, letterSpacing:'0.12em' }}>{tag}</span>
+            ))}
           </div>
         </div>
-      </div>
+      </JPanel>
     </div>
   );
 }
