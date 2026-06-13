@@ -1,102 +1,99 @@
 import { motion } from 'framer-motion';
-import { useGetSecurityStatus, getGetSecurityStatusQueryKey, useListSecurityEvents, getListSecurityEventsQueryKey } from '@workspace/api-client-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShieldAlert, ShieldCheck, AlertTriangle, Activity } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ShieldAlert, ShieldCheck, Key, RefreshCw, Activity } from 'lucide-react';
+import { useJarvisHealth } from '@/hooks/useJarvis';
+import { useNexusStore } from '@/store/nexusStore';
+
+const API_KEYS = [
+  { id: 'OPENAI_API_KEY', label: 'OpenAI', color: '#10b981' },
+  { id: 'ANTHROPIC_API_KEY', label: 'Anthropic', color: '#a855f7' },
+  { id: 'JARVIS_ENGINE', label: 'Jarvis Engine', color: '#00d4ff' },
+  { id: 'SESSION_SECRET', label: 'Session Secret', color: '#c9a84c' },
+];
 
 export default function Security() {
-  const { data: status, isLoading: statusLoading } = useGetSecurityStatus({ query: { queryKey: getGetSecurityStatusQueryKey() } });
-  const { data: events, isLoading: eventsLoading } = useListSecurityEvents({ query: { queryKey: getListSecurityEventsQueryKey() } });
+  const { data: health, refetch, isFetching } = useJarvisHealth();
+  const agentHistory = useNexusStore(s => s.agentHistory);
 
-  const scoreColor = status?.overallScore && status.overallScore > 90 ? 'text-green-400' : 'text-accent';
+  const status = health?.status ?? 'offline';
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex items-center gap-3">
-        <ShieldAlert className="w-8 h-8 text-primary" />
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Security Command</h1>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: '#ef4444', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Security</h2>
+        <p style={{ fontSize: 12, color: 'rgba(130,170,200,0.55)', lineHeight: 1.5 }}>Monitor API key status, run diagnostics, and review the audit log.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="glass-panel border-primary/20 md:col-span-1 neon-glow flex flex-col items-center justify-center p-8 relative overflow-hidden">
-          <div className="absolute inset-0 bg-primary/5 blur-2xl" />
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-widest relative z-10">System Integrity</h2>
-          <div className={cn("text-7xl font-bold font-mono mt-4 relative z-10 drop-shadow-[0_0_15px_rgba(0,212,255,0.5)]", scoreColor)}>
-            {statusLoading ? '--' : status?.overallScore}
-          </div>
-          <div className="mt-4 flex items-center gap-2 text-sm text-foreground relative z-10">
-            {status?.threatLevel === 'Low' ? <ShieldCheck className="w-4 h-4 text-green-400" /> : <AlertTriangle className="w-4 h-4 text-destructive" />}
-            Threat Level: <span className="font-mono">{status?.threatLevel || 'Unknown'}</span>
-          </div>
-        </Card>
+      {/* API key status */}
+      <div className="nexus-card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <Key style={{ width: 14, height: 14, color: '#ef4444' }} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(239,68,68,0.8)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>API Key Status</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {API_KEYS.map(key => (
+            <div key={key.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,212,255,0.03)', border: '1px solid rgba(0,212,255,0.08)', borderRadius: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(130,170,200,0.3)' }} />
+                <span style={{ fontSize: 12, color: 'rgba(200,225,245,0.8)', fontFamily: 'var(--font-mono)' }}>{key.id}</span>
+              </div>
+              <span className="nexus-badge" data-variant="red">UNSET</span>
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 11, color: 'rgba(130,170,200,0.4)', marginTop: 12, lineHeight: 1.5 }}>Key values are never displayed. Use environment variables to configure credentials.</p>
+      </div>
 
-        <div className="md:col-span-2 flex flex-col gap-3">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">Defense Layers</h3>
-          {statusLoading ? (
-             Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 animate-pulse bg-secondary/50 rounded-lg border border-border" />
-            ))
-          ) : (
-            status?.layers.map((layer, i) => (
-              <motion.div 
-                key={layer.id}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="bg-card/40 backdrop-blur-sm border border-white/5 rounded-lg p-3 flex items-center justify-between hover:border-primary/30 transition-colors"
-              >
-                <div className="flex flex-col">
-                  <span className="font-medium text-foreground">{layer.name}</span>
-                  <span className="text-xs text-muted-foreground">{layer.status}</span>
-                </div>
-                <div className="flex items-center gap-3 w-48">
-                  <div className="h-2 flex-1 bg-secondary rounded-full overflow-hidden">
-                    <div 
-                      className={cn("h-full", layer.score > 90 ? "bg-green-500" : "bg-accent")} 
-                      style={{ width: `${layer.score}%` }} 
-                    />
-                  </div>
-                  <span className="text-sm font-mono w-8 text-right">{layer.score}%</span>
-                </div>
-              </motion.div>
-            ))
-          )}
+      {/* Diagnostics */}
+      <div className="nexus-card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {status === 'online' ? <ShieldCheck style={{ width: 14, height: 14, color: '#10b981' }} /> : <ShieldAlert style={{ width: 14, height: 14, color: '#ef4444' }} />}
+            <span style={{ fontSize: 11, fontWeight: 600, color: status === 'online' ? 'rgba(16,185,129,0.8)' : 'rgba(239,68,68,0.8)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+              System Diagnostics
+            </span>
+          </div>
+          <button className="nexus-btn" onClick={() => refetch()} disabled={isFetching}
+            style={{ padding: '6px 14px', fontSize: 11, borderColor: 'rgba(239,68,68,0.3)', color: '#ef4444', background: 'rgba(239,68,68,0.08)' }}>
+            <RefreshCw style={{ width: 12, height: 12 }} className={isFetching ? 'animate-spin' : ''} />
+            {isFetching ? 'Running…' : 'Run Diagnostics'}
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {[
+            { label: 'Backend', value: status.toUpperCase(), ok: status === 'online' },
+            { label: 'Engine', value: health?.engine ?? '—', ok: !!health?.engine && health.engine !== 'none' },
+            { label: 'Model', value: health?.model ?? '—', ok: !!health?.model && health.model !== '—' },
+            { label: 'Uptime', value: health?.uptime ? `${Math.floor(health.uptime / 60)}m` : '—', ok: !!health?.uptime },
+          ].map(({ label, value, ok }) => (
+            <div key={label} style={{ padding: '10px 14px', background: 'rgba(0,212,255,0.03)', border: '1px solid rgba(0,212,255,0.06)', borderRadius: 10 }}>
+              <div style={{ fontSize: 9.5, color: 'rgba(130,170,200,0.45)', letterSpacing: '0.1em', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: ok ? '#10b981' : '#ef4444', fontFamily: 'var(--font-mono)' }}>{value}</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      <Card className="glass-panel border-white/5 mt-4">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><Activity className="w-5 h-5 text-primary" /> Security Events</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-3">
-            {eventsLoading ? (
-              <div className="h-32 animate-pulse bg-secondary/30 rounded" />
-            ) : events?.length === 0 ? (
-              <div className="text-center text-muted-foreground p-4">No recent security events.</div>
-            ) : (
-              events?.map(event => (
-                <div key={event.id} className="flex items-start gap-4 p-3 rounded-lg border border-border bg-secondary/20 hover:bg-secondary/40 transition-colors">
-                  <div className={cn(
-                    "p-2 rounded-full",
-                    event.severity === 'High' || event.severity === 'Critical' ? "bg-destructive/20 text-destructive" : 
-                    event.severity === 'Medium' ? "bg-accent/20 text-accent" : "bg-primary/20 text-primary"
-                  )}>
-                    {event.severity === 'Critical' || event.severity === 'High' ? <AlertTriangle className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-foreground">{event.type}</span>
-                      <span className="text-xs text-muted-foreground font-mono">{new Date(event.timestamp).toLocaleString()}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
-                  </div>
-                </div>
-              ))
-            )}
+      {/* Audit log */}
+      <div className="nexus-card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <Activity style={{ width: 14, height: 14, color: '#c9a84c' }} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(201,168,76,0.8)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Audit Log</span>
+        </div>
+        {agentHistory.length === 0 ? (
+          <div style={{ color: 'rgba(130,170,200,0.4)', fontSize: 12, padding: '12px 0' }}>No events recorded this session.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {agentHistory.slice(0, 10).map((ev, i) => (
+              <motion.div key={ev.id} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.08)', borderRadius: 8 }}>
+                <span style={{ fontSize: 9.5, color: '#c9a84c', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{new Date(ev.ts).toLocaleTimeString()}</span>
+                <span style={{ fontSize: 10, color: 'rgba(168,85,247,0.8)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{ev.agent.toUpperCase()}</span>
+                <span style={{ fontSize: 11, color: 'rgba(190,220,240,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.prompt}</span>
+              </motion.div>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
     </div>
   );
 }

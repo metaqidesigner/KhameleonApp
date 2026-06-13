@@ -73,5 +73,9 @@
     "vite": "catalog:",
     "wouter": "^3.3.5",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "marked": "^18.0.5",
+    "zustand": "^5.0.14"
   }
 }

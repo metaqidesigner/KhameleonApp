@@ -1,67 +1,58 @@
-import { motion } from 'framer-motion';
-import { useListVaultItems, getListVaultItemsQueryKey } from '@workspace/api-client-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Key, Lock, AlertTriangle, Fingerprint } from 'lucide-react';
+import { Lock, Key, Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
+
+const ENV_KEYS = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'SESSION_SECRET', 'DATABASE_URL', 'JARVIS_ENGINE', 'JARVIS_MODEL'];
 
 export default function Vault() {
-  const { data: items, isLoading } = useListVaultItems({ query: { queryKey: getListVaultItemsQueryKey() } });
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+
+  const toggle = (k: string) => setRevealed(prev => ({ ...prev, [k]: !prev[k] }));
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex items-center gap-3">
-        <Key className="w-8 h-8 text-primary" />
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Nexus Vault</h1>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: '#c9a84c', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Vault</h2>
+        <p style={{ fontSize: 12, color: 'rgba(130,170,200,0.55)', lineHeight: 1.5 }}>Local encrypted secrets management. Values are never transmitted or displayed in plain text.</p>
       </div>
 
-      <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 flex items-start gap-3 text-destructive">
-        <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
-        <div>
-          <h3 className="font-bold">SECURITY NOTICE</h3>
-          <p className="text-sm mt-1">Mock data only — no real credentials, keys, or sensitive information are stored in this demo environment. The Vault demonstrates credential management UI patterns.</p>
+      {/* Lock icon hero */}
+      <div className="nexus-card" style={{ padding: 32, textAlign: 'center' }}>
+        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 30px rgba(201,168,76,0.15)' }}>
+          <Lock style={{ width: 28, height: 28, color: '#c9a84c' }} />
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(220,240,255,0.9)', marginBottom: 6 }}>Local Encrypted Secrets</div>
+        <div style={{ fontSize: 12, color: 'rgba(130,170,200,0.5)', lineHeight: 1.6, maxWidth: 360, margin: '0 auto' }}>
+          Coming soon — AES-256 encrypted local keystore for storing API keys, tokens, and credentials without external services.
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-2">
-        {isLoading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="glass-panel border-white/5 h-32 animate-pulse bg-secondary/30" />
-          ))
-        ) : (
-          items?.map((item, i) => (
-            <motion.div 
-              key={item.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <Card className="glass-panel border-white/5 hover:border-primary/30 transition-all group overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <Fingerprint className="w-24 h-24" />
-                </div>
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start relative z-10">
-                    <CardTitle className="text-lg text-foreground font-mono">{item.name}</CardTitle>
-                    <Lock className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                </CardHeader>
-                <CardContent className="relative z-10 flex flex-col gap-3">
-                  <div className="flex gap-2">
-                    <span className="text-xs px-2 py-0.5 rounded border border-border bg-secondary text-muted-foreground uppercase tracking-wider">
-                      {item.category}
-                    </span>
-                    <span className="text-xs px-2 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary uppercase tracking-wider">
-                      {item.permissionLevel}
-                    </span>
-                  </div>
-                  
-                  <div className="text-xs text-muted-foreground font-mono mt-2">
-                    Last Access: {new Date(item.lastAccessed).toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))
-        )}
+      {/* Env key status */}
+      <div className="nexus-card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <Key style={{ width: 14, height: 14, color: '#c9a84c' }} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(201,168,76,0.8)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Environment Variables</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {ENV_KEYS.map(k => (
+            <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.1)', borderRadius: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgba(130,170,200,0.2)' }} />
+                <span style={{ fontSize: 12, color: 'rgba(200,225,245,0.8)', fontFamily: 'var(--font-mono)' }}>{k}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 11, color: 'rgba(130,170,200,0.4)', fontFamily: 'var(--font-mono)' }}>
+                  {revealed[k] ? '••••••••••••' : '[ NOT SET ]'}
+                </span>
+                <button onClick={() => toggle(k)} style={{ background: 'none', border: 'none', color: 'rgba(130,170,200,0.4)', cursor: 'pointer', padding: 2 }}>
+                  {revealed[k] ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 11, color: 'rgba(130,170,200,0.35)', marginTop: 12, lineHeight: 1.5 }}>
+          Key values are never exposed by Nexus Command. Configure secrets in your environment or .env file.
+        </p>
       </div>
     </div>
   );

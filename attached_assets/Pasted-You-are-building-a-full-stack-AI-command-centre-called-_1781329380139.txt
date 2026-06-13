@@ -1,0 +1,410 @@
+You are building a full-stack AI command centre called "Nexus Command" that integrates
+OpenJarvis (https://github.com/open-jarvis/OpenJarvis) as its local-first AI backbone.
+You have full creative and architectural freedom over every part of the UI and codebase.
+
+═══════════════════════════════════════════════════════
+PROJECT STRUCTURE
+═══════════════════════════════════════════════════════
+
+Monorepo with two workspaces:
+  /backend   → Python (FastAPI) — OpenJarvis server + REST/WebSocket bridge
+  /frontend  → React + TypeScript + Vite — the Nexus Command canvas UI
+
+═══════════════════════════════════════════════════════
+BACKEND  (/backend)
+═══════════════════════════════════════════════════════
+
+1. Clone and install OpenJarvis as a dependency:
+     pip install git+https://github.com/open-jarvis/OpenJarvis.git
+
+2. Create main.py — a FastAPI app that:
+   a) Starts the OpenJarvis Jarvis() instance on app startup:
+        from openjarvis import Jarvis
+        jarvis = Jarvis()
+
+   b) Exposes these REST endpoints:
+
+      POST /api/ask
+        Body: { "prompt": string, "agent": string?, "tools": string[]? }
+        Response: { "content": string, "tool_results": any[], "model": string }
+
+      GET  /api/agents
+        → returns list of available OpenJarvis agent types:
+          ["simple", "orchestrator", "deep_research", "morning_digest",
+           "code_assistant", "channel_agent", "proactive_agent", "operative"]
+
+      GET  /api/health
+        → { "status": "online", "engine": string, "model": string, "uptime": number }
+
+      GET  /api/memory/search?q=<query>
+        → returns relevant memory chunks
+
+      POST /api/memory/index
+        Body: { "path": string }
+
+      GET  /api/connectors
+        → list of available connectors
+          (gmail, gcalendar, slack, notion, gdrive, github, discord, telegram, etc.)
+
+      POST /api/connectors/connect
+        Body: { "connector": string }
+        → initiates OAuth / connection flow
+
+      POST /api/research
+        Body: { "query": string }
+        → uses agent="deep_research", returns streamed markdown
+
+      GET  /api/mode
+        → { "name": string } — current Jarvis operating mode
+
+      GET  /api/skills
+        → list of installed OpenJarvis skills
+
+      POST /api/skills/install
+        Body: { "source": string }
+        → installs a skill e.g. "hermes:arxiv"
+
+      WebSocket /ws/chat
+        → streams tokens from Jarvis as generated
+          client sends: { "prompt": string, "agent": string? }
+          server emits: { "token": string } chunks, then { "done": true, "model": string }
+
+   c) CORS: allow all origins in development
+
+3. requirements.txt:
+     fastapi
+     uvicorn[standard]
+     git+https://github.com/open-jarvis/OpenJarvis.git
+     python-dotenv
+     websockets
+
+4. .env.example:
+     OPENAI_API_KEY=
+     ANTHROPIC_API_KEY=
+     JARVIS_ENGINE=ollama
+     JARVIS_MODEL=llama3.2
+
+═══════════════════════════════════════════════════════
+FRONTEND  (/frontend)
+═══════════════════════════════════════════════════════
+
+You have full freedom to redesign, refactor, and improve every part of the frontend.
+The existing code is a starting point — improve anything that would benefit from it.
+
+──────────────────────────────────────────────────────
+1. DESIGN SYSTEM
+──────────────────────────────────────────────────────
+
+Evolve the existing dark sci-fi aesthetic into a more complete design system:
+
+  Colors:
+    --nexus-cyan:   #00d4ff
+    --nexus-gold:   #c9a84c
+    --nexus-green:  #10b981
+    --nexus-purple: #a855f7
+    --nexus-red:    #ef4444
+    --nexus-bg:     #020810
+    --nexus-surface: rgba(2, 14, 28, 0.92)
+
+  Typography:
+    - Primary: Inter (already imported)
+    - Monospace: JetBrains Mono (add to Google Fonts import)
+    - Use monospace for all data values, model names, status readouts
+
+  Add these new utility classes to index.css:
+    .nexus-card        — glass card with subtle cyan border glow
+    .nexus-badge       — small status badge, variant props via data-variant
+    .nexus-input       — styled text input matching the command bar aesthetic
+    .nexus-btn         — primary action button with glow-on-hover
+    .nexus-btn-ghost   — ghost variant
+    .nexus-grid-2      — responsive 2-col grid
+    .nexus-grid-3      — responsive 3-col grid
+    .nexus-shimmer     — loading skeleton animation (already exists, extend it)
+    .nexus-stream-text — monospace text that appears character by character via CSS
+
+──────────────────────────────────────────────────────
+2. BRAIN CANVAS ANIMATION  (src/components/BrainCanvas.tsx)
+──────────────────────────────────────────────────────
+
+Extract BrainCanvas into its own file and enhance it:
+
+  - When isStreaming=true (passed as prop): increase neuron firing rate 3×,
+    brighten axon colors, add a second faster pulse ring in gold
+  - When a module is active: draw a faint beam from the brain centre
+    toward the active module node's angle, pulsing at 1 Hz
+  - Add a subtle lens-flare / bloom effect at the brain centre using
+    layered radial gradients — triggers on first load and on each query
+  - Make neuron count dynamic: Math.min(70 + connectedModules * 4, 140)
+    where connectedModules = number of connected OpenJarvis connectors
+
+──────────────────────────────────────────────────────
+3. ORBITAL LAYOUT  (src/components/layout/CanvasLayout.tsx)
+──────────────────────────────────────────────────────
+
+Rebuild the orbital layout with these improvements:
+
+  a) THREE rings instead of two:
+       innerR  = safeArea * 0.28   → 6 core operational modules
+       middleR = safeArea * 0.42   → 6 intelligence modules
+       outerR  = safeArea * 0.56   → 4 utility / config modules
+
+     Redistribute MODULES across three rings:
+       Inner  (core):        Dashboard, Inbox, Agents, Communications, Calendar, Approvals
+       Middle (intelligence): Research, Analytics, Memory, Knowledge, Security, Automations
+       Outer  (utility):     Vault, Marketplace, Settings, Skills  ← add Skills as new module
+
+  b) Orbit ring SVG guides: add slow clockwise rotation animation to inner ring,
+     counter-clockwise to outer ring (CSS animation on the SVG elements)
+
+  c) ModuleNode: when a connector is "connected" (from useJarvisConnectors),
+     show a tiny green dot in the bottom-right corner of the node circle
+
+  d) Add a "Skills" module node (id: 'skills', Icon: Puzzle from lucide-react,
+     color: '#f59e0b', ring: 'outer')
+
+  e) On mobile (w < 768): collapse the orbital view into a vertical scrollable
+     grid of module cards instead. Each card shows the icon, label, and a
+     one-line description. Tapping opens the same slide-in panel.
+
+──────────────────────────────────────────────────────
+4. COMMAND BAR  (src/components/CommandBar.tsx)
+──────────────────────────────────────────────────────
+
+Extract into its own component and fully wire up:
+
+  - Track inputValue, isStreaming, responseText, agentMode states
+  - Agent selector: small pill buttons above the input (Simple / Orchestrator /
+    Research / Code) — clicking one sets agentMode
+  - On Enter or click of a send arrow button:
+      • call streamChat(inputValue, agentMode, appendToken, onDone)
+      • show a response overlay panel above the bar:
+          - Glass card, max-height 40vh, scrollable
+          - Renders streamed markdown (use a lightweight markdown renderer
+            or just pre-wrap with nexus-stream-text class)
+          - Shows model name in bottom-right in monospace
+          - Dismiss with Escape or clicking outside
+  - While streaming: show animated cyan "thinking" dots inside the input
+  - Wire up ⌘K shortcut to focus the input from anywhere
+  - Add a microphone icon button (stub — no actual voice, just UI)
+
+──────────────────────────────────────────────────────
+5. TOP BAR  (src/components/TopBar.tsx)
+──────────────────────────────────────────────────────
+
+Extract into its own component:
+
+  - Replace hardcoded "99.9% HEALTH" with useJarvisHealth():
+      green pill  → status online,  shows engine + model name
+      amber pill  → status degraded
+      red pill    → status offline, shows "OFFLINE — check backend"
+  - Replace hardcoded "WORK MODE" with useGetCurrentMode()
+  - Add a live uptime counter (format as HH:MM:SS, tick every second)
+    using health.uptime from the backend
+  - Notification bell: when clicked, show a dropdown of the last 5 Jarvis
+    agent completions (store in a zustand store, populated by ws/chat messages)
+  - Add a keyboard shortcut hint: "⌘K to command"
+
+──────────────────────────────────────────────────────
+6. SLIDE-IN PANEL  (src/components/Panel.tsx)
+──────────────────────────────────────────────────────
+
+Extract into its own component and improve:
+
+  - Panel width: clamp(480px, 58vw, 1100px)
+  - Add a breadcrumb bar below the panel header:
+      NEXUS  >  [Module Name]
+  - Add a panel resize handle on the left edge (drag to resize width)
+  - Panel header: show the active agent type as a small badge
+    e.g. "AGENT: ORCHESTRATOR" when Research is open
+  - Smooth exit: current spring animation is fine, but add a subtle
+    opacity fade on the content (not the panel itself) during open/close
+
+──────────────────────────────────────────────────────
+7. API CLIENT  (src/lib/jarvisApi.ts)
+──────────────────────────────────────────────────────
+
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+export async function askJarvis(prompt, agent?, tools?) { ... }
+export async function getAgents(): Promise<string[]> { ... }
+export async function getHealth() { ... }
+export async function searchMemory(q: string) { ... }
+export async function getConnectors(): Promise<string[]> { ... }
+export async function getSkills(): Promise<any[]> { ... }
+export async function installSkill(source: string) { ... }
+export async function runResearch(query: string) { ... }
+
+export function streamChat(prompt, agent, onToken, onDone) {
+  const ws = new WebSocket(`${BASE.replace('http','ws')}/ws/chat`);
+  ws.onopen = () => ws.send(JSON.stringify({ prompt, agent }));
+  ws.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    if (d.token) onToken(d.token);
+    if (d.done)  { onDone(d.model); ws.close(); }
+  };
+  ws.onerror = () => { onDone(null); };
+  return () => ws.close();
+}
+
+──────────────────────────────────────────────────────
+8. REACT QUERY HOOKS  (src/hooks/useJarvis.ts)
+──────────────────────────────────────────────────────
+
+export function useJarvisHealth()       // polls every 15s
+export function useJarvisAgents()       // cached 5 min
+export function useJarvisConnectors()   // cached 1 min
+export function useJarvisSkills()       // cached 1 min
+export function useAskJarvis()          // useMutation
+export function useMemorySearch(q)      // enabled when q.length > 2
+export function useGetCurrentMode()     // replaces @workspace/api-client-react
+
+──────────────────────────────────────────────────────
+9. STATE  (src/store/nexusStore.ts)
+──────────────────────────────────────────────────────
+
+Create a Zustand store:
+
+  interface NexusStore {
+    activeModule: string | null
+    panelOpen: boolean
+    isStreaming: boolean
+    agentHistory: AgentEvent[]   // last 20 completions { prompt, response, model, ts }
+    connectedCount: number       // derived from connectors list
+    setActiveModule: (id: string | null) => void
+    setPanelOpen: (open: boolean) => void
+    setStreaming: (v: boolean) => void
+    pushAgentEvent: (e: AgentEvent) => void
+  }
+
+──────────────────────────────────────────────────────
+10. PAGE COMPONENTS — connect each to real Jarvis data
+──────────────────────────────────────────────────────
+
+Dashboard:
+  - Health card: engine, model, uptime, status
+  - Agent activity feed: last 5 events from nexusStore.agentHistory
+  - Quick-action buttons: "Morning Digest", "Ask Orchestrator", "Run Research"
+  - Connector status grid: icons for each connector, green/grey dot
+
+Agents:
+  - useJarvisAgents() → card grid, one card per agent type
+  - Each card: agent name, short description, an icon, a "Launch" button
+  - Launch opens a mini chat panel pinned inside the slide-in panel
+    (chat history stored in local component state)
+
+Research:
+  - Full-width prompt input with a "Deep Research" submit button
+  - Streamed markdown result rendered below (use marked or remark-lite)
+  - Show estimated token count and model used on completion
+
+Memory:
+  - Search box wired to useMemorySearch()
+  - Results as cards: content snippet, source path, relevance score
+  - "Index Path" input + button calling POST /api/memory/index
+
+Skills:
+  - useJarvisSkills() → installed skills grid
+  - "Install Skill" input (e.g. "hermes:arxiv") + install button
+  - Each skill card: name, description, source, uninstall button stub
+
+Communications:
+  - useJarvisConnectors() → connector tiles grid
+  - Each tile: logo/icon, name, "Connect" or "Connected" status button
+  - Connectors: Gmail, Google Calendar, Slack, Notion, Google Drive,
+    GitHub, Discord, Telegram, WhatsApp, TickTick
+
+Automations:
+  - List of scheduled / proactive agent types from useJarvisAgents()
+  - Each row: agent name, schedule input (cron string), enable toggle (stub)
+  - "Run Now" button that calls askJarvis with that agent type
+
+Analytics:
+  - Bar chart of agentHistory events by agent type (use recharts)
+  - Line chart of response times over last 20 queries (mock data ok)
+  - Token usage summary card
+
+Security:
+  - API key status cards (OPENAI, ANTHROPIC, etc.) — show set/unset, not value
+  - "Run Diagnostics" button calling GET /api/health
+  - Audit log of last 10 agentHistory events with timestamps
+
+Vault:
+  - Placeholder with a lock icon and "Coming soon — local encrypted secrets"
+  - List of env vars that are set (keys only, never values)
+
+Calendar, Inbox, Approvals, Marketplace, Knowledge:
+  - Stub pages with:
+      - Module icon + title
+      - A relevant description of what OpenJarvis can do for this module
+      - A "Connect via OpenJarvis" button that opens Communications panel
+      - A placeholder skeleton grid (3–4 shimmer cards)
+
+──────────────────────────────────────────────────────
+11. FALLBACK / MOCK MODE
+──────────────────────────────────────────────────────
+
+If the backend is unreachable:
+  - All hooks return graceful mock data (never throw uncaught errors)
+  - Health hook returns { status: "offline", engine: "none", model: "—", uptime: 0 }
+  - Command bar shows inline warning:
+      "⚠ Backend offline — set ANTHROPIC_API_KEY or install Ollama, then restart"
+  - Brain canvas dims to 40% opacity and neuron firing slows to 20% speed
+  - All page stubs still render (no blank screens)
+  - Show a top-of-screen banner: "NEXUS OFFLINE — running in demo mode"
+
+═══════════════════════════════════════════════════════
+PACKAGE DEPENDENCIES TO ADD
+═══════════════════════════════════════════════════════
+
+  zustand
+  marked             ← markdown rendering for streamed responses
+  recharts           ← charts in Analytics page
+  @tanstack/react-query (already present)
+  framer-motion      (already present)
+  lucide-react       (already present)
+
+═══════════════════════════════════════════════════════
+PACKAGE.JSON SCRIPTS  (root)
+═══════════════════════════════════════════════════════
+
+{
+  "scripts": {
+    "dev:backend":  "cd backend && uvicorn main:app --reload --port 8000",
+    "dev:frontend": "cd frontend && vite",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
+  }
+}
+
+═══════════════════════════════════════════════════════
+REPLIT CONFIGURATION  (.replit)
+═══════════════════════════════════════════════════════
+
+[workflows]
+  [[workflows.workflow]]
+  name = "Start Nexus"
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "cd backend && pip install -r requirements.txt -q && uvicorn main:app --host 0.0.0.0 --port 8000 &"
+  [[workflows.workflow.tasks]]
+  task = "shell.exec"
+  args = "cd frontend && npm install && npm run dev -- --host 0.0.0.0"
+
+[env]
+VITE_API_URL = "https://${REPL_SLUG}.${REPL_OWNER}.repl.co"
+
+═══════════════════════════════════════════════════════
+.env.example  (frontend)
+═══════════════════════════════════════════════════════
+
+VITE_API_URL=http://localhost:8000
+
+═══════════════════════════════════════════════════════
+QUALITY REQUIREMENTS
+═══════════════════════════════════════════════════════
+
+- Zero TypeScript errors (strict mode)
+- No hardcoded strings that should be env vars
+- Every async operation has a loading state and error state in the UI
+- The app must render and be fully interactive even with no backend running
+- Mobile layout must work at 375px viewport width
+- All animations must respect prefers-reduced-motion media query

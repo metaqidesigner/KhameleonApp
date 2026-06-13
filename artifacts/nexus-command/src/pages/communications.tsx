@@ -1,138 +1,87 @@
 import { motion } from 'framer-motion';
-import { useListCommunications, getListCommunicationsQueryKey, useGetCommunicationAnalytics, getGetCommunicationAnalyticsQueryKey } from '@workspace/api-client-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Sparkles, Mail, MessageCircle, AlertTriangle } from 'lucide-react';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { cn } from '@/lib/utils';
+import { Radio, ExternalLink, CheckCircle, Circle } from 'lucide-react';
+import { useJarvisConnectors } from '@/hooks/useJarvis';
+
+const CONNECTOR_ICONS: Record<string, string> = {
+  gmail: '📧', gcalendar: '📅', slack: '💬', notion: '📓',
+  gdrive: '📁', github: '⚙️', discord: '🎮', telegram: '✈️',
+  whatsapp: '💚', ticktick: '✅',
+};
+
+const CONNECTOR_DESCRIPTIONS: Record<string, string> = {
+  gmail: 'Read, compose, and manage your emails',
+  gcalendar: 'View and create calendar events',
+  slack: 'Send and receive Slack messages',
+  notion: 'Read and write Notion pages',
+  gdrive: 'Access and manage Google Drive files',
+  github: 'Manage repos, issues, and PRs',
+  discord: 'Monitor and respond in Discord servers',
+  telegram: 'Send and receive Telegram messages',
+  whatsapp: 'WhatsApp messaging integration',
+  ticktick: 'Task and to-do management',
+};
 
 export default function Communications() {
-  const { data: comms, isLoading } = useListCommunications({ query: { queryKey: getListCommunicationsQueryKey() } });
-  const { data: analytics, isLoading: analyticsLoading } = useGetCommunicationAnalytics({ query: { queryKey: getGetCommunicationAnalyticsQueryKey() } });
+  const { data: connectors, isLoading } = useJarvisConnectors();
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex items-center gap-3">
-        <MessageSquare className="w-8 h-8 text-primary" />
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Communications Hub</h1>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: '#38bdf8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Connectors</h2>
+        <p style={{ fontSize: 12, color: 'rgba(130,170,200,0.55)', lineHeight: 1.5 }}>Connect your tools and services to give Nexus access to your digital world. Each connector unlocks new agent capabilities.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <div className="lg:col-span-8 flex flex-col gap-4">
-          {isLoading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="glass-panel border-white/5 h-40 animate-pulse bg-secondary/30" />
-            ))
-          ) : (
-            comms?.map((comm, i) => (
-              <motion.div 
-                key={comm.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <Card className={cn(
-                  "glass-panel transition-all relative overflow-hidden group",
-                  comm.isRead ? "border-white/5 opacity-80" : "border-primary/30 shadow-[0_0_15px_rgba(0,212,255,0.1)]"
-                )}>
-                  <CardContent className="p-5 flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center border border-border">
-                          {comm.source === 'Email' ? <Mail className="w-5 h-5 text-muted-foreground" /> : <MessageCircle className="w-5 h-5 text-muted-foreground" />}
-                        </div>
-                        <div>
-                          <div className="font-bold text-foreground">{comm.sender}</div>
-                          <div className="text-xs text-muted-foreground">{comm.senderEmail || comm.source}</div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <span className={cn(
-                          "px-2 py-0.5 rounded text-xs font-mono border",
-                          comm.sentiment === 'Negative' || comm.sentiment === 'Urgent' ? "bg-destructive/10 text-destructive border-destructive/20" :
-                          comm.sentiment === 'Positive' ? "bg-green-500/10 text-green-400 border-green-500/20" :
-                          "bg-secondary text-muted-foreground border-border"
-                        )}>
-                          {comm.sentiment}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-xs font-mono border bg-primary/10 text-primary border-primary/20">
-                          {comm.priority} Priority
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <h3 className="text-lg font-medium text-foreground mt-1">{comm.subject}</h3>
-                    
-                    <div className="bg-primary/5 border border-primary/10 rounded-lg p-3 relative">
-                      <Sparkles className="w-4 h-4 text-accent absolute top-3 left-3" />
-                      <div className="pl-6 text-sm text-foreground/80 leading-relaxed">
-                        <span className="font-semibold text-primary mr-1">AI Analysis:</span>
-                        {comm.summary}
-                      </div>
-                    </div>
+      {/* Stats bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Radio style={{ width: 14, height: 14, color: '#38bdf8' }} />
+        <span style={{ fontSize: 12, color: 'rgba(130,170,200,0.6)' }}>
+          {isLoading ? 'Loading…' : `${(connectors ?? []).filter(c => c.connected).length} of ${(connectors ?? []).length} connected`}
+        </span>
+      </div>
 
-                    {comm.suggestedResponse && (
-                      <div className="mt-2 text-sm text-muted-foreground bg-secondary/30 p-3 rounded border border-border">
-                        <span className="font-mono text-xs text-foreground block mb-1">SUGGESTED RESPONSE:</span>
-                        {comm.suggestedResponse}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))
-          )}
+      {/* Connector grid */}
+      {isLoading ? (
+        <div className="nexus-grid-2">
+          {Array.from({ length: 8 }).map((_, i) => <div key={i} className="nexus-card nexus-shimmer" style={{ height: 100 }} />)}
         </div>
-
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          <Card className="glass-panel border-white/5">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Communication Analytics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {analyticsLoading ? <div className="h-48 animate-pulse bg-secondary rounded" /> : (
-                <div className="flex flex-col gap-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-secondary/50 p-4 rounded-lg border border-border text-center">
-                      <div className="text-2xl font-mono text-primary font-bold">{analytics?.totalMessages}</div>
-                      <div className="text-xs text-muted-foreground uppercase tracking-wider mt-1">Total</div>
-                    </div>
-                    <div className="bg-secondary/50 p-4 rounded-lg border border-border text-center">
-                      <div className="text-2xl font-mono text-accent font-bold">{analytics?.avgResponseTime}h</div>
-                      <div className="text-xs text-muted-foreground uppercase tracking-wider mt-1">Avg Response</div>
-                    </div>
-                  </div>
-
-                  <div className="h-[200px]">
-                    <h4 className="text-xs font-medium text-muted-foreground text-center mb-2">By Source</h4>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={analytics?.bySource}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={70}
-                          paddingAngle={5}
-                          dataKey="value"
-                        >
-                          {analytics?.bySource.map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={entry.color || 'hsl(var(--primary))'} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          contentStyle={{ backgroundColor: 'rgba(10, 22, 40, 0.9)', borderColor: 'rgba(0, 212, 255, 0.2)' }}
-                          itemStyle={{ color: '#fff' }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
+      ) : (
+        <div className="nexus-grid-2">
+          {(connectors ?? []).map((connector, i) => (
+            <motion.div key={connector.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+              className="nexus-card" style={{ padding: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <div style={{ fontSize: 24, lineHeight: 1 }}>{CONNECTOR_ICONS[connector.id] ?? '🔌'}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(220,240,255,0.95)', marginBottom: 2 }}>{connector.name}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(130,170,200,0.55)', lineHeight: 1.4 }}>{CONNECTOR_DESCRIPTIONS[connector.id] ?? 'External integration'}</div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                {connector.connected ? (
+                  <CheckCircle style={{ width: 18, height: 18, color: '#10b981', flexShrink: 0 }} />
+                ) : (
+                  <Circle style={{ width: 18, height: 18, color: 'rgba(130,170,200,0.25)', flexShrink: 0 }} />
+                )}
+              </div>
+              <button
+                className={connector.connected ? 'nexus-btn-ghost' : 'nexus-btn'}
+                style={connector.connected ? {} : { borderColor: 'rgba(56,189,248,0.4)', color: '#38bdf8', background: 'rgba(56,189,248,0.08)', width: '100%', justifyContent: 'center' }}
+                onClick={() => { /* stub OAuth flow */ }}
+              >
+                {connector.connected ? (
+                  <span style={{ fontSize: 11, color: '#10b981' }}>✓ Connected</span>
+                ) : (
+                  <><ExternalLink style={{ width: 12, height: 12 }} /> Connect via OpenJarvis</>
+                )}
+              </button>
+            </motion.div>
+          ))}
         </div>
+      )}
 
+      {/* Info box */}
+      <div style={{ padding: 16, background: 'rgba(56,189,248,0.05)', border: '1px solid rgba(56,189,248,0.12)', borderRadius: 12 }}>
+        <p style={{ fontSize: 12, color: 'rgba(130,170,200,0.6)', lineHeight: 1.6, margin: 0 }}>
+          Connectors require a running OpenJarvis backend with the appropriate credentials configured. Start with <code style={{ fontSize: 11, color: '#38bdf8', background: 'rgba(56,189,248,0.1)', padding: '1px 5px', borderRadius: 4 }}>OPENAI_API_KEY</code> or <code style={{ fontSize: 11, color: '#38bdf8', background: 'rgba(56,189,248,0.1)', padding: '1px 5px', borderRadius: 4 }}>ANTHROPIC_API_KEY</code> in your .env file.
+        </p>
       </div>
     </div>
   );

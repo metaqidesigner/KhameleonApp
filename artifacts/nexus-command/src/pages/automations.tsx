@@ -13,7 +13,7 @@ export default function Automations() {
 
   const handleRun = (id: number, name: string) => {
     runAutomation.mutate(
-      { data: { id } },
+      { id },
       {
         onSuccess: (res) => {
           toast({

@@ -1,137 +1,122 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useListAgents, getListAgentsQueryKey, useRouteTask } from '@workspace/api-client-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Bot, Network, Zap, CheckCircle2, ShieldAlert, Cpu } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { Bot, Zap, Brain, Code, Radio, Cpu, Eye, Network, Send, X } from 'lucide-react';
+import { useJarvisAgents } from '@/hooks/useJarvis';
+import { streamChat } from '@/lib/jarvisApi';
+import { useNexusStore } from '@/store/nexusStore';
+import { marked } from 'marked';
 
-export default function Agents() {
-  const [taskInput, setTaskInput] = useState('');
-  const [routingResult, setRoutingResult] = useState<any>(null);
-  const { data: agents, isLoading } = useListAgents({ query: { queryKey: getListAgentsQueryKey() } });
-  const routeTask = useRouteTask();
+const AGENT_META: Record<string, { icon: React.FC<{ style?: React.CSSProperties }>, color: string, glow: string, description: string }> = {
+  simple:          { icon: Bot,     color: '#00d4ff', glow: '0,212,255',   description: 'Fast single-turn responses. Best for quick questions and lookups.' },
+  orchestrator:    { icon: Network, color: '#a855f7', glow: '168,85,247',  description: 'Coordinates multiple agents to solve complex, multi-step problems.' },
+  deep_research:   { icon: Brain,   color: '#38bdf8', glow: '56,189,248',  description: 'Performs thorough web research and synthesises a detailed report.' },
+  morning_digest:  { icon: Zap,     color: '#c9a84c', glow: '201,168,76',  description: 'Summarises your day — calendar, emails, tasks, and priorities.' },
+  code_assistant:  { icon: Code,    color: '#10b981', glow: '16,185,129',  description: 'Writes, reviews, and debugs code across all major languages.' },
+  channel_agent:   { icon: Radio,   color: '#38bdf8', glow: '56,189,248',  description: 'Monitors and responds across communication channels.' },
+  proactive_agent: { icon: Eye,     color: '#f59e0b', glow: '245,158,11',  description: 'Autonomously watches for events and triggers actions.' },
+  operative:       { icon: Cpu,     color: '#ef4444', glow: '239,68,68',   description: 'Executes complex tool chains with full system access.' },
+};
 
-  const handleRouteTask = () => {
-    if (!taskInput) return;
-    routeTask.mutate(
-      { data: { task: taskInput } },
-      {
-        onSuccess: (res) => {
-          setRoutingResult(res);
-        }
-      }
+function AgentChat({ agentId, onClose }: { agentId: string; onClose: () => void }) {
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string; model?: string }[]>([]);
+  const [input, setInput] = useState('');
+  const { isStreaming, setStreaming, pushAgentEvent } = useNexusStore();
+
+  const send = () => {
+    if (!input.trim() || isStreaming) return;
+    const prompt = input.trim();
+    setInput('');
+    setMessages(m => [...m, { role: 'user', text: prompt }]);
+    setStreaming(true);
+    let acc = '';
+    setMessages(m => [...m, { role: 'ai', text: '' }]);
+    const ts = Date.now();
+    const cleanup = streamChat(prompt, agentId,
+      (token) => { acc += token; setMessages(m => { const copy = [...m]; copy[copy.length - 1] = { role: 'ai', text: acc }; return copy; }); },
+      (model) => {
+        setStreaming(false);
+        setMessages(m => { const copy = [...m]; copy[copy.length - 1] = { role: 'ai', text: acc, model: model ?? undefined }; return copy; });
+        pushAgentEvent({ id: crypto.randomUUID(), prompt, response: acc, model: model ?? 'unknown', agent: agentId, ts, durationMs: Date.now() - ts });
+        cleanup();
+      },
     );
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex items-center gap-3">
-        <Bot className="w-8 h-8 text-primary" />
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Agent Orchestration Engine</h1>
+    <div style={{ marginTop: 16, background: 'rgba(0,10,20,0.6)', border: '1px solid rgba(0,212,255,0.12)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid rgba(0,212,255,0.08)' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(0,212,255,0.7)', letterSpacing: '0.1em' }}>CHAT · {agentId.toUpperCase()}</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(200,220,240,0.5)', cursor: 'pointer', padding: 4 }}><X style={{ width: 14, height: 14 }} /></button>
       </div>
-
-      <Card className="glass-panel border-primary/20 neon-glow relative overflow-hidden">
-        <div className="absolute inset-0 bg-primary/5 blur-xl pointer-events-none" />
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg text-primary">
-            <Network className="w-5 h-5" /> Task Router
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4">
-            <Input 
-              value={taskInput}
-              onChange={(e) => setTaskInput(e.target.value)}
-              placeholder="Describe a task to route to the optimal AI agent..."
-              className="bg-secondary/50 border-primary/30 text-foreground h-12 text-lg focus-visible:ring-primary/50"
-              onKeyDown={(e) => e.key === 'Enter' && handleRouteTask()}
-            />
-            <Button onClick={handleRouteTask} disabled={routeTask.isPending} className="h-12 px-8 bg-primary hover:bg-primary/80 text-primary-foreground font-semibold tracking-wider">
-              {routeTask.isPending ? 'ROUTING...' : 'ROUTE TASK'}
-            </Button>
+      <div style={{ minHeight: 120, maxHeight: 260, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }} className="scrollbar-hide">
+        {messages.length === 0 && <div style={{ color: 'rgba(130,170,200,0.4)', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>Send a message to start…</div>}
+        {messages.map((m, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+            <div style={{
+              maxWidth: '82%', padding: '9px 13px', borderRadius: 10,
+              background: m.role === 'user' ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${m.role === 'user' ? 'rgba(0,212,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
+              fontSize: 12, color: 'rgba(210,235,250,0.9)', lineHeight: 1.55,
+            }}>
+              {m.role === 'ai' ? <div className="nexus-prose" dangerouslySetInnerHTML={{ __html: marked.parse(m.text) as string }} style={{ fontSize: 12 }} /> : m.text}
+              {m.model && <div style={{ fontSize: 9.5, color: 'rgba(0,212,255,0.35)', marginTop: 5, fontFamily: 'var(--font-mono)' }}>{m.model}</div>}
+            </div>
           </div>
-
-          {routingResult && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-6 p-4 rounded-xl border border-primary/30 bg-primary/10 flex flex-col gap-3"
-            >
-              <div className="flex items-center gap-2 text-primary font-semibold">
-                <CheckCircle2 className="w-5 h-5" /> Routed successfully
-              </div>
-              <div className="text-foreground text-sm leading-relaxed">{routingResult.reasoning}</div>
-              <div className="flex gap-6 mt-2">
-                <div>
-                  <span className="text-muted-foreground text-xs uppercase">Primary Agent</span>
-                  <div className="font-mono text-white font-medium">{routingResult.primaryAgent?.name}</div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground text-xs uppercase">Confidence</span>
-                  <div className="font-mono text-green-400 font-medium">{routingResult.confidenceScore}%</div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="glass-panel border-white/5 h-48 animate-pulse bg-secondary/30" />
-          ))
-        ) : (
-          agents?.map((agent, i) => (
-            <motion.div 
-              key={agent.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <Card className="glass-panel border-white/10 hover:border-primary/50 hover:shadow-[0_0_20px_rgba(0,212,255,0.15)] transition-all h-full group">
-                <CardHeader className="pb-3 flex flex-row items-start justify-between">
-                  <div>
-                    <CardTitle className="text-xl text-foreground group-hover:text-primary transition-colors">{agent.name}</CardTitle>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wider mt-1">{agent.category}</div>
-                  </div>
-                  <div className="px-2 py-1 rounded-full bg-secondary text-xs font-mono border border-border">
-                    {agent.status}
-                  </div>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4">
-                  <p className="text-sm text-muted-foreground line-clamp-2">{agent.description}</p>
-                  
-                  <div className="grid grid-cols-2 gap-4 mt-auto">
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Reliability</div>
-                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                        <div className="h-full bg-green-500" style={{ width: `${agent.reliabilityScore}%` }} />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Zap className="w-3 h-3" /> Cost Eff.</div>
-                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                        <div className="h-full bg-accent" style={{ width: `${agent.costScore}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {agent.supportedModels?.map((model: string) => (
-                      <span key={model} className="text-[10px] px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 flex items-center gap-1">
-                        <Cpu className="w-3 h-3" /> {model}
-                      </span>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))
-        )}
+        ))}
       </div>
+      <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(0,212,255,0.08)', display: 'flex', gap: 8 }}>
+        <input className="nexus-input" style={{ fontSize: 12, padding: '7px 12px' }} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} disabled={isStreaming} placeholder="Ask this agent…" />
+        <button className="nexus-btn" style={{ padding: '7px 14px', flexShrink: 0 }} onClick={send} disabled={isStreaming || !input.trim()}>
+          <Send style={{ width: 13, height: 13 }} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function Agents() {
+  const { data: agents, isLoading } = useJarvisAgents();
+  const [openChat, setOpenChat] = useState<string | null>(null);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div>
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: '#00d4ff', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>AI Agents</h2>
+        <p style={{ fontSize: 12, color: 'rgba(130,170,200,0.55)', lineHeight: 1.5 }}>Launch any Jarvis agent type. Each agent has specialised capabilities for different tasks.</p>
+      </div>
+
+      {isLoading ? (
+        <div className="nexus-grid-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="nexus-card nexus-shimmer" style={{ height: 130 }} />)}</div>
+      ) : (
+        <div className="nexus-grid-2">
+          {(agents ?? []).map((agentId, i) => {
+            const meta = AGENT_META[agentId] ?? { icon: Bot, color: '#00d4ff', glow: '0,212,255', description: 'General purpose agent.' };
+            const { icon: Icon } = meta;
+            const isOpen = openChat === agentId;
+            return (
+              <motion.div key={agentId} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+                className="nexus-card" style={{ padding: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 12, flexShrink: 0, background: `rgba(${meta.glow},0.12)`, border: `1px solid rgba(${meta.glow},0.3)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon style={{ width: 17, height: 17, color: meta.color }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(220,240,255,0.95)', letterSpacing: '0.04em', fontFamily: 'var(--font-mono)' }}>{agentId.replace(/_/g, ' ').toUpperCase()}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(130,170,200,0.6)', marginTop: 3, lineHeight: 1.4 }}>{meta.description}</div>
+                    </div>
+                  </div>
+                  <button className="nexus-btn" style={{ flexShrink: 0, padding: '6px 14px', fontSize: 11, borderColor: `rgba(${meta.glow},0.4)`, color: meta.color, background: `rgba(${meta.glow},0.1)` }}
+                    onClick={() => setOpenChat(isOpen ? null : agentId)}>
+                    {isOpen ? 'Close' : 'Launch'}
+                  </button>
+                </div>
+                {isOpen && <AgentChat agentId={agentId} onClose={() => setOpenChat(null)} />}
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

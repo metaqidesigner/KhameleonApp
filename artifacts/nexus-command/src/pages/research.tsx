@@ -1,105 +1,115 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { useListResearchItems, getListResearchItemsQueryKey } from '@workspace/api-client-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { FlaskConical, Search, BookOpen, ExternalLink, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { FlaskConical, Send, Hash, Cpu } from 'lucide-react';
+import { marked } from 'marked';
+import { runResearch, streamChat } from '@/lib/jarvisApi';
+import { useNexusStore } from '@/store/nexusStore';
 
 export default function Research() {
-  const [search, setSearch] = useState('');
-  const { data: items, isLoading } = useListResearchItems({ query: { queryKey: getListResearchItemsQueryKey() } });
+  const [query, setQuery] = useState('');
+  const [result, setResult] = useState('');
+  const [model, setModel] = useState<string | null>(null);
+  const [tokenEstimate, setTokenEstimate] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [streamMode, setStreamMode] = useState(true);
+  const { setStreaming, pushAgentEvent } = useNexusStore();
 
-  const filteredItems = items?.filter(item => 
-    item.title.toLowerCase().includes(search.toLowerCase()) || 
-    item.description?.toLowerCase().includes(search.toLowerCase()) ||
-    item.tags?.some(t => t.toLowerCase().includes(search.toLowerCase()))
-  );
+  const handleResearch = async () => {
+    if (!query.trim() || loading) return;
+    setLoading(true);
+    setResult('');
+    setModel(null);
+    setTokenEstimate(null);
+    const ts = Date.now();
+
+    if (streamMode) {
+      setStreaming(true);
+      let acc = '';
+      const cleanup = streamChat(query, 'deep_research',
+        (token) => { acc += token; setResult(acc); },
+        (mdl) => {
+          setLoading(false);
+          setStreaming(false);
+          setModel(mdl);
+          setTokenEstimate(Math.round(acc.length / 4));
+          pushAgentEvent({ id: crypto.randomUUID(), prompt: query, response: acc, model: mdl ?? 'unknown', agent: 'deep_research', ts, durationMs: Date.now() - ts });
+          cleanup();
+        },
+      );
+    } else {
+      const res = await runResearch(query);
+      setResult(res.content);
+      setModel(res.model);
+      setTokenEstimate(Math.round(res.content.length / 4));
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto pb-10">
-      <div className="flex items-center gap-3">
-        <FlaskConical className="w-8 h-8 text-primary" />
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Research Centre</h1>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: '#38bdf8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Deep Research</h2>
+        <p style={{ fontSize: 12, color: 'rgba(130,170,200,0.55)', lineHeight: 1.5 }}>Nexus will conduct a thorough research session using the deep_research agent and return a structured markdown report.</p>
       </div>
 
-      <div className="relative group w-full">
-        <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-        <Input 
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search research topics, entities, or tags..." 
-          className="pl-10 h-12 bg-card/50 border-primary/20 focus-visible:ring-primary/50 text-base"
-        />
+      {/* Mode toggle */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        {[{ id: true, label: 'Stream' }, { id: false, label: 'Batch' }].map(m => (
+          <button key={String(m.id)} onClick={() => setStreamMode(m.id)}
+            className={`nexus-pill ${streamMode === m.id ? 'nexus-pill-cyan' : 'nexus-pill-ghost'}`}
+            style={{ cursor: 'pointer', fontSize: 10, padding: '3px 12px' }}>
+            {m.label}
+          </button>
+        ))}
       </div>
 
-      <div className="flex flex-col gap-4 mt-2">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="glass-panel border-white/5 h-32 animate-pulse bg-secondary/30" />
-          ))
-        ) : filteredItems?.length === 0 ? (
-          <div className="text-center p-10 border border-dashed border-border rounded-xl text-muted-foreground">
-            No research items found matching your query.
+      {/* Input */}
+      <div className="nexus-card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <input className="nexus-input" value={query} onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleResearch()}
+            placeholder="e.g. 'Latest advances in quantum error correction 2024'" />
+          <button className="nexus-btn" onClick={handleResearch} disabled={loading || !query.trim()}
+            style={{ flexShrink: 0, borderColor: 'rgba(56,189,248,0.4)', color: '#38bdf8', background: 'rgba(56,189,248,0.1)' }}>
+            {loading ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(56,189,248,0.3)', borderTopColor: '#38bdf8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> Researching…</> : <><Send style={{ width: 13, height: 13 }} /> Deep Research</>}
+          </button>
+        </div>
+      </div>
+
+      {/* Loading skeleton */}
+      {loading && !result && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="nexus-shimmer" style={{ height: 18, borderRadius: 6, width: `${75 + Math.random() * 20}%` }} />
+          ))}
+        </div>
+      )}
+
+      {/* Result */}
+      {result && (
+        <div className="nexus-card" style={{ padding: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+            <FlaskConical style={{ width: 14, height: 14, color: '#38bdf8' }} />
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(56,189,248,0.8)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Research Report</span>
           </div>
-        ) : (
-          filteredItems?.map((item, i) => (
-            <motion.div 
-              key={item.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <Card className="glass-panel border-white/5 hover:border-primary/30 transition-colors group">
-                <CardContent className="p-5 flex gap-5">
-                  <div className="hidden sm:flex w-12 h-12 rounded-lg bg-secondary/50 border border-border items-center justify-center shrink-0 group-hover:border-primary/50 group-hover:text-primary transition-colors text-muted-foreground">
-                    <BookOpen className="w-6 h-6" />
-                  </div>
-                  
-                  <div className="flex-1 flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">{item.title}</h3>
-                      <div className="flex gap-2">
-                        <span className="text-xs font-mono px-2 py-0.5 rounded border border-border bg-secondary text-muted-foreground">{item.type}</span>
-                        {item.credibilityScore && (
-                          <span className={cn(
-                            "text-xs font-mono px-2 py-0.5 rounded border",
-                            item.credibilityScore >= 90 ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-primary/10 text-primary border-primary/20"
-                          )}>
-                            Score: {item.credibilityScore}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <p className="text-sm text-muted-foreground">{item.description}</p>
-                    
-                    {item.aiSummary && (
-                      <div className="bg-primary/5 border border-primary/10 p-3 rounded-lg mt-2 text-sm text-foreground/80 flex items-start gap-2">
-                        <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                        <div><span className="font-semibold text-primary">Key Finding:</span> {item.aiSummary}</div>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="flex gap-2">
-                        {item.tags?.map(tag => (
-                          <span key={tag} className="text-[10px] px-2 py-0.5 rounded bg-secondary/50 text-muted-foreground border border-border uppercase tracking-wider">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1 hover:text-primary cursor-pointer transition-colors">
-                        <ExternalLink className="w-3 h-3" /> {item.sources || 0} Sources
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))
-        )}
-      </div>
+
+          <div className="nexus-prose" dangerouslySetInnerHTML={{ __html: marked.parse(result) as string }} />
+
+          {(model || tokenEstimate) && (
+            <div style={{ marginTop: 20, paddingTop: 14, borderTop: '1px solid rgba(0,212,255,0.08)', display: 'flex', gap: 20 }}>
+              {tokenEstimate && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'rgba(0,212,255,0.45)', fontFamily: 'var(--font-mono)' }}>
+                  <Hash style={{ width: 11, height: 11 }} /> ~{tokenEstimate.toLocaleString()} tokens
+                </div>
+              )}
+              {model && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'rgba(0,212,255,0.45)', fontFamily: 'var(--font-mono)' }}>
+                  <Cpu style={{ width: 11, height: 11 }} /> {model.toUpperCase()}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

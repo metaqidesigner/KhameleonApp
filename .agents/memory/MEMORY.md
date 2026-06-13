@@ -1,0 +1,1 @@
+- [Nexus Command Architecture](nexus-command-arch.md) — three-ring orbital layout, Zustand store, Jarvis API client with graceful offline fallback, all extracted into separate component files.
