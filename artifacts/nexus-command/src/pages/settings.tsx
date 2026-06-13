@@ -1,100 +1,217 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Settings as SettingsIcon, User, Bell, Shield, Database, Cpu } from 'lucide-react';
-import { useListModes, getListModesQueryKey, useSetCurrentMode, getGetCurrentModeQueryKey } from '@workspace/api-client-react';
-import { useQueryClient } from '@tanstack/react-query';
-import { cn } from '@/lib/utils';
+import { useState } from 'react';
+
+type Section = 'general' | 'engine' | 'appearance' | 'memory' | 'telemetry' | 'advanced';
+
+const SECTIONS: { id: Section; label: string }[] = [
+  { id: 'general',    label: 'General' },
+  { id: 'engine',     label: 'Engine' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'memory',     label: 'Memory' },
+  { id: 'telemetry',  label: 'Telemetry' },
+  { id: 'advanced',   label: 'Advanced' },
+];
+
+function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #30363d', gap: 16 }}>
+      <span style={{ fontSize: 13, color: '#e6edf3', flex: 1 }}>{label}</span>
+      <div style={{ flexShrink: 0 }}>{children}</div>
+    </div>
+  );
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 36, height: 20, borderRadius: 10,
+        background: checked ? 'rgba(88,166,255,0.3)' : '#21262d',
+        border: `1px solid ${checked ? '#58a6ff' : '#30363d'}`,
+        cursor: 'pointer', padding: 0, position: 'relative', transition: 'background 0.2s',
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: 2,
+        left: checked ? 16 : 2, width: 14, height: 14,
+        background: checked ? '#58a6ff' : '#484f58',
+        borderRadius: '50%', transition: 'left 0.2s',
+      }} />
+    </button>
+  );
+}
 
 export default function Settings() {
-  const { data: modes } = useListModes({ query: { queryKey: getListModesQueryKey() } });
-  const setMode = useSetCurrentMode();
-  const queryClient = useQueryClient();
+  const [section, setSection] = useState<Section>('general');
+  const [mode, setMode] = useState('work');
+  const [engine, setEngine] = useState('ollama');
+  const [model, setModel] = useState('llama3.2');
+  const [baseUrl, setBaseUrl] = useState('http://localhost:11434');
+  const [fontSize, setFontSize] = useState<12 | 13 | 14>(13);
+  const [railExpanded, setRailExpandedLocal] = useState(true);
+  const [indexPath, setIndexPath] = useState('');
+  const [autoIndex, setAutoIndex] = useState(false);
+  const [chunkSize, setChunkSize] = useState(512);
+  const [anonymousTelemetry, setAnonymousTelemetry] = useState(false);
+  const [showCost, setShowCost] = useState(true);
+  const [showEnergy, setShowEnergy] = useState(true);
+  const [connResult, setConnResult] = useState<string | null>(null);
 
-  const handleModeChange = (modeId: number) => {
-    setMode.mutate({ data: { modeId } }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListModesQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetCurrentModeQueryKey() });
-      }
-    });
+  const testConnection = async () => {
+    try {
+      const r = await fetch('/api/health');
+      const d = await r.json() as { status: string; engine: string; model: string };
+      setConnResult(`✓ ${d.status} — ${d.engine} / ${d.model}`);
+    } catch {
+      setConnResult('✗ Connection failed — backend unreachable');
+    }
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto pb-10">
-      <div className="flex items-center gap-3">
-        <SettingsIcon className="w-8 h-8 text-primary" />
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">System Settings</h1>
+    <div className="j-page">
+      <div className="j-page-header">
+        <div>
+          <h1>Settings</h1>
+          <p>Configure Jarvis behaviour and connections</p>
+        </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-1 flex flex-col gap-2">
-          {['Profile', 'Operating Modes', 'Notifications', 'Security', 'Data & Memory', 'Advanced'].map((tab, i) => (
-            <div 
-              key={tab} 
-              className={cn(
-                "px-4 py-3 rounded-lg text-sm font-medium cursor-pointer transition-colors",
-                i === 1 ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-              )}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* Left nav */}
+        <div style={{
+          width: 160, flexShrink: 0, padding: '12px 0',
+          borderRight: '1px solid #30363d', background: '#0d1117',
+          overflow: 'auto',
+        }}>
+          {SECTIONS.map(s => (
+            <button
+              key={s.id}
+              onClick={() => setSection(s.id)}
+              style={{
+                width: '100%', height: 34, display: 'flex', alignItems: 'center',
+                padding: '0 14px', background: section === s.id ? '#21262d' : 'none',
+                border: 'none', borderLeft: section === s.id ? '2px solid #58a6ff' : '2px solid transparent',
+                color: section === s.id ? '#e6edf3' : '#8b949e',
+                fontSize: 13, cursor: 'pointer', textAlign: 'left',
+              }}
             >
-              {tab}
-            </div>
+              {s.label}
+            </button>
           ))}
         </div>
 
-        <div className="md:col-span-2 flex flex-col gap-6">
-          <Card className="glass-panel border-white/10">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Cpu className="w-5 h-5 text-primary" /> Operating Modes</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <p className="text-sm text-muted-foreground mb-2">Configure how Nexus Command behaves across different contexts. Selecting a mode changes UI density, notification routing, and active agents.</p>
-              
-              <div className="flex flex-col gap-3">
-                {modes?.map(mode => (
-                  <div 
-                    key={mode.id} 
-                    className={cn(
-                      "flex items-center justify-between p-4 rounded-lg border transition-all cursor-pointer",
-                      mode.isActive ? "bg-primary/5 border-primary/40 shadow-[0_0_10px_rgba(0,212,255,0.1)]" : "bg-secondary/30 border-white/5 hover:border-white/20"
-                    )}
-                    onClick={() => handleModeChange(mode.id)}
-                  >
-                    <div>
-                      <div className={cn("font-bold", mode.isActive ? "text-primary" : "text-foreground")}>{mode.name}</div>
-                      <div className="text-xs text-muted-foreground mt-1">{mode.description}</div>
-                    </div>
-                    <div className={cn(
-                      "w-4 h-4 rounded-full border-2",
-                      mode.isActive ? "border-primary bg-primary" : "border-muted-foreground/50"
-                    )} />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+        {/* Content */}
+        <div style={{ flex: 1, padding: 24, overflowY: 'auto' }} className="scrollbar-thin">
+          {section === 'general' && (
+            <div>
+              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>General</h2>
+              <SettingRow label="Mode">
+                <select className="j-input" value={mode} onChange={e => setMode(e.target.value)} style={{ width: 140 }}>
+                  {['work', 'research', 'creative', 'focused'].map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </SettingRow>
+              <SettingRow label="Username">
+                <input className="j-input" style={{ width: 180 }} defaultValue="Jarvis User" />
+              </SettingRow>
+            </div>
+          )}
 
-          <Card className="glass-panel border-white/10 opacity-70">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg"><Bell className="w-5 h-5 text-muted-foreground" /> Notifications</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="notif-sound" className="flex flex-col gap-1 cursor-pointer">
-                  <span>Audio Alerts</span>
-                  <span className="font-normal text-xs text-muted-foreground">Play subtle sci-fi sounds for critical alerts</span>
-                </Label>
-                <Switch id="notif-sound" defaultChecked />
+          {section === 'engine' && (
+            <div>
+              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>Engine</h2>
+              <SettingRow label="Engine">
+                <select className="j-input" value={engine} onChange={e => setEngine(e.target.value)} style={{ width: 160 }}>
+                  {['ollama', 'vllm', 'sglang', 'llama.cpp', 'openai', 'anthropic'].map(e => <option key={e} value={e}>{e}</option>)}
+                </select>
+              </SettingRow>
+              <SettingRow label="Model">
+                <input className="j-input" value={model} onChange={e => setModel(e.target.value)} style={{ width: 180 }} />
+              </SettingRow>
+              <SettingRow label="Base URL">
+                <input className="j-input" value={baseUrl} onChange={e => setBaseUrl(e.target.value)} style={{ width: 240 }} />
+              </SettingRow>
+              <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button onClick={testConnection} className="j-btn j-btn-primary">Test Connection</button>
+                {connResult && (
+                  <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: connResult.startsWith('✓') ? '#3fb950' : '#f85149' }}>
+                    {connResult}
+                  </span>
+                )}
               </div>
-              <div className="flex items-center justify-between mt-2">
-                <Label htmlFor="notif-agent" className="flex flex-col gap-1 cursor-pointer">
-                  <span>Agent Proactivity</span>
-                  <span className="font-normal text-xs text-muted-foreground">Allow agents to initiate actions without prompt</span>
-                </Label>
-                <Switch id="notif-agent" defaultChecked />
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          )}
+
+          {section === 'appearance' && (
+            <div>
+              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>Appearance</h2>
+              <SettingRow label="Theme">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="j-badge j-badge-blue">Dark</span>
+                  <span style={{ fontSize: 11, color: '#484f58' }}>OpenJarvis is dark by design</span>
+                </div>
+              </SettingRow>
+              <SettingRow label="Font size">
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {([12, 13, 14] as const).map(s => (
+                    <button key={s} onClick={() => setFontSize(s)} className={`j-pill ${fontSize === s ? 'j-pill-active' : ''}`}>
+                      {s}px
+                    </button>
+                  ))}
+                </div>
+              </SettingRow>
+              <SettingRow label="Rail expanded by default">
+                <Toggle checked={railExpanded} onChange={setRailExpandedLocal} />
+              </SettingRow>
+            </div>
+          )}
+
+          {section === 'memory' && (
+            <div>
+              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>Memory</h2>
+              <SettingRow label="Default index path">
+                <input className="j-input" value={indexPath} onChange={e => setIndexPath(e.target.value)} placeholder="~/documents" style={{ width: 220 }} />
+              </SettingRow>
+              <SettingRow label="Auto-index on startup">
+                <Toggle checked={autoIndex} onChange={setAutoIndex} />
+              </SettingRow>
+              <SettingRow label="Chunk size">
+                <input type="number" className="j-input" value={chunkSize} onChange={e => setChunkSize(+e.target.value)} min={128} max={4096} style={{ width: 80 }} />
+              </SettingRow>
+            </div>
+          )}
+
+          {section === 'telemetry' && (
+            <div>
+              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>Telemetry</h2>
+              <SettingRow label="Send anonymous telemetry">
+                <Toggle checked={anonymousTelemetry} onChange={setAnonymousTelemetry} />
+              </SettingRow>
+              <SettingRow label="Show cost estimates">
+                <Toggle checked={showCost} onChange={setShowCost} />
+              </SettingRow>
+              <SettingRow label="Show energy estimates">
+                <Toggle checked={showEnergy} onChange={setShowEnergy} />
+              </SettingRow>
+            </div>
+          )}
+
+          {section === 'advanced' && (
+            <div>
+              <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 16px', color: '#e6edf3' }}>Advanced</h2>
+              <p style={{ fontSize: 12, color: '#8b949e', marginBottom: 16 }}>
+                Advanced configuration options for Jarvis runtime behaviour.
+              </p>
+              <SettingRow label="Max concurrent agents">
+                <input type="number" className="j-input" defaultValue={3} min={1} max={10} style={{ width: 80 }} />
+              </SettingRow>
+              <SettingRow label="WebSocket reconnect interval">
+                <input type="number" className="j-input" defaultValue={5000} style={{ width: 100 }} />
+                <span style={{ fontSize: 11, color: '#484f58', marginLeft: 6 }}>ms</span>
+              </SettingRow>
+              <SettingRow label="Debug logging">
+                <Toggle checked={false} onChange={() => {}} />
+              </SettingRow>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,1 +1,1 @@
-- [Nexus Command Architecture](nexus-command-arch.md) — three-ring orbital layout, Zustand store, Jarvis API client with graceful offline fallback, all extracted into separate component files.
+- [Jarvis Command Architecture](jarvis-command-arch.md) — three-column terminal-native shell: NavRail + AppShell + StatusBar, state in jarvisStore.ts, all Jarvis API calls in jarvisApi.ts with offline fallbacks.

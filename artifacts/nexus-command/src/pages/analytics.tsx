@@ -1,86 +1,186 @@
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { LineChart as LineChartIcon, Hash, Clock } from 'lucide-react';
-import { useNexusStore } from '@/store/nexusStore';
+import {
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
+import { useJarvisHealth, useJarvisTelemetry } from '@/hooks/useJarvis';
+import { useJarvisStore } from '@/store/jarvisStore';
 
-const MOCK_RESPONSE_TIMES = Array.from({ length: 20 }, (_, i) => ({ i: i + 1, ms: 400 + Math.floor(Math.random() * 1200) }));
+const COLORS = ['#58a6ff', '#3fb950', '#d29922', '#f85149', '#bc8cff', '#39d353'];
 
-const AGENT_COLORS: Record<string, string> = {
-  simple: '#00d4ff', orchestrator: '#a855f7', deep_research: '#38bdf8',
-  morning_digest: '#c9a84c', code_assistant: '#10b981', channel_agent: '#38bdf8',
-  proactive_agent: '#f59e0b', operative: '#ef4444',
-};
+function fmt(v: number | undefined, d = 0, suf = '') {
+  if (v === undefined) return '—';
+  return v.toFixed(d) + suf;
+}
+
+// Generate 7-day mock data from agent history
+function buildDailyData(agentHistory: { ts: number }[]) {
+  const days: Record<string, number> = {};
+  const now = Date.now();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now - i * 86400000);
+    days[d.toLocaleDateString('en', { weekday: 'short' })] = 0;
+  }
+  agentHistory.forEach(ev => {
+    const d = new Date(ev.ts).toLocaleDateString('en', { weekday: 'short' });
+    if (d in days) days[d]++;
+  });
+  return Object.entries(days).map(([day, count]) => ({ day, count }));
+}
+
+function buildLatencyBuckets(telemetry: { queries: { latency_ms: number }[] } | undefined) {
+  const buckets = [
+    { range: '<100ms', count: 0 },
+    { range: '100-300ms', count: 0 },
+    { range: '300-1s', count: 0 },
+    { range: '>1s', count: 0 },
+  ];
+  if (!telemetry) return buckets;
+  for (const q of telemetry.queries) {
+    const ms = q.latency_ms;
+    if (ms < 100) buckets[0].count++;
+    else if (ms < 300) buckets[1].count++;
+    else if (ms < 1000) buckets[2].count++;
+    else buckets[3].count++;
+  }
+  return buckets;
+}
 
 export default function Analytics() {
-  const agentHistory = useNexusStore(s => s.agentHistory);
+  const { data: health } = useJarvisHealth();
+  const { data: telemetry } = useJarvisTelemetry();
+  const agentHistory = useJarvisStore(s => s.agentHistory);
 
-  // Build agent-type bar chart data from history
+  const dailyData = buildDailyData(agentHistory);
+  const latencyData = buildLatencyBuckets(telemetry);
+
+  // Agent usage from history
   const agentCounts: Record<string, number> = {};
   agentHistory.forEach(ev => { agentCounts[ev.agent] = (agentCounts[ev.agent] ?? 0) + 1; });
-  const barData = Object.entries(agentCounts).map(([agent, count]) => ({ agent: agent.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), count, fill: AGENT_COLORS[agent] ?? '#00d4ff' }));
+  const agentPie = Object.entries(agentCounts).map(([name, value]) => ({ name, value }));
+  const totalAgentQueries = Object.values(agentCounts).reduce((a, b) => a + b, 0);
 
-  // Response time line from history
-  const rtData = agentHistory.slice(0, 20).reverse().map((ev, i) => ({ i: i + 1, ms: ev.durationMs ?? Math.floor(Math.random() * 1200 + 400) }));
-  const rtDisplay = rtData.length > 1 ? rtData : MOCK_RESPONSE_TIMES;
+  // Cost breakdown by agent
+  const costRows = Object.entries(telemetry?.by_agent ?? {}).map(([agent, stats]) => ({
+    agent, queries: stats.queries, avgCost: stats.avg_cost, totalCost: stats.total_cost,
+  }));
 
-  const totalTokens = agentHistory.reduce((sum, ev) => sum + Math.round(ev.response.length / 4), 0);
-  const avgMs = agentHistory.length > 0 ? Math.round(agentHistory.reduce((s, e) => s + (e.durationMs ?? 0), 0) / agentHistory.length) : null;
+  const statCards = [
+    { label: 'TOTAL QUERIES',  value: fmt((health?.total_queries ?? 0) + agentHistory.length, 0) },
+    { label: 'AVG LATENCY',    value: fmt(health?.avg_latency_ms ?? telemetry?.avg_latency_ms, 0, 'ms') },
+    { label: 'TOTAL COST',     value: `$${fmt(telemetry?.cost_usd, 4)}` },
+    { label: 'ENERGY',         value: fmt(telemetry?.energy_wh, 2, ' Wh') },
+  ];
+
+  const tooltipStyle = { background: '#161b22', border: '1px solid #30363d', fontSize: 11, fontFamily: 'var(--font-mono)', color: '#e6edf3' };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <h2 style={{ fontSize: 14, fontWeight: 700, color: '#10b981', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Analytics</h2>
-        <p style={{ fontSize: 12, color: 'rgba(130,170,200,0.55)', lineHeight: 1.5 }}>Usage metrics from this session's agent activity.</p>
+    <div className="j-page">
+      <div className="j-page-header">
+        <div>
+          <h1>Analytics</h1>
+          <p>Efficiency metrics and usage telemetry</p>
+        </div>
       </div>
+      <div className="j-page-content" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Stat cards */}
+        <div className="j-grid-4">
+          {statCards.map(s => (
+            <div key={s.label} className="j-stat-card">
+              <div className="j-stat-value">{s.value}</div>
+              <div className="j-stat-label">{s.label}</div>
+            </div>
+          ))}
+        </div>
 
-      {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
-        {[
-          { label: 'Total Queries', value: agentHistory.length, icon: LineChartIcon, color: '#00d4ff' },
-          { label: 'Est. Tokens', value: totalTokens.toLocaleString(), icon: Hash, color: '#c9a84c' },
-          { label: 'Avg Response', value: avgMs ? `${avgMs}ms` : '—', icon: Clock, color: '#10b981' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="nexus-card" style={{ padding: 16, textAlign: 'center' }}>
-            <Icon style={{ width: 16, height: 16, color, margin: '0 auto 10px' }} />
-            <div style={{ fontSize: 22, fontWeight: 800, color, fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{value}</div>
-            <div style={{ fontSize: 10, color: 'rgba(130,170,200,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</div>
+        {/* Charts row 1 */}
+        <div className="j-grid-2">
+          <div className="j-card">
+            <div className="j-card-header">Queries Over Time — 7 days</div>
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={dailyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#58a6ff" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#58a6ff" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="day" tick={{ fontSize: 10, fontFamily: 'var(--font-mono)', fill: '#484f58' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fontFamily: 'var(--font-mono)', fill: '#484f58' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Area type="monotone" dataKey="count" stroke="#58a6ff" strokeWidth={1.5} fill="url(#blueGrad)" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-        ))}
-      </div>
 
-      {/* Agent usage chart */}
-      <div className="nexus-card" style={{ padding: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(0,212,255,0.7)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 16 }}>Queries by Agent Type</div>
-        {barData.length === 0 ? (
-          <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(130,170,200,0.35)', fontSize: 12 }}>No queries yet — use the command bar to get started</div>
-        ) : (
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={barData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,212,255,0.06)" />
-              <XAxis dataKey="agent" tick={{ fill: 'rgba(130,170,200,0.5)', fontSize: 10 }} />
-              <YAxis tick={{ fill: 'rgba(130,170,200,0.5)', fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: 'rgba(2,10,22,0.97)', border: '1px solid rgba(0,212,255,0.2)', borderRadius: 8, fontSize: 12, color: '#e0f0ff' }} />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                {barData.map((entry, i) => (
-                  <rect key={i} fill={entry.fill} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </div>
+          <div className="j-card">
+            <div className="j-card-header">Latency Distribution</div>
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={latencyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                <XAxis dataKey="range" tick={{ fontSize: 10, fontFamily: 'var(--font-mono)', fill: '#484f58' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fontFamily: 'var(--font-mono)', fill: '#484f58' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="count" fill="#58a6ff" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
 
-      {/* Response time chart */}
-      <div className="nexus-card" style={{ padding: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(0,212,255,0.7)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 16 }}>Response Times (last 20 queries)</div>
-        <ResponsiveContainer width="100%" height={150}>
-          <LineChart data={rtDisplay} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,212,255,0.06)" />
-            <XAxis dataKey="i" tick={{ fill: 'rgba(130,170,200,0.5)', fontSize: 10 }} />
-            <YAxis tick={{ fill: 'rgba(130,170,200,0.5)', fontSize: 10 }} unit="ms" />
-            <Tooltip contentStyle={{ background: 'rgba(2,10,22,0.97)', border: '1px solid rgba(0,212,255,0.2)', borderRadius: 8, fontSize: 12, color: '#e0f0ff' }} />
-            <Line type="monotone" dataKey="ms" stroke="#10b981" strokeWidth={2} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
+        {/* Charts row 2 */}
+        <div className="j-grid-2">
+          <div className="j-card">
+            <div className="j-card-header">Agent Usage</div>
+            {agentPie.length === 0 ? (
+              <div className="j-empty" style={{ padding: '24px 0' }}>No data yet</div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={140}>
+                  <PieChart>
+                    <Pie data={agentPie} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" paddingAngle={2}>
+                      {agentPie.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 8 }}>
+                  {agentPie.map((a, i) => (
+                    <div key={a.name} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontFamily: 'var(--font-mono)', color: '#8b949e' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[i % COLORS.length], flexShrink: 0 }} />
+                      <span style={{ flex: 1 }}>{a.name}</span>
+                      <span>{a.value}</span>
+                      <span style={{ color: '#484f58' }}>{totalAgentQueries > 0 ? Math.round(a.value / totalAgentQueries * 100) : 0}%</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="j-card">
+            <div className="j-card-header">Cost Breakdown</div>
+            {costRows.length === 0 ? (
+              <div className="j-empty" style={{ padding: '24px 0' }}>No cost data</div>
+            ) : (
+              <table className="j-table">
+                <thead><tr>
+                  <th>Agent</th><th>Queries</th><th>Avg cost</th><th>Total</th>
+                </tr></thead>
+                <tbody>
+                  {costRows.map(r => (
+                    <tr key={r.agent}>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{r.agent}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{r.queries}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>${r.avgCost.toFixed(4)}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>${r.totalCost.toFixed(4)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <p style={{ fontSize: 11, color: '#484f58', fontFamily: 'var(--font-mono)', marginTop: 12 }}>
+              Local queries are $0.00 (engine cost only)
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

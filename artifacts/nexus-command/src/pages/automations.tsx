@@ -1,91 +1,96 @@
-import { motion } from 'framer-motion';
-import { useListAutomations, getListAutomationsQueryKey, useRunAutomation } from '@workspace/api-client-react';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Workflow, Play, Clock, Zap } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+import { Play, Clock, Zap } from 'lucide-react';
+
+interface Automation {
+  id: string;
+  name: string;
+  trigger: string;
+  description: string;
+  status: 'Active' | 'Disabled';
+  lastExecution: string;
+}
+
+const MOCK_AUTOMATIONS: Automation[] = [
+  { id: '1', name: 'Morning Digest', trigger: 'schedule:07:00', description: 'Daily briefing from emails, calendar, and news', status: 'Active', lastExecution: new Date(Date.now() - 3600 * 1000 * 14).toISOString() },
+  { id: '2', name: 'Memory Auto-Index', trigger: 'schedule:22:00', description: 'Index new documents added to watched folders', status: 'Active', lastExecution: new Date(Date.now() - 3600 * 1000 * 2).toISOString() },
+  { id: '3', name: 'Slack Digest', trigger: 'channel:slack', description: 'Summarise unread Slack messages every hour', status: 'Disabled', lastExecution: new Date(Date.now() - 3600 * 1000 * 48).toISOString() },
+];
 
 export default function Automations() {
-  const { data: automations, isLoading } = useListAutomations({ query: { queryKey: getListAutomationsQueryKey() } });
-  const runAutomation = useRunAutomation();
-  const { toast } = useToast();
+  const [automations, setAutomations] = useState<Automation[]>(MOCK_AUTOMATIONS);
+  const [running, setRunning] = useState<string | null>(null);
 
-  const handleRun = (id: number, name: string) => {
-    runAutomation.mutate(
-      { id },
-      {
-        onSuccess: (res) => {
-          toast({
-            title: "Automation Executed",
-            description: `${name}: ${res.message}`,
-            variant: res.success ? "default" : "destructive",
-          });
-        }
-      }
-    );
+  const toggle = (id: string) => {
+    setAutomations(a => a.map(au =>
+      au.id === id ? { ...au, status: au.status === 'Active' ? 'Disabled' : 'Active' } : au
+    ));
+  };
+
+  const run = async (id: string) => {
+    setRunning(id);
+    await new Promise(r => setTimeout(r, 1500));
+    setRunning(null);
+    setAutomations(a => a.map(au => au.id === id ? { ...au, lastExecution: new Date().toISOString() } : au));
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-10">
-      <div className="flex items-center gap-3">
-        <Workflow className="w-8 h-8 text-primary" />
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Automation Engine</h1>
+    <div className="j-page">
+      <div className="j-page-header">
+        <div>
+          <h1>Automations</h1>
+          <p>Scheduled and event-driven agent workflows</p>
+        </div>
+        <button className="j-btn j-btn-primary">+ New Automation</button>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
-        {isLoading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="glass-panel border-white/5 h-56 animate-pulse bg-secondary/30" />
-          ))
-        ) : (
-          automations?.map((auto, i) => (
-            <motion.div 
-              key={auto.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <Card className="glass-panel border-white/10 hover:border-primary/40 transition-colors h-full flex flex-col group">
-                <CardHeader className="pb-3 flex flex-row items-start justify-between">
-                  <div className="flex flex-col gap-1">
-                    <CardTitle className="text-lg text-foreground group-hover:text-primary transition-colors">{auto.name}</CardTitle>
-                    <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider flex items-center gap-1 mt-1">
-                      <Zap className="w-3 h-3 text-accent" /> {auto.trigger}
-                    </span>
-                  </div>
-                  <Switch checked={auto.status === 'Active'} />
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col gap-4">
-                  <p className="text-sm text-muted-foreground">{auto.description}</p>
-                  
-                  <div className="flex flex-wrap gap-2 mt-auto">
-                    {auto.applicationsUsed?.map(app => (
-                      <span key={app} className="text-xs px-2 py-0.5 rounded bg-secondary text-foreground border border-border">
-                        {app}
-                      </span>
-                    ))}
-                  </div>
-                </CardContent>
-                <CardFooter className="pt-0 border-t border-white/5 mt-4 pb-4">
-                  <div className="w-full flex items-center justify-between mt-4">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" /> Last run: {new Date(auto.lastExecution).toLocaleDateString()}
-                    </div>
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleRun(auto.id, auto.name)}
-                      disabled={runAutomation.isPending || auto.status !== 'Active'}
-                      className="bg-primary/20 text-primary hover:bg-primary hover:text-primary-foreground font-semibold"
-                    >
-                      <Play className="w-4 h-4 mr-1" /> RUN NOW
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Card>
-            </motion.div>
-          ))
-        )}
+      <div className="j-page-content">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {automations.map(auto => (
+            <div key={auto.id} className="j-card" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{auto.name}</span>
+                  <span className={`j-badge ${auto.status === 'Active' ? 'j-badge-green' : 'j-badge-gray'}`}>{auto.status}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#58a6ff', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Zap style={{ width: 10, height: 10 }} />{auto.trigger}
+                  </span>
+                </div>
+                <p style={{ fontSize: 12, color: '#8b949e', margin: 0 }}>{auto.description}</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: '#484f58', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Clock style={{ width: 10, height: 10 }} />
+                  {new Date(auto.lastExecution).toLocaleDateString()}
+                </span>
+                <button
+                  onClick={() => toggle(auto.id)}
+                  style={{
+                    width: 36, height: 20, borderRadius: 10,
+                    background: auto.status === 'Active' ? 'rgba(63,185,80,0.2)' : '#21262d',
+                    border: `1px solid ${auto.status === 'Active' ? '#3fb950' : '#30363d'}`,
+                    cursor: 'pointer', padding: 0, position: 'relative',
+                  }}
+                >
+                  <span style={{
+                    position: 'absolute', top: 2,
+                    left: auto.status === 'Active' ? 16 : 2,
+                    width: 14, height: 14, borderRadius: '50%',
+                    background: auto.status === 'Active' ? '#3fb950' : '#484f58',
+                    transition: 'left 0.15s',
+                  }} />
+                </button>
+                <button
+                  onClick={() => run(auto.id)}
+                  disabled={running === auto.id || auto.status !== 'Active'}
+                  className="j-btn j-btn-primary"
+                  style={{ height: 28, fontSize: 12, padding: '0 12px' }}
+                >
+                  <Play style={{ width: 12, height: 12 }} />
+                  {running === auto.id ? 'Running…' : 'Run'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

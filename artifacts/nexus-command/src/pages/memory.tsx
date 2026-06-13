@@ -1,83 +1,103 @@
 import { useState } from 'react';
-import { BrainCircuit, Search, FolderOpen, Star, FileText } from 'lucide-react';
 import { useMemorySearch, useIndexMemory } from '@/hooks/useJarvis';
 
 export default function Memory() {
   const [searchQ, setSearchQ] = useState('');
   const [indexPath, setIndexPath] = useState('');
-  const [debouncedQ, setDebouncedQ] = useState('');
-  const [timer, setTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const { data: results, isLoading: searching } = useMemorySearch(searchQ);
+  const indexMutation = useIndexMemory();
 
-  const { data: results, isLoading: searching } = useMemorySearch(debouncedQ);
-  const { mutate: indexPath_, isPending: indexing } = useIndexMemory();
-
-  const handleSearchChange = (v: string) => {
-    setSearchQ(v);
-    if (timer) clearTimeout(timer);
-    const t = setTimeout(() => setDebouncedQ(v), 400);
-    setTimer(t);
+  const handleIndex = () => {
+    if (!indexPath.trim()) return;
+    indexMutation.mutate(indexPath.trim());
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <h2 style={{ fontSize: 14, fontWeight: 700, color: '#a855f7', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Memory</h2>
-        <p style={{ fontSize: 12, color: 'rgba(130,170,200,0.55)', lineHeight: 1.5 }}>Search your indexed knowledge base or add new documents for Jarvis to remember.</p>
-      </div>
-
-      {/* Search */}
-      <div className="nexus-card" style={{ padding: 18 }}>
-        <div style={{ fontSize: 11, color: 'rgba(168,85,247,0.7)', fontWeight: 600, letterSpacing: '0.1em', marginBottom: 12, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Search style={{ width: 12, height: 12 }} /> Search Memory
+    <div className="j-page">
+      <div className="j-page-header">
+        <div>
+          <h1>Memory</h1>
+          <p>Local persistent knowledge base</p>
         </div>
-        <input className="nexus-input" value={searchQ} onChange={e => handleSearchChange(e.target.value)} placeholder="Type at least 3 chars to search your knowledge base…" />
       </div>
-
-      {/* Results */}
-      {debouncedQ.length > 2 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 10, color: 'rgba(130,170,200,0.45)', letterSpacing: '0.12em', fontWeight: 600, textTransform: 'uppercase' }}>
-            {searching ? 'Searching…' : `${(results ?? []).length} results for "${debouncedQ}"`}
+      <div className="j-page-content" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Index section */}
+        <div className="j-card">
+          <div className="j-card-header">Index a Path</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              className="j-input"
+              value={indexPath}
+              onChange={e => setIndexPath(e.target.value)}
+              placeholder="/path/to/documents or ~/notes"
+              onKeyDown={e => e.key === 'Enter' && handleIndex()}
+            />
+            <button
+              onClick={handleIndex}
+              disabled={!indexPath.trim() || indexMutation.isPending}
+              className="j-btn j-btn-primary"
+              style={{ flexShrink: 0 }}
+            >
+              {indexMutation.isPending ? 'Indexing…' : 'Index'}
+            </button>
           </div>
-          {searching ? (
-            Array.from({ length: 3 }).map((_, i) => <div key={i} className="nexus-card nexus-shimmer" style={{ height: 80 }} />)
-          ) : (
-            (results ?? []).map((r, i) => (
-              <div key={i} className="nexus-card" style={{ padding: 18 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                  <FileText style={{ width: 14, height: 14, color: '#a855f7', flexShrink: 0, marginTop: 2 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, color: 'rgba(210,235,250,0.9)', lineHeight: 1.5, marginBottom: 8 }}>{r.content}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 10, color: 'rgba(0,212,255,0.45)', fontFamily: 'var(--font-mono)' }}>{r.source}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Star style={{ width: 10, height: 10, color: '#c9a84c' }} />
-                        <span style={{ fontSize: 10, color: '#c9a84c', fontFamily: 'var(--font-mono)' }}>{(r.score * 100).toFixed(0)}% match</span>
-                      </div>
-                    </div>
+          {indexMutation.isSuccess && (
+            <div style={{ marginTop: 8, fontSize: 12, fontFamily: 'var(--font-mono)', color: '#3fb950' }}>
+              ✓ Indexed {(indexMutation.data as { ok: boolean; chunks?: number })?.chunks ?? 0} chunks from {indexPath}
+            </div>
+          )}
+          {indexMutation.isError && (
+            <div style={{ marginTop: 8, fontSize: 12, fontFamily: 'var(--font-mono)', color: '#f85149' }}>
+              ✗ Index failed — check path and backend connection
+            </div>
+          )}
+        </div>
+
+        {/* Search section */}
+        <div>
+          <input
+            className="j-input"
+            value={searchQ}
+            onChange={e => setSearchQ(e.target.value)}
+            placeholder="Search your indexed knowledge..."
+            style={{ height: 44, fontSize: 14 }}
+          />
+        </div>
+
+        {/* Results */}
+        {searchQ.length > 2 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {searching ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="j-skeleton" style={{ height: 80 }} />
+              ))
+            ) : results?.length === 0 ? (
+              <div className="j-empty">
+                No results. Try searching for something in your indexed documents.
+              </div>
+            ) : (
+              results?.map((r, i) => (
+                <div key={i} className="j-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: '#58a6ff' }}>{r.source}</span>
+                  <p style={{ fontSize: 13, color: '#8b949e', margin: 0, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {r.content}
+                  </p>
+                  <div className="j-relevance-bar">
+                    <div className="j-relevance-fill" style={{ width: `${Math.round(r.score * 100)}%` }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, fontSize: 11, fontFamily: 'var(--font-mono)', color: '#484f58' }}>
+                    {r.ts && <span>{new Date(r.ts).toLocaleString()}</span>}
+                    {r.chunk_id && <span>{r.chunk_id}</span>}
+                    <span style={{ marginLeft: 'auto' }}>{Math.round(r.score * 100)}% relevance</span>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
-          {!searching && (results ?? []).length === 0 && (
-            <div style={{ textAlign: 'center', color: 'rgba(130,170,200,0.4)', fontSize: 12, padding: '20px 0' }}>No results found. Try indexing a path first.</div>
-          )}
-        </div>
-      )}
-
-      {/* Index path */}
-      <div className="nexus-card" style={{ padding: 18 }}>
-        <div style={{ fontSize: 11, color: 'rgba(168,85,247,0.7)', fontWeight: 600, letterSpacing: '0.1em', marginBottom: 12, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <FolderOpen style={{ width: 12, height: 12 }} /> Index a Path
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <input className="nexus-input" value={indexPath} onChange={e => setIndexPath(e.target.value)} onKeyDown={e => e.key === 'Enter' && indexPath_(indexPath)} placeholder="/path/to/documents or ~/notes" />
-          <button className="nexus-btn" onClick={() => indexPath_(indexPath)} disabled={indexing || !indexPath.trim()}
-            style={{ flexShrink: 0, borderColor: 'rgba(168,85,247,0.4)', color: '#a855f7', background: 'rgba(168,85,247,0.1)' }}>
-            <BrainCircuit style={{ width: 13, height: 13 }} /> {indexing ? 'Indexing…' : 'Index'}
-          </button>
-        </div>
+              ))
+            )}
+          </div>
+        )}
+        {searchQ.length <= 2 && searchQ.length > 0 && (
+          <p style={{ fontSize: 12, color: '#484f58', fontFamily: 'var(--font-mono)' }}>Type at least 3 characters to search…</p>
+        )}
       </div>
     </div>
   );

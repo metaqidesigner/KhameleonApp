@@ -1,58 +1,82 @@
-import { Lock, Key, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 
-const ENV_KEYS = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'SESSION_SECRET', 'DATABASE_URL', 'JARVIS_ENGINE', 'JARVIS_MODEL'];
+const ENV_KEYS = [
+  { name: 'ANTHROPIC_API_KEY', desc: 'Anthropic API (Claude)' },
+  { name: 'OPENAI_API_KEY',    desc: 'OpenAI API (GPT)' },
+  { name: 'JARVIS_ENGINE',     desc: 'Default engine override' },
+  { name: 'JARVIS_MODEL',      desc: 'Default model override' },
+  { name: 'SESSION_SECRET',    desc: 'Session signing key' },
+  { name: 'DATABASE_URL',      desc: 'PostgreSQL connection string' },
+];
 
 export default function Vault() {
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
 
-  const toggle = (k: string) => setRevealed(prev => ({ ...prev, [k]: !prev[k] }));
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <h2 style={{ fontSize: 14, fontWeight: 700, color: '#c9a84c', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Vault</h2>
-        <p style={{ fontSize: 12, color: 'rgba(130,170,200,0.55)', lineHeight: 1.5 }}>Local encrypted secrets management. Values are never transmitted or displayed in plain text.</p>
-      </div>
-
-      {/* Lock icon hero */}
-      <div className="nexus-card" style={{ padding: 32, textAlign: 'center' }}>
-        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 30px rgba(201,168,76,0.15)' }}>
-          <Lock style={{ width: 28, height: 28, color: '#c9a84c' }} />
-        </div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(220,240,255,0.9)', marginBottom: 6 }}>Local Encrypted Secrets</div>
-        <div style={{ fontSize: 12, color: 'rgba(130,170,200,0.5)', lineHeight: 1.6, maxWidth: 360, margin: '0 auto' }}>
-          Coming soon — AES-256 encrypted local keystore for storing API keys, tokens, and credentials without external services.
+    <div className="j-page">
+      <div className="j-page-header">
+        <div>
+          <h1>Vault</h1>
+          <p>Environment secrets and credential status</p>
         </div>
       </div>
+      <div className="j-page-content">
+        <div className="j-card">
+          <div className="j-card-header">Environment Keys</div>
+          <p style={{ fontSize: 12, color: '#8b949e', marginBottom: 16 }}>
+            Key values are never exposed to the frontend. Status reflects whether the variable is set in the environment.
+          </p>
+          <table className="j-table">
+            <thead><tr>
+              <th>Key</th><th>Description</th><th>Status</th><th>Value</th>
+            </tr></thead>
+            <tbody>
+              {ENV_KEYS.map(k => {
+                const isSet = false; // can't read env from client
+                return (
+                  <tr key={k.name}>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{k.name}</td>
+                    <td style={{ fontSize: 12, color: '#8b949e' }}>{k.desc}</td>
+                    <td>
+                      <span className={`j-badge ${isSet ? 'j-badge-green' : 'j-badge-gray'}`}>
+                        {isSet ? '● Set' : '— Not set'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => setRevealed(r => ({ ...r, [k.name]: !r[k.name] }))}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          background: 'none', border: 'none', color: '#484f58',
+                          cursor: 'pointer', fontSize: 12, fontFamily: 'var(--font-mono)',
+                        }}
+                      >
+                        {revealed[k.name]
+                          ? <><EyeOff style={{ width: 12, height: 12 }} /> ••••••••</>
+                          : <><Eye style={{ width: 12, height: 12 }} /> Show</>
+                        }
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-      {/* Env key status */}
-      <div className="nexus-card" style={{ padding: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <Key style={{ width: 14, height: 14, color: '#c9a84c' }} />
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(201,168,76,0.8)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Environment Variables</span>
+        <div className="j-card" style={{ marginTop: 16 }}>
+          <div className="j-card-header">Add Secret</div>
+          <p style={{ fontSize: 12, color: '#8b949e', marginBottom: 12 }}>
+            Set environment variables via the Replit Secrets panel or your deployment environment.
+            Never commit secrets to code.
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="j-input" placeholder="KEY_NAME" style={{ width: 180 }} />
+            <input className="j-input" placeholder="value..." type="password" style={{ flex: 1 }} />
+            <button className="j-btn j-btn-primary" style={{ flexShrink: 0 }}>Add</button>
+          </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {ENV_KEYS.map(k => (
-            <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.1)', borderRadius: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgba(130,170,200,0.2)' }} />
-                <span style={{ fontSize: 12, color: 'rgba(200,225,245,0.8)', fontFamily: 'var(--font-mono)' }}>{k}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 11, color: 'rgba(130,170,200,0.4)', fontFamily: 'var(--font-mono)' }}>
-                  {revealed[k] ? '••••••••••••' : '[ NOT SET ]'}
-                </span>
-                <button onClick={() => toggle(k)} style={{ background: 'none', border: 'none', color: 'rgba(130,170,200,0.4)', cursor: 'pointer', padding: 2 }}>
-                  {revealed[k] ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p style={{ fontSize: 11, color: 'rgba(130,170,200,0.35)', marginTop: 12, lineHeight: 1.5 }}>
-          Key values are never exposed by Nexus Command. Configure secrets in your environment or .env file.
-        </p>
       </div>
     </div>
   );

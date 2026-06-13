@@ -1,0 +1,694 @@
+You are building a full-stack AI command centre that integrates OpenJarvis
+(https://github.com/open-jarvis/OpenJarvis) as its backbone. The entire UI must
+be completely redesigned from scratch to match OpenJarvis's actual identity:
+local-first, efficiency-obsessed, terminal-native, minimal, and data-dense.
+Throw away the orbital brain canvas aesthetic entirely. This is not a sci-fi
+visualiser. It is a serious personal AI operating system.
+
+═══════════════════════════════════════════════════════
+DESIGN PHILOSOPHY — READ THIS FIRST
+═══════════════════════════════════════════════════════
+
+OpenJarvis is a Stanford research project. Its UI aesthetic must reflect:
+  - Terminal / CLI heritage: monospace everywhere data appears
+  - Local-first honesty: always show engine, model, hardware, watts, cost
+  - Efficiency as identity: token/s, latency ms, watt·s per query front and centre
+  - No decoration for decoration's sake — every pixel earns its place
+  - Dark but not "space game" — think VS Code Dark+ meets htop meets Linear
+
+Reference aesthetic: VS Code sidebar + tmux panes + Linear issue tracker
+NOT: Iron Man HUD, holographic displays, orbital rings, glowing brains
+
+Color palette — restrained, purposeful:
+  Background:    #0d1117   (GitHub dark, not pure black)
+  Surface:       #161b22   (cards, panels)
+  Surface-alt:   #21262d   (hover states, inputs)
+  Border:        #30363d   (dividers)
+  Text-primary:  #e6edf3   (main text)
+  Text-muted:    #8b949e   (labels, metadata)
+  Text-faint:    #484f58   (disabled, placeholders)
+  Accent-blue:   #58a6ff   (links, active states, cursor)
+  Accent-green:  #3fb950   (online, success, tokens)
+  Accent-amber:  #d29922   (warnings, degraded)
+  Accent-red:    #f85149   (errors, offline)
+  Accent-purple: #bc8cff   (agent type badges)
+  Accent-cyan:   #39d353   (activity graph — like GitHub contributions)
+
+Typography:
+  UI text:   -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif, 13px
+  Data/mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace, 12px
+  Headings:  600 weight, NOT uppercase, NOT letter-spaced
+
+Spacing: 4px base unit. Compact by default. No large hero sections.
+Borders: 1px solid #30363d. Subtle, not glowing.
+Shadows: none except for modals (0 8px 24px rgba(0,0,0,0.4))
+Radius:  6px for cards, 4px for inputs/buttons, 2px for badges
+
+═══════════════════════════════════════════════════════
+BACKEND  (/backend)
+═══════════════════════════════════════════════════════
+
+Same as before — FastAPI bridging OpenJarvis. Keep all endpoints:
+
+  POST /api/ask           → jarvis.ask_full(prompt, agent, tools)
+  GET  /api/agents        → list of agent type strings
+  GET  /api/health        → { status, engine, model, uptime, tokens_per_sec,
+                              watt_per_query, total_queries, total_cost_usd }
+  GET  /api/memory/search → memory chunk results
+  POST /api/memory/index  → index a local path
+  GET  /api/connectors    → list with { id, name, connected, last_sync }
+  POST /api/connectors/connect
+  POST /api/research      → agent="deep_research"
+  GET  /api/mode          → { name: string }
+  GET  /api/skills        → installed skills
+  POST /api/skills/install
+  GET  /api/telemetry     → { queries: [], energy_wh, cost_usd, avg_latency_ms }
+  WebSocket /ws/chat      → streaming tokens + metadata
+
+  Health response must include hardware info:
+    { status, engine, model, uptime, gpu, vram_gb, tokens_per_sec,
+      watt_per_query, total_queries, total_cost_usd, avg_latency_ms }
+
+  WS done message must include:
+    { done: true, model, latency_ms, tokens, cost_usd, energy_wh }
+
+requirements.txt:
+  fastapi, uvicorn[standard],
+  git+https://github.com/open-jarvis/OpenJarvis.git,
+  python-dotenv, websockets
+
+.env.example:
+  ANTHROPIC_API_KEY=
+  OPENAI_API_KEY=
+  JARVIS_ENGINE=ollama
+  JARVIS_MODEL=llama3.2
+
+═══════════════════════════════════════════════════════
+FRONTEND LAYOUT  (/frontend)
+═══════════════════════════════════════════════════════
+
+Completely replace CanvasLayout.tsx. The new layout is a three-column
+desktop app shell, like VS Code or Linear:
+
+┌─────────────────────────────────────────────────────────┐
+│  TOP BAR (40px)                                         │
+├──────┬──────────────────────────┬───────────────────────┤
+│      │                          │                       │
+│ NAV  │    MAIN CONTENT AREA     │   DETAIL / CHAT       │
+│ RAIL │    (changes per module)  │   PANEL (resizable,   │
+│ 52px │                          │   optional)           │
+│      │                          │                       │
+├──────┴──────────────────────────┴───────────────────────┤
+│  STATUS BAR (28px)                                      │
+└─────────────────────────────────────────────────────────┘
+
+All panels are resizable via drag handles.
+No floating overlays. No slide-in panels from the right edge.
+No backdrop blurs except for command palette.
+
+──────────────────────────────────────────────────────
+TOP BAR  (src/components/TopBar.tsx)
+──────────────────────────────────────────────────────
+
+Height: 40px. Background: #161b22. Border-bottom: 1px solid #30363d.
+
+Left section:
+  - "⬡ JARVIS" wordmark in accent-blue, 13px semibold, monospace
+    (⬡ is the OpenJarvis hexagon-like logo stand-in)
+  - Current mode badge: small pill, text like "work" or "research"
+    in surface-alt with text-muted color
+
+Center section:
+  - Command palette trigger: looks like a search bar
+    placeholder: "Search or ask Jarvis...   ⌘K"
+    width: 400px max, background: surface-alt, border: border color
+    clicking opens the full command palette overlay
+
+Right section (left to right):
+  - Engine badge: "ollama · llama3.2" in monospace text-muted 11px
+  - Separator
+  - Status dot + text: "● online" (green) or "● offline" (red)
+  - Separator
+  - Notifications icon (bell, 16px) with unread count badge
+  - Settings icon (gear, 16px)
+  - Avatar circle 28px (initials "JV" for Jarvis)
+
+──────────────────────────────────────────────────────
+NAV RAIL  (src/components/NavRail.tsx)
+──────────────────────────────────────────────────────
+
+Width: 52px collapsed (icons only), 200px expanded (icon + label).
+Toggle with a chevron button at the bottom of the rail.
+Background: #0d1117. Border-right: 1px solid #30363d.
+
+Nav items — icon only when collapsed, icon + label when expanded.
+Use lucide-react icons. Active state: accent-blue icon + left border accent.
+Hover state: surface-alt background.
+
+Items (top group — core):
+  LayoutDashboard  Dashboard
+  MessageSquare    Chat
+  Inbox            Inbox
+  FolderKanban     Projects
+  CheckSquare      Approvals
+  Calendar         Calendar
+
+Divider
+
+Items (middle group — intelligence):
+  FlaskConical     Research
+  BrainCircuit     Memory
+  Network          Knowledge
+  LineChart        Analytics
+
+Divider
+
+Items (bottom group — system):
+  Workflow         Automations
+  Bot              Agents
+  Store            Skills
+  ShieldAlert      Security
+  Key              Vault
+  MessageSquare    Comms
+  Store            Marketplace
+
+Divider at bottom, then:
+  Settings         Settings
+
+──────────────────────────────────────────────────────
+STATUS BAR  (src/components/StatusBar.tsx)
+──────────────────────────────────────────────────────
+
+Height: 28px. Background: #161b22. Border-top: 1px solid #30363d.
+All text: 11px monospace, text-muted.
+
+Left section (space-separated items):
+  ● [engine] · [model]   e.g. "● ollama · llama3.2"
+  |  [gpu]               e.g. "M3 Pro · 18GB"
+  |  [uptime]            e.g. "↑ 4h 22m"
+
+Center section:
+  [last query latency]   e.g. "⚡ 312ms"
+  [tokens/s]             e.g. "∿ 48.2 tok/s"
+  [last cost]            e.g. "$ 0.0000" (free for local)
+
+Right section:
+  [total queries today]  e.g. "◈ 47 queries"
+  [energy]               e.g. "⚡ 0.8 Wh"
+  [total cost]           e.g. "$ 0.0002"
+  [memory indexed]       e.g. "⬡ 2.3k chunks"
+
+All values come from useJarvisHealth() and useJarvisTelemetry().
+Values update in real time (poll every 10s).
+Show "—" for unavailable values. Never crash if backend is down.
+
+──────────────────────────────────────────────────────
+COMMAND PALETTE  (src/components/CommandPalette.tsx)
+──────────────────────────────────────────────────────
+
+Triggered by ⌘K or clicking the top bar search area.
+Centered overlay, max-width 600px, max-height 480px.
+Background: #161b22. Border: 1px solid #30363d. Radius: 8px.
+Box shadow: 0 16px 48px rgba(0,0,0,0.6).
+Backdrop: rgba(0,0,0,0.5) behind.
+
+Layout inside:
+  Top: text input, full width, 40px, no border just bottom border
+       placeholder: "Ask Jarvis anything, or jump to a module..."
+       icon: Search 16px on left, Escape badge on right
+
+  Below input: results list (scrollable)
+    Each result: icon (16px) + primary label + secondary hint right-aligned
+    Keyboard navigation with arrow keys, Enter to select
+
+  Result groups (separated by group headers in text-faint):
+    RECENT — last 5 queries from agent history
+    MODULES — all module names (type to filter)
+    AGENTS  — all agent types (prefix with @, e.g. @research)
+    ACTIONS — "Index memory path...", "Run morning digest", "Open settings"
+
+  Bottom bar (28px):
+    Left: agent mode selector — pill toggles: Simple · Orchestrator · Research · Code
+    Right: "↵ to run  ·  ↑↓ to navigate  ·  Esc to close"
+
+  On Enter with text typed and no result selected:
+    → call streamChat(inputValue, selectedAgent)
+    → close palette and show response in a new Chat session
+
+──────────────────────────────────────────────────────
+MAIN CONTENT AREA — MODULE PAGES
+──────────────────────────────────────────────────────
+
+Each page fills the main content area. Consistent layout:
+  - Page header: 56px, title (16px 600) + subtitle (13px text-muted) + actions right
+  - Content: scrollable, padded 20px, uses the grid system below
+
+Grid system:
+  .j-grid-1  one full-width column
+  .j-grid-2  two equal columns, 16px gap
+  .j-grid-3  three equal columns, 16px gap
+  .j-grid-4  four equal columns, 16px gap
+  All collapse to single column on <768px
+
+Card component:
+  background: #161b22, border: 1px solid #30363d, border-radius: 6px
+  padding: 16px, no shadow
+  Card header: label 11px uppercase text-muted tracking-wider + optional right action
+  Card body: content
+
+Stat card (for Dashboard metrics):
+  Large number in monospace (24px 600), label below (11px text-muted)
+  Optional trend indicator (▲ green / ▼ red / — neutral)
+  Optional sparkline (small 40px height recharts line)
+
+Table component:
+  border-collapse: collapse, full width
+  Header: 11px uppercase text-muted, border-bottom
+  Rows: 36px height, border-bottom #30363d, hover: surface-alt
+  Cells: 13px, padding 8px 12px
+
+Badge component:
+  inline-flex, 11px monospace, padding 2px 6px, radius 2px
+  Variants: green (success), amber (warning), red (error), blue (info),
+            purple (agent type), gray (neutral)
+
+──────────────────────────────────────────────────────
+DASHBOARD PAGE  (src/pages/dashboard/index.tsx)
+──────────────────────────────────────────────────────
+
+Page header: "Dashboard" + subtitle "System overview and recent activity"
+
+Row 1 — stat cards (j-grid-4):
+  Total Queries Today   |  Avg Latency   |  Total Cost   |  Energy Used
+  [count] mono          |  [ms] mono     |  $[usd] mono  |  [wh] Wh mono
+  from useJarvisHealth() + useJarvisTelemetry()
+
+Row 2 (j-grid-2):
+  Left: "System" card
+    Table rows:
+      Engine      ollama
+      Model       llama3.2
+      GPU         M3 Pro
+      VRAM        18 GB
+      Uptime      4h 22m
+      tok/s       48.2
+      Watt/query  0.8 W
+    All values from health endpoint in monospace
+
+  Right: "Agent Activity" card
+    List of last 10 agentHistory events
+    Each row: [timestamp mono] [agent badge] [prompt truncated 60 chars]
+    Clicking a row expands it inline to show full response
+
+Row 3 (j-grid-2):
+  Left: "Connected Sources" card
+    Grid of connector tiles (2 cols):
+      Each tile: icon + name + "Connected" (green) or "—" (gray)
+      Show all connectors from useJarvisConnectors()
+
+  Right: "Quick Actions" card
+    Stacked buttons:
+      [▶ Morning Digest]    → askJarvis with agent="morning_digest"
+      [▶ Deep Research]     → navigate to Research page
+      [▶ Memory Index]      → open memory index dialog
+      [▶ Run Diagnostics]   → call /api/health and show result inline
+    Each button: full width, left-aligned, 36px height,
+                 surface-alt background, text-primary, hover: border accent
+
+──────────────────────────────────────────────────────
+CHAT PAGE  (src/pages/chat/index.tsx)
+──────────────────────────────────────────────────────
+
+This is the main conversational interface — replace the old command bar concept.
+
+Layout: two sections, full height minus top/status bars
+  Top (flex-1, scrollable): message history
+  Bottom (fixed, auto-height): input area
+
+Message bubbles:
+  User messages: right-aligned, surface-alt background, border radius 6px 6px 0 6px
+  Assistant messages: left-aligned, no background, just left border 2px accent-blue
+  Each message has: timestamp (11px mono text-faint), agent badge if non-simple
+
+  Assistant message footer (after completion):
+    [model] · [latency]ms · [tokens] tok · [cost] · [energy]
+    All in 11px mono text-faint, horizontal with dividers
+
+  Streaming: show cursor block ▌ blinking after last character
+
+Input area:
+  Background: surface. Border-top: 1px solid border.
+  Agent selector row (above input):
+    Small pill buttons: Simple | Orchestrator | Research | Code | Morning Digest
+    Active pill: accent-blue border + text
+  Textarea: auto-resize up to 200px, no border (full-width inside area)
+             placeholder: "Message Jarvis..."
+  Bottom row:
+    Left: attachment icon (stub), web-search toggle, memory toggle
+    Right: character count (mono text-faint) + Send button (accent-blue)
+  Keyboard: Enter to send, Shift+Enter for newline
+
+Session management:
+  Left sub-panel (200px, collapsible):
+    "Sessions" header + new session button
+    List of past sessions (title = first user message, truncated)
+    Each row: title + timestamp
+    Clicking loads that session's history from local state
+
+──────────────────────────────────────────────────────
+AGENTS PAGE  (src/pages/agents/index.tsx)
+──────────────────────────────────────────────────────
+
+Page header: "Agents" + "Eight built-in reasoning patterns"
+
+Agent cards grid (j-grid-3):
+  For each agent from useJarvisAgents():
+    Card:
+      Header: [agent name] + [badge: type]
+      Body: one-line description
+        simple           → "Single-turn chat with tool use"
+        orchestrator     → "Multi-step planning and delegation"
+        deep_research    → "Extended research with web retrieval"
+        morning_digest   → "Scheduled summary of overnight activity"
+        code_assistant   → "Code review, generation, and debugging"
+        channel_agent    → "Monitors and responds on messaging channels"
+        proactive_agent  → "Background monitoring with scheduled alerts"
+        operative        → "Autonomous multi-tool task execution"
+      Footer:
+        [▶ Launch] button → opens Chat page with this agent pre-selected
+        [⏱ Schedule] button → stub, opens schedule dialog
+
+──────────────────────────────────────────────────────
+RESEARCH PAGE  (src/pages/research/index.tsx)
+──────────────────────────────────────────────────────
+
+Page header: "Deep Research" + "Extended multi-step research with web retrieval"
+
+Two-column layout:
+  Left (400px fixed): input panel
+    Textarea (full height, min 120px): research query
+    Options (collapsible):
+      Max iterations: number input (default 5)
+      Web search: toggle (on by default)
+      Save to memory: toggle (off by default)
+    [▶ Run Research] button: accent-blue, full width, 40px
+
+  Right (flex-1): results panel
+    Initially: empty state with dashed border and "Results will appear here"
+    During stream: progressive markdown rendering
+      Show a trace panel at the top (collapsible, closed by default):
+        Each tool call appears as a row: [tool_name] → [result summary]
+        This gives the research loop transparency the OpenJarvis article described
+    After completion:
+      Full markdown rendered with proper heading hierarchy
+      Footer: model · latency · tokens · cost · energy (same as chat)
+      [💾 Save to Memory] button if save toggle was off
+      [📋 Copy] button
+
+──────────────────────────────────────────────────────
+MEMORY PAGE  (src/pages/memory/index.tsx)
+──────────────────────────────────────────────────────
+
+Page header: "Memory" + "Local persistent knowledge base"
+
+Top section — index controls:
+  Input: "Path to index" + [Index] button
+  Progress indicator when indexing (show chunk count as it grows)
+  Stats row: [X chunks indexed] · [Y sources] · [Z MB] in mono
+
+Search section:
+  Search input (full width, prominent, 44px)
+  Results list below (no grid — full width list):
+    Each result:
+      Source path in mono accent-blue (14px)
+      Content snippet (13px, max 3 lines, ellipsis)
+      Relevance score bar (thin, green, 0–100%)
+      [timestamp] [chunk ID] in 11px mono text-faint
+
+Empty state: "No results. Try searching for something in your indexed documents."
+
+──────────────────────────────────────────────────────
+ANALYTICS PAGE  (src/pages/analytics/index.tsx)
+──────────────────────────────────────────────────────
+
+Page header: "Analytics" + "Efficiency metrics and usage telemetry"
+
+Row 1 — stat cards (j-grid-4):
+  Total Queries  |  Avg Latency ms  |  Total Cost $  |  Energy Wh
+
+Row 2 (j-grid-2):
+  Left: "Queries Over Time" card
+    recharts AreaChart, 7-day rolling, fill accent-blue at 20% opacity
+    X axis: day labels, Y axis: count
+
+  Right: "Latency Distribution" card
+    recharts BarChart, buckets: <100ms, 100-300ms, 300-1s, >1s
+
+Row 3 (j-grid-2):
+  Left: "Agent Usage" card
+    recharts PieChart (donut), one segment per agent type, colored by accent
+    Legend below: name + count + % in mono
+
+  Right: "Cost Breakdown" card
+    Table: agent type | queries | avg cost | total cost
+    Footer: "Local queries are $0.00 (engine cost only)"
+
+──────────────────────────────────────────────────────
+COMMUNICATIONS PAGE  (src/pages/communications/index.tsx)
+──────────────────────────────────────────────────────
+
+Page header: "Channels & Connectors" + "Connect Jarvis to your communication channels"
+
+Channels section:
+  Section label "CHANNELS" (11px uppercase text-faint)
+  Grid (j-grid-3): all OpenJarvis channel types
+  Each tile: icon + name + connected badge or [Connect] button
+  Channels (from API reference): Discord, Telegram, Slack, WhatsApp,
+    Gmail, iMessage, Signal, IRC, Matrix, Mattermost, Reddit, Twitter,
+    Twitch, Nostr, LINE, Viber, XMPP, Zulip, Google Chat, Webchat, Webhook
+
+  Connectors section:
+  Section label "CONNECTORS" (11px uppercase text-faint)
+  Grid (j-grid-3): all OpenJarvis connectors
+  Connectors: Gmail, Google Calendar, Google Drive, Google Contacts,
+    Google Tasks, Notion, Slack, Obsidian, Dropbox, Spotify, Strava,
+    Oura, Apple Notes, Apple Music, Apple Health, Apple Contacts,
+    GitHub Notifications, HackerNews, News RSS, iMessage, WhatsApp,
+    Outlook, Granola, Weather
+
+──────────────────────────────────────────────────────
+SKILLS PAGE  (src/pages/skills/index.tsx)
+──────────────────────────────────────────────────────
+
+Page header: "Skills" + "Installable capability extensions via Hermes registry"
+
+Install section:
+  Input: source string (e.g. "hermes:arxiv") + [Install] button
+  Below: link "Browse Hermes registry →" (stub)
+
+Installed skills list (full-width table):
+  Name | Source | Status | Actions
+  Each row: skill name (mono) | hermes:X | Active badge | [Uninstall] button
+  Empty state: "No skills installed. Install from the Hermes registry."
+
+──────────────────────────────────────────────────────
+SECURITY PAGE  (src/pages/security/index.tsx)
+──────────────────────────────────────────────────────
+
+Page header: "Security" + "Credential status, audit log, and guardrails"
+
+Row 1 (j-grid-2):
+  Left: "API Credentials" card
+    Table: Key Name | Status | Action
+    ANTHROPIC_API_KEY  | ● Set / ✕ Not set  | [Revoke] stub
+    OPENAI_API_KEY     | ● Set / ✕ Not set  | [Revoke] stub
+    Show key presence only, never values
+
+  Right: "Guardrails" card
+    Table of OpenJarvis security primitives (from API reference):
+      Injection Scanner  | Active
+      Rate Limiter       | Active (X req/min)
+      File Policy        | Active (sandbox)
+      SSRF Protection    | Active
+      Audit Log          | Active
+    All sourced from /api/health or hardcoded as "Active" if backend confirms online
+
+Row 2: "Audit Log" card (full width)
+  Table: Timestamp | Agent | Action | Status | Latency
+  Last 20 entries from agentHistory store
+  Monospace timestamps, agent badges, status badges
+
+──────────────────────────────────────────────────────
+SETTINGS PAGE  (src/pages/settings/index.tsx)
+──────────────────────────────────────────────────────
+
+Left nav (200px): sections list
+  General, Engine, Appearance, Memory, Telemetry, Advanced
+
+General:
+  Mode: dropdown (work, research, creative, focused)
+  Username: text input
+
+Engine:
+  Engine: dropdown (ollama, vllm, sglang, llama.cpp, openai, anthropic)
+  Model: text input (e.g. llama3.2)
+  Base URL: text input (e.g. http://localhost:11434)
+  [Test Connection] button → calls /api/health, shows result inline
+
+Appearance:
+  Theme: only dark (disabled toggle — "OpenJarvis is dark by design")
+  Font size: 12 / 13 / 14 options
+  Rail: expanded by default toggle
+
+Memory:
+  Default index path: text input
+  Auto-index on startup: toggle
+  Chunk size: number input
+
+Telemetry:
+  Send anonymous telemetry: toggle (off by default)
+  Show cost estimates: toggle
+  Show energy estimates: toggle
+
+──────────────────────────────────────────────────────
+REMAINING MODULE PAGES (stub but meaningful)
+──────────────────────────────────────────────────────
+
+Inbox, Projects, Calendar, Approvals, Vault, Marketplace, Knowledge:
+  Each gets:
+    - Correct page header + description
+    - A "Connect via Jarvis" explanation card describing what the module does
+    - A list of required connectors with [Connect] buttons
+    - A skeleton loading grid (3 shimmer cards)
+    - No blank screens, no placeholder text like "coming soon" — instead
+      describe what Jarvis will do when the connector is set up
+
+──────────────────────────────────────────────────────
+STATE  (src/store/nexusStore.ts → renamed jarvisStore.ts)
+──────────────────────────────────────────────────────
+
+Zustand store:
+  activeModule: string        // current nav item
+  chatSessions: Session[]     // [{id, messages[], agentType, createdAt}]
+  activeSessionId: string
+  isStreaming: boolean
+  agentHistory: AgentEvent[]  // last 50 events
+  railExpanded: boolean
+  commandPaletteOpen: boolean
+  selectedAgent: AgentType
+
+──────────────────────────────────────────────────────
+API CLIENT  (src/lib/jarvisApi.ts)
+──────────────────────────────────────────────────────
+
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+All existing endpoints plus:
+  getHealth()        → includes gpu, vram_gb, tokens_per_sec, watt_per_query,
+                        total_queries, total_cost_usd, avg_latency_ms
+  getTelemetry()     → { queries: [], energy_wh, cost_usd, avg_latency_ms,
+                          by_agent: Record<string, AgentStats> }
+  streamChat() WS    → done msg includes { latency_ms, tokens, cost_usd, energy_wh }
+
+──────────────────────────────────────────────────────
+HOOKS  (src/hooks/useJarvis.ts)
+──────────────────────────────────────────────────────
+
+useJarvisHealth()       // 15s poll
+useJarvisTelemetry()    // 30s poll
+useJarvisAgents()       // cached
+useJarvisConnectors()   // 60s poll
+useJarvisSkills()       // cached
+useAskJarvis()          // mutation
+useMemorySearch(q)      // enabled when q.length > 2
+useGetCurrentMode()     // replaces @workspace/api-client-react
+
+──────────────────────────────────────────────────────
+CSS  (src/index.css)
+──────────────────────────────────────────────────────
+
+Import JetBrains Mono from Google Fonts.
+Reset: box-sizing border-box, no margin/padding on body.
+
+Define CSS custom properties matching the palette above.
+
+Utility classes:
+  .j-card        background surface, border, radius 6px, padding 16px
+  .j-card-header 11px uppercase tracking, text-muted, margin-bottom 12px,
+                 border-bottom 1px border, padding-bottom 8px
+  .j-btn         13px, 32px height, radius 4px, border, cursor pointer,
+                 background transparent, text-primary, hover surface-alt
+  .j-btn-primary background accent-blue (15% opacity), border accent-blue,
+                 color accent-blue, hover (25% opacity)
+  .j-btn-danger  accent-red variant
+  .j-input       full width, 32px height (or auto for textarea),
+                 background surface-alt, border border-color, radius 4px,
+                 padding 0 10px, color text-primary, 13px
+                 focus: border accent-blue, outline none
+  .j-badge       11px mono, padding 2px 6px, radius 2px
+  .j-badge-green .j-badge-amber .j-badge-red .j-badge-blue .j-badge-purple .j-badge-gray
+  .j-mono        font-family monospace, 12px
+  .j-text-muted  color text-muted
+  .j-text-faint  color text-faint
+  .j-divider     1px solid border-color, margin 12px 0
+  .scrollbar-thin  thin scrollbar, track surface, thumb border-color
+
+Remove ALL nexus-* classes. Remove ALL cyan glow effects.
+Remove ALL keyframe animations except:
+  @keyframes blink  { 0%,100%{opacity:1} 50%{opacity:0} }  ← cursor only
+  @keyframes shimmer { ... }  ← loading skeletons only
+
+──────────────────────────────────────────────────────
+OFFLINE / FALLBACK MODE
+──────────────────────────────────────────────────────
+
+When backend is unreachable:
+  - Status bar: "● offline" in accent-red
+  - Top bar engine badge: "no engine"
+  - All hooks return mock data:
+      health: { status:"offline", engine:"none", model:"—", ... }
+      agents: full list of known agent types (hardcoded)
+      connectors: all disconnected
+  - Chat page shows banner: "Backend offline — run `jarvis serve` or set API keys"
+  - Dashboard shows all stats as "—"
+  - Research page shows: "Engine required — configure in Settings"
+  - Never throw uncaught errors
+  - Never show blank pages
+
+═══════════════════════════════════════════════════════
+PACKAGE DEPENDENCIES
+═══════════════════════════════════════════════════════
+
+  zustand
+  marked
+  recharts
+  @tanstack/react-query  (already present)
+  framer-motion          (already present — use sparingly: only page transitions)
+  lucide-react           (already present)
+
+Remove framer-motion usage from every micro-interaction.
+Only use it for route-level page transitions (opacity 0→1, 200ms).
+
+═══════════════════════════════════════════════════════
+REPLIT CONFIGURATION
+═══════════════════════════════════════════════════════
+
+Same as before:
+  backend: uvicorn main:app --host 0.0.0.0 --port 8000
+  frontend: vite --host 0.0.0.0
+  VITE_API_URL = Replit URL
+
+═══════════════════════════════════════════════════════
+QUALITY REQUIREMENTS
+═══════════════════════════════════════════════════════
+
+- Zero TypeScript errors (strict mode)
+- No unused imports
+- Every async operation shows loading + error states
+- Mobile (375px): nav rail collapses to bottom tab bar (5 core tabs only)
+- Respects prefers-reduced-motion
+- The word "NEXUS" must not appear anywhere in the final UI
+- No orbital rings, no brain canvas, no glowing cyan, no sci-fi chrome
+- Every numeric data value must use the monospace font
+- Efficiency metrics (latency, cost, energy) must be visible at all times
+  in the status bar — this is core to OpenJarvis's identity

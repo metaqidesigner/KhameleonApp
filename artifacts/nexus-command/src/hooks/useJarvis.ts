@@ -1,12 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  getHealth, getAgents, getConnectors, getSkills,
-  askJarvis, searchMemory, indexMemoryPath, installSkill,
-  type JarvisHealth, type JarvisConnector, type JarvisSkill,
+  getHealth, getTelemetry, getAgents, getConnectors, getSkills,
+  getCurrentMode, askJarvis, searchMemory, indexMemoryPath, installSkill,
+  type JarvisHealth, type JarvisConnector, type JarvisSkill, type JarvisTelemetry,
 } from '@/lib/jarvisApi';
-import { useGetCurrentMode } from '@workspace/api-client-react';
-
-export { useGetCurrentMode };
 
 export function useJarvisHealth() {
   return useQuery<JarvisHealth>({
@@ -14,6 +11,16 @@ export function useJarvisHealth() {
     queryFn: getHealth,
     refetchInterval: 15_000,
     staleTime: 10_000,
+    retry: false,
+  });
+}
+
+export function useJarvisTelemetry() {
+  return useQuery<JarvisTelemetry>({
+    queryKey: ['jarvis', 'telemetry'],
+    queryFn: getTelemetry,
+    refetchInterval: 30_000,
+    staleTime: 25_000,
     retry: false,
   });
 }
@@ -41,6 +48,15 @@ export function useJarvisSkills() {
     queryKey: ['jarvis', 'skills'],
     queryFn: getSkills,
     staleTime: 60_000,
+    retry: false,
+  });
+}
+
+export function useGetCurrentMode() {
+  return useQuery<{ name: string }>({
+    queryKey: ['jarvis', 'mode'],
+    queryFn: getCurrentMode,
+    staleTime: 5 * 60_000,
     retry: false,
   });
 }
