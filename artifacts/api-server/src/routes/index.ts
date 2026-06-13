@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import dashboardRouter from "./dashboard";
 import agentsRouter from "./agents";
+import agentRosterRouter from "./agentRoster";
 import inboxRouter from "./inbox";
 import projectsRouter from "./projects";
 import tasksRouter from "./tasks";
@@ -21,6 +22,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/dashboard", dashboardRouter);
+router.use("/agents", agentRosterRouter);
 router.use("/agents", agentsRouter);
 router.use("/inbox", inboxRouter);
 router.use("/projects", projectsRouter);

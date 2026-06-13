@@ -5,6 +5,7 @@ interface JPanelProps {
   title: string;
   icon?: React.ReactNode;
   badge?: string;
+  action?: React.ReactNode;
   headerVariant?: 'red' | 'amber';
   children: React.ReactNode;
   className?: string;
@@ -13,7 +14,7 @@ interface JPanelProps {
 }
 
 export default function JPanel({
-  title, icon, badge = 'CLASSIFIED', headerVariant = 'red',
+  title, icon, badge = 'CLASSIFIED', action, headerVariant = 'red',
   children, className = '', style, noPadding,
 }: JPanelProps) {
   const corners = useJarvisStore(s => s.cornerBracketsEnabled);
@@ -29,6 +30,7 @@ export default function JPanel({
           {title}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {action && <span style={{ display: 'flex' }}>{action}</span>}
           <span className="j-badge-classified">{badge}</span>
           <button
             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}

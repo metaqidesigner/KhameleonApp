@@ -1,0 +1,165 @@
+Add a complete multi-AI-agent system to the existing JARVIS Command Centre.
+The UI already exists (JARVIS Iron Man 2 aesthetic, dark panels, red headers,
+cyan accents, scan lines, ticker). This prompt covers the NEW agent layer only.
+Do not change any existing visual style — extend it.
+
+═══════════════════════════════════════════════════════
+CONCEPT: THE AGENT ROSTER
+═══════════════════════════════════════════════════════
+
+The command centre connects to multiple AI providers simultaneously.
+Each provider/model appears as a named AGENT with its own:
+  - Identity card (name, provider, model, avatar color, status)
+  - Live status (ONLINE / STANDBY / OFFLINE / BUSY)
+  - Performance metrics (latency, tokens/s, cost/query, quality score)
+  - Conversation history
+  - Role assignment (what tasks it handles)
+
+Built-in agents:
+  ┌─────────────────────────────────────────────────────┐
+  │ ID          │ NAME        │ PROVIDER   │ MODEL        │
+  ├─────────────────────────────────────────────────────┤
+  │ claude      │ CLAUDE      │ Anthropic  │ claude-sonnet-4-6 │
+  │ gpt4o       │ GPT-4o      │ OpenAI     │ gpt-4o       │
+  │ gemini      │ GEMINI      │ Google     │ gemini-2.0-flash  │
+  │ openrouter  │ OPENROUTER  │ OpenRouter │ (any model)  │
+  │ local       │ LOCAL       │ Ollama     │ (configured) │
+  │ minimax     │ MINIMAX     │ MiniMax    │ (configured) │
+  └─────────────────────────────────────────────────────┘
+
+Users can add custom agents (any OpenAI-compatible endpoint).
+
+═══════════════════════════════════════════════════════
+BACKEND — AGENT GATEWAY  (/backend/agents/)
+═══════════════════════════════════════════════════════
+
+Install dependencies:
+  pip install litellm openai anthropic
+
+Create /backend/agents/gateway.py:
+
+  AgentConfig dataclass:
+    id: str
+    name: str
+    provider: str          # anthropic | openai | google | ollama | litellm | custom
+    model: str             # e.g. claude-sonnet-4-6, gpt-4o, gemini-2.0-flash
+    api_key: str | None    # from env or user-supplied
+    base_url: str | None   # for custom/ollama endpoints
+    enabled: bool
+    role: str              # "general" | "research" | "code" | "analysis" | "creative"
+    system_prompt: str     # per-agent system prompt, editable by user
+    color: str             # hex, for UI avatar
+
+  AgentGateway class:
+    __init__: load agents from AGENTS_CONFIG env var (JSON) or defaults
+    
+    async ask(agent_id, messages, stream=False, tools=None):
+      → routes to correct provider via litellm.acompletion()
+      → litellm handles all providers uniformly:
+          anthropic/claude-sonnet-4-6
+          openai/gpt-4o
+          gemini/gemini-2.0-flash
+          ollama/llama3.2
+          openrouter/<model>
+          <custom base_url>/v1/chat/completions
+      → tracks: latency_ms, tokens, cost_usd, energy_wh (estimate)
+      → logs to AgentEvent store
+
+    async ask_all(messages, agents=None):
+      → sends same prompt to multiple agents simultaneously (asyncio.gather)
+      → returns list of AgentResponse objects
+      → used for "MULTI-AGENT VOTE" and "COUNCIL MODE"
+
+    get_status(agent_id):
+      → pings agent with a 1-token health check
+      → returns ONLINE / OFFLINE / BUSY
+
+  Energy estimation:
+    local agents: use jarvis telemetry watt_per_query if available
+    cloud agents: estimate 0.001 Wh per 1k tokens (configurable)
+
+New API endpoints in main.py:
+
+  GET  /api/agents/roster
+    → list of all AgentConfig objects (api_key masked to "SET"/"NOT SET")
+
+  POST /api/agents/roster
+    → add or update an agent config
+    Body: AgentConfig (without id → auto-generated)
+
+  DELETE /api/agents/roster/{agent_id}
+    → remove a custom agent
+
+  GET  /api/agents/{agent_id}/status
+    → { agent_id, status, latency_ms, model, provider }
+
+  GET  /api/agents/{agent_id}/metrics
+    → { queries, avg_latency_ms, avg_tokens, total_cost_usd,
+        total_energy_wh, quality_score, last_active }
+
+  POST /api/agents/{agent_id}/ask
+    Body: { messages: Message[], stream: bool, tools: string[]? }
+    → single agent query, returns AgentResponse
+    → if stream=true, use SSE (text/event-stream) not WebSocket
+
+  POST /api/agents/ask-all
+    Body: { messages: Message[], agent_ids: string[]?, mode: "parallel"|"vote"|"council" }
+    → parallel: fire all simultaneously, stream all responses
+    → vote: ask all, then ask a "judge" agent to pick best answer
+    → council: agents debate, orchestrator synthesises
+
+  WebSocket /ws/agents/{agent_id}/chat
+    → streaming chat with a specific agent
+    → same protocol as /ws/chat but agent-specific
+    → done message: { done, agent_id, model, latency_ms, tokens, cost_usd }
+
+  WebSocket /ws/agents/council
+    → multi-agent council session
+    → client sends: { prompt, agent_ids, mode }
+    → server streams: { agent_id, token } chunks interleaved
+    → then: { type: "synthesis", token } for final synthesis
+    → then: { type: "done", results: AgentResult[] }
+
+  GET  /api/agents/{agent_id}/history
+    → last 50 conversations for this agent
+
+  POST /api/agents/compare
+    Body: { prompt: string, agent_ids: string[] }
+    → runs prompt on all specified agents in parallel
+    → returns all responses + a cost/latency/quality comparison table
+
+.env additions:
+  ANTHROPIC_API_KEY=
+  OPENAI_API_KEY=
+  GEMINI_API_KEY=
+  OPENROUTER_API_KEY=
+  MINIMAX_API_KEY=
+  AGENTS_CONFIG=  # optional JSON override of default roster
+
+═══════════════════════════════════════════════════════
+FRONTEND — AGENTS TAB (full redesign of the Agents page)
+═══════════════════════════════════════════════════════
+
+The Agents tab now has a sub-navigation row below the top bar tabs:
+
+  ROSTER | CHAT | MULTI-AGENT | COMPARE | COUNCIL | SETTINGS
+
+──────────────────────────────────────────────────────
+AGENTS › ROSTER  (src/pages/agents/Roster.tsx)
+──────────────────────────────────────────────────────
+
+Default panel layout — 2 panels:
+
+Panel 1 (left 35%): "AGENT ROSTER"
+  Red header bar: "AGENT ROSTER — [N] ACTIVE"
+
+  Each agent row:
+    ┌──────────────────────────────────────────────┐
+    │ [●] [AVATAR] [NAME]         [PROVIDER BADGE] │
+    │      [model name mono]      [STATUS BADGE]   │
+    │      [role badge]           [LATENCY] [COST] │
+    └──────────────────────────────────────────────┘
+
+    Avatar: 32px circle, agent's color, initials (e.g. "CL" for Claude,
+            "GP" for GPT-4o, "GM" for Gemini, "LC" for Local)
+    Status dot: green ONLINE /
