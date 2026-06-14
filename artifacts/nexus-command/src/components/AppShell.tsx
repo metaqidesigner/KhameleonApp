@@ -4,6 +4,7 @@ import TopBar from './TopBar';
 import NewsTicker from './NewsTicker';
 import CommandPalette from './CommandPalette';
 import ChatPanel from './ChatPanel';
+import { JarvisOrbPortal } from './orb/JarvisOrbPortal';
 import { useJarvisStore } from '@/store/jarvisStore';
 
 const Overview    = lazy(() => import('@/pages/overview'));
@@ -59,6 +60,7 @@ export function AppShell() {
       </div>
       <CommandPalette />
       <ChatPanel />
+      <JarvisOrbPortal />
     </>
   );
 }

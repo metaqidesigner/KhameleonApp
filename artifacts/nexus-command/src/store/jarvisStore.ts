@@ -11,6 +11,8 @@ export type TabId =
   | 'comms' | 'analytics' | 'security' | 'vault'
   | 'skills' | 'settings';
 
+export type OrbStatus = 'online' | 'speaking' | 'listening' | 'offline';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -48,6 +50,17 @@ export interface PanelLayout {
   maxH?: number;
 }
 
+export interface VoiceSettings {
+  voice: string;
+  rate: number;
+  pitch: number;
+  volume: number;
+  lang: string;
+  pushToTalk: boolean;
+  autoSendDelay: number;
+  maxSpeakLength: number;
+}
+
 interface JarvisStore {
   activeTab: TabId;
   chatOpen: boolean;
@@ -60,6 +73,16 @@ interface JarvisStore {
   scanLinesEnabled: boolean;
   cornerBracketsEnabled: boolean;
   tickerSpeed: number;
+
+  orbStatus: OrbStatus;
+  orbPosition: { x: number; y: number } | null;
+  orbMinimized: boolean;
+  orbChatOpen: boolean;
+  orbActiveAgentId: string;
+  voiceEnabled: boolean;
+  autoSpeak: boolean;
+  wakeWordActive: boolean;
+  voiceSettings: VoiceSettings;
 
   setActiveTab: (t: TabId) => void;
   setChatOpen: (v: boolean) => void;
@@ -74,6 +97,17 @@ interface JarvisStore {
   setScanLines: (v: boolean) => void;
   setCornerBrackets: (v: boolean) => void;
   setTickerSpeed: (v: number) => void;
+
+  setOrbStatus: (s: OrbStatus) => void;
+  setOrbPosition: (p: { x: number; y: number }) => void;
+  setOrbMinimized: (v: boolean) => void;
+  toggleOrbChat: () => void;
+  setOrbChatOpen: (v: boolean) => void;
+  setOrbActiveAgentId: (id: string) => void;
+  toggleVoice: () => void;
+  toggleAutoSpeak: () => void;
+  setWakeWordActive: (v: boolean) => void;
+  setVoiceSettings: (s: Partial<VoiceSettings>) => void;
 }
 
 export const useJarvisStore = create<JarvisStore>()(
@@ -90,6 +124,25 @@ export const useJarvisStore = create<JarvisStore>()(
       scanLinesEnabled: true,
       cornerBracketsEnabled: true,
       tickerSpeed: 60,
+
+      orbStatus: 'online',
+      orbPosition: null,
+      orbMinimized: false,
+      orbChatOpen: false,
+      orbActiveAgentId: 'claude',
+      voiceEnabled: false,
+      autoSpeak: false,
+      wakeWordActive: false,
+      voiceSettings: {
+        voice: '',
+        rate: 1.05,
+        pitch: 0.9,
+        volume: 1.0,
+        lang: 'en-US',
+        pushToTalk: false,
+        autoSendDelay: 800,
+        maxSpeakLength: 800,
+      },
 
       setActiveTab:          (t)      => set({ activeTab: t }),
       setChatOpen:           (v)      => set({ chatOpen: v }),
@@ -109,6 +162,17 @@ export const useJarvisStore = create<JarvisStore>()(
       setScanLines:          (v)      => set({ scanLinesEnabled: v }),
       setCornerBrackets:     (v)      => set({ cornerBracketsEnabled: v }),
       setTickerSpeed:        (v)      => set({ tickerSpeed: v }),
+
+      setOrbStatus:          (s)      => set({ orbStatus: s }),
+      setOrbPosition:        (p)      => set({ orbPosition: p }),
+      setOrbMinimized:       (v)      => set({ orbMinimized: v }),
+      toggleOrbChat:         ()       => set(s => ({ orbChatOpen: !s.orbChatOpen })),
+      setOrbChatOpen:        (v)      => set({ orbChatOpen: v }),
+      setOrbActiveAgentId:   (id)     => set({ orbActiveAgentId: id }),
+      toggleVoice:           ()       => set(s => ({ voiceEnabled: !s.voiceEnabled })),
+      toggleAutoSpeak:       ()       => set(s => ({ autoSpeak: !s.autoSpeak })),
+      setWakeWordActive:     (v)      => set({ wakeWordActive: v }),
+      setVoiceSettings:      (patch)  => set(s => ({ voiceSettings: { ...s.voiceSettings, ...patch } })),
     }),
     {
       name: 'jarvis-ui',
@@ -119,6 +183,12 @@ export const useJarvisStore = create<JarvisStore>()(
         cornerBracketsEnabled: s.cornerBracketsEnabled,
         tickerSpeed: s.tickerSpeed,
         selectedAgent: s.selectedAgent,
+        orbPosition: s.orbPosition,
+        orbMinimized: s.orbMinimized,
+        orbActiveAgentId: s.orbActiveAgentId,
+        voiceEnabled: s.voiceEnabled,
+        autoSpeak: s.autoSpeak,
+        voiceSettings: s.voiceSettings,
       }),
     }
   )

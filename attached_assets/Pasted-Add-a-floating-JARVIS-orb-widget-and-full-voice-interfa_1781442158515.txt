@@ -1,0 +1,511 @@
+Add a floating JARVIS orb widget and full voice interface to the existing
+JARVIS Command Centre. This sits on top of all pages as a fixed overlay.
+Do not change any existing visual style — extend it.
+
+═══════════════════════════════════════════════════════
+THE ORB WIDGET  (src/components/orb/JarvisOrb.tsx)
+═══════════════════════════════════════════════════════
+
+A fixed, draggable orb that floats above all content on every page.
+No label. No text. Just the animated core.
+
+──────────────────────────────────────────────────────
+VISUAL STRUCTURE
+──────────────────────────────────────────────────────
+
+Outer wrapper:
+  position: fixed
+  default position: bottom 40px, right 44px
+  z-index: 9999
+  cursor: grab (grabbing when dragging)
+  user-select: none
+  draggable anywhere on the viewport
+  position persists to localStorage on drop
+
+orb-container: 90px × 90px, relative
+
+Layers inside (bottom to top):
+  1. orb-glow     — radial gradient bloom, pulses slowly
+  2. tick-svg     — SVG with 24 tick marks on outer edge,
+                    counter-rotates slowly (12s), marks at every 15° are
+                    longer and brighter (cyan 0.6 opacity),
+                    others shorter and dimmer (cyan 0.25 opacity)
+  3. ring-3       — 90px, 2 visible quadrants only (top-left arc),
+                    crimson rgba(192,21,42,0.5), rotates CW 7s
+  4. ring-2       — 74px, bottom+left arcs, cyan 0.6, rotates CCW 4s
+  5. ring-1       — 58px, top+right arcs, cyan, rotates CW 2.5s,
+                    glow: 0 0 8px rgba(0,212,255,0.5)
+  6. orb-core     — 38px circle, centre
+                    radial-gradient: #67e8f9 → #00d4ff → #0369a1
+                    box-shadow: 0 0 18px #00d4ff, 0 0 36px rgba(0,212,255,0.4)
+
+──────────────────────────────────────────────────────
+ORB STATES  (driven by jarvisStore.orbStatus)
+──────────────────────────────────────────────────────
+
+ONLINE (default):
+  Core: pulses scale 1→1.1, 2s ease-in-out, cyan glow
+  Rings: slow steady rotation at default speeds
+  Glow: breathes opacity 0.5→1, 2s
+
+SPEAKING (streaming response OR voice output playing):
+  Core: pulses scale 1→1.18, 0.4s, much brighter cyan
+        box-shadow adds third layer: 0 0 90px rgba(0,212,255,0.2)
+  Ring-1: speeds up to 0.7s, turns white-cyan (#e0f2fe)
+           glow: 0 0 18px rgba(0,212,255,0.9)
+  Ring-2: speeds up to 1s, full cyan
+  Ring-3: speeds up to 2s, shifts to cyan
+  Glow: 0.4s pulse, scale up to 1.6
+
+LISTENING (voice input active — microphone open):
+  Core: steady amber/gold — radial-gradient #fcd34d → #c9a84c → #78350f
+        slow throb 0.8s, no fast pulse
+        box-shadow: 0 0 20px #c9a84c, 0 0 40px rgba(201,168,76,0.4)
+  Ring-1: slow gold rotation 4s, border-color #c9a84c
+  Ring-2: slow counter 6s, border-color rgba(201,168,76,0.5)
+  Ring-3: very slow 14s, crimson stays
+  Glow: amber radial-gradient, breathes slowly
+
+OFFLINE:
+  Core: crimson — radial-gradient #f87171 → #c0152a → #450a0a
+        slow dim pulse 3s, fades to 0.65 opacity
+        box-shadow: 0 0 14px #c0152a, 0 0 28px rgba(192,21,42,0.3)
+  Ring-1: slows to 8s, border-color #ef4444, reduced glow
+  Ring-2: slows to 12s, dim red
+  Ring-3: slows to 20s, very faint crimson
+  Glow: dim red, barely visible
+
+Transitions between states: all CSS transitions 0.4s ease
+
+──────────────────────────────────────────────────────
+ORB INTERACTION
+──────────────────────────────────────────────────────
+
+Click (no drag):
+  → toggle the JARVIS chat panel (see below)
+  → if offline: toggle chat panel (shows offline message)
+
+Right-click:
+  → context menu (custom, JARVIS styled):
+      SWITCH AGENT     → submenu: Claude / GPT-4o / Gemini / Local
+      VOICE MODE       → toggle voice on/off
+      MINIMIZE         → shrinks orb to 48px (compact mode)
+      RESET POSITION   → snap back to bottom-right
+
+Drag:
+  → freely reposition anywhere on viewport
+  → chat panel follows the orb position
+  → position saved to localStorage
+
+Double-click:
+  → toggle LISTENING state (shortcut to activate voice)
+
+──────────────────────────────────────────────────────
+COMPACT MODE
+──────────────────────────────────────────────────────
+
+When minimized (48px):
+  Only the core + ring-1 visible (rings 2 and 3 hidden)
+  orb-container shrinks to 48px × 48px
+  core shrinks to 20px
+  ring-1 at 36px
+  All animations continue at half speed
+  Click restores to full size
+
+═══════════════════════════════════════════════════════
+CHAT PANEL  (src/components/orb/OrbChatPanel.tsx)
+═══════════════════════════════════════════════════════
+
+Appears when orb is clicked. Positioned above and to the left of the orb.
+Adjusts automatically so it never goes off-screen.
+
+Dimensions: 310px wide × 420px tall
+Follows orb when dragged (offset: -220px left, -430px top of orb)
+
+Visual: full JARVIS panel aesthetic
+  background: rgba(2,10,22,0.97)
+  border: 1px solid rgba(0,212,255,0.35)
+  box-shadow: 0 0 24px rgba(0,212,255,0.15)
+  NO border-radius — sharp corners
+  corner brackets ::before ::after (cyan L-shapes, 10px)
+
+──────────────────────────────────────────────────────
+PANEL HEADER (red gradient bar)
+──────────────────────────────────────────────────────
+
+background: linear-gradient(90deg, #6b0000 0%, #3d0000 60%, transparent 100%)
+border-bottom: 1px solid rgba(192,21,42,0.4)
+height: 36px, padding: 0 12px
+
+Contents left→right:
+  [status dot 8px — cyan online, red offline, gold listening]
+  [J.A.R.V.I.S — Rajdhani 12px 700 uppercase white]
+  [AGENT: {activeAgent} — Share Tech Mono 9px cyan 0.6]
+  [● ONLINE / ● OFFLINE — Share Tech Mono 9px green/red]  ← right-aligned
+  [CLASSIFIED badge]
+  [✕ close button]
+
+──────────────────────────────────────────────────────
+AGENT SELECTOR ROW
+──────────────────────────────────────────────────────
+
+Below header, border-bottom: 1px solid rgba(0,212,255,0.08)
+padding: 6px 8px
+Pills for each agent in roster:
+  CL (Claude, purple dot) | GP (GPT-4o, green dot) |
+  GM (Gemini, blue dot)   | LC (Local, cyan dot)
+Active pill: border #00d4ff, bg rgba(0,212,255,0.08)
+Share Tech Mono 9px
+
+──────────────────────────────────────────────────────
+MESSAGES AREA
+──────────────────────────────────────────────────────
+
+flex-1, scrollable, padding 10px, gap 7px
+Thin cyan scrollbar
+
+User message:
+  align-self: flex-end
+  background: rgba(192,21,42,0.15)
+  border: 1px solid rgba(192,21,42,0.3)
+  color: #fff, Rajdhani 12px
+
+AI message:
+  align-self: flex-start
+  border-left: 2px solid #00d4ff
+  background: rgba(0,212,255,0.04)
+  color: #b8d4e8, Rajdhani 12px
+  Footer: Share Tech Mono 9px #5a8ab0
+    {agent} · {latency}ms · {tokens} tok · ${cost}
+
+Voice message (when response was spoken aloud):
+  Same as AI message but footer includes: 🔊 SPOKEN · {duration}s
+
+Typing indicator:
+  Share Tech Mono 11px italic, cyan 0.5 opacity
+  text: "PROCESSING..."
+
+Offline message:
+  border-left: 2px solid #c0152a
+  background: rgba(192,21,42,0.06)
+  color: #fca5a5
+  text: "CONNECTION LOST — Backend unreachable. Check engine configuration."
+
+──────────────────────────────────────────────────────
+INPUT AREA
+──────────────────────────────────────────────────────
+
+background: rgba(0,4,8,0.6)
+border-top: 1px solid rgba(0,212,255,0.1)
+padding: 8px, gap 6px, flex row
+
+Voice button (left of input):
+  28px × 28px
+  background: transparent
+  border: 1px solid rgba(0,212,255,0.2)
+  icon: Mic (lucide, 14px, cyan)
+  LISTENING state: border #c9a84c, icon gold, pulsing background
+  onClick: toggle voice listening
+
+Text input:
+  flex: 1
+  background: rgba(0,212,255,0.05)
+  border: 1px solid rgba(0,212,255,0.2)
+  color: #b8d4e8, Rajdhani 12px
+  placeholder: "QUERY JARVIS..." (Share Tech Mono 10px, faint cyan)
+  focus: border rgba(0,212,255,0.5)
+  Enter to send
+
+Send button:
+  28px × 28px
+  background: linear-gradient(135deg, #6b0000, #3d0000)
+  border: 1px solid rgba(192,21,42,0.5)
+  icon: ➤ white 11px
+  hover: border #c0152a, glow
+
+═══════════════════════════════════════════════════════
+VOICE INTERFACE  (src/components/orb/VoiceController.tsx)
+═══════════════════════════════════════════════════════
+
+──────────────────────────────────────────────────────
+VOICE INPUT — Speech to Text
+──────────────────────────────────────────────────────
+
+Use the Web Speech API (SpeechRecognition):
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SR();
+
+Configuration:
+  recognition.continuous = false
+  recognition.interimResults = true
+  recognition.lang = 'en-US'    ← user-configurable in Settings
+
+Activation:
+  - Click the Mic button in the chat panel input area
+  - Double-click the orb
+  - Keyboard shortcut: hold Space bar for 0.5s (push-to-talk)
+    (only when no input is focused)
+
+While listening:
+  → orb enters LISTENING state (gold)
+  → chat input shows interim transcript live as user speaks,
+    fading cyan text: "Hearing: [interim text]..."
+  → a waveform visualiser replaces the input placeholder:
+      5 animated bars, heights driven by microphone volume
+      (use getUserMedia + AnalyserNode for amplitude)
+      bars: cyan, 3px wide, 4px gap, rounded tops
+      height range: 4px–24px, animate smoothly
+
+On speech end (silence detected):
+  → final transcript populates the input
+  → auto-sends after 800ms delay (user can cancel by clicking X)
+  → orb returns to ONLINE state during processing
+  → then enters SPEAKING state during response streaming
+
+On error:
+  → orb flashes red briefly (0.3s) then returns to previous state
+  → chat shows: "VOICE INPUT ERROR — [reason]"
+
+──────────────────────────────────────────────────────
+VOICE OUTPUT — Text to Speech
+──────────────────────────────────────────────────────
+
+Use the Web Speech API (SpeechSynthesis):
+  window.speechSynthesis.speak(utterance)
+
+Voice selection (in Settings › Voice):
+  → load window.speechSynthesis.getVoices()
+  → filter to English voices
+  → preferred voices in order:
+      "Google UK English Male"
+      "Microsoft Ryan Online (Natural) - English (United Kingdom)"
+      "Daniel" (macOS)
+      "Alex" (macOS fallback)
+      First available English male voice
+  → user can override in Settings
+
+Utterance configuration:
+  utterance.rate   = 1.05    ← slightly faster than default
+  utterance.pitch  = 0.9     ← slightly deeper
+  utterance.volume = 1.0
+
+When to speak:
+  → Auto-speak toggle in Settings (default: OFF)
+  → When ON: every AI response is spoken after streaming completes
+  → Manual: each AI message has a 🔊 button to replay it
+  → Orb enters SPEAKING state while audio plays
+  → Orb returns to ONLINE on utterance end
+
+Text pre-processing before speaking:
+  Strip markdown: remove **, *, #, `, _, [](), etc.
+  Replace: "$" → "dollars", "%" → "percent"
+  Replace: "ms" → "milliseconds", "tok" → "tokens"
+  Truncate to 800 characters max for long responses
+    (speak summary + "...response continues in panel")
+
+Interruption:
+  → Clicking the orb while SPEAKING cancels speechSynthesis
+  → Mic button while SPEAKING: cancels speech, starts listening
+  → ESC key: cancels any active speech
+
+──────────────────────────────────────────────────────
+WAVEFORM VISUALISER  (src/components/orb/VoiceWaveform.tsx)
+──────────────────────────────────────────────────────
+
+Shown in two contexts:
+
+1. Inside chat input area while LISTENING:
+   5 bars, 3px wide, 4px gap, rounded tops
+   Heights driven by live microphone AnalyserNode amplitude
+   Color: #c9a84c (gold, matching listening state)
+   Contained in 32px height strip replacing input text
+
+2. Below the orb while SPEAKING (output waveform):
+   9 bars, 2px wide, 3px gap
+   Heights: animated sine wave pattern (not real audio data)
+   simulates speech rhythm: vary heights with offset phases
+   Color: #00d4ff (cyan)
+   Positioned: centred below orb, 8px gap from orb container
+   Fades in when SPEAKING, fades out when done
+   Width: 52px total, height: 20px
+
+──────────────────────────────────────────────────────
+VOICE SETTINGS  (added to Settings › Voice section)
+──────────────────────────────────────────────────────
+
+AUTO-SPEAK RESPONSES:  toggle (default OFF)
+VOICE:                 dropdown of available SpeechSynthesis voices
+                       filtered to English, show voice name + language
+SPEECH RATE:           slider 0.7 – 1.5 (default 1.05)
+PITCH:                 slider 0.5 – 1.5 (default 0.9)
+VOLUME:                slider 0.0 – 1.0 (default 1.0)
+LANGUAGE:              dropdown for SpeechRecognition lang (default en-US)
+PUSH-TO-TALK:          toggle — hold Space to listen (default OFF)
+AUTO-SEND DELAY:       slider 500ms – 2000ms (default 800ms)
+MAX SPEAK LENGTH:      slider 200 – 800 chars (default 800)
+[TEST VOICE] button:   speaks "J.A.R.V.I.S online. All systems nominal."
+
+──────────────────────────────────────────────────────
+VOICE KEYBOARD SHORTCUTS
+──────────────────────────────────────────────────────
+
+Double-click orb   → toggle listening
+Space (hold 0.5s)  → push to talk (if enabled in settings)
+ESC                → cancel speech or listening
+⌘K                 → focus command palette (existing)
+⌘M                 → toggle mic on/off
+⌘J                 → toggle orb chat panel
+
+All shortcuts registered globally in a useKeyboardShortcuts() hook.
+Show shortcut hints in Settings › Voice as a reference table.
+
+──────────────────────────────────────────────────────
+WAKE WORD (optional, browser-permitting)
+──────────────────────────────────────────────────────
+
+If SpeechRecognition continuous mode is supported:
+  Add a "Wake Word" toggle in Settings › Voice
+  Wake word: "Hey Jarvis" or "Jarvis" (user-configurable)
+  When enabled: recognition runs continuously in background,
+    listening only for the wake word
+  On detection: orb pulses briefly, then enters full LISTENING mode
+  Show a tiny indicator in the status bar: "👂 WAKE WORD ACTIVE"
+
+  Implementation:
+    recognition.continuous = true
+    recognition.interimResults = true
+    onresult: check if transcript includes wake word (case-insensitive)
+    If match: stop continuous recognition, start fresh single recognition
+
+═══════════════════════════════════════════════════════
+STORE ADDITIONS  (src/store/jarvisStore.ts)
+═══════════════════════════════════════════════════════
+
+Add to existing Zustand store:
+  orbStatus:      'online' | 'speaking' | 'listening' | 'offline'
+  orbPosition:    { x: number, y: number }
+  orbMinimized:   boolean
+  orbChatOpen:    boolean
+  voiceEnabled:   boolean
+  autoSpeak:      boolean
+  wakeWordActive: boolean
+  voiceSettings: {
+    voice:        string     // SpeechSynthesis voice name
+    rate:         number     // 1.05
+    pitch:        number     // 0.9
+    volume:       number     // 1.0
+    lang:         string     // 'en-US'
+    pushToTalk:   boolean
+    autoSendDelay: number    // 800
+    maxSpeakLength: number   // 800
+  }
+  setOrbStatus:   (s: OrbStatus) => void
+  setOrbPosition: (p: {x,y}) => void
+  toggleOrbChat:  () => void
+  toggleVoice:    () => void
+  toggleAutoSpeak:() => void
+
+═══════════════════════════════════════════════════════
+COMPONENT TREE
+═══════════════════════════════════════════════════════
+
+App.tsx
+  └── CanvasLayout (existing shell)
+        ├── TopBar
+        ├── NavRail
+        ├── Main content area (pages)
+        ├── StatusBar
+        └── JarvisOrbPortal          ← NEW (renders via React Portal)
+              ├── JarvisOrb           ← the animated orb
+              ├── VoiceWaveform       ← output bars below orb
+              └── OrbChatPanel        ← chat popup
+                    ├── VoiceController  ← manages SR + TTS
+                    └── VoiceWaveform   ← input bars in chat
+
+JarvisOrbPortal renders into document.body via ReactDOM.createPortal
+so it always floats above everything regardless of z-index context.
+
+═══════════════════════════════════════════════════════
+BROWSER COMPATIBILITY
+═══════════════════════════════════════════════════════
+
+SpeechRecognition: Chrome/Edge only (not Firefox/Safari)
+SpeechSynthesis:   All modern browsers
+
+Graceful degradation:
+  If SpeechRecognition not available:
+    → Mic button shows with strikethrough tooltip: "Voice input requires Chrome or Edge"
+    → Push-to-talk and wake word options hidden in Settings
+    → TTS output still works
+
+  If SpeechSynthesis not available:
+    → Auto-speak toggle hidden
+    → 🔊 buttons hidden on messages
+    → orb never enters SPEAKING state from voice (only from streaming)
+
+  Always check before initialising:
+    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window))
+      setVoiceInputAvailable(false)
+    if (!('speechSynthesis' in window))
+      setVoicOutputAvailable(false)
+
+═══════════════════════════════════════════════════════
+INTEGRATION WITH EXISTING MULTI-AGENT SYSTEM
+═══════════════════════════════════════════════════════
+
+The orb chat panel uses the same streamAgentChat() function
+as the main Agents › Chat page. When a message is sent from the orb:
+
+  1. orbStatus → 'speaking' (cyan, fast rings)
+  2. stream tokens into the message bubble progressively
+  3. On stream complete:
+       a. if autoSpeak: run TTS on the response text
+       b. orbStatus stays 'speaking' until TTS finishes
+       c. then orbStatus → 'online'
+  4. Push event to agentHistory in jarvisStore
+  5. Event appears in bottom ticker automatically
+
+When voice input sends a message:
+  1. orbStatus → 'online' briefly (processing)
+  2. streamAgentChat fires
+  3. orbStatus → 'speaking'
+  4. TTS plays (if autoSpeak)
+  5. orbStatus → 'online'
+
+Wake word flow:
+  1. User says "Hey Jarvis, [query]"
+  2. Wake word detected → recognition restarts
+  3. Full query captured
+  4. orbStatus → 'online' → streaming → 'speaking' (TTS)
+  5. Full hands-free loop complete
+
+═══════════════════════════════════════════════════════
+PACKAGES TO ADD
+═══════════════════════════════════════════════════════
+
+No new npm packages required.
+Uses only:
+  Web Speech API    (browser built-in, no install)
+  Web Audio API     (browser built-in, for mic amplitude)
+  ReactDOM.createPortal (already in react-dom)
+
+═══════════════════════════════════════════════════════
+QUALITY REQUIREMENTS
+═══════════════════════════════════════════════════════
+
+- Orb is ALWAYS visible on every page, every tab
+- Orb position persists across page navigation and refreshes
+- Chat panel never covers the top bar or status bar
+- Voice recognition permission prompt handled gracefully:
+    if denied: show "MICROPHONE ACCESS DENIED" in chat panel
+    mic button dims and disables
+- Never start listening without explicit user action
+  (no auto-start, respects browser autoplay policies)
+- All voice state changes reflected in orbStatus immediately
+- Waveform animation uses requestAnimationFrame, cancelled on unmount
+- Zero memory leaks: recognition and synthesis cleaned up on unmount
+- Orb drag does not interfere with page scrolling
+- On mobile: orb fixed bottom-right, not draggable,
+  tap to open chat, no push-to-talk (use mic button only)
+- prefers-reduced-motion: all orb animations at 20% speed,
+  waveform bars static at mid-height

@@ -1,6 +1,6 @@
 ---
 name: Jarvis Command Architecture
-description: Key decisions for the terminal-native three-column shell replacing the orbital brain canvas.
+description: Frontend shell layout, state management, and routing for the Jarvis Command Centre app.
 ---
 
 ## Design
@@ -14,6 +14,7 @@ description: Key decisions for the terminal-native three-column shell replacing 
 - Store: `src/store/jarvisStore.ts` (replaces nexusStore.ts — deleted)
 - API client: `src/lib/jarvisApi.ts` — all calls wrap in safeFetch with offline fallbacks
 - Hooks: `src/hooks/useJarvis.ts`
+- Orb portal: `src/components/orb/JarvisOrbPortal.tsx` → `createPortal(document.body)`
 
 ## Deleted files (do not recreate)
 - `src/components/BrainCanvas.tsx`
@@ -32,3 +33,20 @@ description: Key decisions for the terminal-native three-column shell replacing 
 - Dashboard shows "backend offline" banner with `jarvis serve` hint
 
 **Why:** OpenJarvis is local-first — UI must work without a backend and show honest system state at all times.
+
+## Zustand v5 selector rule — CRITICAL
+Never use object-returning selectors — they break React's getSnapshot contract and cause infinite loops.
+```typescript
+// CORRECT — one call per value:
+const orbStatus    = useJarvisStore(s => s.orbStatus);
+const setOrbStatus = useJarvisStore(s => s.setOrbStatus);
+
+// WRONG — new object every render → "Maximum update depth exceeded":
+const { orbStatus } = useJarvisStore(s => ({ orbStatus: s.orbStatus }));
+```
+`useShallow` from `zustand/shallow` is the comparison function, NOT a hook. The hook lives in `zustand/react/shallow` but individual selectors are simpler and equally correct.
+
+## CSS
+- Global Jarvis styles: `src/index.css`
+- Orb-specific styles: `src/components/orb/orb.css`
+- Web Speech API global types: `src/types/speech.d.ts`
