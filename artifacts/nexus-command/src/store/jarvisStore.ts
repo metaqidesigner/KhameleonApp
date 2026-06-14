@@ -59,6 +59,8 @@ export interface VoiceSettings {
   pushToTalk: boolean;
   autoSendDelay: number;
   maxSpeakLength: number;
+  elevenLabsVoiceId: string;
+  elevenLabsModelId: string;
 }
 
 interface JarvisStore {
@@ -149,6 +151,8 @@ export const useJarvisStore = create<JarvisStore>()(
         pushToTalk: false,
         autoSendDelay: 800,
         maxSpeakLength: 800,
+        elevenLabsVoiceId: 'wDsJlOXPqcvIUKdLXjDs',
+        elevenLabsModelId: 'eleven_turbo_v2_5',
       },
 
       setActiveTab:          (t)      => set({ activeTab: t }),

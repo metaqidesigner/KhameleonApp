@@ -1,0 +1,116 @@
+Update the ElevenLabs voice configuration to use the provided
+voice ID. Apply this in both the backend .env and the frontend
+store default. Do not change anything else.
+
+═══════════════════════════════════════════════════════
+BACKEND — .env
+═══════════════════════════════════════════════════════
+
+Set these values directly in .env (not .env.example):
+
+  ELEVENLABS_VOICE_ID=wDsJlOXPqcvIUKdLXjDs
+  ELEVENLABS_MODEL_ID=eleven_turbo_v2_5
+
+═══════════════════════════════════════════════════════
+BACKEND — /backend/voice/tts.py
+═══════════════════════════════════════════════════════
+
+Update the constant at the top of the file:
+
+  CHANGE:
+    ELEVEN_VOICE = os.getenv("ELEVENLABS_VOICE_ID", "")
+
+  TO:
+    ELEVEN_VOICE = os.getenv("ELEVENLABS_VOICE_ID", "wDsJlOXPqcvIUKdLXjDs")
+
+So if the .env value is ever missing, it falls back to
+this ID automatically rather than failing silently.
+
+═══════════════════════════════════════════════════════
+FRONTEND — src/store/jarvisStore.ts
+═══════════════════════════════════════════════════════
+
+Update the voiceSettings initial state:
+
+  CHANGE:
+    elevenLabsVoiceId: ''
+
+  TO:
+    elevenLabsVoiceId: 'wDsJlOXPqcvIUKdLXjDs'
+
+This means the voice works immediately on first load
+without the user needing to visit Settings › Voice
+to select it.
+
+═══════════════════════════════════════════════════════
+FRONTEND — src/components/orb/VoiceController.tsx
+═══════════════════════════════════════════════════════
+
+Update the speakElevenLabs call to always include
+the hardcoded fallback:
+
+  CHANGE:
+    const audio = await speakElevenLabs(clean, {
+      voiceId: voiceSettings.elevenLabsVoiceId,
+      ...
+    });
+
+  TO:
+    const audio = await speakElevenLabs(clean, {
+      voiceId: voiceSettings.elevenLabsVoiceId
+                || 'wDsJlOXPqcvIUKdLXjDs',
+      ...
+    });
+
+═══════════════════════════════════════════════════════
+FRONTEND — src/pages/settings/VoiceSettings.tsx
+═══════════════════════════════════════════════════════
+
+In the voice list, pre-select and highlight the row
+matching voice ID 'wDsJlOXPqcvIUKdLXjDs' on mount:
+
+  useEffect(() => {
+    setSelectedVoiceId('wDsJlOXPqcvIUKdLXjDs');
+  }, []);
+
+Show an "ACTIVE" badge on this voice row by default
+without the user needing to click SELECT.
+
+Also add a pinned card at the very top of the voice
+list in Settings › Voice, above the search results:
+
+  ┌──────────────────────────────────────────────┐
+  │  CONFIGURED VOICE                  [ACTIVE]  │
+  │  ID: wDsJlOXPqcvIUKdLXjDs                   │
+  │  [▶ PREVIEW]  [SEARCH FOR OTHERS]            │
+  └──────────────────────────────────────────────┘
+
+  Card style: j-panel, amber header bar
+  "CONFIGURED VOICE" — Rajdhani 11px 700 uppercase
+  ID shown in Share Tech Mono 10px #5a8ab0
+  PREVIEW button: speaks test phrase with this voice
+  SEARCH FOR OTHERS: expands the voice search below
+
+═══════════════════════════════════════════════════════
+TEST SEQUENCE
+═══════════════════════════════════════════════════════
+
+After applying these changes, verify the full loop:
+
+  1. App loads
+  2. Say "Hello Jarvis"
+  3. Orb turns gold (listening)
+  4. Speak a query: "What is the status of all systems?"
+  5. Orb turns cyan (streaming)
+  6. Response streams into chat panel
+  7. Audio plays using voice ID wDsJlOXPqcvIUKdLXjDs
+  8. Orb stays cyan while audio plays
+  9. Audio ends → orb returns to idle blue
+  10. Wake word listener restarts automatically
+  11. Status bar shows: "👂 LISTENING FOR 'HELLO JARVIS'"
+
+If audio does not play in step 7:
+  Check: ELEVENLABS_API_KEY is set in .env
+  Check: GET /api/voice/status returns { connected: true }
+  Check: browser console for CORS or fetch errors
+  Fallback: Web Speech API will activate automatically
