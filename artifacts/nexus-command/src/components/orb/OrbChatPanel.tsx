@@ -20,6 +20,14 @@ const AGENT_COLORS: Record<string, string> = {
   minimax:    '#ec4899',
 };
 
+const PREFERRED_VOICES = [
+  'Google UK English Male',
+  'Microsoft Ryan Online (Natural) - English (United Kingdom)',
+  'Microsoft Guy Online (Natural) - English (United States)',
+  'Daniel',
+  'Alex',
+];
+
 interface OrbMsg {
   id: string;
   role: 'user' | 'assistant' | 'error';
@@ -37,56 +45,112 @@ interface Props {
   onClose: () => void;
 }
 
-function speakText(text: string, voiceSettings: VoiceSettings) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const { rate, pitch, volume, maxSpeakLength, lang } = voiceSettings;
-  const stripped = text
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/#{1,6}\s/g, '')
-    .replace(/`{1,3}[^`]*`{1,3}/g, '')
-    .slice(0, maxSpeakLength);
-  const utterance = new SpeechSynthesisUtterance(stripped);
-  utterance.rate = rate; utterance.pitch = pitch; utterance.volume = volume; utterance.lang = lang;
-  window.speechSynthesis.speak(utterance);
+function getVoices(): Promise<SpeechSynthesisVoice[]> {
+  return new Promise(resolve => {
+    const v = window.speechSynthesis.getVoices();
+    if (v.length > 0) { resolve(v); return; }
+    window.speechSynthesis.onvoiceschanged = () => resolve(window.speechSynthesis.getVoices());
+  });
 }
 
 export function OrbChatPanel({ style, onClose }: Props) {
-  const orbActiveAgentId   = useJarvisStore(s => s.orbActiveAgentId);
+  const orbActiveAgentId    = useJarvisStore(s => s.orbActiveAgentId);
   const setOrbActiveAgentId = useJarvisStore(s => s.setOrbActiveAgentId);
   const orbStatus           = useJarvisStore(s => s.orbStatus);
   const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
-  const autoSpeak           = useJarvisStore(s => s.autoSpeak);
   const voiceSettings       = useJarvisStore(s => s.voiceSettings);
   const pushAgentEvent      = useJarvisStore(s => s.pushAgentEvent);
+  const pendingVoiceQuery   = useJarvisStore(s => s.pendingVoiceQuery);
+  const setPendingVoiceQuery = useJarvisStore(s => s.setPendingVoiceQuery);
 
-  const [roster, setRoster] = useState<AgentConfig[]>(FALLBACK_ROSTER);
+  const [roster, setRoster]     = useState<AgentConfig[]>(FALLBACK_ROSTER);
   const [messages, setMessages] = useState<OrbMsg[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput]       = useState('');
   const [streaming, setStreaming] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const stopStreamRef = useRef<(() => void) | null>(null);
-  const streamBufRef = useRef('');
+  const messagesEndRef  = useRef<HTMLDivElement>(null);
+  const inputRef        = useRef<HTMLInputElement>(null);
+  const stopStreamRef   = useRef<(() => void) | null>(null);
+  const streamBufRef    = useRef('');
+  const voicesRef       = useRef<SpeechSynthesisVoice[]>([]);
+
+  // Countdown state for auto-send
+  const [countdown, setCountdown] = useState<{ progress: number } | null>(null);
+  const countdownRafRef = useRef<number | null>(null);
+  const countdownStartRef = useRef<number>(0);
 
   useEffect(() => {
     getRoster().then(setRoster).catch(() => {});
+    if ('speechSynthesis' in window) {
+      getVoices().then(v => { voicesRef.current = v; });
+    }
   }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // ── TTS with orbStatus wiring + Chrome keepalive ──────────────────────────
+  const speakResponse = useCallback((text: string, settings: VoiceSettings) => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+
+    const clean = text
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/`(.*?)`/g, '$1')
+      .replace(/```[\s\S]*?```/g, 'code block omitted')
+      .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+      .replace(/\$/g, 'dollars')
+      .replace(/%/g, 'percent')
+      .replace(/\bms\b/g, 'milliseconds')
+      .replace(/\btok\b/g, 'tokens')
+      .replace(/\n+/g, '. ')
+      .trim()
+      .slice(0, settings.maxSpeakLength);
+
+    if (!clean) return;
+
+    const utterance = new SpeechSynthesisUtterance(clean);
+    utterance.rate   = settings.rate;
+    utterance.pitch  = settings.pitch;
+    utterance.volume = settings.volume;
+    utterance.lang   = settings.lang;
+
+    const voices = voicesRef.current.length ? voicesRef.current : window.speechSynthesis.getVoices();
+    let sel: SpeechSynthesisVoice | null = null;
+    for (const name of PREFERRED_VOICES) {
+      sel = voices.find(v => v.name === name) ?? null;
+      if (sel) break;
+    }
+    if (!sel && settings.voice) sel = voices.find(v => v.name === settings.voice) ?? null;
+    if (!sel) sel = voices.find(v => v.lang.startsWith('en')) ?? null;
+    if (sel) utterance.voice = sel;
+
+    utterance.onstart = () => setOrbStatus('speaking');
+    utterance.onend   = () => setOrbStatus('online');
+    utterance.onerror = () => setOrbStatus('online');
+
+    // Chrome bug: TTS pauses after ~15s without this
+    const keepAlive = setInterval(() => {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+      } else {
+        clearInterval(keepAlive);
+      }
+    }, 10000);
+
+    window.speechSynthesis.speak(utterance);
+  }, [setOrbStatus]);
+
+  // ── Send handler ──────────────────────────────────────────────────────────
   const handleSend = useCallback((text: string) => {
     const trimmed = text.trim();
     if (!trimmed || streaming) return;
 
     const userMsg: OrbMsg = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: trimmed,
-      ts: Date.now(),
+      id: crypto.randomUUID(), role: 'user', content: trimmed, ts: Date.now(),
     };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
@@ -102,14 +166,9 @@ export function OrbChatPanel({ style, onClose }: Props) {
     ];
 
     const assistantId = crypto.randomUUID();
-    const placeholder: OrbMsg = {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      agentId: orbActiveAgentId,
-      ts: Date.now(),
-    };
-    setMessages(prev => [...prev, placeholder]);
+    setMessages(prev => [...prev, {
+      id: assistantId, role: 'assistant', content: '', agentId: orbActiveAgentId, ts: Date.now(),
+    }]);
 
     stopStreamRef.current = streamAgentChat(
       orbActiveAgentId,
@@ -121,15 +180,16 @@ export function OrbChatPanel({ style, onClose }: Props) {
       },
       (done) => {
         setStreaming(false);
+        const fullResponse = streamBufRef.current;
         setMessages(prev => prev.map(m =>
           m.id === assistantId
-            ? { ...m, latencyMs: done.latencyMs, tokens: done.tokens, costUsd: done.costUsd }
+            ? { ...m, latencyMs: done.latencyMs, tokens: done.tokens, costUsd: done.costUsd, wasSpoken: true }
             : m
         ));
         pushAgentEvent({
           id: assistantId,
           prompt: trimmed,
-          response: streamBufRef.current,
+          response: fullResponse,
           model: done.model,
           agent: orbActiveAgentId,
           ts: Date.now(),
@@ -137,13 +197,8 @@ export function OrbChatPanel({ style, onClose }: Props) {
           tokens: done.tokens,
           costUsd: done.costUsd,
         });
-        if (autoSpeak) {
-          speakText(streamBufRef.current, voiceSettings);
-          setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, wasSpoken: true } : m));
-        } else {
-          setOrbStatus('online');
-        }
-        if (!autoSpeak) setOrbStatus('online');
+        // Orb chat always speaks — voice-first by design
+        speakResponse(fullResponse, voiceSettings);
       },
       (err) => {
         setStreaming(false);
@@ -153,25 +208,64 @@ export function OrbChatPanel({ style, onClose }: Props) {
         setMessages(prev => prev.map(m =>
           m.id === assistantId
             ? { ...m, role: 'error' as const, content: isOffline
-                ? 'CONNECTION LOST — Backend unreachable. Check engine configuration.'
+                ? 'CONNECTION LOST — Backend unreachable.'
                 : `AGENT ERROR — ${err}` }
             : m
         ));
       },
     );
-  }, [streaming, messages, orbActiveAgentId, setOrbStatus, autoSpeak, voiceSettings, pushAgentEvent]);
+  }, [streaming, messages, orbActiveAgentId, setOrbStatus, voiceSettings, pushAgentEvent, speakResponse]);
 
+  // Pick up queries injected by VoiceController
+  useEffect(() => {
+    if (!pendingVoiceQuery) return;
+    setPendingVoiceQuery(null);
+    handleSend(pendingVoiceQuery);
+  }, [pendingVoiceQuery, setPendingVoiceQuery, handleSend]);
+
+  // ── Voice mic input ───────────────────────────────────────────────────────
   const handleTranscript = useCallback((text: string) => {
     setInput(text);
     handleSend(text);
   }, [handleSend]);
 
-  const { voiceInputAvailable, isListening, interim, analyserRef, toggleListening } = useVoice(handleTranscript);
+  const {
+    voiceInputAvailable, isListening, interim,
+    pendingTranscript, cancelAutoSend,
+    analyserRef, toggleListening,
+  } = useVoice(handleTranscript);
 
-  const statusColor = orbStatus === 'online' ? '#00d4ff'
-    : orbStatus === 'speaking' ? '#00d4ff'
-    : orbStatus === 'listening' ? '#c9a84c'
-    : '#c0152a';
+  // Countdown progress bar animation
+  useEffect(() => {
+    if (!pendingTranscript) {
+      setCountdown(null);
+      if (countdownRafRef.current != null) cancelAnimationFrame(countdownRafRef.current);
+      return;
+    }
+    countdownStartRef.current = performance.now();
+    const duration = voiceSettings.autoSendDelay;
+
+    const tick = () => {
+      const elapsed = performance.now() - countdownStartRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+      setCountdown({ progress });
+      if (progress < 1) countdownRafRef.current = requestAnimationFrame(tick);
+    };
+    countdownRafRef.current = requestAnimationFrame(tick);
+    return () => { if (countdownRafRef.current != null) cancelAnimationFrame(countdownRafRef.current); };
+  }, [pendingTranscript, voiceSettings.autoSendDelay]);
+
+  // Cancel auto-send on ESC
+  useEffect(() => {
+    if (!pendingTranscript) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') cancelAutoSend(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pendingTranscript, cancelAutoSend]);
+
+  const statusColor = orbStatus === 'listening' ? '#c9a84c'
+    : orbStatus === 'offline'  ? '#c0152a'
+    : '#00d4ff';
 
   const activeAgent = roster.find(a => a.id === orbActiveAgentId) ?? roster[0];
 
@@ -219,14 +313,14 @@ export function OrbChatPanel({ style, onClose }: Props) {
               <div className="orb-msg-footer">
                 <span>{(msg.agentId ?? orbActiveAgentId).toUpperCase()}</span>
                 {msg.latencyMs != null && <span>{msg.latencyMs}ms</span>}
-                {msg.tokens != null && <span>{msg.tokens} tok</span>}
-                {msg.costUsd != null && msg.costUsd > 0 && <span>${msg.costUsd.toFixed(4)}</span>}
+                {msg.tokens   != null && <span>{msg.tokens} tok</span>}
+                {msg.costUsd  != null && msg.costUsd > 0 && <span>${msg.costUsd.toFixed(4)}</span>}
                 {msg.wasSpoken && <span>🔊 SPOKEN</span>}
                 {'speechSynthesis' in window && (
                   <button
                     className="orb-msg-speak-btn"
                     title="Replay"
-                    onClick={() => speakText(msg.content, voiceSettings)}
+                    onClick={() => speakResponse(msg.content, voiceSettings)}
                   >🔊</button>
                 )}
               </div>
@@ -236,50 +330,91 @@ export function OrbChatPanel({ style, onClose }: Props) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="orb-chat-input-area">
-        <button
-          className={`orb-mic-btn${isListening ? ' listening' : ''}`}
-          title={voiceInputAvailable ? (isListening ? 'Stop listening' : 'Voice input') : 'Voice input requires Chrome or Edge'}
-          disabled={!voiceInputAvailable}
-          onClick={toggleListening}
-        >
-          {isListening ? (
-            <InputWaveform analyserRef={analyserRef} active={isListening} />
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-              <line x1="8" y1="23" x2="16" y2="23"/>
-              {!voiceInputAvailable && <line x1="4" y1="4" x2="20" y2="20" stroke="#c0152a"/>}
-            </svg>
-          )}
-        </button>
-
-        {isListening && interim ? (
-          <div style={{ flex: 1, fontFamily: 'var(--j-font-mono)', fontSize: 10, color: 'rgba(0,212,255,0.5)', padding: '0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            Hearing: {interim}...
+      {/* Input area */}
+      <div className="orb-chat-input-area" style={{ flexDirection: 'column', gap: 0 }}>
+        {/* Countdown bar */}
+        {pendingTranscript && countdown && (
+          <div style={{ width: '100%', marginBottom: 4 }}>
+            <div style={{ position: 'relative', height: 2, background: 'rgba(0,212,255,0.12)', borderRadius: 1, overflow: 'hidden' }}>
+              <div style={{
+                position: 'absolute', left: 0, top: 0, height: '100%',
+                width: `${(1 - countdown.progress) * 100}%`,
+                background: 'var(--j-cyan)',
+                transition: 'width 50ms linear',
+              }} />
+            </div>
           </div>
-        ) : (
-          <input
-            ref={inputRef}
-            className="orb-text-input"
-            placeholder="QUERY JARVIS..."
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSend(input); }}
-            disabled={streaming}
-          />
         )}
 
-        <button
-          className="orb-send-btn"
-          disabled={streaming || (!input.trim() && !isListening)}
-          onClick={() => handleSend(input)}
-        >
-          ➤
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+          <button
+            className={`orb-mic-btn${isListening ? ' listening' : ''}`}
+            title={voiceInputAvailable ? (isListening ? 'Stop listening' : 'Voice input') : 'Voice input requires Chrome or Edge'}
+            disabled={!voiceInputAvailable}
+            onClick={toggleListening}
+          >
+            {isListening ? (
+              <InputWaveform analyserRef={analyserRef} active={isListening} />
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+                {!voiceInputAvailable && <line x1="4" y1="4" x2="20" y2="20" stroke="#c0152a"/>}
+              </svg>
+            )}
+          </button>
+
+          {pendingTranscript ? (
+            <>
+              <div style={{
+                flex: 1, fontFamily: 'var(--j-font-mono)', fontSize: 10,
+                color: 'rgba(0,212,255,0.7)', padding: '0 4px',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {pendingTranscript}
+              </div>
+              <button
+                onClick={cancelAutoSend}
+                style={{
+                  padding: '3px 8px', fontFamily: 'var(--j-font-mono)', fontSize: 9,
+                  letterSpacing: '0.1em', background: 'transparent',
+                  border: '1px solid rgba(192,21,42,0.5)', color: 'rgba(192,21,42,0.8)',
+                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                }}
+              >
+                ✕ CANCEL
+              </button>
+            </>
+          ) : isListening && interim ? (
+            <div style={{
+              flex: 1, fontFamily: 'var(--j-font-mono)', fontSize: 10,
+              color: 'rgba(0,212,255,0.5)', padding: '0 4px',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              Hearing: {interim}…
+            </div>
+          ) : (
+            <input
+              ref={inputRef}
+              className="orb-text-input"
+              placeholder="QUERY JARVIS..."
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleSend(input); }}
+              disabled={streaming}
+            />
+          )}
+
+          <button
+            className="orb-send-btn"
+            disabled={streaming || (!input.trim() && !isListening && !pendingTranscript)}
+            onClick={() => handleSend(input)}
+          >
+            ➤
+          </button>
+        </div>
       </div>
     </div>
   );

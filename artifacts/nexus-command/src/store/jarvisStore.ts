@@ -82,6 +82,8 @@ interface JarvisStore {
   voiceEnabled: boolean;
   autoSpeak: boolean;
   wakeWordActive: boolean;
+  wakeWordBlocked: boolean;
+  pendingVoiceQuery: string | null;
   voiceSettings: VoiceSettings;
 
   setActiveTab: (t: TabId) => void;
@@ -103,10 +105,13 @@ interface JarvisStore {
   setOrbMinimized: (v: boolean) => void;
   toggleOrbChat: () => void;
   setOrbChatOpen: (v: boolean) => void;
+  openOrbChat: () => void;
   setOrbActiveAgentId: (id: string) => void;
   toggleVoice: () => void;
   toggleAutoSpeak: () => void;
   setWakeWordActive: (v: boolean) => void;
+  setWakeWordBlocked: (v: boolean) => void;
+  setPendingVoiceQuery: (q: string | null) => void;
   setVoiceSettings: (s: Partial<VoiceSettings>) => void;
 }
 
@@ -130,9 +135,11 @@ export const useJarvisStore = create<JarvisStore>()(
       orbMinimized: false,
       orbChatOpen: false,
       orbActiveAgentId: 'claude',
-      voiceEnabled: false,
-      autoSpeak: false,
-      wakeWordActive: false,
+      voiceEnabled: true,
+      autoSpeak: true,
+      wakeWordActive: true,
+      wakeWordBlocked: false,
+      pendingVoiceQuery: null,
       voiceSettings: {
         voice: '',
         rate: 1.05,
@@ -168,10 +175,13 @@ export const useJarvisStore = create<JarvisStore>()(
       setOrbMinimized:       (v)      => set({ orbMinimized: v }),
       toggleOrbChat:         ()       => set(s => ({ orbChatOpen: !s.orbChatOpen })),
       setOrbChatOpen:        (v)      => set({ orbChatOpen: v }),
+      openOrbChat:           ()       => set({ orbChatOpen: true }),
       setOrbActiveAgentId:   (id)     => set({ orbActiveAgentId: id }),
       toggleVoice:           ()       => set(s => ({ voiceEnabled: !s.voiceEnabled })),
       toggleAutoSpeak:       ()       => set(s => ({ autoSpeak: !s.autoSpeak })),
       setWakeWordActive:     (v)      => set({ wakeWordActive: v }),
+      setWakeWordBlocked:    (v)      => set({ wakeWordBlocked: v }),
+      setPendingVoiceQuery:  (q)      => set({ pendingVoiceQuery: q }),
       setVoiceSettings:      (patch)  => set(s => ({ voiceSettings: { ...s.voiceSettings, ...patch } })),
     }),
     {

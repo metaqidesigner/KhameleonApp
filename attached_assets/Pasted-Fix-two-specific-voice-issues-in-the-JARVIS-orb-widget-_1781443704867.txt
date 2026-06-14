@@ -1,0 +1,394 @@
+Fix two specific voice issues in the JARVIS orb widget.
+Do not change anything else.
+
+═══════════════════════════════════════════════════════
+FIX 1 — WAKE WORD AUTO-STARTS ON PAGE LOAD
+═══════════════════════════════════════════════════════
+
+The wake word listener must start automatically when the app loads,
+without the user needing to click anything first.
+
+In VoiceController.tsx, add a useEffect that fires on mount:
+
+  useEffect(() => {
+    if (!voiceInputAvailable) return;
+
+    // Request microphone permission proactively on first load
+    // Show a one-time permission prompt styled as a JARVIS panel
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(() => {
+        startWakeWordListener();
+      })
+      .catch(() => {
+        // Permission denied — show notice in status bar
+        setWakeWordBlocked(true);
+      });
+  }, []);
+
+──────────────────────────────────────────────────────
+PERMISSION PROMPT  (shown once on first visit)
+──────────────────────────────────────────────────────
+
+If this is the first time (check localStorage key 'jarvis_mic_granted'):
+  Show a centred JARVIS-styled modal BEFORE requesting permission:
+
+  background: rgba(2,10,22,0.97)
+  border: 1px solid rgba(0,212,255,0.35)
+  corner brackets (cyan ::before ::after)
+  width: 360px, padding: 24px
+
+  Red header bar: "MICROPHONE ACCESS REQUIRED"
+
+  Body text (Rajdhani 13px #b8d4e8):
+    "J.A.R.V.I.S requires microphone access to enable
+     wake word detection and voice commands.
+     Say 'Hello JARVIS' at any time to activate."
+
+  Two buttons:
+    [▶ GRANT ACCESS]  → red gradient style → triggers getUserMedia
+    [SKIP]            → ghost style → closes modal, disables wake word
+
+  On grant: save localStorage 'jarvis_mic_granted' = 'true', dismiss modal
+  On skip:  save localStorage 'jarvis_mic_granted' = 'denied', dismiss modal
+            wake word and mic button both disabled until Settings › Voice
+
+  Never show this modal again once answered (check localStorage on mount)
+
+──────────────────────────────────────────────────────
+WAKE WORD LISTENER  (startWakeWordListener function)
+──────────────────────────────────────────────────────
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function startWakeWordListener() {
+  const recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = voiceSettings.lang; // default 'en-US'
+
+  recognition.onresult = (event) => {
+    const transcript = Array.from(event.results)
+      .map(r => r[0].transcript)
+      .join(' ')
+      .toLowerCase()
+      .trim();
+
+    // Wake phrases — any of these trigger activation
+    const wakePhrases = [
+      'hello jarvis',
+      'hey jarvis',
+      'ok jarvis',
+      'jarvis',         // fallback single word
+    ];
+
+    const triggered = wakePhrases.some(phrase =>
+      transcript.includes(phrase)
+    );
+
+    if (triggered) {
+      recognition.stop();           // stop wake listener
+      setOrbStatus('listening');    // orb turns gold
+      openOrbChat();                // open chat panel if closed
+
+      // Extract query after the wake phrase if present
+      // e.g. "Hello Jarvis what is the weather" → "what is the weather"
+      let query = transcript;
+      wakePhrases.forEach(phrase => {
+        query = query.replace(phrase, '').trim();
+      });
+
+      if (query.length > 2) {
+        // User said wake word + query in one breath
+        // wait 400ms then send directly
+        setTimeout(() => {
+          sendVoiceMessage(query);
+        }, 400);
+      } else {
+        // Wake word only — start fresh listening for the query
+        startQueryListening();
+      }
+    }
+  };
+
+  recognition.onend = () => {
+    // Auto-restart wake listener unless deliberately stopped
+    if (wakeWordActive && !isListeningForQuery) {
+      setTimeout(() => startWakeWordListener(), 300);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'no-speech') {
+      // Normal — just restart
+      setTimeout(() => startWakeWordListener(), 300);
+    } else if (e.error === 'not-allowed') {
+      setWakeWordBlocked(true);
+    }
+  };
+
+  recognition.start();
+  wakeRecognitionRef.current = recognition;
+}
+
+──────────────────────────────────────────────────────
+QUERY LISTENING  (startQueryListening function)
+──────────────────────────────────────────────────────
+
+Called after wake word is detected with no trailing query.
+Listens for a single utterance then sends it.
+
+function startQueryListening() {
+  const recognition = new SR();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = voiceSettings.lang;
+
+  // Show interim transcript in chat input as user speaks
+  recognition.onresult = (event) => {
+    const interim = Array.from(event.results)
+      .map(r => r[0].transcript)
+      .join('');
+    setInputPreview(interim); // show grey preview text in input
+  };
+
+  recognition.onend = () => {
+    const final = finalTranscriptRef.current.trim();
+    if (final.length > 1) {
+      // Auto-send after delay (user can cancel)
+      showCancelCountdown(voiceSettings.autoSendDelay, () => {
+        sendVoiceMessage(final);
+      });
+    } else {
+      // Nothing heard — return to wake listener
+      setOrbStatus('online');
+      startWakeWordListener();
+    }
+    isListeningForQuery = false;
+  };
+
+  recognition.onerror = () => {
+    setOrbStatus('online');
+    startWakeWordListener();
+    isListeningForQuery = false;
+  };
+
+  isListeningForQuery = true;
+  recognition.start();
+  queryRecognitionRef.current = recognition;
+}
+
+──────────────────────────────────────────────────────
+CANCEL COUNTDOWN UI
+──────────────────────────────────────────────────────
+
+After voice query is captured, before auto-sending:
+  Show in the chat input area:
+    [transcript text]  [✕ CANCEL (0.8s)]
+
+  A thin cyan progress bar depletes left→right over autoSendDelay ms
+  If user clicks ✕ or presses ESC: cancel send, return to wake listener
+  If countdown completes: send the message
+
+──────────────────────────────────────────────────────
+STATUS BAR INDICATOR
+──────────────────────────────────────────────────────
+
+When wake word listener is active, add to the left section of StatusBar:
+  "👂 LISTENING FOR 'HELLO JARVIS'"
+  Share Tech Mono 10px, color rgba(0,212,255,0.4)
+  Pulses gently (opacity 0.4→0.7, 2s)
+
+When blocked (permission denied):
+  "🚫 VOICE BLOCKED"
+  color rgba(192,21,42,0.5)
+
+When actively listening for query:
+  "🎤 HEARING YOU..."
+  color #c9a84c (gold, matches orb)
+
+═══════════════════════════════════════════════════════
+FIX 2 — TTS FIRES ON EVERY AI RESPONSE
+═══════════════════════════════════════════════════════
+
+In VoiceController.tsx, after every AI message is received
+(both from orb chat and from wake word flow), automatically
+speak the response using SpeechSynthesis.
+
+──────────────────────────────────────────────────────
+speakResponse function
+──────────────────────────────────────────────────────
+
+function speakResponse(text: string) {
+  if (!('speechSynthesis' in window)) return;
+
+  // Cancel any in-progress speech
+  window.speechSynthesis.cancel();
+
+  // Clean the text
+  const clean = text
+    .replace(/#{1,6}\s/g, '')        // headings
+    .replace(/\*\*(.*?)\*\*/g, '$1') // bold
+    .replace(/\*(.*?)\*/g, '$1')     // italic
+    .replace(/`(.*?)`/g, '$1')       // inline code
+    .replace(/```[\s\S]*?```/g, 'code block omitted')
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1') // links
+    .replace(/\$/g, 'dollars')
+    .replace(/%/g, 'percent')
+    .replace(/\bms\b/g, 'milliseconds')
+    .replace(/\btok\b/g, 'tokens')
+    .replace(/\n+/g, '. ')
+    .trim()
+    .slice(0, voiceSettings.maxSpeakLength);
+
+  const utterance = new SpeechSynthesisUtterance(clean);
+
+  // Voice selection
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = [
+    'Google UK English Male',
+    'Microsoft Ryan Online (Natural) - English (United Kingdom)',
+    'Microsoft Guy Online (Natural) - English (United States)',
+    'Daniel',
+    'Alex',
+  ];
+  let selectedVoice = null;
+  for (const name of preferred) {
+    selectedVoice = voices.find(v => v.name === name) || null;
+    if (selectedVoice) break;
+  }
+  // Fallback: first English male-sounding voice
+  if (!selectedVoice) {
+    selectedVoice = voices.find(v => v.lang.startsWith('en')) || null;
+  }
+  if (selectedVoice) utterance.voice = selectedVoice;
+
+  utterance.rate   = voiceSettings.rate;   // 1.05
+  utterance.pitch  = voiceSettings.pitch;  // 0.9
+  utterance.volume = voiceSettings.volume; // 1.0
+
+  utterance.onstart = () => {
+    setOrbStatus('speaking');  // orb goes cyan, fast rings
+  };
+
+  utterance.onend = () => {
+    setOrbStatus('online');    // orb returns to idle
+    // Restart wake word listener after response finishes
+    if (wakeWordActive) {
+      setTimeout(() => startWakeWordListener(), 500);
+    }
+  };
+
+  utterance.onerror = () => {
+    setOrbStatus('online');
+    if (wakeWordActive) startWakeWordListener();
+  };
+
+  // Chrome bug fix: speechSynthesis pauses after ~15s
+  // Keep it alive with this interval
+  const keepAlive = setInterval(() => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    } else {
+      clearInterval(keepAlive);
+    }
+  }, 10000);
+
+  window.speechSynthesis.speak(utterance);
+}
+
+──────────────────────────────────────────────────────
+WIRE speakResponse INTO THE MESSAGE FLOW
+──────────────────────────────────────────────────────
+
+In OrbChatPanel.tsx, after streaming completes (onDone callback):
+
+  const handleStreamDone = (model, latency, tokens, cost) => {
+    setOrbStatus('online');
+    addMessageToHistory({ role: 'assistant', content: fullResponse, ... });
+
+    // Always speak — no toggle needed for now
+    // (user can disable in Settings › Voice later)
+    speakResponse(fullResponse);
+  };
+
+In the existing Agents › Chat page and Command Palette chat:
+  Add the same speakResponse call after stream completes
+  Only if autoSpeak is true (Settings toggle)
+  Orb chat always speaks (it's voice-first by design)
+
+──────────────────────────────────────────────────────
+VOICES LOAD TIMING FIX
+──────────────────────────────────────────────────────
+
+SpeechSynthesis voices load asynchronously in Chrome.
+Always load voices like this, never synchronously:
+
+  function getVoices(): Promise<SpeechSynthesisVoice[]> {
+    return new Promise((resolve) => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        resolve(voices);
+      } else {
+        window.speechSynthesis.onvoiceschanged = () => {
+          resolve(window.speechSynthesis.getVoices());
+        };
+      }
+    });
+  }
+
+Call this once on mount, store result in a ref.
+Use the cached ref in speakResponse — never call getVoices() inline.
+
+──────────────────────────────────────────────────────
+FULL VOICE CONVERSATION LOOP
+──────────────────────────────────────────────────────
+
+The complete hands-free flow after these fixes:
+
+  1. App loads → permission modal (first time only)
+  2. User grants mic → wake word listener starts silently
+  3. Status bar shows: "👂 LISTENING FOR 'HELLO JARVIS'"
+  4. User says "Hello Jarvis"
+  5. Orb flashes → turns gold → chat panel opens
+  6. Status bar: "🎤 HEARING YOU..."
+  7. User speaks their query
+  8. Transcript appears in input, countdown shows
+  9. Auto-sends after 800ms
+  10. Orb turns cyan (streaming)
+  11. Response streams into chat panel
+  12. Stream completes → speakResponse fires
+  13. Orb stays cyan while speaking
+  14. Speech ends → orb returns to idle (blue/cyan)
+  15. Wake word listener restarts automatically
+  16. Status bar: "👂 LISTENING FOR 'HELLO JARVIS'"
+  17. Loop repeats hands-free
+
+═══════════════════════════════════════════════════════
+SETTINGS UPDATE
+═══════════════════════════════════════════════════════
+
+In Settings › Voice, update these defaults:
+
+  WAKE WORD ACTIVE:    true   ← was false, now on by default
+  AUTO-SPEAK RESPONSES: true  ← was false, now on by default
+  WAKE PHRASES:        editable list, default: ["hello jarvis", "hey jarvis",
+                       "ok jarvis", "jarvis"]
+  RESET MIC PERMISSION: button → clears localStorage 'jarvis_mic_granted'
+                        and reloads to show permission modal again
+
+═══════════════════════════════════════════════════════
+BROWSER NOTE TO SHOW IN SETTINGS › VOICE
+═══════════════════════════════════════════════════════
+
+Display this notice at the top of the Voice settings panel:
+
+  "⚠ BROWSER COMPATIBILITY"
+  "Wake word detection and voice input require Google Chrome or
+   Microsoft Edge. Safari and Firefox do not support the
+   SpeechRecognition API. Text-to-speech works in all browsers."
+
+  Share Tech Mono 10px, amber color #c9a84c,
+  background rgba(201,168,76,0.06),
+  border 1px solid rgba(201,168,76,0.2),
+  padding 8px 10px

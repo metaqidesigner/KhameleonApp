@@ -7,12 +7,14 @@ export interface UseVoiceReturn {
   isListening: boolean;
   isSpeaking: boolean;
   interim: string;
+  pendingTranscript: string | null;
   analyserRef: React.RefObject<AnalyserNode | null>;
   startListening: () => void;
   stopListening: () => void;
   toggleListening: () => void;
   speak: (text: string) => void;
   cancelSpeech: () => void;
+  cancelAutoSend: () => void;
   availableVoices: SpeechSynthesisVoice[];
 }
 
@@ -49,17 +51,22 @@ export function useVoice(
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [interim, setInterim] = useState('');
+  const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  const recognitionRef = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const autoSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recognitionRef    = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
+  const analyserRef       = useRef<AnalyserNode | null>(null);
+  const audioCtxRef       = useRef<AudioContext | null>(null);
+  const autoSendTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finalTranscriptRef = useRef('');
 
+  // Async voices load (Chrome loads them lazily)
   useEffect(() => {
     if (!voiceOutputAvailable) return;
-    const load = () => setAvailableVoices(window.speechSynthesis.getVoices().filter(v => v.lang.startsWith('en')));
+    const load = () => {
+      const v = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+      if (v.length) setAvailableVoices(v);
+    };
     load();
     window.speechSynthesis.onvoiceschanged = load;
     return () => { window.speechSynthesis.onvoiceschanged = null; };
@@ -71,6 +78,15 @@ export function useVoice(
       audioCtxRef.current = null;
       analyserRef.current = null;
     }
+  }, []);
+
+  const cancelAutoSend = useCallback(() => {
+    if (autoSendTimerRef.current) {
+      clearTimeout(autoSendTimerRef.current);
+      autoSendTimerRef.current = null;
+    }
+    setPendingTranscript(null);
+    finalTranscriptRef.current = '';
   }, []);
 
   const startListening = useCallback(async () => {
@@ -86,7 +102,7 @@ export function useVoice(
       source.connect(analyser);
       analyserRef.current = analyser;
     } catch {
-      // mic access denied — continue without waveform
+      // mic denied — continue without waveform
     }
 
     const SpeechRecognition = (window as unknown as Record<string, unknown>).SpeechRecognition as typeof window.SpeechRecognition
@@ -124,8 +140,9 @@ export function useVoice(
 
       const text = finalTranscriptRef.current.trim();
       if (text) {
-        if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+        setPendingTranscript(text);
         autoSendTimerRef.current = setTimeout(() => {
+          setPendingTranscript(null);
           onTranscript(text);
           finalTranscriptRef.current = '';
         }, voiceSettings.autoSendDelay);
@@ -148,6 +165,7 @@ export function useVoice(
     recognitionRef.current?.stop();
     recognitionRef.current = null;
     if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+    setPendingTranscript(null);
     stopMicStream();
     setIsListening(false);
     setInterim('');
@@ -168,39 +186,41 @@ export function useVoice(
       : text;
 
     const utterance = new SpeechSynthesisUtterance(full);
-    utterance.rate = voiceSettings.rate;
-    utterance.pitch = voiceSettings.pitch;
+    utterance.rate   = voiceSettings.rate;
+    utterance.pitch  = voiceSettings.pitch;
     utterance.volume = voiceSettings.volume;
-    utterance.lang = voiceSettings.lang;
+    utterance.lang   = voiceSettings.lang;
 
     const preferred = [
       'Google UK English Male',
       'Microsoft Ryan Online (Natural) - English (United Kingdom)',
+      'Microsoft Guy Online (Natural) - English (United States)',
       'Daniel',
       'Alex',
     ];
     const voices = availableVoices;
+    let sel: SpeechSynthesisVoice | null = null;
     for (const name of preferred) {
-      const v = voices.find(v => v.name === name);
-      if (v) { utterance.voice = v; break; }
+      sel = voices.find(v => v.name === name) ?? null;
+      if (sel) break;
     }
-    if (!utterance.voice && voiceSettings.voice) {
-      const v = voices.find(v => v.name === voiceSettings.voice);
-      if (v) utterance.voice = v;
-    }
+    if (!sel && voiceSettings.voice) sel = voices.find(v => v.name === voiceSettings.voice) ?? null;
+    if (!sel) sel = voices.find(v => v.lang.startsWith('en')) ?? null;
+    if (sel) utterance.voice = sel;
 
-    utterance.onstart = () => {
-      setIsSpeaking(true);
-      setOrbStatus('speaking');
-    };
-    utterance.onend = () => {
-      setIsSpeaking(false);
-      setOrbStatus('online');
-    };
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-      setOrbStatus('online');
-    };
+    utterance.onstart = () => { setIsSpeaking(true); setOrbStatus('speaking'); };
+    utterance.onend   = () => { setIsSpeaking(false); setOrbStatus('online'); };
+    utterance.onerror = () => { setIsSpeaking(false); setOrbStatus('online'); };
+
+    // Chrome bug: TTS pauses after ~15s
+    const keepAlive = setInterval(() => {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+      } else {
+        clearInterval(keepAlive);
+      }
+    }, 10000);
 
     window.speechSynthesis.speak(utterance);
   }, [voiceOutputAvailable, autoSpeak, voiceSettings, availableVoices, setOrbStatus]);
@@ -226,12 +246,14 @@ export function useVoice(
     isListening,
     isSpeaking,
     interim,
+    pendingTranscript,
     analyserRef,
     startListening,
     stopListening,
     toggleListening,
     speak,
     cancelSpeech,
+    cancelAutoSend,
     availableVoices,
   };
 }
