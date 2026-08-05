@@ -32,6 +32,50 @@ function stripMarkdown(text: string): string {
     .replace(/\btok\b/g, ' tokens');
 }
 
+// ── ElevenLabs TTS ────────────────────────────────────────────────────────────
+// Calls POST /api/voice/tts, streams the audio/mpeg response, plays via Web Audio.
+// Returns a stop() function that aborts playback. Throws on error so the caller
+// can fall back to speechSynthesis.
+async function playElevenLabs(
+  text: string,
+  voiceId: string,
+  modelId: string,
+  onStart: () => void,
+  onEnd: () => void,
+  signal: AbortSignal,
+): Promise<void> {
+  const res = await fetch('/api/voice/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voice_id: voiceId, model_id: modelId }),
+    signal,
+  });
+
+  if (!res.ok) throw new Error(`TTS HTTP ${res.status}`);
+
+  const arrayBuffer = await res.arrayBuffer();
+  if (signal.aborted) return;
+
+  const ctx = new AudioContext();
+  const decoded = await ctx.decodeAudioData(arrayBuffer);
+  if (signal.aborted) { ctx.close(); return; }
+
+  const source = ctx.createBufferSource();
+  source.buffer = decoded;
+  source.connect(ctx.destination);
+
+  onStart();
+
+  await new Promise<void>((resolve) => {
+    source.onended = () => resolve();
+    signal.addEventListener('abort', () => { source.stop(); ctx.close(); resolve(); });
+    source.start(0);
+  });
+
+  ctx.close();
+  onEnd();
+}
+
 export function useVoice(
   onTranscript: (text: string) => void,
   onListenStart?: () => void,
@@ -49,16 +93,17 @@ export function useVoice(
     typeof window !== 'undefined' && 'speechSynthesis' in window
   );
   const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [interim, setInterim] = useState('');
+  const [isSpeaking, setIsSpeaking]   = useState(false);
+  const [interim, setInterim]         = useState('');
   const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [availableVoices, setAvailableVoices]     = useState<SpeechSynthesisVoice[]>([]);
 
-  const recognitionRef    = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
-  const analyserRef       = useRef<AnalyserNode | null>(null);
-  const audioCtxRef       = useRef<AudioContext | null>(null);
-  const autoSendTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recognitionRef     = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
+  const analyserRef        = useRef<AnalyserNode | null>(null);
+  const audioCtxRef        = useRef<AudioContext | null>(null);
+  const autoSendTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finalTranscriptRef = useRef('');
+  const ttsAbortRef        = useRef<AbortController | null>(null);
 
   // Async voices load (Chrome loads them lazily)
   useEffect(() => {
@@ -176,8 +221,12 @@ export function useVoice(
     else startListening();
   }, [isListening, startListening, stopListening]);
 
+  // ── speak: ElevenLabs first, speechSynthesis fallback ──────────────────────
   const speak = useCallback((rawText: string) => {
-    if (!voiceOutputAvailable || !autoSpeak) return;
+    if (!autoSpeak) return;
+
+    // Cancel any in-flight TTS
+    ttsAbortRef.current?.abort();
     window.speechSynthesis.cancel();
 
     const text = stripMarkdown(rawText).slice(0, voiceSettings.maxSpeakLength);
@@ -185,57 +234,84 @@ export function useVoice(
       ? text + '... response continues in panel'
       : text;
 
-    const utterance = new SpeechSynthesisUtterance(full);
-    utterance.rate   = voiceSettings.rate;
-    utterance.pitch  = voiceSettings.pitch;
-    utterance.volume = voiceSettings.volume;
-    utterance.lang   = voiceSettings.lang;
+    const ctrl = new AbortController();
+    ttsAbortRef.current = ctrl;
 
-    const preferred = [
-      'Google UK English Male',
-      'Microsoft Ryan Online (Natural) - English (United Kingdom)',
-      'Microsoft Guy Online (Natural) - English (United States)',
-      'Daniel',
-      'Alex',
-    ];
-    const voices = availableVoices;
-    let sel: SpeechSynthesisVoice | null = null;
-    for (const name of preferred) {
-      sel = voices.find(v => v.name === name) ?? null;
-      if (sel) break;
-    }
-    if (!sel && voiceSettings.voice) sel = voices.find(v => v.name === voiceSettings.voice) ?? null;
-    if (!sel) sel = voices.find(v => v.lang.startsWith('en')) ?? null;
-    if (sel) utterance.voice = sel;
-
-    utterance.onstart = () => { setIsSpeaking(true); setOrbStatus('speaking'); };
-    utterance.onend   = () => { setIsSpeaking(false); setOrbStatus('online'); };
-    utterance.onerror = () => { setIsSpeaking(false); setOrbStatus('online'); };
-
-    // Chrome bug: TTS pauses after ~15s
-    const keepAlive = setInterval(() => {
-      if (window.speechSynthesis.speaking) {
-        window.speechSynthesis.pause();
-        window.speechSynthesis.resume();
-      } else {
-        clearInterval(keepAlive);
+    const onStart = () => { setIsSpeaking(true); setOrbStatus('speaking'); };
+    const onEnd   = () => {
+      if (!ctrl.signal.aborted) {
+        setIsSpeaking(false);
+        setOrbStatus('online');
       }
-    }, 10000);
+    };
 
-    window.speechSynthesis.speak(utterance);
-  }, [voiceOutputAvailable, autoSpeak, voiceSettings, availableVoices, setOrbStatus]);
+    // Try ElevenLabs; fall back to speechSynthesis on any error
+    playElevenLabs(
+      full,
+      voiceSettings.elevenLabsVoiceId,
+      voiceSettings.elevenLabsModelId,
+      onStart,
+      onEnd,
+      ctrl.signal,
+    ).catch(() => {
+      if (ctrl.signal.aborted) return;
+      // Fallback: Web Speech API
+      if (!('speechSynthesis' in window)) return;
+
+      const utterance = new SpeechSynthesisUtterance(full);
+      utterance.rate   = voiceSettings.rate;
+      utterance.pitch  = voiceSettings.pitch;
+      utterance.volume = voiceSettings.volume;
+      utterance.lang   = voiceSettings.lang;
+
+      const preferred = [
+        'Google UK English Male',
+        'Microsoft Ryan Online (Natural) - English (United Kingdom)',
+        'Microsoft Guy Online (Natural) - English (United States)',
+        'Daniel',
+        'Alex',
+      ];
+      let sel: SpeechSynthesisVoice | null = null;
+      for (const name of preferred) {
+        sel = availableVoices.find(v => v.name === name) ?? null;
+        if (sel) break;
+      }
+      if (!sel && voiceSettings.voice) sel = availableVoices.find(v => v.name === voiceSettings.voice) ?? null;
+      if (!sel) sel = availableVoices.find(v => v.lang.startsWith('en')) ?? null;
+      if (sel) utterance.voice = sel;
+
+      utterance.onstart = onStart;
+      utterance.onend   = onEnd;
+      utterance.onerror = onEnd;
+
+      // Chrome bug: TTS pauses after ~15s
+      const keepAlive = setInterval(() => {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        } else {
+          clearInterval(keepAlive);
+        }
+      }, 10000);
+      utterance.onend = () => { clearInterval(keepAlive); onEnd(); };
+
+      window.speechSynthesis.speak(utterance);
+    });
+  }, [autoSpeak, voiceSettings, availableVoices, setOrbStatus]);
 
   const cancelSpeech = useCallback(() => {
-    if (!voiceOutputAvailable) return;
+    ttsAbortRef.current?.abort();
+    ttsAbortRef.current = null;
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
     setOrbStatus('online');
-  }, [voiceOutputAvailable, setOrbStatus]);
+  }, [setOrbStatus]);
 
   useEffect(() => {
     return () => {
       recognitionRef.current?.stop();
       if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+      ttsAbortRef.current?.abort();
       stopMicStream();
     };
   }, [stopMicStream]);

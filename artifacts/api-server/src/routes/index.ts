@@ -20,6 +20,7 @@ import marketplaceRouter from "./marketplace";
 import telemetryRouter from "./telemetry";
 import feedRouter from "./feed";
 import connectorsRouter from "./connectors";
+import voiceRouter from "./voice";
 
 const router: IRouter = Router();
 
@@ -27,6 +28,7 @@ router.use(healthRouter);
 router.use("/telemetry", telemetryRouter);
 router.use("/feed", feedRouter);
 router.use("/connectors", connectorsRouter);
+router.use("/voice", voiceRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/agents", agentRosterRouter);
 router.use("/agents", agentsRouter);
