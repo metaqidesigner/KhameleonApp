@@ -1,34 +1,73 @@
 import { Router } from "express";
+import { isConnected } from "../lib/oauthTokens.js";
 
 const router = Router();
 
-// Static list of known connectors — all offline until OAuth integrations are wired
-const CONNECTORS = [
-  { id: "gmail",        name: "Gmail",            connected: false },
-  { id: "gcal",         name: "Google Calendar",  connected: false },
-  { id: "gdrive",       name: "Google Drive",     connected: false },
-  { id: "gcontacts",    name: "Google Contacts",  connected: false },
-  { id: "notion",       name: "Notion",           connected: false },
-  { id: "slack",        name: "Slack",            connected: false },
-  { id: "obsidian",     name: "Obsidian",         connected: false },
-  { id: "github",       name: "GitHub",           connected: false },
-  { id: "spotify",      name: "Spotify",          connected: false },
-  { id: "strava",       name: "Strava",           connected: false },
-  { id: "oura",         name: "Oura",             connected: false },
-  { id: "apple_health", name: "Apple Health",     connected: false },
-  { id: "apple_notes",  name: "Apple Notes",      connected: false },
-  { id: "hn",           name: "HackerNews",       connected: false },
-  { id: "outlook",      name: "Outlook",          connected: false },
-  { id: "weather",      name: "Weather",          connected: false },
-  { id: "dropbox",      name: "Dropbox",          connected: false },
-  { id: "ticktick",     name: "TickTick",         connected: false },
-  { id: "whatsapp",     name: "WhatsApp",         connected: false },
-  { id: "newsrss",      name: "News RSS",         connected: false },
-  { id: "granola",      name: "Granola",          connected: false },
+/**
+ * Provider map: connector id → which OAuth provider token covers it.
+ * Multiple connectors can share one provider row (Gmail + GCal both use "google").
+ */
+const PROVIDER_MAP: Record<string, string> = {
+  gmail:     "google",
+  gcal:      "google",
+  gdrive:    "google",
+  gcontacts: "google",
+  github:    "github",
+  slack:     "slack",
+  notion:    "notion",
+  dropbox:   "dropbox",
+  outlook:   "microsoft",
+};
+
+const ALL_CONNECTORS: { id: string; name: string }[] = [
+  { id: "gmail",        name: "Gmail" },
+  { id: "gcal",         name: "Google Calendar" },
+  { id: "gdrive",       name: "Google Drive" },
+  { id: "gcontacts",    name: "Google Contacts" },
+  { id: "notion",       name: "Notion" },
+  { id: "slack",        name: "Slack" },
+  { id: "obsidian",     name: "Obsidian" },
+  { id: "github",       name: "GitHub" },
+  { id: "spotify",      name: "Spotify" },
+  { id: "strava",       name: "Strava" },
+  { id: "oura",         name: "Oura" },
+  { id: "apple_health", name: "Apple Health" },
+  { id: "apple_notes",  name: "Apple Notes" },
+  { id: "hn",           name: "HackerNews" },
+  { id: "outlook",      name: "Outlook" },
+  { id: "weather",      name: "Weather" },
+  { id: "dropbox",      name: "Dropbox" },
+  { id: "ticktick",     name: "TickTick" },
+  { id: "whatsapp",     name: "WhatsApp" },
+  { id: "newsrss",      name: "News RSS" },
+  { id: "granola",      name: "Granola" },
 ];
 
-router.get("/", (_req, res) => {
-  res.json(CONNECTORS);
+router.get("/", async (req, res) => {
+  try {
+    // Batch-check which providers have live tokens (deduplicated)
+    const providerIds = [...new Set(Object.values(PROVIDER_MAP))];
+    const statusMap: Record<string, boolean> = {};
+    await Promise.all(
+      providerIds.map(async (p) => {
+        statusMap[p] = await isConnected(p);
+      })
+    );
+
+    const connectors = ALL_CONNECTORS.map((c) => {
+      const provider = PROVIDER_MAP[c.id];
+      return {
+        ...c,
+        connected: provider ? (statusMap[provider] ?? false) : false,
+      };
+    });
+
+    res.json(connectors);
+  } catch (err) {
+    req.log.error({ err }, "Error fetching connectors");
+    // Fall back to all-offline rather than 500
+    res.json(ALL_CONNECTORS.map((c) => ({ ...c, connected: false })));
+  }
 });
 
 export default router;

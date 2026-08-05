@@ -21,6 +21,7 @@ import telemetryRouter from "./telemetry";
 import feedRouter from "./feed";
 import connectorsRouter from "./connectors";
 import voiceRouter from "./voice";
+import authRouter from "./auth";
 
 const router: IRouter = Router();
 
@@ -29,6 +30,7 @@ router.use("/telemetry", telemetryRouter);
 router.use("/feed", feedRouter);
 router.use("/connectors", connectorsRouter);
 router.use("/voice", voiceRouter);
+router.use("/auth", authRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/agents", agentRosterRouter);
 router.use("/agents", agentsRouter);
