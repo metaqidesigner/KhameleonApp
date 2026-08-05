@@ -17,10 +17,16 @@ import approvalsRouter from "./approvals";
 import insightsRouter from "./insights";
 import modesRouter from "./modes";
 import marketplaceRouter from "./marketplace";
+import telemetryRouter from "./telemetry";
+import feedRouter from "./feed";
+import connectorsRouter from "./connectors";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use("/telemetry", telemetryRouter);
+router.use("/feed", feedRouter);
+router.use("/connectors", connectorsRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/agents", agentRosterRouter);
 router.use("/agents", agentsRouter);
