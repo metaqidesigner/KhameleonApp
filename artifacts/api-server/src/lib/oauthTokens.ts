@@ -1,8 +1,6 @@
 /**
  * OAuth token store + automatic refresh middleware.
- *
- * Supports any provider; Google-specific refresh logic is wired here.
- * Add new provider refresh flows in `refreshAccessToken` as connectors are added.
+ * Add new provider refresh flows in REFRESHERS as connectors are added.
  */
 
 import { db } from "@workspace/db";
@@ -18,10 +16,9 @@ export interface TokenRecord {
   scope: string;
 }
 
-/** How many seconds before actual expiry we consider the token stale */
-const EXPIRY_BUFFER_SECS = 300; // 5 minutes
+const EXPIRY_BUFFER_SECS = 300; // refresh 5 min before actual expiry
 
-// ── Read ─────────────────────────────────────────────────────────────────────
+// ── Read ──────────────────────────────────────────────────────────────────────
 
 export async function getToken(provider: string): Promise<TokenRecord | null> {
   const [row] = await db
@@ -29,48 +26,27 @@ export async function getToken(provider: string): Promise<TokenRecord | null> {
     .from(oauthTokensTable)
     .where(eq(oauthTokensTable.provider, provider))
     .limit(1);
-
   return row
-    ? {
-        provider: row.provider,
-        accessToken: row.accessToken,
-        refreshToken: row.refreshToken ?? null,
-        expiresAt: row.expiresAt ?? null,
-        scope: row.scope,
-      }
+    ? { provider: row.provider, accessToken: row.accessToken,
+        refreshToken: row.refreshToken ?? null, expiresAt: row.expiresAt ?? null, scope: row.scope }
     : null;
 }
 
 export function isExpired(token: TokenRecord): boolean {
-  if (!token.expiresAt) return false; // no expiry = never expires
-  const bufferMs = EXPIRY_BUFFER_SECS * 1000;
-  return token.expiresAt.getTime() - bufferMs < Date.now();
+  if (!token.expiresAt) return false;
+  return token.expiresAt.getTime() - EXPIRY_BUFFER_SECS * 1000 < Date.now();
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────
 
 export async function saveToken(
   provider: string,
-  data: {
-    accessToken: string;
-    refreshToken?: string | null;
-    expiresInSecs?: number | null;
-    scope?: string;
-  }
+  data: { accessToken: string; refreshToken?: string | null; expiresInSecs?: number | null; scope?: string }
 ): Promise<void> {
-  const expiresAt = data.expiresInSecs
-    ? new Date(Date.now() + data.expiresInSecs * 1000)
-    : null;
-
+  const expiresAt = data.expiresInSecs ? new Date(Date.now() + data.expiresInSecs * 1000) : null;
   await db
     .insert(oauthTokensTable)
-    .values({
-      provider,
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken ?? null,
-      expiresAt,
-      scope: data.scope ?? "",
-    })
+    .values({ provider, accessToken: data.accessToken, refreshToken: data.refreshToken ?? null, expiresAt, scope: data.scope ?? "" })
     .onConflictDoUpdate({
       target: oauthTokensTable.provider,
       set: {
@@ -87,11 +63,10 @@ export async function deleteToken(provider: string): Promise<void> {
   await db.delete(oauthTokensTable).where(eq(oauthTokensTable.provider, provider));
 }
 
-// ── Refresh ───────────────────────────────────────────────────────────────────
+// ── Provider refresh logic ─────────────────────────────────────────────────────
 
 async function refreshGoogle(token: TokenRecord): Promise<TokenRecord> {
-  if (!token.refreshToken) throw new Error("No refresh token available for Google");
-
+  if (!token.refreshToken) throw new Error("No refresh token for Google");
   const clientId     = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) throw new Error("GOOGLE_CLIENT_ID/SECRET not set");
@@ -100,66 +75,71 @@ async function refreshGoogle(token: TokenRecord): Promise<TokenRecord> {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: token.refreshToken,
-      grant_type: "refresh_token",
+      client_id: clientId, client_secret: clientSecret,
+      refresh_token: token.refreshToken, grant_type: "refresh_token",
     }),
   });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Google token refresh failed: ${res.status} ${body}`);
-  }
-
-  const json = (await res.json()) as {
-    access_token: string;
-    expires_in: number;
-    scope?: string;
-  };
-
+  if (!res.ok) throw new Error(`Google refresh failed: ${res.status} ${await res.text()}`);
+  const json = await res.json() as { access_token: string; expires_in: number; scope?: string };
   await saveToken("google", {
-    accessToken: json.access_token,
-    refreshToken: token.refreshToken, // Google keeps the same refresh token
-    expiresInSecs: json.expires_in,
-    scope: json.scope ?? token.scope,
+    accessToken: json.access_token, refreshToken: token.refreshToken,
+    expiresInSecs: json.expires_in, scope: json.scope ?? token.scope,
   });
-
   return (await getToken("google"))!;
 }
 
+async function refreshMicrosoft(token: TokenRecord): Promise<TokenRecord> {
+  if (!token.refreshToken) throw new Error("No refresh token for Microsoft");
+  const clientId     = process.env.MICROSOFT_CLIENT_ID;
+  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("MICROSOFT_CLIENT_ID/SECRET not set");
+
+  const res = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId, client_secret: clientSecret,
+      refresh_token: token.refreshToken, grant_type: "refresh_token",
+      scope: "https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Calendars.ReadWrite offline_access",
+    }),
+  });
+  if (!res.ok) throw new Error(`Microsoft refresh failed: ${res.status} ${await res.text()}`);
+  const json = await res.json() as {
+    access_token: string; refresh_token?: string; expires_in: number; scope?: string;
+  };
+  await saveToken("microsoft", {
+    accessToken: json.access_token,
+    // Microsoft may rotate the refresh token; always persist the latest one
+    refreshToken: json.refresh_token ?? token.refreshToken,
+    expiresInSecs: json.expires_in,
+    scope: json.scope ?? token.scope,
+  });
+  return (await getToken("microsoft"))!;
+}
+
 const REFRESHERS: Record<string, (t: TokenRecord) => Promise<TokenRecord>> = {
-  google: refreshGoogle,
+  google:    refreshGoogle,
+  microsoft: refreshMicrosoft,
 };
 
-/**
- * Returns a fresh access token for the given provider.
- * Automatically refreshes if the token is within the expiry buffer.
- * Throws if no token is stored or refresh fails.
- */
+// ── Public API ────────────────────────────────────────────────────────────────
+
 export async function getFreshToken(provider: string): Promise<string> {
   let token = await getToken(provider);
   if (!token) throw new Error(`No token stored for provider: ${provider}`);
-
   if (isExpired(token)) {
     logger.info({ provider }, "OAuth token near-expired, refreshing");
     const refresher = REFRESHERS[provider];
     if (!refresher) throw new Error(`No refresh logic for provider: ${provider}`);
     token = await refresher(token);
-    logger.info({ provider }, "OAuth token refreshed successfully");
+    logger.info({ provider }, "OAuth token refreshed");
   }
-
   return token.accessToken;
 }
 
-/**
- * Returns true if a valid (non-expired or refreshable) token exists.
- * Does NOT actually call the refresh — just checks presence and expiry state.
- */
 export async function isConnected(provider: string): Promise<boolean> {
   const token = await getToken(provider);
   if (!token) return false;
-  // If it's expired and there's no refresh token, it's effectively disconnected
   if (isExpired(token) && !token.refreshToken) return false;
   return true;
 }
