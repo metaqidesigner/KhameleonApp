@@ -267,7 +267,7 @@ function AppearanceSection() {
       <Row>
         <Label>THEME</Label>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,4,8,0.6)', border: '1px solid rgba(0,212,255,0.15)' }}>
-          <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'var(--j-text-muted)' }}>JARVIS REQUIRES DARK MODE</span>
+          <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'var(--j-text-muted)' }}>KHAMELEON REQUIRES DARK MODE</span>
           <Toggle value={true} onChange={() => {}} />
         </div>
       </Row>
@@ -304,7 +304,7 @@ function AppearanceSection() {
 
 function GenericSection({ section }: { section: Section }) {
   const fields: Record<string, string[][]> = {
-    GENERAL:   [['WORKSPACE NAME', 'My JARVIS'], ['DEFAULT AGENT', 'simple'], ['LANGUAGE', 'en']],
+    GENERAL:   [['WORKSPACE NAME', 'My Khameleon'], ['DEFAULT AGENT', 'simple'], ['LANGUAGE', 'en']],
     MEMORY:    [['MAX CHUNKS', '10000'], ['CHUNK SIZE', '512'], ['OVERLAP', '50']],
     TELEMETRY: [['RETENTION DAYS', '30'], ['EXPORT FORMAT', 'json']],
     ADVANCED:  [['API TIMEOUT (ms)', '30000'], ['STREAM BUFFER', '2048'], ['LOG LEVEL', 'info']],

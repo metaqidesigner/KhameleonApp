@@ -5,7 +5,7 @@ function fmtTime(ts: number) {
   return new Date(ts).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
 }
 
-const OFFLINE_MSG = '/// JARVIS OFFLINE — RUN `jarvis serve` OR SET API KEYS /// AWAITING ENGINE CONNECTION /// SYSTEM STANDBY ///';
+const OFFLINE_MSG = '/// KHAMELEON OFFLINE — SET API KEYS TO CONNECT /// AWAITING ENGINE CONNECTION /// SYSTEM STANDBY ///';
 
 export default function NewsTicker() {
   const { data: feed } = useJarvisAgentFeed();
@@ -43,7 +43,7 @@ export default function NewsTicker() {
         flexShrink: 0,
         whiteSpace: 'nowrap',
       }}>
-        JARVIS FEED
+        KHAMELEON FEED
       </div>
 
       {/* Scrolling content */}

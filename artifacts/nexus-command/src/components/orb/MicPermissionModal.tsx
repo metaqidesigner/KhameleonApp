@@ -85,9 +85,9 @@ export function MicPermissionModal({ onGranted, onSkipped }: Props) {
           textAlign: 'center',
           margin: '0 0 20px 0',
         }}>
-          J.A.R.V.I.S requires microphone access to enable
+          KHAMELEON requires microphone access to enable
           wake word detection and voice commands.<br />
-          Say <span style={{ color: '#00d4ff', fontWeight: 600 }}>"Hello JARVIS"</span> at any time to activate.
+          Say <span style={{ color: '#00d4ff', fontWeight: 600 }}>"Hello Khameleon"</span> at any time to activate.
         </p>
 
         {/* Buttons */}

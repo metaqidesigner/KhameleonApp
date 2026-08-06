@@ -56,7 +56,7 @@ export default function Communications() {
     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, height:'100%', padding:8 }}>
       <JPanel title="CHANNELS" icon={<Radio size={13}/>}>
         <div style={{ marginBottom:10, padding:'6px 10px', background:'linear-gradient(90deg, rgba(107,0,0,0.5), transparent)', fontFamily:'var(--j-font-ui)', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.18em', color:'var(--j-text-muted)', borderBottom:'1px solid rgba(192,21,42,0.3)' }}>
-          JARVIS CHANNEL NETWORK
+          KHAMELEON CHANNEL NETWORK
         </div>
         <TileGrid items={CHANNELS} />
       </JPanel>

@@ -98,7 +98,7 @@ export default function CommandPalette() {
             value={query}
             onChange={e => { setQuery(e.target.value); setCursor(0); }}
             onKeyDown={onKey}
-            placeholder="QUERY JARVIS..."
+            placeholder="QUERY KHAMELEON..."
             style={{
               flex:1, background:'transparent', border:'none', outline:'none',
               fontFamily:'var(--j-font-head)', fontSize:14, color:'var(--j-cyan)',

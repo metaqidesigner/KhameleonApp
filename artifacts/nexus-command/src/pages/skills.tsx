@@ -47,7 +47,7 @@ export default function Skills() {
         <JPanel title="INSTALLED SKILLS" icon={<Zap size={13}/>}>
           {skills.length === 0 ? (
             <div className="j-empty">
-              NO SKILLS INSTALLED — USE HERMES REGISTRY TO EXTEND JARVIS
+              NO SKILLS INSTALLED — USE HERMES REGISTRY TO EXTEND KHAMELEON
             </div>
           ) : (
             <table className="j-table">

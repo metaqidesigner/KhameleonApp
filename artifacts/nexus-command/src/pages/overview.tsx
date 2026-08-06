@@ -97,7 +97,7 @@ export default function Overview() {
               {agentHistory.length === 0 ? (
                 <div className="j-empty">
                   <div style={{ width:40, height:40, border:'2px solid rgba(0,212,255,0.2)', borderRadius:'50%', borderTop:'2px solid var(--j-cyan)', animation:'jarvis-spin 3s linear infinite' }} />
-                  NO ACTIVITY — QUERY JARVIS TO BEGIN
+                  NO ACTIVITY — QUERY KHAMELEON TO BEGIN
                 </div>
               ) : (
                 agentHistory.slice(0, 15).map((ev, i) => (
@@ -148,7 +148,7 @@ export default function Overview() {
                 ))}
                 {!isOnline && (
                   <div style={{ marginTop:8, padding:'10px 12px', background:'rgba(192,21,42,0.08)', border:'1px solid rgba(192,21,42,0.25)', fontFamily:'var(--j-font-mono)', fontSize:10, color:'var(--j-red)', letterSpacing:'0.06em', lineHeight:1.5 }}>
-                    ● BACKEND OFFLINE — RUN `jarvis serve` OR SET API KEYS
+                    ● BACKEND OFFLINE — SET API KEYS TO CONNECT
                   </div>
                 )}
               </div>

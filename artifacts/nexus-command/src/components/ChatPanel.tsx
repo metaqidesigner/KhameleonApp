@@ -103,7 +103,7 @@ export default function ChatPanel() {
           <div className="j-panel-header" style={{ cursor: 'default', flexShrink: 0 }}>
             <span className="j-panel-title">
               <Bot size={14} color="var(--j-red)" />
-              JARVIS INTERFACE
+              KHAMELEON INTERFACE
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               {(KNOWN_AGENTS as unknown as AgentType[]).slice(0, 5).map(a => (
@@ -141,7 +141,7 @@ export default function ChatPanel() {
           >
             {chatMessages.length === 0 && (
               <div style={{ color: 'var(--j-text-faint)', fontFamily: 'var(--j-font-mono)', fontSize: 11, textAlign: 'center', padding: 20 }}>
-                // JARVIS INTERFACE READY — QUERY AWAITING //
+                // KHAMELEON INTERFACE READY — QUERY AWAITING //
               </div>
             )}
             {chatMessages.map(msg => (
@@ -177,7 +177,7 @@ export default function ChatPanel() {
             <input
               className="j-input"
               style={{ flex: 1 }}
-              placeholder="QUERY JARVIS..."
+              placeholder="QUERY KHAMELEON..."
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={onKey}

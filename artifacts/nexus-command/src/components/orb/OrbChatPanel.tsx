@@ -274,7 +274,7 @@ export function OrbChatPanel({ style, onClose }: Props) {
       {/* Header */}
       <div className="orb-chat-header">
         <div className="orb-status-dot" style={{ background: statusColor }} />
-        <span className="orb-chat-header-title">J.A.R.V.I.S</span>
+        <span className="orb-chat-header-title">KHAMELEON</span>
         <span className="orb-chat-header-agent">AGENT: {activeAgent?.name ?? orbActiveAgentId.toUpperCase()}</span>
         <span className="orb-chat-header-status" style={{ color: orbStatus === 'offline' ? '#ef4444' : '#3fb950' }}>
           ● {orbStatus.toUpperCase()}
@@ -301,7 +301,7 @@ export function OrbChatPanel({ style, onClose }: Props) {
       <div className="orb-messages">
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', padding: '20px 0', fontFamily: 'var(--j-font-mono)', fontSize: 10, color: 'rgba(0,212,255,0.3)', letterSpacing: '0.1em' }}>
-            QUERY JARVIS TO BEGIN
+            QUERY KHAMELEON TO BEGIN
           </div>
         )}
         {messages.map(msg => (
@@ -399,7 +399,7 @@ export function OrbChatPanel({ style, onClose }: Props) {
             <input
               ref={inputRef}
               className="orb-text-input"
-              placeholder="QUERY JARVIS..."
+              placeholder="QUERY KHAMELEON..."
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSend(input); }}

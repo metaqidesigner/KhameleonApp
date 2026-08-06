@@ -3,7 +3,7 @@ import { useJarvisStore } from '@/store/jarvisStore';
 import { MicPermissionModal } from './MicPermissionModal';
 
 const MIC_KEY = 'jarvis_mic_granted';
-const WAKE_PHRASES = ['hello jarvis', 'hey jarvis', 'ok jarvis', 'jarvis'];
+const WAKE_PHRASES = ['hello khameleon', 'hey khameleon', 'ok khameleon', 'khameleon'];
 
 type WakeStatus = 'idle' | 'waiting' | 'listening' | 'blocked';
 
@@ -213,7 +213,7 @@ export function VoiceController() {
     : wakeStatus === 'listening'
       ? '🎤 HEARING YOU...'
       : wakeStatus === 'waiting'
-        ? "👂 LISTENING FOR 'HELLO JARVIS'"
+        ? "👂 LISTENING FOR 'HELLO KHAMELEON'"
         : null;
 
   const indicatorColor = wakeWordBlocked

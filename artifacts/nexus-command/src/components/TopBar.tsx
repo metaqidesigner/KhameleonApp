@@ -69,7 +69,7 @@ export default function TopBar() {
           ))}
         </div>
         <span style={{ fontFamily:'var(--j-font-head)', fontSize:15, fontWeight:700, color:'var(--j-cyan)', letterSpacing:'0.32em', animation:'jarvis-flicker 10s linear infinite' }}>
-          J.A.R.V.I.S
+          KHAMELEON
         </span>
         <span style={{ color:'rgba(0,212,255,0.22)', fontSize:20 }}>|</span>
         <span className="j-badge j-badge-cyan" style={{ fontFamily:'var(--j-font-mono)', fontSize:10 }}>

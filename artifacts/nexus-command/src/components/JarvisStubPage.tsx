@@ -32,7 +32,7 @@ export default function JarvisStubPage({ title, icon, connectors }: Props) {
             {title}
           </div>
           <div style={{ fontFamily:'var(--j-font-mono)', fontSize:11, color:'var(--j-text-muted)', letterSpacing:'0.12em', animation:'jarvis-pulse 2s ease-in-out infinite' }}>
-            CONNECTING TO JARVIS NETWORK...
+            CONNECTING TO KHAMELEON NETWORK...
           </div>
 
           <div style={{ width:'100%', maxWidth:400 }}>

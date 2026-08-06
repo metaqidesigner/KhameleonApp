@@ -2,7 +2,7 @@ import React from 'react';
 import { Lock } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 
-const SET_KEYS = ['ANTHROPIC_API_KEY', 'JARVIS_ENGINE', 'SESSION_SECRET'];
+const SET_KEYS = ['ANTHROPIC_API_KEY', 'KHAMELEON_ENGINE', 'SESSION_SECRET'];
 
 export default function Vault() {
   return (

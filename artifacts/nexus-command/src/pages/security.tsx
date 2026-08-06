@@ -14,12 +14,12 @@ const GUARDRAILS = [
 const KEYS = [
   { id: 'ANTHROPIC_API_KEY', label: 'ANTHROPIC_API_KEY' },
   { id: 'OPENAI_API_KEY',    label: 'OPENAI_API_KEY' },
-  { id: 'JARVIS_ENGINE',     label: 'JARVIS_ENGINE' },
+  { id: 'KHAMELEON_ENGINE',  label: 'KHAMELEON_ENGINE' },
 ];
 
 export default function Security() {
   const agentHistory = useJarvisStore(s => s.agentHistory);
-  const [keySet] = useState<Record<string, boolean>>({ ANTHROPIC_API_KEY: false, OPENAI_API_KEY: false, JARVIS_ENGINE: true });
+  const [keySet] = useState<Record<string, boolean>>({ ANTHROPIC_API_KEY: false, OPENAI_API_KEY: false, KHAMELEON_ENGINE: true });
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'40% 60%', gap:6, height:'100%', padding:8 }}>
