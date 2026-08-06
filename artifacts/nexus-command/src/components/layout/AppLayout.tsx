@@ -63,8 +63,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
-          {!collapsed && <span className="font-bold tracking-wider text-primary truncate text-sm">NEWTONIA</span>}
-          {collapsed && <span className="font-bold text-primary mx-auto text-sm">NW</span>}
+          {!collapsed && <span className="font-bold tracking-wider text-primary truncate text-sm">KHAMELEON</span>}
+          {collapsed && <span className="font-bold text-primary mx-auto text-sm">KH</span>}
         </div>
         
         <div className="flex-1 overflow-y-auto py-4 scrollbar-hide">

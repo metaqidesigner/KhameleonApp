@@ -132,7 +132,7 @@ function ConnectorsSection() {
       )}
 
       <p style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', marginBottom: 20, lineHeight: 1.6 }}>
-        Connect external accounts to pull real email and calendar data into Newtonia.
+        Connect external accounts to pull real email and calendar data into Khameleon.
         Credentials must be added as Replit Secrets before connecting.
       </p>
 
