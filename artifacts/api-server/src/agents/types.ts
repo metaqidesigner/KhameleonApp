@@ -22,11 +22,32 @@ export interface AgentConfig {
   systemPrompt: string;
   color: string;
   initials: string;
+  /** If true, the agent receives the full Replit tool set (Anthropic only). */
+  useTools?: boolean;
 }
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+}
+
+/** One tool call + its result, collected during an agentic loop turn. */
+export interface ToolCallRecord {
+  name: string;
+  input: Record<string, unknown>;
+  result: string;
+  durationMs: number;
+  error?: string;
+}
+
+/** Emitted as SSE events during an agentic loop so the UI can show live activity. */
+export interface ToolEvent {
+  type: 'tool_start' | 'tool_result' | 'tool_error';
+  name: string;
+  input?: Record<string, unknown>;
+  result?: string;
+  error?: string;
+  durationMs?: number;
 }
 
 export interface AgentResponse {
@@ -38,6 +59,8 @@ export interface AgentResponse {
   costUsd: number;
   energyWh: number;
   error?: string;
+  /** Tool calls executed during this response (populated for orchestrator agents). */
+  toolCalls?: ToolCallRecord[];
 }
 
 export interface AgentStatusInfo {
@@ -69,4 +92,5 @@ export interface ConversationEntry {
   latencyMs: number;
   tokens: number;
   costUsd: number;
+  toolCalls?: ToolCallRecord[];
 }

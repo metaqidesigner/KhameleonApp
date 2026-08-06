@@ -16,6 +16,7 @@ export interface AgentConfig {
   systemPrompt: string;
   color: string;
   initials: string;
+  useTools?: boolean;
 }
 
 export interface AgentStatusInfo {
@@ -24,6 +25,7 @@ export interface AgentStatusInfo {
   latencyMs?: number;
   model: string;
   provider: Provider;
+  useTools?: boolean;
 }
 
 export interface AgentMetrics {
@@ -37,6 +39,14 @@ export interface AgentMetrics {
   lastActive?: string;
 }
 
+export interface ToolCallRecord {
+  name: string;
+  input: Record<string, unknown>;
+  result: string;
+  durationMs: number;
+  error?: string;
+}
+
 export interface ConversationEntry {
   id: string;
   agentId: string;
@@ -47,6 +57,31 @@ export interface ConversationEntry {
   latencyMs: number;
   tokens: number;
   costUsd: number;
+  toolCalls?: ToolCallRecord[];
+}
+
+/** Emitted via SSE during an agentic loop so the UI can show live tool activity. */
+export interface ToolEvent {
+  type: 'tool_start' | 'tool_result' | 'tool_error';
+  name: string;
+  input?: Record<string, unknown>;
+  result?: string;
+  error?: string;
+  durationMs?: number;
+}
+
+/** DB-persisted conversation row returned by /api/agent-conversations */
+export interface AgentConversationRow {
+  id: number;
+  agentId: string;
+  sessionId: string;
+  role: 'user' | 'assistant' | 'tool_use' | 'tool_result';
+  content: string;
+  toolName?: string;
+  latencyMs?: number;
+  tokens?: number;
+  costUsd?: number;
+  createdAt: string;
 }
 
 export interface ChatMessage { role: 'user'|'assistant'|'system'; content: string; }
@@ -60,6 +95,8 @@ export interface AgentResponse {
   costUsd: number;
   energyWh: number;
   error?: string;
+  toolCalls?: ToolCallRecord[];
+  sessionId?: string;
 }
 
 export interface CompareResult {
@@ -69,7 +106,7 @@ export interface CompareResult {
 
 // ── Fallback roster shown when backend is offline ─────────
 export const FALLBACK_ROSTER: AgentConfig[] = [
-  { id:'claude',     name:'CLAUDE',     provider:'anthropic', model:'claude-sonnet-4-6', enabled:true, role:'general',  systemPrompt:'', color:'#c9a84c', initials:'CL' },
+  { id:'claude',     name:'CLAUDE',     provider:'anthropic', model:'claude-sonnet-4-6', enabled:true, role:'general',  systemPrompt:'', color:'#c9a84c', initials:'CL', useTools:true },
   { id:'gpt4o',      name:'GPT-4o',     provider:'openai',    model:'gpt-4o',            enabled:true, role:'general',  systemPrompt:'', color:'#00d4ff', initials:'GP' },
   { id:'gemini',     name:'GEMINI',     provider:'google',    model:'gemini-2.0-flash',  enabled:true, role:'research', systemPrompt:'', color:'#3fb950', initials:'GM' },
   { id:'openrouter', name:'OPENROUTER', provider:'openrouter',model:'mistral-7b-instruct',enabled:true,role:'general',  systemPrompt:'', color:'#a78bfa', initials:'OR' },
@@ -125,6 +162,18 @@ export async function getAgentHistory(id: string): Promise<ConversationEntry[]> 
   return safeFetch<ConversationEntry[]>(`${BASE}/agents/${id}/history`, undefined, []);
 }
 
+export async function getAgentConversations(params?: {
+  agentId?: string;
+  sessionId?: string;
+  limit?: number;
+}): Promise<AgentConversationRow[]> {
+  const qs = new URLSearchParams();
+  if (params?.agentId)   qs.set('agentId', params.agentId);
+  if (params?.sessionId) qs.set('sessionId', params.sessionId);
+  if (params?.limit)     qs.set('limit', String(params.limit));
+  return safeFetch<AgentConversationRow[]>(`${BASE}/agent-conversations?${qs}`, undefined, []);
+}
+
 export async function askAgent(id: string, messages: ChatMessage[]): Promise<AgentResponse> {
   return safeFetch<AgentResponse>(`${BASE}/agents/${id}/ask`, {
     method: 'POST',
@@ -137,7 +186,8 @@ export async function askAgent(id: string, messages: ChatMessage[]): Promise<Age
 }
 
 export interface StreamDone {
-  agentId: string; model: string; latencyMs: number; tokens: number; costUsd: number;
+  agentId: string; model: string; latencyMs: number; tokens: number;
+  costUsd: number; sessionId?: string; toolCallCount?: number;
 }
 
 export function streamAgentChat(
@@ -146,6 +196,8 @@ export function streamAgentChat(
   onToken: (t: string) => void,
   onDone: (d: StreamDone) => void,
   onError: (e: string) => void,
+  onToolEvent?: (e: ToolEvent) => void,
+  sessionId?: string,
 ): () => void {
   let closed = false;
   const ctrl = new AbortController();
@@ -155,7 +207,7 @@ export function streamAgentChat(
       const res = await fetch(`${BASE}/agents/${agentId}/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, stream: true }),
+        body: JSON.stringify({ messages, stream: true, sessionId }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
@@ -172,9 +224,18 @@ export function streamAgentChat(
           if (!line.startsWith('data: ')) continue;
           try {
             const d = JSON.parse(line.slice(6)) as Record<string, unknown>;
-            if (d.token)  onToken(d.token as string);
-            if (d.error)  onError(d.error as string);
-            if (d.done)   onDone({ agentId: d.agentId as string, model: d.model as string, latencyMs: d.latencyMs as number, tokens: d.tokens as number, costUsd: d.costUsd as number });
+            if (d.token)      onToken(d.token as string);
+            if (d.error)      onError(d.error as string);
+            if (d.tool_event) onToolEvent?.(d.tool_event as ToolEvent);
+            if (d.done)       onDone({
+              agentId:      d.agentId as string,
+              model:        d.model as string,
+              latencyMs:    d.latencyMs as number,
+              tokens:       d.tokens as number,
+              costUsd:      d.costUsd as number,
+              sessionId:    d.sessionId as string | undefined,
+              toolCallCount: d.toolCallCount as number | undefined,
+            });
           } catch { /* ignore parse errors */ }
         }
       }

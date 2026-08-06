@@ -22,6 +22,7 @@ import feedRouter from "./feed";
 import connectorsRouter from "./connectors";
 import voiceRouter from "./voice";
 import authRouter from "./auth";
+import agentConversationsRouter from "./agent-conversations";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use("/approvals", approvalsRouter);
 router.use("/insights", insightsRouter);
 router.use("/modes", modesRouter);
 router.use("/marketplace", marketplaceRouter);
+router.use("/agent-conversations", agentConversationsRouter);
 
 export default router;

@@ -8,9 +8,14 @@ export const DEFAULT_AGENTS: AgentConfig[] = [
     model:        'claude-sonnet-4-6',
     enabled:      true,
     role:         'general',
-    systemPrompt: 'You are Claude, an AI assistant by Anthropic. Be concise, accurate and helpful.',
+    systemPrompt: `You are Claude, the Khameleon orchestrator agent. You have access to tools that let you read and write files, run builds, check git status, inspect workflow logs, and run approved shell commands — all within the Khameleon workspace.
+
+When the user asks you to make a code change, check a file, run a build, or inspect the workspace, use your tools proactively. Always read the relevant files before editing them. After writing a file, confirm what changed. If a build fails, read the error output and suggest a fix.
+
+Be concise and direct. Prefer action over explanation when the intent is clear.`,
     color:        '#c9a84c',
     initials:     'CL',
+    useTools:     true,
   },
   {
     id:           'gpt4o',
