@@ -35,7 +35,7 @@ description: Frontend shell layout, state management, and routing for the Jarvis
 **Why:** OpenJarvis is local-first — UI must work without a backend and show honest system state at all times.
 
 ## Zustand v5 selector rule — CRITICAL
-Never use object-returning selectors — they break React's getSnapshot contract and cause infinite loops.
+Never use object-returning selectors — applies to EVERY component at EVERY nesting level (sub-components like Bubble, TaskRunCard, CommandBar etc. are just as affected as top-level components). They break React's getSnapshot contract and cause infinite loops.
 ```typescript
 // CORRECT — one call per value:
 const orbStatus    = useJarvisStore(s => s.orbStatus);
@@ -44,7 +44,7 @@ const setOrbStatus = useJarvisStore(s => s.setOrbStatus);
 // WRONG — new object every render → "Maximum update depth exceeded":
 const { orbStatus } = useJarvisStore(s => ({ orbStatus: s.orbStatus }));
 ```
-`useShallow` from `zustand/shallow` is the comparison function, NOT a hook. The hook lives in `zustand/react/shallow` but individual selectors are simpler and equally correct.
+`useShallow` from `zustand/shallow` is the comparison function, NOT a hook. The hook lives in `zustand/react/shallow` but individual selectors are simpler and always correct. When this bug hits, grep ALL components in the changed files — not just the top-level one named in the React error.
 
 ## CSS
 - Global Jarvis styles: `src/index.css`

@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Bot } from 'lucide-react';
+import { X, Send, Bot, ExternalLink } from 'lucide-react';
 import { marked } from 'marked';
 import { useJarvisStore, type AgentType } from '@/store/jarvisStore';
-import { streamChat } from '@/lib/jarvisApi';
-import { KNOWN_AGENTS } from '@/lib/jarvisApi';
+import { submitCommand } from '@/lib/taskRunApi';
 
 const AGENT_LABELS: Record<AgentType, string> = {
   simple: 'SIMPLE', orchestrator: 'ORCHESTRATOR',
@@ -13,60 +12,139 @@ const AGENT_LABELS: Record<AgentType, string> = {
   proactive_agent: 'PROACTIVE', operative: 'OPERATIVE',
 };
 
-export default function ChatPanel() {
-  const {
-    chatOpen, setChatOpen,
-    chatMessages, appendMessage, updateLastMessage,
-    isStreaming, setStreaming,
-    selectedAgent, setSelectedAgent,
-  } = useJarvisStore();
+// ── Message bubble ────────────────────────────────────────────
 
-  const [input, setInput] = useState('');
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const stopRef = useRef<(() => void) | null>(null);
+interface Msg {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  taskRunId?: string;
+}
+
+function Bubble({ msg }: { msg: Msg }) {
+  const setActiveTab  = useJarvisStore(s => s.setActiveTab);
+  const addActiveTask = useJarvisStore(s => s.addActiveTask);
+
+  const isUser = msg.role === 'user';
+
+  const html = React.useMemo(() => {
+    if (isUser) return null;
+    try {
+      return { __html: marked.parse(msg.content) as string };
+    } catch {
+      return { __html: msg.content };
+    }
+  }, [msg.content, isUser]);
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      alignItems: isUser ? 'flex-end' : 'flex-start',
+      gap: 2, marginBottom: 10,
+    }}>
+      <div style={{
+        maxWidth: '88%', padding: '8px 12px',
+        background: isUser ? 'rgba(0,196,184,0.12)' : 'rgba(8,14,32,0.6)',
+        border: `1px solid ${isUser ? 'rgba(0,196,184,0.25)' : 'rgba(120,168,220,0.10)'}`,
+        borderRadius: isUser ? '10px 10px 2px 10px' : '10px 10px 10px 2px',
+        backdropFilter: 'blur(10px)',
+      }}>
+        {isUser ? (
+          <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: '#fff' }}>{msg.content}</span>
+        ) : (
+          <div className="j-prose" style={{ fontSize: 12 }} dangerouslySetInnerHTML={html!} />
+        )}
+      </div>
+
+      {/* Task link for assistant messages with taskRunId */}
+      {msg.taskRunId && (
+        <button
+          onClick={() => {
+            addActiveTask(msg.taskRunId!);
+            setActiveTab('tasks');
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: 'rgba(0,196,184,0.08)', border: '1px solid rgba(0,196,184,0.22)',
+            borderRadius: 6, padding: '3px 8px', cursor: 'pointer',
+            color: 'var(--j-teal)', fontFamily: 'var(--j-font-mono)', fontSize: 9,
+            letterSpacing: '0.08em', transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,196,184,0.14)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,196,184,0.08)')}
+        >
+          <ExternalLink size={9} /> VIEW IN TASKS
+        </button>
+      )}
+
+      <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 8, color: 'var(--j-text-faint)' }}>
+        {new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+      </span>
+    </div>
+  );
+}
+
+// ── Main chat panel ───────────────────────────────────────────
+
+export default function ChatPanel() {
+  const chatOpen       = useJarvisStore(s => s.chatOpen);
+  const setChatOpen    = useJarvisStore(s => s.setChatOpen);
+  const selectedAgent  = useJarvisStore(s => s.selectedAgent);
+  const setSelectedAgent = useJarvisStore(s => s.setSelectedAgent);
+  const addActiveTask  = useJarvisStore(s => s.addActiveTask);
+  const setActiveTab   = useJarvisStore(s => s.setActiveTab);
+
+  const [input, setInput]     = useState('');
+  const [msgs, setMsgs]       = useState<Msg[]>([]);
+  const [sending, setSending] = useState(false);
+  const bodyRef               = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [chatMessages]);
+  }, [msgs]);
 
-  const submit = () => {
+  const submit = async () => {
     const text = input.trim();
-    if (!text || isStreaming) return;
+    if (!text || sending) return;
     setInput('');
 
-    const userMsg = {
-      id: crypto.randomUUID(),
-      role: 'user' as const,
-      content: text,
-      timestamp: Date.now(),
-    };
-    appendMessage(userMsg);
+    const userMsg: Msg = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: Date.now() };
+    setMsgs(prev => [...prev, userMsg]);
+    setSending(true);
 
-    const botMsg = {
-      id: crypto.randomUUID(),
-      role: 'assistant' as const,
-      content: '',
-      agentType: selectedAgent,
-      timestamp: Date.now(),
-    };
-    appendMessage(botMsg);
-    setStreaming(true);
+    try {
+      const { taskRunId } = await submitCommand(text, { triggerType: 'manual' });
 
-    stopRef.current = streamChat(
-      text,
-      selectedAgent,
-      (token) => updateLastMessage({ content: useJarvisStore.getState().chatMessages.slice(-1)[0].content + token }),
-      (done) => {
-        updateLastMessage({
-          model: done.model ?? undefined,
-          latencyMs: done.latency_ms,
-          tokens: done.tokens,
-          costUsd: done.cost_usd,
-          energyWh: done.energy_wh,
-        });
-        setStreaming(false);
-      },
-    );
+      if (taskRunId) addActiveTask(taskRunId);
+
+      const botMsg: Msg = {
+        id: crypto.randomUUID(), role: 'assistant',
+        content: taskRunId
+          ? `Task queued — I'm working on it now. Each step will run with full tool access.\n\nClick **VIEW IN TASKS** below to watch the live trace.`
+          : 'Command submitted.',
+        timestamp: Date.now(),
+        taskRunId,
+      };
+      setMsgs(prev => [...prev, botMsg]);
+
+      // Auto-navigate to tasks tab after a short delay
+      if (taskRunId) {
+        setTimeout(() => {
+          setActiveTab('tasks');
+          setChatOpen(false);
+        }, 1800);
+      }
+    } catch (err) {
+      const botMsg: Msg = {
+        id: crypto.randomUUID(), role: 'assistant',
+        content: `Failed to submit command: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        timestamp: Date.now(),
+      };
+      setMsgs(prev => [...prev, botMsg]);
+    } finally {
+      setSending(false);
+    }
   };
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -77,120 +155,97 @@ export default function ChatPanel() {
     <AnimatePresence>
       {chatOpen && (
         <motion.div
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }}
-          transition={{ duration: 0.25, ease: 'easeOut' }}
+          initial={{ y: 80, opacity: 0, scale: 0.96 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          exit={{ y: 80, opacity: 0, scale: 0.96 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
           style={{
-            position: 'fixed',
-            bottom: 32 + 8, left: '50%',
-            transform: 'translateX(-50%)',
-            width: 560,
-            maxHeight: '60vh',
-            zIndex: 60,
-            display: 'flex',
-            flexDirection: 'column',
-            background: 'rgba(0,4,12,0.97)',
-            border: '1px solid rgba(0,212,255,0.4)',
-            boxShadow: '0 0 40px rgba(0,212,255,0.2), 0 24px 60px rgba(0,0,0,0.85)',
+            position: 'fixed', bottom: 24, right: 24, zIndex: 200,
+            width: 380, height: 520, display: 'flex', flexDirection: 'column',
+            background: 'rgba(8,14,32,0.88)',
+            backdropFilter: 'blur(28px)',
+            WebkitBackdropFilter: 'blur(28px)',
+            border: '1px solid rgba(0,196,184,0.18)',
+            borderRadius: 16,
+            boxShadow: '0 8px 48px rgba(0,0,0,0.6), 0 0 60px rgba(0,196,184,0.08)',
+            overflow: 'hidden',
           }}
         >
-          {/* Corner brackets */}
-          <div style={{ position: 'absolute', top: -1, left: -1, width: 14, height: 14, borderTop: '2px solid #00d4ff', borderLeft: '2px solid #00d4ff', zIndex: 1, pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', bottom: -1, right: -1, width: 14, height: 14, borderBottom: '2px solid #00d4ff', borderRight: '2px solid #00d4ff', zIndex: 1, pointerEvents: 'none' }} />
-
           {/* Header */}
-          <div className="j-panel-header" style={{ cursor: 'default', flexShrink: 0 }}>
-            <span className="j-panel-title">
-              <Bot size={14} color="var(--j-red)" />
-              KHAMELEON INTERFACE
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
+            borderBottom: '1px solid rgba(0,196,184,0.10)',
+            background: 'rgba(0,196,184,0.045)',
+            flexShrink: 0,
+          }}>
+            <Bot size={14} style={{ color: 'var(--j-teal)' }} />
+            <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 11, color: '#fff', letterSpacing: '0.22em', flex: 1 }}>
+              COMMAND INTERFACE
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {(KNOWN_AGENTS as unknown as AgentType[]).slice(0, 5).map(a => (
-                <button
-                  key={a}
-                  onClick={() => setSelectedAgent(a)}
-                  style={{
-                    fontFamily: 'var(--j-font-mono)', fontSize: 8,
-                    padding: '2px 6px', textTransform: 'uppercase',
-                    cursor: 'pointer', border: '1px solid',
-                    letterSpacing: '0.06em',
-                    background: selectedAgent === a ? 'var(--j-red)' : 'transparent',
-                    borderColor: selectedAgent === a ? 'var(--j-red)' : 'rgba(0,212,255,0.25)',
-                    color: selectedAgent === a ? '#fff' : 'var(--j-text-muted)',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {AGENT_LABELS[a]}
-                </button>
+            {/* Agent selector */}
+            <select
+              value={selectedAgent}
+              onChange={e => setSelectedAgent(e.target.value as AgentType)}
+              style={{
+                background: 'rgba(0,196,184,0.08)', border: '1px solid rgba(0,196,184,0.2)',
+                color: 'var(--j-teal)', fontFamily: 'var(--j-font-mono)', fontSize: 9,
+                padding: '2px 6px', borderRadius: 6, cursor: 'pointer', letterSpacing: '0.06em',
+              }}
+            >
+              {Object.entries(AGENT_LABELS).map(([id, label]) => (
+                <option key={id} value={id}>{label}</option>
               ))}
-              <button
-                onClick={() => { setChatOpen(false); stopRef.current?.(); }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 16, padding: '0 2px', lineHeight: 1 }}
-              >
-                <X size={14} />
-              </button>
-            </div>
+            </select>
+            <button
+              onClick={() => setChatOpen(false)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', padding: 0, display: 'flex' }}
+            >
+              <X size={14} />
+            </button>
           </div>
 
           {/* Messages */}
-          <div
-            ref={bodyRef}
-            className="scrollbar-jarvis"
-            style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 200 }}
-          >
-            {chatMessages.length === 0 && (
-              <div style={{ color: 'var(--j-text-faint)', fontFamily: 'var(--j-font-mono)', fontSize: 11, textAlign: 'center', padding: 20 }}>
-                // KHAMELEON INTERFACE READY — QUERY AWAITING //
+          <div ref={bodyRef} className="scrollbar-jarvis" style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
+            {msgs.length === 0 && (
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                height: '100%', gap: 10, color: 'var(--j-text-faint)',
+                fontFamily: 'var(--j-font-mono)', fontSize: 10, textAlign: 'center', letterSpacing: '0.08em',
+              }}>
+                <Bot size={28} style={{ opacity: 0.3 }} />
+                <div>TYPE ANY COMMAND</div>
+                <div style={{ fontSize: 9, opacity: 0.6 }}>Each command runs as a tracked task with full tool access</div>
               </div>
             )}
-            {chatMessages.map(msg => (
-              <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start', animation: 'jarvis-fadein 0.2s ease both' }}>
-                <div style={{
-                  maxWidth: '88%',
-                  padding: '8px 12px',
-                  background: msg.role === 'user' ? 'rgba(192,21,42,0.15)' : 'transparent',
-                  border: msg.role === 'user' ? '1px solid rgba(192,21,42,0.3)' : 'none',
-                  borderLeft: msg.role === 'assistant' ? '2px solid var(--j-cyan)' : undefined,
-                  paddingLeft: msg.role === 'assistant' ? 10 : undefined,
-                }}>
-                  {msg.role === 'assistant' ? (
-                    <div
-                      className="j-prose"
-                      dangerouslySetInnerHTML={{ __html: (marked.parse(msg.content || '') as string) + (isStreaming && msg === chatMessages[chatMessages.length - 1] ? '<span class="j-blink" style="color:var(--j-cyan);font-weight:700">▌</span>' : '') }}
-                    />
-                  ) : (
-                    <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 13, color: 'var(--j-text)' }}>{msg.content}</span>
-                  )}
-                </div>
-                {msg.role === 'assistant' && msg.model && (
-                  <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-muted)', marginTop: 2, paddingLeft: 12 }}>
-                    {msg.model} · {msg.latencyMs}ms · {msg.tokens} tok · ${(msg.costUsd ?? 0).toFixed(4)}
-                  </div>
-                )}
+            {msgs.map(m => <Bubble key={m.id} msg={m} />)}
+            {sending && (
+              <div style={{ display: 'flex', gap: 5, padding: '4px 0' }}>
+                {[0, 120, 240].map(d => (
+                  <div key={d} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--j-teal)', animation: `jarvis-pulse 0.8s ease-in-out ${d}ms infinite` }} />
+                ))}
               </div>
-            ))}
+            )}
           </div>
 
           {/* Input */}
-          <div style={{ borderTop: '1px solid rgba(0,212,255,0.18)', background: 'rgba(0,4,8,0.9)', padding: '8px 12px', display: 'flex', gap: 8, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 8, padding: '10px 12px', borderTop: '1px solid rgba(120,168,220,0.08)', flexShrink: 0 }}>
             <input
               className="j-input"
-              style={{ flex: 1 }}
-              placeholder="QUERY KHAMELEON..."
+              style={{ flex: 1, height: 38, fontSize: 12, borderRadius: 8 }}
+              placeholder="Issue a command…"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={onKey}
-              disabled={isStreaming}
+              disabled={sending}
+              autoFocus
             />
             <button
               className="j-btn-primary"
-              style={{ height: 34, padding: '0 14px', fontSize: 11 }}
+              style={{ height: 38, width: 38, padding: 0, borderRadius: 8, flexShrink: 0 }}
               onClick={submit}
-              disabled={isStreaming || !input.trim()}
+              disabled={!input.trim() || sending}
             >
-              <Send size={12} />
-              TRANSMIT
+              <Send size={13} />
             </button>
           </div>
         </motion.div>

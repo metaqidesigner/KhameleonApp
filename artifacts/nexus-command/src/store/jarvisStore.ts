@@ -9,7 +9,7 @@ export type AgentType =
 export type TabId =
   | 'overview' | 'agents' | 'research' | 'memory'
   | 'comms' | 'analytics' | 'security' | 'vault'
-  | 'skills' | 'settings';
+  | 'skills' | 'settings' | 'tasks';
 
 export type OrbStatus = 'online' | 'speaking' | 'listening' | 'offline';
 
@@ -24,6 +24,7 @@ export interface ChatMessage {
   tokens?: number;
   costUsd?: number;
   energyWh?: number;
+  taskRunId?: string;
 }
 
 export interface AgentEvent {
@@ -76,6 +77,9 @@ interface JarvisStore {
   cornerBracketsEnabled: boolean;
   tickerSpeed: number;
 
+  /** IDs of currently active (running) task runs — drives the badge on the TASKS tab */
+  activeTaskIds: string[];
+
   orbStatus: OrbStatus;
   orbPosition: { x: number; y: number } | null;
   orbMinimized: boolean;
@@ -101,6 +105,9 @@ interface JarvisStore {
   setScanLines: (v: boolean) => void;
   setCornerBrackets: (v: boolean) => void;
   setTickerSpeed: (v: number) => void;
+
+  addActiveTask: (id: string) => void;
+  removeActiveTask: (id: string) => void;
 
   setOrbStatus: (s: OrbStatus) => void;
   setOrbPosition: (p: { x: number; y: number }) => void;
@@ -131,6 +138,7 @@ export const useJarvisStore = create<JarvisStore>()(
       scanLinesEnabled: true,
       cornerBracketsEnabled: true,
       tickerSpeed: 60,
+      activeTaskIds: [],
 
       orbStatus: 'online',
       orbPosition: null,
@@ -173,6 +181,9 @@ export const useJarvisStore = create<JarvisStore>()(
       setScanLines:          (v)      => set({ scanLinesEnabled: v }),
       setCornerBrackets:     (v)      => set({ cornerBracketsEnabled: v }),
       setTickerSpeed:        (v)      => set({ tickerSpeed: v }),
+
+      addActiveTask:    (id) => set(s => ({ activeTaskIds: [...new Set([...s.activeTaskIds, id])] })),
+      removeActiveTask: (id) => set(s => ({ activeTaskIds: s.activeTaskIds.filter(x => x !== id) })),
 
       setOrbStatus:          (s)      => set({ orbStatus: s }),
       setOrbPosition:        (p)      => set({ orbPosition: p }),

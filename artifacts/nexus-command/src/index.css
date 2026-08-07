@@ -4,30 +4,48 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ── JARVIS Design Tokens ───────────────────────────────── */
+/* ── KHAMELEON Design Tokens — Glassmorphism Edition ────── */
 :root {
-  --j-bg:          #000408;
-  --j-surface:     #020c14;
-  --j-surface-alt: #030f1c;
-  --j-border:      rgba(0,212,255,0.25);
-  --j-border-dim:  rgba(0,212,255,0.12);
-  --j-cyan:        #00d4ff;
-  --j-red:         #c0152a;
-  --j-red-dark:    #8b0000;
-  --j-amber:       #c9a84c;
-  --j-green:       #3fb950;
-  --j-text:        #b8d4e8;
-  --j-text-muted:  #5a8ab0;
-  --j-text-faint:  #2a4a6a;
-  --j-font-ui:     'Rajdhani', sans-serif;
-  --j-font-head:   'Orbitron', sans-serif;
-  --j-font-mono:   'Share Tech Mono', monospace;
+  --j-bg:          #080c1a;
+  --j-surface:     rgba(8, 14, 32, 0.72);
+  --j-surface-alt: rgba(12, 18, 40, 0.60);
+  --j-border:      rgba(120, 168, 220, 0.11);
+  --j-border-dim:  rgba(120, 168, 220, 0.055);
+
+  /* Primary — teal */
+  --j-teal:  #00c4b8;
+  --j-cyan:  #00c4b8;          /* backwards compat */
+
+  /* Secondary — violet */
+  --j-violet: #7860c2;
+
+  /* Tertiary — amber (worth noticing) */
+  --j-amber: #e2aa34;
+
+  /* Alerts/errors — coral (replaces heavy red) */
+  --j-coral:    #e25a6e;
+  --j-red:      #e25a6e;       /* backwards compat */
+  --j-red-dark: rgba(226, 90, 110, 0.35);
+
+  /* Status */
+  --j-green: #38cf8a;
+
+  /* Text */
+  --j-text:       #c4d4ec;
+  --j-text-muted: #586898;
+  --j-text-faint: #283258;
+
+  /* Fonts */
+  --j-font-ui:   'Rajdhani', sans-serif;
+  --j-font-head: 'Orbitron', sans-serif;
+  --j-font-mono: 'Share Tech Mono', monospace;
+
   /* Tailwind compat */
-  --background: 220 100% 2%;
-  --foreground: 210 50% 80%;
-  --primary: 192 100% 50%;
-  --border-color: rgba(0,212,255,0.25);
-  --radius: 0rem;
+  --background: 228 55% 7%;
+  --foreground: 216 52% 82%;
+  --primary: 176 100% 38%;
+  --border-color: rgba(120, 168, 220, 0.11);
+  --radius: 0.875rem;
 }
 
 /* ── Reset ─────────────────────────────────────────────── */
@@ -58,7 +76,7 @@ html, body, #root {
   position: relative;
 }
 
-/* ── Background Layer ───────────────────────────────────── */
+/* ── Background Layer — colored glow blooms + circuit grid ─ */
 .j-bg-layer {
   position: fixed;
   inset: 0;
@@ -70,39 +88,47 @@ html, body, #root {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.75) 100%),
-    repeating-linear-gradient(0deg,
-      transparent 0px, transparent 3px,
-      rgba(0,180,220,0.025) 3px, rgba(0,180,220,0.025) 4px),
-    linear-gradient(rgba(0,212,255,0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,212,255,0.035) 1px, transparent 1px),
-    var(--j-bg);
-  background-size: 100% 100%, 100% 4px, 48px 48px, 48px 48px, 100%;
+    /* Teal glow — top left */
+    radial-gradient(ellipse 75% 55% at 12% 22%, rgba(0, 196, 184, 0.09) 0%, transparent 65%),
+    /* Violet glow — top right */
+    radial-gradient(ellipse 60% 50% at 85% 18%, rgba(120, 96, 194, 0.10) 0%, transparent 65%),
+    /* Amber glow — bottom center */
+    radial-gradient(ellipse 50% 38% at 50% 88%, rgba(226, 170, 52, 0.065) 0%, transparent 65%),
+    /* Circuit grid */
+    linear-gradient(rgba(120, 168, 220, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 168, 220, 0.022) 1px, transparent 1px),
+    #080c1a;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 38px 38px, 38px 38px, 100%;
 }
 .j-bg-layer::after {
   content: '';
   position: absolute;
   inset: 0;
   width: 2px;
-  background: rgba(0,212,255,0.07);
-  animation: jarvis-scan 9s linear infinite;
+  background: rgba(0, 196, 184, 0.05);
+  animation: jarvis-scan 12s linear infinite;
   pointer-events: none;
 }
 
-/* ── Panel ──────────────────────────────────────────────── */
+/* ── Panel — frosted glass ──────────────────────────────── */
 .j-panel {
   position: relative;
-  background: rgba(2,12,20,0.94);
-  border: 1px solid var(--j-border);
+  background: rgba(8, 14, 32, 0.72);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid rgba(120, 168, 220, 0.11);
+  border-radius: 14px;
   box-shadow:
-    0 0 14px rgba(0,212,255,0.1),
-    inset 0 0 40px rgba(0,0,0,0.5);
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 4px 32px rgba(0, 0, 0, 0.5),
+    0 0 48px rgba(0, 196, 184, 0.04);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   height: 100%;
 }
-/* Corner brackets */
+
+/* Soft corner glow instead of hard brackets */
 .j-panel.j-corner::before,
 .j-panel.j-corner::after {
   content: '';
@@ -113,14 +139,16 @@ html, body, #root {
   pointer-events: none;
 }
 .j-panel.j-corner::before {
-  top: -1px; left: -1px;
-  border-top: 2px solid var(--j-cyan);
-  border-left: 2px solid var(--j-cyan);
+  top: 0; left: 0;
+  border-top: 1px solid rgba(0, 196, 184, 0.45);
+  border-left: 1px solid rgba(0, 196, 184, 0.45);
+  border-radius: 14px 0 0 0;
 }
 .j-panel.j-corner::after {
-  bottom: -1px; right: -1px;
-  border-bottom: 2px solid var(--j-cyan);
-  border-right: 2px solid var(--j-cyan);
+  bottom: 0; right: 0;
+  border-bottom: 1px solid rgba(0, 196, 184, 0.45);
+  border-right: 1px solid rgba(0, 196, 184, 0.45);
+  border-radius: 0 0 14px 0;
 }
 
 .j-panel-header {
@@ -129,9 +157,9 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px;
-  background: linear-gradient(90deg, #6b0000 0%, #3d0000 55%, transparent 100%);
-  border-bottom: 1px solid rgba(192,21,42,0.45);
+  padding: 0 12px;
+  background: rgba(0, 196, 184, 0.055);
+  border-bottom: 1px solid rgba(0, 196, 184, 0.10);
   cursor: grab;
   user-select: none;
 }
@@ -160,17 +188,18 @@ html, body, #root {
   font-family: var(--j-font-mono);
   font-size: 9px;
   letter-spacing: 0.08em;
-  color: var(--j-red);
-  background: rgba(192,21,42,0.18);
-  border: 1px solid rgba(192,21,42,0.4);
-  padding: 1px 5px;
+  color: var(--j-coral);
+  background: rgba(226, 90, 110, 0.12);
+  border: 1px solid rgba(226, 90, 110, 0.28);
+  padding: 2px 8px;
   text-transform: uppercase;
+  border-radius: 12px;
 }
 
 /* ── Amber header variant ───────────────────────────────── */
 .j-panel-header-amber {
-  background: linear-gradient(90deg, #6b4000 0%, #3d2400 55%, transparent 100%);
-  border-bottom: 1px solid rgba(201,168,76,0.4);
+  background: rgba(226, 170, 52, 0.055);
+  border-bottom: 1px solid rgba(226, 170, 52, 0.10);
 }
 
 /* ── Buttons ────────────────────────────────────────────── */
@@ -181,8 +210,9 @@ html, body, #root {
   gap: 8px;
   height: 44px;
   padding: 0 20px;
-  background: linear-gradient(90deg, #6b0000, #3d0000);
-  border: 1px solid var(--j-red);
+  background: linear-gradient(135deg, rgba(0, 196, 184, 0.18), rgba(120, 96, 194, 0.14));
+  border: 1px solid rgba(0, 196, 184, 0.45);
+  border-radius: 8px;
   color: #fff;
   font-family: var(--j-font-ui);
   font-size: 13px;
@@ -190,12 +220,11 @@ html, body, #root {
   text-transform: uppercase;
   letter-spacing: 0.15em;
   cursor: pointer;
-  transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 .j-btn-primary:hover {
-  border-color: var(--j-cyan);
-  color: var(--j-cyan);
-  box-shadow: 0 0 12px rgba(0,212,255,0.25);
+  border-color: rgba(0, 196, 184, 0.75);
+  box-shadow: 0 0 18px rgba(0, 196, 184, 0.28);
 }
 .j-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -206,8 +235,9 @@ html, body, #root {
   height: 32px;
   padding: 0 14px;
   background: transparent;
-  border: 1px solid rgba(0,212,255,0.3);
-  color: var(--j-cyan);
+  border: 1px solid rgba(0, 196, 184, 0.25);
+  border-radius: 6px;
+  color: var(--j-teal);
   font-family: var(--j-font-ui);
   font-size: 12px;
   font-weight: 600;
@@ -216,7 +246,7 @@ html, body, #root {
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
-.j-btn-ghost:hover { background: rgba(0,212,255,0.08); border-color: var(--j-cyan); }
+.j-btn-ghost:hover { background: rgba(0, 196, 184, 0.08); border-color: var(--j-teal); }
 .j-btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .j-action-btn {
@@ -226,10 +256,11 @@ html, body, #root {
   width: 100%;
   height: 44px;
   padding: 0 14px;
-  background: rgba(0,212,255,0.05);
-  border: 1px solid rgba(0,212,255,0.2);
-  border-left: 3px solid var(--j-cyan);
-  color: var(--j-cyan);
+  background: rgba(0, 196, 184, 0.05);
+  border: 1px solid rgba(0, 196, 184, 0.14);
+  border-left: 3px solid var(--j-teal);
+  border-radius: 0 6px 6px 0;
+  color: var(--j-teal);
   font-family: var(--j-font-ui);
   font-size: 13px;
   font-weight: 600;
@@ -238,15 +269,18 @@ html, body, #root {
   cursor: pointer;
   transition: background 0.15s, border-left-color 0.15s;
 }
-.j-action-btn:hover { background: rgba(0,212,255,0.12); border-left-color: var(--j-red); }
+.j-action-btn:hover { background: rgba(0, 196, 184, 0.10); border-left-color: var(--j-violet); }
 
 /* ── Input ──────────────────────────────────────────────── */
 .j-input {
   width: 100%;
   height: 34px;
-  padding: 0 10px;
-  background: rgba(0,4,8,0.9);
-  border: 1px solid rgba(0,212,255,0.25);
+  padding: 0 12px;
+  background: rgba(8, 14, 32, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(120, 168, 220, 0.18);
+  border-radius: 8px;
   color: var(--j-text);
   font-family: var(--j-font-ui);
   font-size: 13px;
@@ -255,15 +289,16 @@ html, body, #root {
 }
 .j-input::placeholder { color: var(--j-text-faint); }
 .j-input:focus {
-  border-color: var(--j-cyan);
-  box-shadow: 0 0 8px rgba(0,212,255,0.2);
+  border-color: var(--j-teal);
+  box-shadow: 0 0 12px rgba(0, 196, 184, 0.18);
 }
 
 .j-textarea {
   width: 100%;
-  padding: 10px;
-  background: rgba(0,4,8,0.9);
-  border: 1px solid rgba(0,212,255,0.25);
+  padding: 10px 12px;
+  background: rgba(8, 14, 32, 0.65);
+  border: 1px solid rgba(120, 168, 220, 0.18);
+  border-radius: 8px;
   color: var(--j-text);
   font-family: var(--j-font-ui);
   font-size: 13px;
@@ -272,7 +307,7 @@ html, body, #root {
   transition: border-color 0.15s;
   line-height: 1.5;
 }
-.j-textarea:focus { border-color: var(--j-cyan); }
+.j-textarea:focus { border-color: var(--j-teal); }
 .j-textarea::placeholder { color: var(--j-text-faint); }
 
 /* ── Badges ─────────────────────────────────────────────── */
@@ -280,19 +315,20 @@ html, body, #root {
   font-family: var(--j-font-mono);
   font-size: 9px;
   letter-spacing: 0.06em;
-  padding: 2px 6px;
+  padding: 2px 8px;
   text-transform: uppercase;
+  border-radius: 10px;
 }
-.j-badge-red    { background: rgba(192,21,42,0.25);  color: var(--j-red);  border: 1px solid rgba(192,21,42,0.5); }
-.j-badge-cyan   { background: rgba(0,212,255,0.12);  color: var(--j-cyan); border: 1px solid rgba(0,212,255,0.4); }
-.j-badge-green  { background: rgba(63,185,80,0.15);  color: var(--j-green);border: 1px solid rgba(63,185,80,0.4); }
-.j-badge-amber  { background: rgba(201,168,76,0.15); color: var(--j-amber);border: 1px solid rgba(201,168,76,0.4); }
-.j-badge-gray   { background: rgba(42,74,106,0.3);   color: var(--j-text-muted); border: 1px solid rgba(42,74,106,0.5); }
+.j-badge-red    { background: rgba(226, 90, 110, 0.14); color: var(--j-coral);  border: 1px solid rgba(226, 90, 110, 0.32); border-radius: 10px; }
+.j-badge-cyan   { background: rgba(0, 196, 184, 0.10);  color: var(--j-teal);   border: 1px solid rgba(0, 196, 184, 0.28);  border-radius: 10px; }
+.j-badge-green  { background: rgba(56, 207, 138, 0.12); color: var(--j-green);  border: 1px solid rgba(56, 207, 138, 0.28); border-radius: 10px; }
+.j-badge-amber  { background: rgba(226, 170, 52, 0.12); color: var(--j-amber);  border: 1px solid rgba(226, 170, 52, 0.28); border-radius: 10px; }
+.j-badge-gray   { background: rgba(40, 50, 88, 0.30);   color: var(--j-text-muted); border: 1px solid rgba(40, 50, 88, 0.5); border-radius: 10px; }
 
 /* ── Table ──────────────────────────────────────────────── */
 .j-table { width: 100%; border-collapse: collapse; }
 .j-table-header {
-  background: linear-gradient(90deg, #6b0000 0%, #3d0000 60%, transparent 100%);
+  background: rgba(0, 196, 184, 0.05);
   height: 26px;
 }
 .j-table th {
@@ -301,19 +337,19 @@ html, body, #root {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  color: #fff;
+  color: rgba(196, 212, 236, 0.70);
   padding: 0 10px;
   text-align: left;
-  border-bottom: 1px solid rgba(192,21,42,0.4);
+  border-bottom: 1px solid rgba(120, 168, 220, 0.10);
 }
 .j-table td {
   padding: 7px 10px;
   font-size: 12px;
-  border-bottom: 1px solid rgba(0,212,255,0.06);
+  border-bottom: 1px solid rgba(120, 168, 220, 0.05);
   color: var(--j-text);
 }
-.j-table tr:nth-child(even) td { background: rgba(0,212,255,0.025); }
-.j-table tr:hover td { background: rgba(0,212,255,0.06); }
+.j-table tr:nth-child(even) td { background: rgba(0, 196, 184, 0.02); }
+.j-table tr:hover td { background: rgba(0, 196, 184, 0.05); }
 
 /* ── Typography ─────────────────────────────────────────── */
 .j-mono    { font-family: var(--j-font-mono); }
@@ -321,16 +357,19 @@ html, body, #root {
 .j-rajdhani { font-family: var(--j-font-ui); }
 .j-muted   { color: var(--j-text-muted); }
 .j-faint   { color: var(--j-text-faint); }
-.j-cyan    { color: var(--j-cyan); }
-.j-red     { color: var(--j-red); }
+.j-cyan    { color: var(--j-teal); }
+.j-red     { color: var(--j-coral); }
 .j-green   { color: var(--j-green); }
 .j-amber   { color: var(--j-amber); }
 .j-upper   { text-transform: uppercase; letter-spacing: 0.1em; }
 
 /* ── Metric tile ────────────────────────────────────────── */
 .j-metric {
-  background: rgba(2,12,20,0.9);
-  border: 1px solid var(--j-border-dim);
+  background: rgba(8, 14, 32, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(120, 168, 220, 0.10);
+  border-radius: 10px;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -338,7 +377,7 @@ html, body, #root {
 }
 .j-metric-header {
   height: 22px;
-  background: linear-gradient(90deg, #6b0000, #3d0000);
+  background: rgba(0, 196, 184, 0.06);
   display: flex;
   align-items: center;
   padding: 0 10px;
@@ -347,7 +386,8 @@ html, body, #root {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.2em;
-  color: rgba(255,255,255,0.85);
+  color: rgba(196, 212, 236, 0.70);
+  border-bottom: 1px solid rgba(120, 168, 220, 0.07);
 }
 .j-metric-value {
   font-family: var(--j-font-mono);
@@ -355,6 +395,7 @@ html, body, #root {
   color: #fff;
   padding: 8px 10px 4px;
   line-height: 1;
+  text-shadow: 0 0 20px rgba(0, 196, 184, 0.4);
 }
 .j-metric-sub {
   font-family: var(--j-font-mono);
@@ -375,13 +416,14 @@ html, body, #root {
   font-size: 11px;
   text-align: center;
   gap: 12px;
-  border: 1px dashed rgba(0,212,255,0.1);
+  border: 1px dashed rgba(120, 168, 220, 0.09);
+  border-radius: 10px;
 }
 
 /* ── Prose (markdown) ────────────────────────────────────── */
 .j-prose { color: var(--j-text); font-size: 13px; line-height: 1.65; font-family: var(--j-font-ui); }
-.j-prose h1 { font-family: var(--j-font-head); font-size: 17px; font-weight: 600; color: var(--j-cyan); margin: 16px 0 8px; }
-.j-prose h2 { font-family: var(--j-font-head); font-size: 14px; font-weight: 600; color: var(--j-cyan); margin: 14px 0 6px; }
+.j-prose h1 { font-family: var(--j-font-head); font-size: 17px; font-weight: 600; color: var(--j-teal); margin: 16px 0 8px; }
+.j-prose h2 { font-family: var(--j-font-head); font-size: 14px; font-weight: 600; color: var(--j-teal); margin: 14px 0 6px; }
 .j-prose h3 { font-size: 13px; font-weight: 700; color: var(--j-text-muted); margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 0.06em; }
 .j-prose p  { margin: 6px 0; }
 .j-prose ul, .j-prose ol { margin: 6px 0 6px 18px; }
@@ -389,35 +431,37 @@ html, body, #root {
 .j-prose code {
   font-family: var(--j-font-mono);
   font-size: 11px;
-  background: rgba(0,212,255,0.08);
-  border: 1px solid rgba(0,212,255,0.2);
+  background: rgba(0, 196, 184, 0.08);
+  border: 1px solid rgba(0, 196, 184, 0.18);
+  border-radius: 4px;
   padding: 1px 5px;
-  color: var(--j-cyan);
+  color: var(--j-teal);
 }
-.j-prose pre { background: rgba(0,4,8,0.9); border: 1px solid rgba(0,212,255,0.2); padding: 12px; margin: 8px 0; overflow-x: auto; }
+.j-prose pre { background: rgba(8, 14, 32, 0.85); border: 1px solid rgba(120, 168, 220, 0.15); border-radius: 8px; padding: 12px; margin: 8px 0; overflow-x: auto; }
 .j-prose pre code { background: none; border: none; padding: 0; }
 .j-prose strong { color: #fff; font-weight: 700; }
-.j-prose blockquote { border-left: 2px solid var(--j-cyan); padding-left: 12px; color: var(--j-text-muted); margin: 8px 0; }
-.j-prose a { color: var(--j-cyan); text-decoration: none; }
+.j-prose blockquote { border-left: 2px solid var(--j-teal); padding-left: 12px; color: var(--j-text-muted); margin: 8px 0; }
+.j-prose a { color: var(--j-teal); text-decoration: none; }
 
 /* ── Effects ─────────────────────────────────────────────── */
-.j-glow     { box-shadow: 0 0 12px rgba(0,212,255,0.4); }
-.j-glow-red { box-shadow: 0 0 12px rgba(192,21,42,0.4); }
+.j-glow     { box-shadow: 0 0 12px rgba(0, 196, 184, 0.4); }
+.j-glow-red { box-shadow: 0 0 12px rgba(226, 90, 110, 0.35); }
 
 .j-shimmer {
   background: linear-gradient(90deg,
-    rgba(0,212,255,0.04) 0%,
-    rgba(0,212,255,0.1) 50%,
-    rgba(0,212,255,0.04) 100%);
+    rgba(0, 196, 184, 0.03) 0%,
+    rgba(0, 196, 184, 0.09) 50%,
+    rgba(0, 196, 184, 0.03) 100%);
   background-size: 400px 100%;
   animation: jarvis-shimmer 1.8s ease-in-out infinite;
-  border: 1px solid rgba(0,212,255,0.1);
+  border: 1px solid rgba(0, 196, 184, 0.09);
 }
 
 /* ── Connector tile ──────────────────────────────────────── */
 .j-tile {
-  background: rgba(0,212,255,0.03);
-  border: 1px solid rgba(0,212,255,0.1);
+  background: rgba(0, 196, 184, 0.03);
+  border: 1px solid rgba(120, 168, 220, 0.09);
+  border-radius: 8px;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -427,17 +471,17 @@ html, body, #root {
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.j-tile:hover { border-color: rgba(0,212,255,0.4); background: rgba(0,212,255,0.07); }
+.j-tile:hover { border-color: rgba(0, 196, 184, 0.35); background: rgba(0, 196, 184, 0.07); }
 
 /* ── Relevance bar ───────────────────────────────────────── */
-.j-rel-bar  { height: 2px; background: rgba(0,212,255,0.15); margin: 4px 0; }
-.j-rel-fill { height: 100%; background: var(--j-cyan); transition: width 0.4s; }
+.j-rel-bar  { height: 2px; background: rgba(0, 196, 184, 0.12); border-radius: 1px; margin: 4px 0; }
+.j-rel-fill { height: 100%; background: var(--j-teal); border-radius: 1px; transition: width 0.4s; }
 
 /* ── Scrollbar ───────────────────────────────────────────── */
 .scrollbar-jarvis::-webkit-scrollbar { width: 4px; }
-.scrollbar-jarvis::-webkit-scrollbar-track { background: rgba(0,4,8,0.8); }
-.scrollbar-jarvis::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.3); border-radius: 2px; }
-.scrollbar-jarvis { scrollbar-width: thin; scrollbar-color: rgba(0,212,255,0.3) rgba(0,4,8,0.8); }
+.scrollbar-jarvis::-webkit-scrollbar-track { background: rgba(8, 14, 32, 0.8); border-radius: 2px; }
+.scrollbar-jarvis::-webkit-scrollbar-thumb { background: rgba(0, 196, 184, 0.25); border-radius: 2px; }
+.scrollbar-jarvis { scrollbar-width: thin; scrollbar-color: rgba(0, 196, 184, 0.25) rgba(8, 14, 32, 0.8); }
 
 /* ── react-grid-layout overrides ─────────────────────────── */
 .react-grid-item { transition: none !important; }
@@ -446,16 +490,17 @@ html, body, #root {
 .react-resizable-handle-se::after {
   width: 8px !important;
   height: 8px !important;
-  border-color: var(--j-cyan) !important;
+  border-color: var(--j-teal) !important;
   opacity: 0.5;
 }
 .react-grid-placeholder {
-  background: rgba(0,212,255,0.08) !important;
-  border: 1px dashed rgba(0,212,255,0.4) !important;
+  background: rgba(0, 196, 184, 0.08) !important;
+  border: 1px dashed rgba(0, 196, 184, 0.35) !important;
   opacity: 1 !important;
+  border-radius: 10px !important;
 }
 
-/* ── Keyframes ───────────────────────────────────────────── */
+/* ── Keyframes (unchanged) ───────────────────────────────── */
 @keyframes jarvis-scan {
   0%   { transform: translateX(-100vw); }
   100% { transform: translateX(100vw); }
@@ -480,7 +525,11 @@ html, body, #root {
 @keyframes radar-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes row-flash {
   0%, 100% { background: transparent; }
-  50% { background: rgba(0,212,255,0.15); }
+  50% { background: rgba(0, 196, 184, 0.12); }
+}
+@keyframes task-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 196, 184, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(0, 196, 184, 0.12); }
 }
 
 .j-blink   { animation: jarvis-blink 0.7s steps(1) infinite; }
@@ -503,7 +552,7 @@ html, body, #root {
   }
 }
 
-/* ── react-grid-layout + react-resizable (inlined to avoid pnpm path issues) ── */
+/* ── react-grid-layout + react-resizable (inlined) ──────── */
 .react-grid-layout { position: relative; transition: height 200ms ease; }
 .react-grid-item { transition: all 200ms ease; transition-property: left, top, width, height; }
 .react-grid-item img { pointer-events: none; user-select: none; }
@@ -511,11 +560,11 @@ html, body, #root {
 .react-grid-item.resizing { transition: none; z-index: 1; will-change: width, height; }
 .react-grid-item.react-draggable-dragging { transition: none; z-index: 3; will-change: transform; }
 .react-grid-item.dropping { visibility: hidden; }
-.react-grid-item.react-grid-placeholder { background: var(--j-cyan); opacity: 0.12; transition-duration: 100ms; z-index: 2; user-select: none; border: 1px dashed var(--j-cyan); }
+.react-grid-item.react-grid-placeholder { background: var(--j-teal); opacity: 0.10; transition-duration: 100ms; z-index: 2; user-select: none; border: 1px dashed var(--j-teal); border-radius: 10px; }
 .react-grid-item.react-grid-placeholder.placeholder-resizing { transition: none; }
 .react-grid-item > .react-resizable-handle { position: absolute; width: 20px; height: 20px; opacity: 0; }
 .react-grid-item:hover > .react-resizable-handle { opacity: 1; }
-.react-grid-item > .react-resizable-handle::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 5px; height: 5px; border-right: 2px solid rgba(0,212,255,0.5); border-bottom: 2px solid rgba(0,212,255,0.5); }
+.react-grid-item > .react-resizable-handle::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 5px; height: 5px; border-right: 2px solid rgba(0, 196, 184, 0.45); border-bottom: 2px solid rgba(0, 196, 184, 0.45); }
 .react-resizable-hide > .react-resizable-handle { display: none; }
 .react-grid-item > .react-resizable-handle.react-resizable-handle-sw { bottom: 0; left: 0; cursor: sw-resize; transform: rotate(90deg); }
 .react-grid-item > .react-resizable-handle.react-resizable-handle-se { bottom: 0; right: 0; cursor: se-resize; }

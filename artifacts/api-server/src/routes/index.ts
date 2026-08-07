@@ -23,6 +23,8 @@ import connectorsRouter from "./connectors";
 import voiceRouter from "./voice";
 import authRouter from "./auth";
 import agentConversationsRouter from "./agent-conversations";
+import commandRouter from "./command";
+import taskRunsRouter from "./task-runs";
 
 const router: IRouter = Router();
 
@@ -50,5 +52,7 @@ router.use("/insights", insightsRouter);
 router.use("/modes", modesRouter);
 router.use("/marketplace", marketplaceRouter);
 router.use("/agent-conversations", agentConversationsRouter);
+router.use("/command", commandRouter);
+router.use("/task-runs", taskRunsRouter);
 
 export default router;
