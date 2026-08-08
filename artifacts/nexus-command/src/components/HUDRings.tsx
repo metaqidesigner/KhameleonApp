@@ -1,10 +1,118 @@
 import React from 'react';
+import { Clock, Activity, Cpu } from 'lucide-react';
 import type { JarvisHealth, JarvisTelemetry } from '@/lib/jarvisApi';
 
 interface HUDRingsProps {
   health: JarvisHealth;
   telemetry: JarvisTelemetry;
 }
+
+// ── Geometry helpers ─────────────────────────────────────────
+
+const CX = 100, CY = 100;   // SVG center
+const R  = 78;               // gauge arc radius
+const START_DEG = 150;       // SVG angle for arc start (8 o'clock area)
+const TOTAL_SPAN = 240;      // degrees clockwise (8 o'clock → top → right → 4 o'clock area)
+const N_SEGS = 44;           // number of segments
+const FILL_FRAC = 0.70;      // each segment fills 70% of its slot
+
+function polar(cx: number, cy: number, r: number, deg: number) {
+  const rad = (deg * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function arcD(r: number, a: number, b: number): string {
+  const s = polar(CX, CY, r, a);
+  const e = polar(CX, CY, r, b);
+  const large = (b - a) > 180 ? 1 : 0;
+  return `M${s.x.toFixed(2)} ${s.y.toFixed(2)} A${r} ${r} 0 ${large} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`;
+}
+
+// ── Color gradient: teal → green → lime → amber → orange → coral ─
+
+const COLOR_STOPS: [number, number, number][] = [
+  [0, 196, 184],   // teal
+  [56, 207, 138],  // green
+  [156, 204, 44],  // lime
+  [226, 170, 52],  // amber
+  [249, 115, 22],  // orange
+  [226, 90, 110],  // coral
+];
+
+function segColor(frac: number): string {
+  const n = COLOR_STOPS.length - 1;
+  const t = Math.min(1, Math.max(0, frac)) * n;
+  const i = Math.floor(t);
+  const f = t - i;
+  const a = COLOR_STOPS[Math.min(i, n)];
+  const b = COLOR_STOPS[Math.min(i + 1, n)];
+  return `rgb(${Math.round(a[0] + f * (b[0] - a[0]))},${Math.round(a[1] + f * (b[1] - a[1]))},${Math.round(a[2] + f * (b[2] - a[2]))})`;
+}
+
+// ── The gauge SVG ─────────────────────────────────────────────
+
+function GaugeSVG() {
+  const OUTER_TICK_R  = R + 7;
+  const LONG_TICK_END = R + 14;
+  const SHORT_TICK_END = R + 10;
+
+  return (
+    <svg width={200} height={200} style={{ display: 'block' }}>
+      {/* Dim background track */}
+      <path
+        d={arcD(R, START_DEG, START_DEG + TOTAL_SPAN)}
+        fill="none"
+        stroke="rgba(255,255,255,0.05)"
+        strokeWidth={9}
+      />
+
+      {/* Colored segments */}
+      {Array.from({ length: N_SEGS }, (_, i) => {
+        const a = START_DEG + (i / N_SEGS) * TOTAL_SPAN;
+        const b = START_DEG + ((i + FILL_FRAC) / N_SEGS) * TOTAL_SPAN;
+        const color = segColor(i / (N_SEGS - 1));
+        const opacity = 0.85 + (i / (N_SEGS - 1)) * 0.15; // slight intensity ramp
+        return (
+          <path
+            key={i}
+            d={arcD(R, a, b)}
+            fill="none"
+            stroke={color}
+            strokeWidth={9}
+            strokeLinecap="butt"
+            opacity={opacity}
+          />
+        );
+      })}
+
+      {/* Outer tick marks */}
+      {Array.from({ length: N_SEGS + 1 }, (_, i) => {
+        const angle = START_DEG + (i / N_SEGS) * TOTAL_SPAN;
+        const isLong = i % 8 === 0;
+        const p1 = polar(CX, CY, OUTER_TICK_R, angle);
+        const p2 = polar(CX, CY, isLong ? LONG_TICK_END : SHORT_TICK_END, angle);
+        return (
+          <line
+            key={`tick-${i}`}
+            x1={p1.x.toFixed(2)} y1={p1.y.toFixed(2)}
+            x2={p2.x.toFixed(2)} y2={p2.y.toFixed(2)}
+            stroke={isLong ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)'}
+            strokeWidth={isLong ? 1.2 : 0.7}
+          />
+        );
+      })}
+
+      {/* Inner faint ring */}
+      <circle cx={CX} cy={CY} r={R - 14} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
+
+      {/* Crosshairs */}
+      <line x1={CX - R + 20} y1={CY} x2={CX + R - 20} y2={CY} stroke="rgba(255,255,255,0.04)" strokeWidth={0.8} />
+      <line x1={CX} y1={CY - R + 20} x2={CX} y2={CY + R - 20} stroke="rgba(255,255,255,0.04)" strokeWidth={0.8} />
+    </svg>
+  );
+}
+
+// ── Uptime formatter ─────────────────────────────────────────
 
 function fmtUptime(s: number): string {
   if (!s) return '—';
@@ -13,183 +121,89 @@ function fmtUptime(s: number): string {
   return `${h}h ${m}m`;
 }
 
-function TickRing({ r, total = 72 }: { r: number; total?: number }) {
-  const ticks = Array.from({ length: total }, (_, i) => i);
-  const cx = 120, cy = 120;
-  return (
-    <g>
-      {ticks.map(i => {
-        const angle = (i / total) * 2 * Math.PI - Math.PI / 2;
-        const len = i % 6 === 0 ? 6 : 3;
-        const x1 = cx + (r - 2) * Math.cos(angle);
-        const y1 = cy + (r - 2) * Math.sin(angle);
-        const x2 = cx + (r - 2 - len) * Math.cos(angle);
-        const y2 = cy + (r - 2 - len) * Math.sin(angle);
-        return (
-          <line
-            key={i}
-            x1={x1} y1={y1} x2={x2} y2={y2}
-            stroke="rgba(0,212,255,0.7)"
-            strokeWidth={i % 6 === 0 ? 1.5 : 0.8}
-          />
-        );
-      })}
-    </g>
-  );
-}
+// ── Main component ────────────────────────────────────────────
 
-function Arc({ cx, cy, r, startDeg, endDeg, color }: {
-  cx: number; cy: number; r: number;
-  startDeg: number; endDeg: number; color: string;
-}) {
-  const toRad = (d: number) => (d - 90) * Math.PI / 180;
-  const x1 = cx + r * Math.cos(toRad(startDeg));
-  const y1 = cy + r * Math.sin(toRad(startDeg));
-  const x2 = cx + r * Math.cos(toRad(endDeg));
-  const y2 = cy + r * Math.sin(toRad(endDeg));
-  const large = endDeg - startDeg > 180 ? 1 : 0;
-  return (
-    <path
-      d={`M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`}
-      fill="none"
-      stroke={color}
-      strokeWidth={4}
-      strokeLinecap="round"
-    />
-  );
-}
-
-const AGENT_COLORS: Record<string, string> = {
-  simple:          '#00d4ff',
-  orchestrator:    '#c9a84c',
-  deep_research:   '#c0152a',
-  morning_digest:  '#3fb950',
-  code_assistant:  '#a78bfa',
-  channel_agent:   '#f97316',
-  proactive_agent: '#14b8a6',
-  operative:       '#ec4899',
-};
-
-export default function HUDRings({ health, telemetry }: HUDRingsProps) {
-  const cx = 120, cy = 120;
-  const outerR = 100, midR = 78, innerR = 54;
-
-  // build mid-ring arcs from by_agent data
-  const agentEntries = Object.entries(telemetry.by_agent);
-  const total = agentEntries.reduce((a, [, s]) => a + s.queries, 0) || 1;
-  let cursor = 0;
-  const arcs = agentEntries.map(([agent, s]) => {
-    const pct = s.queries / total;
-    const span = pct * 340;
-    const start = cursor;
-    cursor += span + 4;
-    return { agent, start, end: start + span };
-  });
-
+export default function HUDRings({ health }: HUDRingsProps) {
   const isOnline = health.status !== 'offline';
-  const tps = health.tokens_per_sec ?? 0;
-  const pulseOpacity = isOnline ? Math.min(1, 0.3 + tps / 80) : 0.2;
-
-  const radialLabels = [
-    { label: `${(tps).toFixed(1)} tok/s`,       angle: 0   },
-    { label: `${health.avg_latency_ms ?? 0}ms`,  angle: 90  },
-    { label: health.engine || '—',               angle: 180 },
-    { label: fmtUptime(health.uptime),           angle: 270 },
-  ];
+  const queries   = isOnline ? (health.total_queries ?? 0) : 'STANDBY';
+  const latency   = health.avg_latency_ms ?? 0;
+  const uptime    = health.uptime ?? 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-      <div style={{ position: 'relative', width: 240, height: 240 }}>
-        {/* Outer ring — spinning */}
-        <div style={{ position: 'absolute', inset: 0, animation: 'jarvis-spin 24s linear infinite' }}>
-          <svg width={240} height={240}>
-            <circle cx={cx} cy={cy} r={outerR} fill="none" stroke="rgba(0,212,255,0.15)" strokeWidth={1} />
-            <TickRing r={outerR} total={72} />
-          </svg>
-        </div>
-        {/* Mid ring — counter-spinning with agent arcs */}
-        <div style={{ position: 'absolute', inset: 0, animation: 'jarvis-spin-r 18s linear infinite' }}>
-          <svg width={240} height={240}>
-            <circle cx={cx} cy={cy} r={midR} fill="none" stroke="rgba(0,212,255,0.1)" strokeWidth={1} />
-            {arcs.length > 0
-              ? arcs.map(a => (
-                  <Arc key={a.agent} cx={cx} cy={cy} r={midR}
-                    startDeg={a.start} endDeg={a.end}
-                    color={AGENT_COLORS[a.agent] ?? '#00d4ff'} />
-                ))
-              : (
-                // default decorative arcs when no data
-                <>
-                  <Arc cx={cx} cy={cy} r={midR} startDeg={10} endDeg={120} color="#00d4ff" />
-                  <Arc cx={cx} cy={cy} r={midR} startDeg={130} endDeg={200} color="#c0152a" />
-                  <Arc cx={cx} cy={cy} r={midR} startDeg={210} endDeg={350} color="#c9a84c" />
-                </>
-              )
-            }
-          </svg>
-        </div>
-        {/* Inner ring — pulsing */}
-        <div style={{ position: 'absolute', inset: 0 }}>
-          <svg width={240} height={240}>
-            <circle cx={cx} cy={cy} r={innerR} fill="none"
-              stroke="#00d4ff"
-              strokeWidth={1.5}
-              opacity={pulseOpacity}
-              style={{ animation: isOnline ? 'jarvis-pulse 2s ease-in-out infinite' : undefined }}
-            />
-            <circle cx={cx} cy={cy} r={innerR - 10} fill="none"
-              stroke="rgba(0,212,255,0.2)"
-              strokeWidth={0.8}
-            />
-            {/* Cross-hairs */}
-            <line x1={cx - innerR + 4} y1={cy} x2={cx + innerR - 4} y2={cy}
-              stroke="rgba(0,212,255,0.2)" strokeWidth={0.7} />
-            <line x1={cx} y1={cy - innerR + 4} x2={cx} y2={cy + innerR - 4}
-              stroke="rgba(0,212,255,0.2)" strokeWidth={0.7} />
-          </svg>
-        </div>
-        {/* Center text */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-        }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      {/* Gauge + side stats */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        {/* SVG gauge with center text overlay */}
+        <div style={{ position: 'relative', width: 200, height: 200, flexShrink: 0 }}>
+          <GaugeSVG />
+          {/* Center overlay */}
           <div style={{
-            fontFamily: 'var(--j-font-mono)', fontSize: 28, color: '#fff', lineHeight: 1,
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
           }}>
-            {isOnline ? (health.total_queries ?? 0) : 'STANDBY'}
-          </div>
-          <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 9, color: 'var(--j-text-muted)', textTransform: 'uppercase', letterSpacing: '0.2em', marginTop: 4 }}>
-            {isOnline ? 'QUERIES' : 'OFFLINE'}
-          </div>
-          <div style={{
-            width: 6, height: 6, borderRadius: '50%', marginTop: 6,
-            background: isOnline ? 'var(--j-green)' : 'var(--j-red)',
-            animation: isOnline ? 'jarvis-pulse 1.5s ease-in-out infinite' : undefined,
-          }} />
-        </div>
-        {/* Radial labels */}
-        {radialLabels.map((l, i) => {
-          const a = l.angle;
-          const labelR = outerR + 20;
-          const rad = (a - 90) * Math.PI / 180;
-          const lx = cx + labelR * Math.cos(rad);
-          const ly = cy + labelR * Math.sin(rad);
-          return (
-            <div key={i} style={{
-              position: 'absolute',
-              left: lx, top: ly,
-              transform: 'translate(-50%,-50%)',
+            <div style={{
               fontFamily: 'var(--j-font-mono)',
-              fontSize: 9,
-              color: 'var(--j-text-muted)',
-              whiteSpace: 'nowrap',
-              pointerEvents: 'none',
+              fontSize: isOnline ? 38 : 18,
+              fontWeight: 700,
+              color: '#fff',
+              lineHeight: 1,
+              letterSpacing: '-0.02em',
             }}>
-              {l.label}
+              {queries}
             </div>
-          );
-        })}
+            <div style={{
+              fontFamily: 'var(--j-font-ui)',
+              fontSize: 9,
+              color: 'rgba(196,212,236,0.45)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.22em',
+              marginTop: 5,
+            }}>
+              {isOnline ? 'Queries' : 'Offline'}
+            </div>
+            {/* Online pulse dot */}
+            <div style={{
+              width: 5, height: 5, borderRadius: '50%', marginTop: 8,
+              background: isOnline ? 'var(--j-green)' : 'var(--j-coral)',
+              boxShadow: isOnline ? '0 0 8px var(--j-green)' : 'none',
+              animation: isOnline ? 'jarvis-pulse 2s ease-in-out infinite' : undefined,
+            }} />
+          </div>
+        </div>
+
+        {/* Side stats */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+          {/* Uptime */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Clock size={13} style={{ color: 'rgba(196,212,236,0.35)', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 15, color: '#fff', letterSpacing: '-0.01em' }}>
+                {fmtUptime(uptime)}
+              </div>
+            </div>
+          </div>
+          {/* Latency */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Activity size={13} style={{ color: 'rgba(196,212,236,0.35)', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 15, color: '#fff', letterSpacing: '-0.01em' }}>
+                {latency.toFixed(0)}ms
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Engine label */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+        <Cpu size={11} style={{ color: 'rgba(0,196,184,0.55)' }} />
+        <span style={{
+          fontFamily: 'var(--j-font-mono)', fontSize: 11,
+          color: 'rgba(196,212,236,0.45)', letterSpacing: '0.04em',
+        }}>
+          {health.engine || 'offline'}
+        </span>
       </div>
     </div>
   );

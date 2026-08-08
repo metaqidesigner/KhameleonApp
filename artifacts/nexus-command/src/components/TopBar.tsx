@@ -3,18 +3,18 @@ import { Bell, Settings, Zap } from 'lucide-react';
 import { useJarvisStore, type TabId } from '@/store/jarvisStore';
 import { useJarvisHealth, useGetCurrentMode } from '@/hooks/useJarvis';
 
-const TABS: { id: TabId; label: string; pinned?: boolean }[] = [
-  { id: 'tasks',     label: 'TASKS',     pinned: true },
-  { id: 'overview',  label: 'OVERVIEW' },
-  { id: 'agents',    label: 'AGENTS' },
-  { id: 'research',  label: 'RESEARCH' },
-  { id: 'memory',    label: 'MEMORY' },
-  { id: 'comms',     label: 'COMMS' },
-  { id: 'analytics', label: 'ANALYTICS' },
-  { id: 'security',  label: 'SECURITY' },
-  { id: 'vault',     label: 'VAULT' },
-  { id: 'skills',    label: 'SKILLS' },
-  { id: 'settings',  label: 'SETTINGS' },
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'tasks',     label: 'Tasks' },
+  { id: 'overview',  label: 'Overview' },
+  { id: 'agents',    label: 'Agents' },
+  { id: 'research',  label: 'Research' },
+  { id: 'memory',    label: 'Memory' },
+  { id: 'comms',     label: 'Comms' },
+  { id: 'analytics', label: 'Analytics' },
+  { id: 'security',  label: 'Security' },
+  { id: 'vault',     label: 'Vault' },
+  { id: 'skills',    label: 'Skills' },
+  { id: 'settings',  label: 'Settings' },
 ];
 
 function LiveClock() {
@@ -27,7 +27,7 @@ function LiveClock() {
   const d = days[now.getDay()];
   const t = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
   return (
-    <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 12, color: 'var(--j-teal)', letterSpacing: '0.08em' }}>
+    <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 12, color: 'rgba(196,212,236,0.7)', letterSpacing: '0.06em' }}>
       {d} {t}
     </span>
   );
@@ -38,12 +38,12 @@ export default function TopBar() {
   const setActiveTab         = useJarvisStore(s => s.setActiveTab);
   const setCommandPaletteOpen = useJarvisStore(s => s.setCommandPaletteOpen);
   const activeTaskIds        = useJarvisStore(s => s.activeTaskIds);
-  const { data: health } = useJarvisHealth();
-  const { data: mode }   = useGetCurrentMode();
+  const { data: health }     = useJarvisHealth();
+  const { data: mode }       = useGetCurrentMode();
 
-  const isOnline = health?.status !== 'offline' && health != null;
-  const engine   = health?.engine ?? 'OFFLINE';
-  const model    = health?.model  ?? '—';
+  const isOnline    = health?.status !== 'offline' && health != null;
+  const engine      = health?.engine ?? 'Offline';
+  const model       = health?.model  ?? '—';
   const runningCount = activeTaskIds.length;
 
   useEffect(() => {
@@ -60,27 +60,39 @@ export default function TopBar() {
   return (
     <div style={{
       height: 44, flexShrink: 0,
-      background: 'rgba(8, 14, 32, 0.92)',
-      backdropFilter: 'blur(24px)',
-      WebkitBackdropFilter: 'blur(24px)',
-      borderBottom: '1px solid rgba(0, 196, 184, 0.14)',
-      boxShadow: '0 2px 24px rgba(0,0,0,0.5), 0 0 40px rgba(0,196,184,0.05)',
+      background: 'rgba(6, 9, 20, 0.97)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      borderBottom: '1px solid rgba(255,255,255,0.07)',
       display: 'flex', alignItems: 'stretch',
       position: 'relative', zIndex: 20,
     }}>
       {/* ── Brand ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px', borderRight: '1px solid rgba(0,196,184,0.10)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: 3 }}>
-          {[0, 80, 160].map(delay => (
-            <div key={delay} style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--j-teal)', animation: `jarvis-pulse 1.8s ease-in-out ${delay}ms infinite`, opacity: 0.8 }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px 0 16px', flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* Three dots */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {['#e25a6e', '#e2aa34', '#38cf8a'].map((c, i) => (
+            <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: c, opacity: 0.75 }} />
           ))}
         </div>
-        <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '0.30em', animation: 'jarvis-flicker 12s linear infinite' }}>
+        {/* Wordmark */}
+        <span style={{
+          fontFamily: 'var(--j-font-head)',
+          fontSize: 14,
+          fontWeight: 700,
+          color: 'var(--j-teal)',
+          letterSpacing: '0.28em',
+          marginLeft: 4,
+          animation: 'jarvis-flicker 14s linear infinite',
+        }}>
           KHAMELEON
         </span>
-        <span style={{ color: 'rgba(0,196,184,0.20)', fontSize: 18 }}>|</span>
-        <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, letterSpacing: '0.08em', padding: '2px 7px', background: 'rgba(0,196,184,0.10)', border: '1px solid rgba(0,196,184,0.22)', borderRadius: 10, color: 'var(--j-teal)' }}>
-          {(mode?.name ?? 'WORK').toUpperCase()}
+      </div>
+
+      {/* ── Mode label ── */}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '0 16px', borderRight: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'rgba(196,212,236,0.5)', whiteSpace: 'nowrap' }}>
+          {(mode?.name ?? 'Work') + ' mode'}
         </span>
       </div>
 
@@ -95,31 +107,37 @@ export default function TopBar() {
               onClick={() => setActiveTab(tab.id)}
               style={{
                 position: 'relative',
-                height: '100%', padding: '0 12px',
-                background: active ? 'rgba(0,196,184,0.07)' : 'transparent',
+                height: '100%',
+                padding: '0 14px',
+                background: 'transparent',
                 border: 'none',
-                borderBottom: active ? '2px solid var(--j-teal)' : '2px solid transparent',
-                color: active ? '#fff' : 'var(--j-text-muted)',
-                fontFamily: 'var(--j-font-ui)', fontSize: 11, fontWeight: 700,
-                textTransform: 'uppercase', letterSpacing: '0.14em',
-                cursor: 'pointer', whiteSpace: 'nowrap',
-                transition: 'color 0.15s, background 0.15s',
+                borderBottom: active ? '2px solid rgba(255,255,255,0.9)' : '2px solid transparent',
+                color: active ? '#fff' : 'rgba(196,212,236,0.42)',
+                fontFamily: 'var(--j-font-ui)',
+                fontSize: 13,
+                fontWeight: active ? 600 : 400,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'color 0.15s',
                 flexShrink: 0,
                 display: 'flex', alignItems: 'center', gap: 5,
+                letterSpacing: '0.01em',
               }}
             >
-              {/* TASKS icon */}
-              {isTasksTab && <Zap size={11} style={{ color: active ? 'var(--j-teal)' : 'inherit' }} />}
+              {isTasksTab && <Zap size={11} style={{ opacity: active ? 0.9 : 0.5 }} />}
               {tab.label}
               {/* Active task count badge */}
               {isTasksTab && runningCount > 0 && (
                 <span style={{
-                  minWidth: 16, height: 16, padding: '0 4px',
-                  background: 'rgba(0,196,184,0.85)', borderRadius: 8,
-                  fontFamily: 'var(--j-font-mono)', fontSize: 8,
-                  color: '#000', fontWeight: 700,
+                  minWidth: 15, height: 15, padding: '0 4px',
+                  background: 'var(--j-teal)',
+                  borderRadius: 8,
+                  fontFamily: 'var(--j-font-mono)',
+                  fontSize: 8,
+                  color: '#000',
+                  fontWeight: 700,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  animation: 'jarvis-pulse 1.5s ease-in-out infinite',
+                  animation: 'jarvis-pulse 1.8s ease-in-out infinite',
                 }}>
                   {runningCount}
                 </span>
@@ -130,24 +148,34 @@ export default function TopBar() {
       </div>
 
       {/* ── Right status ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderLeft: '1px solid rgba(0,196,184,0.10)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
         <LiveClock />
-        <span style={{ color: 'rgba(0,196,184,0.15)', fontSize: 16 }}>|</span>
-        <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: 'var(--j-text-muted)', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
-          <span style={{ color: isOnline ? 'var(--j-green)' : 'var(--j-coral)' }}>●</span>{' '}
-          {engine.toUpperCase()} · {model.toUpperCase()}
-        </span>
-        <span style={{ color: 'rgba(0,196,184,0.15)', fontSize: 16 }}>|</span>
+
+        <span style={{ color: 'rgba(255,255,255,0.1)', fontSize: 16 }}>|</span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+            background: isOnline ? 'var(--j-green)' : 'var(--j-coral)',
+            boxShadow: isOnline ? '0 0 5px var(--j-green)' : 'none',
+          }} />
+          <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'rgba(196,212,236,0.55)', whiteSpace: 'nowrap', letterSpacing: '0.01em' }}>
+            {engine} · {model}
+          </span>
+        </div>
+
         <button
           onClick={() => setCommandPaletteOpen(true)}
-          style={{ background: 'rgba(0,196,184,0.07)', border: '1px solid rgba(0,196,184,0.18)', color: 'var(--j-text-muted)', fontFamily: 'var(--j-font-mono)', fontSize: 9, padding: '3px 7px', cursor: 'pointer', letterSpacing: '0.06em', borderRadius: 6 }}>
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(196,212,236,0.5)', fontFamily: 'var(--j-font-mono)', fontSize: 9, padding: '3px 8px', cursor: 'pointer', letterSpacing: '0.06em', borderRadius: 5 }}>
           ⌘K
         </button>
-        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-muted)', padding: 0, position: 'relative' }}>
+
+        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(196,212,236,0.5)', padding: 0, position: 'relative', display: 'flex' }}>
           <Bell size={15} />
-          <span style={{ position: 'absolute', top: -4, right: -4, width: 13, height: 13, background: 'var(--j-coral)', borderRadius: '50%', fontFamily: 'var(--j-font-mono)', fontSize: 7, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>3</span>
+          <span style={{ position: 'absolute', top: -5, right: -5, width: 14, height: 14, background: 'var(--j-coral)', borderRadius: '50%', fontFamily: 'var(--j-font-mono)', fontSize: 7, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>3</span>
         </button>
-        <button onClick={() => setActiveTab('settings')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-muted)', padding: 0 }}>
+
+        <button onClick={() => setActiveTab('settings')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(196,212,236,0.5)', padding: 0, display: 'flex' }}>
           <Settings size={14} />
         </button>
       </div>
