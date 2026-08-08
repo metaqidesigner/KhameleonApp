@@ -154,11 +154,10 @@ export default function HUDRings({ health }: HUDRingsProps) {
             </div>
             <div style={{
               fontFamily: 'var(--j-font-ui)',
-              fontSize: 9,
+              fontSize: 10,
               color: 'rgba(196,212,236,0.45)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.22em',
-              marginTop: 5,
+              letterSpacing: '0.06em',
+              marginTop: 4,
             }}>
               {isOnline ? 'Queries' : 'Offline'}
             </div>

@@ -158,11 +158,10 @@ export function VoiceController() {
     const stored = localStorage.getItem(MIC_KEY);
     if (stored === 'true') {
       startWakeListener();
-    } else if (stored === 'denied') {
+    } else {
+      // Default to blocked — user enables voice from Settings › Voice
       setWakeWordBlocked(true);
       setWakeStatus('blocked');
-    } else {
-      setShowModal(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -209,7 +208,7 @@ export function VoiceController() {
   }, [setWakeWordBlocked]);
 
   const indicatorLabel = wakeWordBlocked
-    ? '🚫 VOICE BLOCKED'
+    ? null  // blocked is now the silent default; user enables voice from Settings
     : wakeStatus === 'listening'
       ? '🎤 HEARING YOU...'
       : wakeStatus === 'waiting'

@@ -92,7 +92,10 @@ export default function TopBar() {
       {/* ── Mode label ── */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '0 16px', borderRight: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
         <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'rgba(196,212,236,0.5)', whiteSpace: 'nowrap' }}>
-          {(mode?.name ?? 'Work') + ' mode'}
+          {mode?.name
+            ? (mode.name.charAt(0).toUpperCase() + mode.name.slice(1).toLowerCase())
+                .replace(/\bmode\b/i, 'mode')
+            : 'Work mode'}
         </span>
       </div>
 
