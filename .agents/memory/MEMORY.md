@@ -2,3 +2,4 @@
 - [AI Agent Gateway](agent-gateway.md) — 6 built-in agents; Anthropic+OpenAI use Replit AI integrations (online automatically), others need GEMINI_API_KEY/OPENROUTER_API_KEY/MINIMAX_API_KEY env vars.
 - [Jarvis CSS Conventions](jarvis-css.md) — No --j-gold CSS var; use #c9a84c. JPanel has action prop. Pre-existing TS errors in db-backed routes are unrelated to agent layer.
 - [Agent Tool-Use Architecture](agent-tool-use.md) — agentic loop (claude only), 9 tools, DB persistence via agent_conversations table, SSE tool events, sessionId continuity.
+- [Task Taxonomy Conventions](task-taxonomy.md) — valid enums: priority urgent/high/medium/low, status todo/in_progress/blocked/done, category deep_work/etc; scheduler fires morning_digest at 7 AM via setTimeout chain in scheduler.ts.

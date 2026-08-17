@@ -264,18 +264,18 @@ async function seed() {
 
   // Tasks
   await db.insert(tasksTable).values([
-    { title: "Complete risk model backtesting", status: "in-progress", priority: "critical", projectId: project1.id, assignee: "Alex Morgan", dueDate: "2026-06-20", aiRecommendation: "Run 5-year historical simulation before next sprint" },
-    { title: "Implement real-time order book", status: "todo", priority: "high", projectId: project1.id, assignee: "Dev Team", dueDate: "2026-06-28", aiRecommendation: "Consider WebSocket architecture for latency optimisation" },
-    { title: "Regulatory compliance review", status: "todo", priority: "critical", projectId: project1.id, assignee: "Legal Agent", dueDate: "2026-06-25", aiRecommendation: "Schedule Legal Agent for ASIC compliance scan" },
-    { title: "Fix personalisation engine accuracy", status: "in-progress", priority: "high", projectId: project2.id, assignee: "Sarah Chen", dueDate: "2026-06-18", aiRecommendation: "A/B test the new recommendation algorithm first" },
-    { title: "Stakeholder presentation prep", status: "todo", priority: "high", projectId: project2.id, assignee: "Alex Morgan", dueDate: "2026-06-22", aiRecommendation: "Use Research Agent to gather competitive landscape data" },
-    { title: "Final compliance documentation", status: "in-progress", priority: "critical", projectId: project3.id, assignee: "James Thornton", dueDate: "2026-06-15", aiRecommendation: "Compliance Agent can auto-generate audit trail report" },
-    { title: "Stakeholder portal UAT", status: "completed", priority: "high", projectId: project3.id, assignee: "QA Team", dueDate: "2026-06-10", aiRecommendation: "All critical paths passing, minor UX issues flagged" },
-    { title: "Agent-based model calibration", status: "todo", priority: "high", projectId: project4.id, assignee: "Dr. Priya Nair", dueDate: "2026-07-15", aiRecommendation: "Request Research Agent for academic paper synthesis" },
-    { title: "Design system implementation", status: "in-progress", priority: "high", projectId: project5.id, assignee: "Design Agent", dueDate: "2026-06-20", aiRecommendation: "DESIGN subagent completing UI build" },
-    { title: "API integration testing", status: "todo", priority: "high", projectId: project5.id, assignee: "Dev Team", dueDate: "2026-06-25", aiRecommendation: "Run end-to-end tests after frontend build completes" },
-    { title: "Review investor deck", status: "todo", priority: "medium", projectId: null, assignee: "Alex Morgan", dueDate: "2026-06-19", aiRecommendation: "Suggest using Research Agent for competitive benchmarks" },
-    { title: "Prepare board meeting agenda", status: "todo", priority: "high", projectId: null, assignee: "Alex Morgan", dueDate: "2026-06-17", aiRecommendation: "Calendar Agent can auto-generate pre-read pack" },
+    { title: "Complete risk model backtesting", status: "in_progress", priority: "urgent", category: "deep_work", recurrence: "one_off", projectId: project1.id, assignee: "Alex Morgan", dueDate: "2026-06-20", aiRecommendation: "Run 5-year historical simulation before next sprint" },
+    { title: "Implement real-time order book", status: "todo", priority: "high", category: "deep_work", recurrence: "one_off", projectId: project1.id, assignee: "Dev Team", dueDate: "2026-06-28", aiRecommendation: "Consider WebSocket architecture for latency optimisation" },
+    { title: "Regulatory compliance review", status: "todo", priority: "urgent", category: "meetings", recurrence: "one_off", projectId: project1.id, assignee: "Legal Agent", dueDate: "2026-06-25", aiRecommendation: "Schedule Legal Agent for ASIC compliance scan" },
+    { title: "Fix personalisation engine accuracy", status: "in_progress", priority: "high", category: "deep_work", recurrence: "one_off", projectId: project2.id, assignee: "Sarah Chen", dueDate: "2026-06-18", aiRecommendation: "A/B test the new recommendation algorithm first" },
+    { title: "Stakeholder presentation prep", status: "todo", priority: "high", category: "deep_work", recurrence: "one_off", projectId: project2.id, assignee: "Alex Morgan", dueDate: "2026-06-22", aiRecommendation: "Use Research Agent to gather competitive landscape data" },
+    { title: "Final compliance documentation", status: "in_progress", priority: "urgent", category: "deep_work", recurrence: "one_off", projectId: project3.id, assignee: "James Thornton", dueDate: "2026-06-15", aiRecommendation: "Compliance Agent can auto-generate audit trail report" },
+    { title: "Stakeholder portal UAT", status: "done", priority: "high", category: "meetings", recurrence: "one_off", projectId: project3.id, assignee: "QA Team", dueDate: "2026-06-10", aiRecommendation: "All critical paths passing, minor UX issues flagged" },
+    { title: "Agent-based model calibration", status: "todo", priority: "high", category: "deep_work", recurrence: "one_off", projectId: project4.id, assignee: "Dr. Priya Nair", dueDate: "2026-07-15", aiRecommendation: "Request Research Agent for academic paper synthesis" },
+    { title: "Design system implementation", status: "in_progress", priority: "high", category: "deep_work", recurrence: "one_off", projectId: project5.id, assignee: "Design Agent", dueDate: "2026-06-20", aiRecommendation: "DESIGN subagent completing UI build" },
+    { title: "API integration testing", status: "todo", priority: "high", category: "task_project_management", recurrence: "one_off", projectId: project5.id, assignee: "Dev Team", dueDate: "2026-06-25", aiRecommendation: "Run end-to-end tests after frontend build completes" },
+    { title: "Review investor deck", status: "todo", priority: "medium", category: "deep_work", recurrence: "one_off", projectId: null, assignee: "Alex Morgan", dueDate: "2026-06-19", aiRecommendation: "Suggest using Research Agent for competitive benchmarks" },
+    { title: "Prepare board meeting agenda", status: "todo", priority: "high", category: "planning", recurrence: "one_off", projectId: null, assignee: "Alex Morgan", dueDate: "2026-06-17", aiRecommendation: "Calendar Agent can auto-generate pre-read pack" },
   ]);
 
   // Calendar Events

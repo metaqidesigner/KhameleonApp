@@ -5,7 +5,7 @@ import {
   Terminal, FileText, Clock, Zap, Filter, Search,
   Calendar, Mail, Play, Plus, Tag, Repeat, CheckSquare,
   Square, Trash2, SunMedium, Coffee, Users, MessageSquare,
-  ClipboardList, LayoutList, CalendarDays, Sparkles, Bot,
+  ClipboardList, LayoutList, CalendarDays, Sparkles, Bot, ListTree,
 } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
@@ -17,6 +17,7 @@ import {
   getTasks, createTask, updateTask, deleteTask,
   type Task, type TaskCategory, type TaskPriority, type TaskRecurrence,
 } from '@/lib/jarvisApi';
+import { streamAgentChat } from '@/lib/agentsApi';
 
 // ── Task taxonomy constants ───────────────────────────────────
 
@@ -124,10 +125,11 @@ interface TaskCardProps {
   task: Task;
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
+  onBreakdown?: (task: Task) => void;
   compact?: boolean;
 }
 
-function TaskCard({ task, onToggle, onDelete, compact }: TaskCardProps) {
+function TaskCard({ task, onToggle, onDelete, onBreakdown, compact }: TaskCardProps) {
   const pri = getPri(task.priority);
   const isDone = task.status === 'done';
 
@@ -176,6 +178,15 @@ function TaskCard({ task, onToggle, onDelete, compact }: TaskCardProps) {
           <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>
             {task.dueDate}
           </span>
+        )}
+        {task.category === 'deep_work' && onBreakdown && (
+          <button
+            onClick={() => onBreakdown(task)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'rgba(120,96,194,0.5)', flexShrink: 0 }}
+            title="Break into subtasks (Orchestrator)"
+          >
+            <ListTree size={10} />
+          </button>
         )}
         <button
           onClick={() => onDelete(task.id)}
@@ -313,9 +324,10 @@ interface TaskListViewProps {
   groupBy: GroupByKey;
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
+  onBreakdown?: (task: Task) => void;
 }
 
-function TaskListView({ tasks, groupBy, onToggle, onDelete }: TaskListViewProps) {
+function TaskListView({ tasks, groupBy, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
   const groups = groupTasks(tasks, groupBy);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -366,7 +378,7 @@ function TaskListView({ tasks, groupBy, onToggle, onDelete }: TaskListViewProps)
               </span>
             </div>
             {!isCollapsed && g.tasks.map(t => (
-              <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} />
+              <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} />
             ))}
           </div>
         );
@@ -382,9 +394,10 @@ interface DailySectionProps {
   tasks: Task[];
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
+  onBreakdown?: (task: Task) => void;
 }
 
-function DailySection({ section, tasks, onToggle, onDelete }: DailySectionProps) {
+function DailySection({ section, tasks, onToggle, onDelete, onBreakdown }: DailySectionProps) {
   const [open, setOpen] = useState(true);
   const recurring = tasks.filter(t => t.recurrence !== 'one_off');
   const oneOff    = tasks.filter(t => t.recurrence === 'one_off');
@@ -426,9 +439,9 @@ function DailySection({ section, tasks, onToggle, onDelete }: DailySectionProps)
       {open && (
         <div>
           {/* Recurring tasks first */}
-          {recurring.map(t => <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} compact />)}
+          {recurring.map(t => <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} compact />)}
           {/* One-off tasks */}
-          {oneOff.map(t => <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} compact />)}
+          {oneOff.map(t => <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} compact />)}
           {tasks.length === 0 && (
             <div style={{ padding: '8px 12px', fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-faint)' }}>
               No tasks in this section
@@ -440,7 +453,7 @@ function DailySection({ section, tasks, onToggle, onDelete }: DailySectionProps)
   );
 }
 
-function TaskDailyView({ tasks, onToggle, onDelete }: TaskListViewProps) {
+function TaskDailyView({ tasks, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
   const bucketed = DAY_SECTIONS.map(s => ({
     section: s,
     tasks: tasks.filter(t => categoryForSection(t) === s.id),
@@ -449,8 +462,131 @@ function TaskDailyView({ tasks, onToggle, onDelete }: TaskListViewProps) {
   return (
     <div>
       {bucketed.map(b => (
-        <DailySection key={b.section.id} section={b.section} tasks={b.tasks} onToggle={onToggle} onDelete={onDelete} />
+        <DailySection key={b.section.id} section={b.section} tasks={b.tasks} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} />
       ))}
+    </div>
+  );
+}
+
+// ── Orchestrator breakdown panel ──────────────────────────────
+
+interface BreakdownPanelProps {
+  task: Task;
+  onClose: () => void;
+  onDone: () => void;
+}
+
+function BreakdownPanel({ task, onClose, onDone }: BreakdownPanelProps) {
+  const [text,   setText]   = useState('');
+  const [status, setStatus] = useState<'running' | 'done' | 'error'>('running');
+  const [errMsg, setErrMsg] = useState('');
+  const stopRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    const messages = [
+      {
+        role: 'user' as const,
+        content:
+          `Break down this Deep Work task into actionable subtasks:\n\n` +
+          `Task ID: ${task.id}\n` +
+          `Title: ${task.title}` +
+          (task.description ? `\nDescription: ${task.description}` : '') +
+          `\n\nPlease create 3–8 concrete, ordered subtasks. ` +
+          `Set parent_task_id to ${task.id} for each subtask you create.`,
+      },
+    ];
+
+    const stop = streamAgentChat(
+      'orchestrator',
+      messages,
+      (token) => setText(prev => prev + token),
+      () => { setStatus('done'); onDone(); },
+      (err)  => { setStatus('error'); setErrMsg(err); },
+    );
+    stopRef.current = stop;
+    return () => { stop(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.id]);
+
+  const orchColor = '#7860c2';
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 0, left: 0, right: 0,
+      background: 'rgba(6,10,26,0.97)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+      border: `1px solid color-mix(in srgb, ${orchColor} 30%, transparent)`,
+      borderBottom: 'none',
+      borderRadius: '12px 12px 0 0',
+      maxHeight: '55%', display: 'flex', flexDirection: 'column',
+      animation: 'jarvis-fadein 0.2s ease both', zIndex: 20,
+      boxShadow: `0 -8px 40px rgba(0,0,0,0.5), 0 0 0 1px color-mix(in srgb, ${orchColor} 12%, transparent)`,
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
+        borderBottom: '1px solid rgba(120,168,220,0.07)', flexShrink: 0,
+      }}>
+        <Bot size={12} style={{ color: orchColor }} />
+        <span style={{
+          fontFamily: 'var(--j-font-head)', fontSize: 10, color: orchColor,
+          letterSpacing: '0.12em',
+        }}>ORCHESTRATOR</span>
+        <span style={{
+          fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)',
+          flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          Breaking down: {task.title}
+        </span>
+        {status === 'running' && (
+          <Loader2 size={11} style={{ color: orchColor, animation: 'jarvis-spin 0.8s linear infinite', flexShrink: 0 }} />
+        )}
+        {status === 'done' && (
+          <CheckCircle2 size={11} style={{ color: 'var(--j-green)', flexShrink: 0 }} />
+        )}
+        <button
+          onClick={() => { stopRef.current?.(); onClose(); }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', display: 'flex', padding: 0, flexShrink: 0 }}
+          title="Close"
+        >
+          <X size={12} />
+        </button>
+      </div>
+
+      {/* Streaming content */}
+      <div className="scrollbar-jarvis" style={{ flex: 1, overflowY: 'auto', padding: '10px 14px' }}>
+        {status === 'error' ? (
+          <div style={{ color: 'var(--j-coral)', fontFamily: 'var(--j-font-ui)', fontSize: 11, lineHeight: 1.5 }}>
+            {errMsg || 'An error occurred while contacting the Orchestrator agent. Check that the API key is configured.'}
+          </div>
+        ) : (
+          <div style={{
+            fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text)',
+            lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          }}>
+            {text || (status === 'running' && (
+              <span style={{ color: 'var(--j-text-faint)' }}>Analysing task and planning subtasks…</span>
+            ))}
+            {status === 'running' && <span className="j-blink" style={{ color: orchColor }}>▌</span>}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      {(status === 'done' || status === 'error') && (
+        <div style={{
+          padding: '8px 14px', borderTop: '1px solid rgba(120,168,220,0.07)',
+          display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0,
+        }}>
+          {status === 'done' && (
+            <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, color: 'var(--j-green)', flex: 1, alignSelf: 'center' }}>
+              ✓ Subtasks created and added to your task list
+            </span>
+          )}
+          <button onClick={onClose} className="j-btn-ghost" style={{ height: 26, padding: '0 12px', fontSize: 10 }}>
+            Close
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -458,16 +594,17 @@ function TaskDailyView({ tasks, onToggle, onDelete }: TaskListViewProps) {
 // ── My Tasks panel ────────────────────────────────────────────
 
 function MyTasksPanel() {
-  const [tasks,       setTasks]       = useState<Task[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [view,        setView]        = useState<'list' | 'daily'>('list');
-  const [groupBy,     setGroupBy]     = useState<GroupByKey>('category');
-  const [catFilter,   setCatFilter]   = useState('');
-  const [priFilter,   setPriFilter]   = useState('');
-  const [recFilter,   setRecFilter]   = useState('');
-  const [statusFilter,setStatusFilter]= useState('');
-  const [searchQ,     setSearchQ]     = useState('');
-  const [creating,    setCreating]    = useState(false);
+  const [tasks,         setTasks]         = useState<Task[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [view,          setView]          = useState<'list' | 'daily'>('list');
+  const [groupBy,       setGroupBy]       = useState<GroupByKey>('category');
+  const [catFilter,     setCatFilter]     = useState('');
+  const [priFilter,     setPriFilter]     = useState('');
+  const [recFilter,     setRecFilter]     = useState('');
+  const [statusFilter,  setStatusFilter]  = useState('');
+  const [searchQ,       setSearchQ]       = useState('');
+  const [creating,      setCreating]      = useState(false);
+  const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
 
   const loadTasks = useCallback(async () => {
     const data = await getTasks({
@@ -499,6 +636,15 @@ function MyTasksPanel() {
     setCreating(false);
   };
 
+  const handleBreakdown = (task: Task) => {
+    setBreakdownTask(task);
+  };
+
+  const handleBreakdownDone = () => {
+    // Reload tasks so newly-created subtasks appear
+    loadTasks();
+  };
+
   const selStyle: React.CSSProperties = {
     background: 'rgba(8,14,32,0.8)', border: '1px solid rgba(120,168,220,0.15)',
     color: 'var(--j-text-muted)', fontFamily: 'var(--j-font-ui)', fontSize: 10,
@@ -509,7 +655,7 @@ function MyTasksPanel() {
   const done = tasks.filter(t => t.status === 'done').length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
       {/* ── Filter / action bar ── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
@@ -641,12 +787,21 @@ function MyTasksPanel() {
           </div>
         ) : view === 'daily' ? (
           <div style={{ padding: 8 }}>
-            <TaskDailyView tasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} />
+            <TaskDailyView tasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
           </div>
         ) : (
-          <TaskListView tasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} />
+          <TaskListView tasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
         )}
       </div>
+
+      {/* ── Orchestrator breakdown panel ── */}
+      {breakdownTask && (
+        <BreakdownPanel
+          task={breakdownTask}
+          onClose={() => setBreakdownTask(null)}
+          onDone={handleBreakdownDone}
+        />
+      )}
     </div>
   );
 }
