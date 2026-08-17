@@ -226,6 +226,109 @@ export async function runResearch(query: string, opts?: { max_iterations?: numbe
   );
 }
 
+// ── Task taxonomy types ────────────────────────────────────
+export type TaskCategory   = 'communication' | 'meetings' | 'deep_work' | 'task_project_management' | 'administrative' | 'planning';
+export type TaskPriority   = 'urgent' | 'high' | 'medium' | 'low';
+export type TaskRecurrence = 'one_off' | 'daily' | 'weekly' | 'custom';
+export type TaskStatus     = 'todo' | 'in_progress' | 'done' | 'blocked';
+export type TaskSource     = 'manual' | 'agent';
+
+export interface Task {
+  id:               number;
+  title:            string;
+  description:      string;
+  status:           TaskStatus;
+  priority:         TaskPriority;
+  category:         TaskCategory;
+  recurrence:       TaskRecurrence;
+  source:           TaskSource;
+  calendarEventId?: string | null;
+  threadId?:        string | null;
+  parentTaskId?:    number | null;
+  projectId?:       number | null;
+  projectName?:     string | null;
+  assignee:         string;
+  dueDate?:         string | null;
+  aiRecommendation: string;
+  createdAt:        string;
+  updatedAt:        string;
+}
+
+export interface CreateTaskInput {
+  title:            string;
+  description?:     string;
+  status?:          TaskStatus;
+  priority?:        TaskPriority;
+  category?:        TaskCategory;
+  recurrence?:      TaskRecurrence;
+  calendarEventId?: string | null;
+  threadId?:        string | null;
+  parentTaskId?:    number | null;
+  projectId?:       number | null;
+  dueDate?:         string | null;
+}
+
+export interface UpdateTaskInput {
+  title?:           string;
+  description?:     string;
+  status?:          TaskStatus;
+  priority?:        TaskPriority;
+  category?:        TaskCategory;
+  recurrence?:      TaskRecurrence;
+  dueDate?:         string | null;
+}
+
+export interface DailyTasksResponse {
+  sections: Record<string, Task[]>;
+  total:    number;
+  byCategory: Record<string, number>;
+}
+
+export async function getTasks(params?: Partial<{
+  category:   string;
+  priority:   string;
+  recurrence: string;
+  source:     string;
+  status:     string;
+  q:          string;
+}>): Promise<Task[]> {
+  const filtered = Object.entries(params ?? {}).filter(([, v]) => v != null && v !== '');
+  const qs = filtered.length ? '?' + new URLSearchParams(Object.fromEntries(filtered)).toString() : '';
+  return safeFetch<Task[]>(`${BASE}/tasks${qs}`, undefined, []);
+}
+
+export async function getDailyTasks(): Promise<DailyTasksResponse> {
+  return safeFetch<DailyTasksResponse>(
+    `${BASE}/tasks/daily`,
+    undefined,
+    { sections: { start_of_day: [], core_work: [], meetings: [], communication: [], administrative: [], end_of_day: [] }, total: 0, byCategory: {} },
+  );
+}
+
+export async function createTask(input: CreateTaskInput): Promise<Task> {
+  const res = await fetch(`${BASE}/tasks`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ priority: 'medium', category: 'deep_work', recurrence: 'one_off', ...input }),
+  });
+  if (!res.ok) throw new Error('Failed to create task');
+  return res.json() as Promise<Task>;
+}
+
+export async function updateTask(id: number, input: UpdateTaskInput): Promise<Task> {
+  const res = await fetch(`${BASE}/tasks/${id}`, {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error('Failed to update task');
+  return res.json() as Promise<Task>;
+}
+
+export async function deleteTask(id: number): Promise<void> {
+  await fetch(`${BASE}/tasks/${id}`, { method: 'DELETE' });
+}
+
 // ── WebSocket streaming ────────────────────────────────────
 export interface StreamDonePayload {
   model: string | null;

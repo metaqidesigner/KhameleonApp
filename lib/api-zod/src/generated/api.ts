@@ -351,13 +351,19 @@ export const ListTasksResponse = zod.array(ListTasksResponseItem)
  * @summary Create a task
  */
 export const CreateTaskBody = zod.object({
-  "title": zod.string(),
-  "description": zod.string().optional(),
-  "status": zod.string(),
-  "priority": zod.string(),
-  "projectId": zod.number().nullish(),
-  "assignee": zod.string().optional(),
-  "dueDate": zod.string().nullish()
+  "title":           zod.string(),
+  "description":     zod.string().optional(),
+  "status":          zod.string().optional().default("todo"),
+  "priority":        zod.string().optional().default("medium"),
+  "category":        zod.string().optional().default("deep_work"),
+  "recurrence":      zod.string().optional().default("one_off"),
+  "source":          zod.string().optional().default("manual"),
+  "calendarEventId": zod.string().nullish(),
+  "threadId":        zod.string().nullish(),
+  "parentTaskId":    zod.number().nullish(),
+  "projectId":       zod.number().nullish(),
+  "assignee":        zod.string().optional(),
+  "dueDate":         zod.string().nullish()
 })
 
 
@@ -369,23 +375,36 @@ export const UpdateTaskParams = zod.object({
 })
 
 export const UpdateTaskBody = zod.object({
-  "title": zod.string().optional(),
-  "status": zod.string().optional(),
-  "priority": zod.string().optional(),
-  "dueDate": zod.string().nullish()
+  "title":           zod.string().optional(),
+  "description":     zod.string().optional(),
+  "status":          zod.string().optional(),
+  "priority":        zod.string().optional(),
+  "category":        zod.string().optional(),
+  "recurrence":      zod.string().optional(),
+  "source":          zod.string().optional(),
+  "calendarEventId": zod.string().nullish(),
+  "threadId":        zod.string().nullish(),
+  "parentTaskId":    zod.number().nullish(),
+  "dueDate":         zod.string().nullish()
 })
 
 export const UpdateTaskResponse = zod.object({
-  "id": zod.number(),
-  "title": zod.string(),
-  "description": zod.string().optional(),
-  "status": zod.string(),
-  "priority": zod.string(),
-  "projectId": zod.number().nullish(),
-  "projectName": zod.string().nullish(),
-  "assignee": zod.string().optional(),
-  "dueDate": zod.string().nullish(),
-  "createdAt": zod.string(),
+  "id":              zod.number(),
+  "title":           zod.string(),
+  "description":     zod.string().optional(),
+  "status":          zod.string(),
+  "priority":        zod.string(),
+  "category":        zod.string().optional(),
+  "recurrence":      zod.string().optional(),
+  "source":          zod.string().optional(),
+  "calendarEventId": zod.string().nullish(),
+  "threadId":        zod.string().nullish(),
+  "parentTaskId":    zod.number().nullish(),
+  "projectId":       zod.number().nullish(),
+  "projectName":     zod.string().nullish(),
+  "assignee":        zod.string().optional(),
+  "dueDate":         zod.string().nullish(),
+  "createdAt":       zod.string(),
   "aiRecommendation": zod.string().optional()
 })
 

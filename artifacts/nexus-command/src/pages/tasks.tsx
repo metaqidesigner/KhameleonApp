@@ -3,7 +3,9 @@ import {
   Send, Mic, MicOff, RefreshCw, ChevronDown, ChevronRight,
   X, RotateCcw, CheckCircle2, AlertTriangle, Loader2,
   Terminal, FileText, Clock, Zap, Filter, Search,
-  Calendar, Mail, Play,
+  Calendar, Mail, Play, Plus, Tag, Repeat, CheckSquare,
+  Square, Trash2, SunMedium, Coffee, Users, MessageSquare,
+  ClipboardList, LayoutList, CalendarDays, Sparkles, Bot,
 } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
@@ -11,16 +13,647 @@ import {
   submitCommand, getTaskRuns, retryTaskRun, cancelTaskRun, streamTaskRun,
   type TaskRun, type TaskStep, type TaskRunStatus, type TriggerType,
 } from '@/lib/taskRunApi';
+import {
+  getTasks, createTask, updateTask, deleteTask,
+  type Task, type TaskCategory, type TaskPriority, type TaskRecurrence,
+} from '@/lib/jarvisApi';
+
+// ── Task taxonomy constants ───────────────────────────────────
+
+const CATEGORIES: { value: TaskCategory; label: string; short: string; color: string; icon: React.ReactNode; desc: string }[] = [
+  { value: 'communication',          label: 'Communication',   short: 'Comms',    color: '#00c4b8', icon: <MessageSquare size={10} />, desc: 'Emails, chat, follow-ups' },
+  { value: 'meetings',               label: 'Meetings',        short: 'Meet',     color: '#7860c2', icon: <Users size={10} />,         desc: 'Prep, notes, action items' },
+  { value: 'deep_work',              label: 'Deep Work',       short: 'Deep',     color: '#c9a84c', icon: <Sparkles size={10} />,      desc: 'Reports, docs, code, designs' },
+  { value: 'task_project_management', label: 'Project Mgmt',  short: 'Proj',     color: '#3b82f6', icon: <ClipboardList size={10} />, desc: 'Status, blockers, triage' },
+  { value: 'administrative',         label: 'Administrative',  short: 'Admin',    color: '#e25a6e', icon: <FileText size={10} />,      desc: 'Expenses, approvals, HR' },
+  { value: 'planning',               label: 'Planning',        short: 'Plan',     color: '#38cf8a', icon: <CalendarDays size={10} />,  desc: 'Daily/weekly prioritisation' },
+];
+
+const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
+  { value: 'urgent', label: 'Urgent', color: '#e25a6e' },
+  { value: 'high',   label: 'High',   color: '#c9a84c' },
+  { value: 'medium', label: 'Medium', color: '#00c4b8' },
+  { value: 'low',    label: 'Low',    color: '#586898' },
+];
+
+const RECURRENCES: { value: TaskRecurrence; label: string; symbol: string }[] = [
+  { value: 'one_off', label: 'One-off', symbol: '·' },
+  { value: 'daily',   label: 'Daily',   symbol: '↺' },
+  { value: 'weekly',  label: 'Weekly',  symbol: '↻' },
+  { value: 'custom',  label: 'Custom',  symbol: '∞' },
+];
+
+const DAY_SECTIONS = [
+  { id: 'start_of_day',  label: 'Start of Day',   time: '7–9 AM',       color: '#7860c2', icon: <Coffee size={12} />,      cats: ['planning'] },
+  { id: 'core_work',     label: 'Core Work',       time: '9 AM–12 PM',   color: '#c9a84c', icon: <Sparkles size={12} />,     cats: ['deep_work'] },
+  { id: 'meetings',      label: 'Meetings',        time: 'As scheduled', color: '#3b82f6', icon: <Users size={12} />,        cats: ['meetings'] },
+  { id: 'communication', label: 'Communication',   time: 'Batched',      color: '#00c4b8', icon: <MessageSquare size={12} />, cats: ['communication'] },
+  { id: 'administrative',label: 'Administrative',  time: 'Afternoon',    color: '#e25a6e', icon: <FileText size={12} />,     cats: ['administrative'] },
+  { id: 'end_of_day',    label: 'End of Day',      time: '4–6 PM',       color: '#38cf8a', icon: <SunMedium size={12} />,    cats: ['task_project_management'] },
+];
 
 // ── Helpers ───────────────────────────────────────────────────
 
+function getCat(v: string) { return CATEGORIES.find(c => c.value === v) ?? CATEGORIES[2]; }
+function getPri(v: string) { return PRIORITIES.find(p => p.value === v) ?? PRIORITIES[2]; }
+function getRec(v: string) { return RECURRENCES.find(r => r.value === v) ?? RECURRENCES[0]; }
+
+function categoryForSection(task: Task): string {
+  const map: Record<string, string> = {
+    planning: 'start_of_day', deep_work: 'core_work', meetings: 'meetings',
+    communication: 'communication', administrative: 'administrative', task_project_management: 'end_of_day',
+  };
+  return map[task.category] ?? 'core_work';
+}
+
 function relativeTime(ts: string): string {
   const diff = Date.now() - new Date(ts).getTime();
-  if (diff < 60_000)  return `${Math.round(diff / 1000)}s ago`;
+  if (diff < 60_000)   return `${Math.round(diff / 1000)}s ago`;
   if (diff < 3600_000) return `${Math.round(diff / 60_000)}m ago`;
   if (diff < 86400_000) return `${Math.round(diff / 3600_000)}h ago`;
   return new Date(ts).toLocaleDateString();
 }
+
+// ── Shared task badge components ──────────────────────────────
+
+function CategoryBadge({ value }: { value: string }) {
+  const cat = getCat(value);
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      fontFamily: 'var(--j-font-ui)', fontSize: 9, fontWeight: 600,
+      letterSpacing: '0.04em',
+      color: cat.color,
+      background: `color-mix(in srgb, ${cat.color} 12%, transparent)`,
+      border: `1px solid color-mix(in srgb, ${cat.color} 28%, transparent)`,
+      borderRadius: 6, padding: '2px 6px',
+    }}>
+      {cat.icon}{cat.short}
+    </span>
+  );
+}
+
+function PriorityDot({ value }: { value: string }) {
+  const p = getPri(value);
+  return (
+    <span title={p.label} style={{
+      width: 7, height: 7, borderRadius: '50%',
+      background: p.color, flexShrink: 0,
+      boxShadow: `0 0 5px ${p.color}55`,
+    }} />
+  );
+}
+
+function RecurrencePill({ value }: { value: string }) {
+  if (value === 'one_off') return null;
+  const r = getRec(value);
+  return (
+    <span style={{
+      fontFamily: 'var(--j-font-mono)', fontSize: 9,
+      color: 'var(--j-text-muted)', padding: '1px 5px',
+      border: '1px solid rgba(120,168,220,0.18)', borderRadius: 5,
+    }}>
+      {r.symbol} {r.label}
+    </span>
+  );
+}
+
+// ── Task card ─────────────────────────────────────────────────
+
+interface TaskCardProps {
+  task: Task;
+  onToggle: (id: number, done: boolean) => void;
+  onDelete: (id: number) => void;
+  compact?: boolean;
+}
+
+function TaskCard({ task, onToggle, onDelete, compact }: TaskCardProps) {
+  const pri = getPri(task.priority);
+  const isDone = task.status === 'done';
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: compact ? '5px 10px' : '7px 12px',
+      borderLeft: `2px solid ${pri.color}`,
+      borderBottom: '1px solid rgba(120,168,220,0.06)',
+      background: isDone ? 'rgba(0,0,0,0.1)' : 'transparent',
+      transition: 'background 0.15s',
+      opacity: isDone ? 0.5 : 1,
+    }}>
+      {/* Status toggle */}
+      <button
+        onClick={() => onToggle(task.id, !isDone)}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: isDone ? 'var(--j-green)' : 'var(--j-text-faint)', flexShrink: 0 }}
+        title={isDone ? 'Mark to-do' : 'Mark done'}
+      >
+        {isDone ? <CheckCircle2 size={14} /> : <Square size={14} />}
+      </button>
+
+      {/* Priority dot */}
+      <PriorityDot value={task.priority} />
+
+      {/* Title */}
+      <span style={{
+        flex: 1, fontFamily: 'var(--j-font-ui)', fontSize: 12,
+        color: isDone ? 'var(--j-text-muted)' : 'var(--j-text)',
+        textDecoration: isDone ? 'line-through' : 'none',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {task.title}
+      </span>
+
+      {/* Right-side badges */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+        <CategoryBadge value={task.category} />
+        <RecurrencePill value={task.recurrence} />
+        {task.source === 'agent' && (
+          <span title="Created by agent" style={{ color: 'var(--j-violet)', display: 'flex' }}>
+            <Bot size={10} />
+          </span>
+        )}
+        {task.dueDate && (
+          <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>
+            {task.dueDate}
+          </span>
+        )}
+        <button
+          onClick={() => onDelete(task.id)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'rgba(120,168,220,0.2)', flexShrink: 0 }}
+          title="Delete"
+        >
+          <Trash2 size={10} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Create task form ──────────────────────────────────────────
+
+interface CreateTaskFormProps {
+  onSave: (task: Omit<Parameters<typeof createTask>[0], never>) => Promise<void>;
+  onCancel: () => void;
+  defaultCategory?: TaskCategory;
+}
+
+function CreateTaskForm({ onSave, onCancel, defaultCategory }: CreateTaskFormProps) {
+  const [title,      setTitle]      = useState('');
+  const [category,   setCategory]   = useState<TaskCategory>(defaultCategory ?? 'deep_work');
+  const [priority,   setPriority]   = useState<TaskPriority>('medium');
+  const [recurrence, setRecurrence] = useState<TaskRecurrence>('one_off');
+  const [dueDate,    setDueDate]    = useState('');
+  const [saving,     setSaving]     = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { titleRef.current?.focus(); }, []);
+
+  const handleSave = async () => {
+    if (!title.trim() || saving) return;
+    setSaving(true);
+    try {
+      await onSave({ title: title.trim(), category, priority, recurrence, dueDate: dueDate || null });
+    } finally { setSaving(false); }
+  };
+
+  const selStyle: React.CSSProperties = {
+    background: 'rgba(8,14,32,0.8)', border: '1px solid rgba(120,168,220,0.18)',
+    color: 'var(--j-text)', fontFamily: 'var(--j-font-ui)', fontSize: 11,
+    borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
+  };
+
+  return (
+    <div style={{
+      background: 'rgba(8,14,32,0.9)', border: '1px solid rgba(0,196,184,0.2)',
+      borderRadius: 10, padding: '12px', marginBottom: 8,
+      animation: 'jarvis-fadein 0.2s ease both',
+    }}>
+      <input
+        ref={titleRef}
+        className="j-input"
+        placeholder="Task title…"
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') onCancel(); }}
+        style={{ height: 36, fontSize: 13, marginBottom: 8 }}
+      />
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+        <select value={category} onChange={e => setCategory(e.target.value as TaskCategory)} style={selStyle}>
+          {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+        </select>
+        <select value={priority} onChange={e => setPriority(e.target.value as TaskPriority)} style={selStyle}>
+          {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+        </select>
+        <select value={recurrence} onChange={e => setRecurrence(e.target.value as TaskRecurrence)} style={selStyle}>
+          {RECURRENCES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+        <input
+          type="date"
+          value={dueDate}
+          onChange={e => setDueDate(e.target.value)}
+          style={{ ...selStyle, cursor: 'pointer' }}
+          placeholder="Due date (optional)"
+        />
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          onClick={handleSave}
+          disabled={!title.trim() || saving}
+          className="j-btn-primary"
+          style={{ height: 30, padding: '0 16px', fontSize: 11 }}
+        >
+          {saving ? <Loader2 size={11} style={{ animation: 'jarvis-spin 0.7s linear infinite' }} /> : <Plus size={11} />}
+          Add Task
+        </button>
+        <button onClick={onCancel} className="j-btn-ghost" style={{ height: 30, padding: '0 12px', fontSize: 11 }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Task list view ────────────────────────────────────────────
+
+type GroupByKey = 'category' | 'priority' | 'recurrence' | 'status';
+
+function groupTasks(tasks: Task[], by: GroupByKey): { key: string; label: string; color: string; tasks: Task[] }[] {
+  if (by === 'category') {
+    return CATEGORIES.map(c => ({
+      key: c.value, label: c.label, color: c.color,
+      tasks: tasks.filter(t => t.category === c.value),
+    })).filter(g => g.tasks.length > 0);
+  }
+  if (by === 'priority') {
+    return PRIORITIES.map(p => ({
+      key: p.value, label: p.label, color: p.color,
+      tasks: tasks.filter(t => t.priority === p.value),
+    })).filter(g => g.tasks.length > 0);
+  }
+  if (by === 'recurrence') {
+    return RECURRENCES.map(r => ({
+      key: r.value, label: r.label, color: 'var(--j-text-muted)',
+      tasks: tasks.filter(t => t.recurrence === r.value),
+    })).filter(g => g.tasks.length > 0);
+  }
+  // status
+  const statuses = [
+    { key: 'todo',        label: 'To-Do',       color: 'var(--j-text-muted)' },
+    { key: 'in_progress', label: 'In Progress',  color: 'var(--j-teal)' },
+    { key: 'blocked',     label: 'Blocked',      color: 'var(--j-coral)' },
+    { key: 'done',        label: 'Done',         color: 'var(--j-green)' },
+  ];
+  return statuses.map(s => ({
+    ...s, tasks: tasks.filter(t => t.status === s.key),
+  })).filter(g => g.tasks.length > 0);
+}
+
+interface TaskListViewProps {
+  tasks: Task[];
+  groupBy: GroupByKey;
+  onToggle: (id: number, done: boolean) => void;
+  onDelete: (id: number) => void;
+}
+
+function TaskListView({ tasks, groupBy, onToggle, onDelete }: TaskListViewProps) {
+  const groups = groupTasks(tasks, groupBy);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  if (tasks.length === 0) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 10, padding: 40, color: 'var(--j-text-faint)',
+      }}>
+        <CheckSquare size={28} style={{ opacity: 0.3 }} />
+        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12 }}>No tasks yet — add one above or run Morning Digest</span>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {groups.map(g => {
+        const isCollapsed = collapsed[g.key];
+        return (
+          <div key={g.key} style={{ marginBottom: 2 }}>
+            <div
+              onClick={() => setCollapsed(c => ({ ...c, [g.key]: !c[g.key] }))}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 12px', cursor: 'pointer', userSelect: 'none',
+                background: 'rgba(120,168,220,0.03)',
+              }}
+            >
+              {isCollapsed
+                ? <ChevronRight size={10} style={{ color: 'var(--j-text-faint)' }} />
+                : <ChevronDown size={10} style={{ color: 'var(--j-text-faint)' }} />}
+              <span style={{
+                fontFamily: 'var(--j-font-ui)', fontSize: 10, fontWeight: 700,
+                letterSpacing: '0.14em', textTransform: 'uppercase',
+                color: typeof g.color === 'string' && g.color.startsWith('#') ? g.color : undefined,
+                ...(typeof g.color === 'string' && g.color.startsWith('var') ? { color: g.color } : {}),
+              }}>
+                {g.label}
+              </span>
+              <span style={{
+                fontFamily: 'var(--j-font-mono)', fontSize: 9,
+                color: 'var(--j-text-faint)',
+                background: 'rgba(120,168,220,0.1)',
+                borderRadius: 8, padding: '1px 6px',
+              }}>
+                {g.tasks.length}
+              </span>
+            </div>
+            {!isCollapsed && g.tasks.map(t => (
+              <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} />
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Daily view ────────────────────────────────────────────────
+
+interface DailySectionProps {
+  section: typeof DAY_SECTIONS[number];
+  tasks: Task[];
+  onToggle: (id: number, done: boolean) => void;
+  onDelete: (id: number) => void;
+}
+
+function DailySection({ section, tasks, onToggle, onDelete }: DailySectionProps) {
+  const [open, setOpen] = useState(true);
+  const recurring = tasks.filter(t => t.recurrence !== 'one_off');
+  const oneOff    = tasks.filter(t => t.recurrence === 'one_off');
+
+  return (
+    <div style={{
+      background: 'rgba(8,14,32,0.5)',
+      border: `1px solid color-mix(in srgb, ${section.color} 18%, transparent)`,
+      borderLeft: `3px solid ${section.color}`,
+      borderRadius: 8, overflow: 'hidden', marginBottom: 6,
+    }}>
+      {/* Section header */}
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px',
+          cursor: 'pointer', userSelect: 'none',
+          background: `color-mix(in srgb, ${section.color} 6%, transparent)`,
+        }}
+      >
+        <span style={{ color: section.color, display: 'flex' }}>{section.icon}</span>
+        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, fontWeight: 700, color: '#fff', flex: 1 }}>
+          {section.label}
+        </span>
+        <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{section.time}</span>
+        {tasks.length > 0 && (
+          <span style={{
+            fontFamily: 'var(--j-font-mono)', fontSize: 8, fontWeight: 700,
+            color: section.color,
+            background: `color-mix(in srgb, ${section.color} 15%, transparent)`,
+            borderRadius: 8, padding: '1px 6px',
+          }}>{tasks.length}</span>
+        )}
+        {open
+          ? <ChevronDown size={10} style={{ color: 'var(--j-text-faint)' }} />
+          : <ChevronRight size={10} style={{ color: 'var(--j-text-faint)' }} />}
+      </div>
+
+      {open && (
+        <div>
+          {/* Recurring tasks first */}
+          {recurring.map(t => <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} compact />)}
+          {/* One-off tasks */}
+          {oneOff.map(t => <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} compact />)}
+          {tasks.length === 0 && (
+            <div style={{ padding: '8px 12px', fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-faint)' }}>
+              No tasks in this section
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TaskDailyView({ tasks, onToggle, onDelete }: TaskListViewProps) {
+  const bucketed = DAY_SECTIONS.map(s => ({
+    section: s,
+    tasks: tasks.filter(t => categoryForSection(t) === s.id),
+  }));
+
+  return (
+    <div>
+      {bucketed.map(b => (
+        <DailySection key={b.section.id} section={b.section} tasks={b.tasks} onToggle={onToggle} onDelete={onDelete} />
+      ))}
+    </div>
+  );
+}
+
+// ── My Tasks panel ────────────────────────────────────────────
+
+function MyTasksPanel() {
+  const [tasks,       setTasks]       = useState<Task[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [view,        setView]        = useState<'list' | 'daily'>('list');
+  const [groupBy,     setGroupBy]     = useState<GroupByKey>('category');
+  const [catFilter,   setCatFilter]   = useState('');
+  const [priFilter,   setPriFilter]   = useState('');
+  const [recFilter,   setRecFilter]   = useState('');
+  const [statusFilter,setStatusFilter]= useState('');
+  const [searchQ,     setSearchQ]     = useState('');
+  const [creating,    setCreating]    = useState(false);
+
+  const loadTasks = useCallback(async () => {
+    const data = await getTasks({
+      category:   catFilter   || undefined,
+      priority:   priFilter   || undefined,
+      recurrence: recFilter   || undefined,
+      status:     statusFilter || undefined,
+      q:          searchQ.length > 1 ? searchQ : undefined,
+    });
+    setTasks(data);
+    setLoading(false);
+  }, [catFilter, priFilter, recFilter, statusFilter, searchQ]);
+
+  useEffect(() => { loadTasks(); }, [loadTasks]);
+
+  const handleToggle = async (id: number, done: boolean) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: done ? 'done' : 'todo' } : t));
+    await updateTask(id, { status: done ? 'done' : 'todo' });
+  };
+
+  const handleDelete = async (id: number) => {
+    setTasks(prev => prev.filter(t => t.id !== id));
+    await deleteTask(id);
+  };
+
+  const handleCreate = async (input: Parameters<typeof createTask>[0]) => {
+    const task = await createTask(input);
+    setTasks(prev => [task, ...prev]);
+    setCreating(false);
+  };
+
+  const selStyle: React.CSSProperties = {
+    background: 'rgba(8,14,32,0.8)', border: '1px solid rgba(120,168,220,0.15)',
+    color: 'var(--j-text-muted)', fontFamily: 'var(--j-font-ui)', fontSize: 10,
+    borderRadius: 6, padding: '3px 7px', cursor: 'pointer', height: 28,
+  };
+
+  const activeTasks = tasks.filter(t => t.status !== 'done');
+  const done = tasks.filter(t => t.status === 'done').length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* ── Filter / action bar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
+        borderBottom: '1px solid rgba(120,168,220,0.07)', flexShrink: 0, flexWrap: 'wrap',
+      }}>
+        {/* Search */}
+        <div style={{ position: 'relative', flex: '1 1 140px' }}>
+          <Search size={10} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--j-text-faint)' }} />
+          <input
+            className="j-input"
+            style={{ height: 28, paddingLeft: 24, fontSize: 11 }}
+            placeholder="Search tasks…"
+            value={searchQ}
+            onChange={e => setSearchQ(e.target.value)}
+          />
+        </div>
+
+        {/* Category filter */}
+        <select value={catFilter} onChange={e => setCatFilter(e.target.value)} style={selStyle}>
+          <option value="">All categories</option>
+          {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+        </select>
+
+        {/* Priority filter */}
+        <select value={priFilter} onChange={e => setPriFilter(e.target.value)} style={selStyle}>
+          <option value="">All priorities</option>
+          {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+        </select>
+
+        {/* Recurrence filter */}
+        <select value={recFilter} onChange={e => setRecFilter(e.target.value)} style={selStyle}>
+          <option value="">Any recurrence</option>
+          {RECURRENCES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+
+        {/* Status filter */}
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selStyle}>
+          <option value="">All statuses</option>
+          <option value="todo">To-Do</option>
+          <option value="in_progress">In Progress</option>
+          <option value="blocked">Blocked</option>
+          <option value="done">Done</option>
+        </select>
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Group By (list view only) */}
+        {view === 'list' && (
+          <select value={groupBy} onChange={e => setGroupBy(e.target.value as GroupByKey)} style={{ ...selStyle, borderColor: 'rgba(120,168,220,0.22)' }}>
+            <option value="category">Group: Category</option>
+            <option value="priority">Group: Priority</option>
+            <option value="recurrence">Group: Recurrence</option>
+            <option value="status">Group: Status</option>
+          </select>
+        )}
+
+        {/* View toggle */}
+        <div style={{ display: 'flex', border: '1px solid rgba(120,168,220,0.15)', borderRadius: 7, overflow: 'hidden' }}>
+          {[
+            { v: 'list',  icon: <LayoutList size={10} />,   label: 'List' },
+            { v: 'daily', icon: <CalendarDays size={10} />, label: 'Daily' },
+          ].map(b => (
+            <button
+              key={b.v}
+              onClick={() => setView(b.v as 'list' | 'daily')}
+              style={{
+                height: 28, padding: '0 10px', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 4,
+                fontFamily: 'var(--j-font-ui)', fontSize: 10,
+                background: view === b.v ? 'rgba(0,196,184,0.14)' : 'transparent',
+                color: view === b.v ? 'var(--j-teal)' : 'var(--j-text-faint)',
+              }}
+            >
+              {b.icon}{b.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Add task */}
+        <button
+          onClick={() => setCreating(c => !c)}
+          className="j-btn-primary"
+          style={{ height: 28, padding: '0 12px', fontSize: 10 }}
+        >
+          <Plus size={11} /> New Task
+        </button>
+
+        {/* Refresh */}
+        <button onClick={loadTasks} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', display: 'flex' }}>
+          <RefreshCw size={12} />
+        </button>
+      </div>
+
+      {/* ── Stats strip ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12, padding: '4px 12px',
+        borderBottom: '1px solid rgba(120,168,220,0.05)', flexShrink: 0,
+      }}>
+        <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)' }}>
+          {activeTasks.length} active · {done} done
+        </span>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {CATEGORIES.map(c => {
+            const count = tasks.filter(t => t.category === c.value && t.status !== 'done').length;
+            if (!count) return null;
+            return (
+              <span key={c.value} style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: c.color }}>
+                {count} {c.short}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Create task form ── */}
+      {creating && (
+        <div style={{ padding: '8px 12px', flexShrink: 0 }}>
+          <CreateTaskForm onSave={handleCreate} onCancel={() => setCreating(false)} />
+        </div>
+      )}
+
+      {/* ── Task list or daily view ── */}
+      <div className="scrollbar-jarvis" style={{ flex: 1, overflowY: 'auto' }}>
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 32, color: 'var(--j-text-faint)' }}>
+            <Loader2 size={14} style={{ animation: 'jarvis-spin 1s linear infinite' }} />
+            <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12 }}>Loading tasks…</span>
+          </div>
+        ) : view === 'daily' ? (
+          <div style={{ padding: 8 }}>
+            <TaskDailyView tasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} />
+          </div>
+        ) : (
+          <TaskListView tasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COMMAND RUNNER components (existing, unchanged)
+// ═══════════════════════════════════════════════════════════════
 
 function StatusBadge({ status }: { status: TaskRunStatus }) {
   const cfg: Record<TaskRunStatus, { color: string; label: string }> = {
@@ -61,8 +694,6 @@ function TriggerBadge({ type }: { type: TriggerType }) {
   );
 }
 
-// ── Step trace row ────────────────────────────────────────────
-
 function StepRow({ step }: { step: TaskStep }) {
   const icons: Record<string, React.ReactNode> = {
     pending:  <div style={{ width: 10, height: 10, borderRadius: '50%', border: '1.5px solid var(--j-text-faint)', flexShrink: 0 }} />,
@@ -71,14 +702,11 @@ function StepRow({ step }: { step: TaskStep }) {
     failed:   <AlertTriangle size={10} style={{ color: 'var(--j-coral)', flexShrink: 0 }} />,
   };
   const textColor = step.status === 'done' ? 'var(--j-text-muted)' : step.status === 'running' ? 'var(--j-text)' : step.status === 'failed' ? 'var(--j-coral)' : 'var(--j-text-faint)';
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
         {icons[step.status] ?? icons.pending}
-        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: textColor, flex: 1 }}>
-          {step.label}
-        </span>
+        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: textColor, flex: 1 }}>{step.label}</span>
         {step.completedAt && step.startedAt && (
           <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>
             {((new Date(step.completedAt).getTime() - new Date(step.startedAt).getTime()) / 1000).toFixed(1)}s
@@ -94,57 +722,32 @@ function StepRow({ step }: { step: TaskStep }) {
   );
 }
 
-// ── Task run card ─────────────────────────────────────────────
-
-interface CardProps {
-  run: TaskRun;
-  onRemove: (id: string) => void;
-}
+interface CardProps { run: TaskRun; onRemove: (id: string) => void; }
 
 function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
   const [run, setRun]           = useState<TaskRun>(initialRun);
-  const [expanded, setExpanded] = useState(
-    initialRun.status !== 'completed' && initialRun.status !== 'cancelled'
-  );
+  const [expanded, setExpanded] = useState(initialRun.status !== 'completed' && initialRun.status !== 'cancelled');
   const [retrying, setRetrying] = useState(false);
   const removeActiveTask        = useJarvisStore(s => s.removeActiveTask);
 
-  // Sync prop changes
   useEffect(() => { setRun(initialRun); }, [initialRun.id]);
 
-  // SSE subscription for live updates
   useEffect(() => {
     if (run.status !== 'running' && run.status !== 'queued') return;
-    const stop = streamTaskRun(
-      run.id,
-      (event) => {
-        const e = event as Record<string, unknown>;
-        setRun((r) => {
-          if (e.type === 'init')    return { ...r, ...(e.task as Partial<TaskRun>) };
-          if (e.type === 'status')  return { ...r, status: e.status as TaskRunStatus };
-          if (e.type === 'steps')   return { ...r, steps: e.steps as TaskStep[] };
-          if (e.type === 'step') {
-            const s = e.step as TaskStep;
-            return { ...r, steps: r.steps.map((x) => (x.index === s.index ? s : x)) };
-          }
-          if (e.type === 'preview') return { ...r, previewContent: e.preview as string };
-          if (e.type === 'done') {
-            setExpanded(false);
-            removeActiveTask(r.id);
-            return { ...r, status: 'completed', resultSummary: e.summary as string, previewContent: (e.preview as string) || r.previewContent };
-          }
-          if (e.type === 'error') {
-            removeActiveTask(r.id);
-            return { ...r, status: 'failed', errorMessage: e.error as string, retryFromStep: e.retryFromStep as number };
-          }
-          if (e.type === 'cancelled') {
-            removeActiveTask(r.id);
-            return { ...r, status: 'cancelled' };
-          }
-          return r;
-        });
-      },
-    );
+    const stop = streamTaskRun(run.id, (event) => {
+      const e = event as Record<string, unknown>;
+      setRun((r) => {
+        if (e.type === 'init')    return { ...r, ...(e.task as Partial<TaskRun>) };
+        if (e.type === 'status')  return { ...r, status: e.status as TaskRunStatus };
+        if (e.type === 'steps')   return { ...r, steps: e.steps as TaskStep[] };
+        if (e.type === 'step') { const s = e.step as TaskStep; return { ...r, steps: r.steps.map((x) => (x.index === s.index ? s : x)) }; }
+        if (e.type === 'preview') return { ...r, previewContent: e.preview as string };
+        if (e.type === 'done') { setExpanded(false); removeActiveTask(r.id); return { ...r, status: 'completed', resultSummary: e.summary as string, previewContent: (e.preview as string) || r.previewContent }; }
+        if (e.type === 'error') { removeActiveTask(r.id); return { ...r, status: 'failed', errorMessage: e.error as string, retryFromStep: e.retryFromStep as number }; }
+        if (e.type === 'cancelled') { removeActiveTask(r.id); return { ...r, status: 'cancelled' }; }
+        return r;
+      });
+    });
     return stop;
   }, [run.id, run.status]);
 
@@ -155,7 +758,6 @@ function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
     setExpanded(true);
     setRetrying(false);
   };
-
   const handleCancel = async () => {
     await cancelTaskRun(run.id);
     setRun((r) => ({ ...r, status: 'cancelled' }));
@@ -163,39 +765,23 @@ function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
   };
 
   const isActive = run.status === 'running' || run.status === 'queued';
-  const borderColor = run.status === 'completed' ? 'rgba(56,207,138,0.18)'
-    : run.status === 'failed' ? 'rgba(226,90,110,0.22)'
-    : run.status === 'running' ? 'rgba(0,196,184,0.22)'
-    : 'rgba(120,168,220,0.11)';
-  const glowColor = run.status === 'completed' ? 'rgba(56,207,138,0.08)'
-    : run.status === 'failed' ? 'rgba(226,90,110,0.06)'
-    : run.status === 'running' ? 'rgba(0,196,184,0.07)'
-    : 'transparent';
+  const borderColor = run.status === 'completed' ? 'rgba(56,207,138,0.18)' : run.status === 'failed' ? 'rgba(226,90,110,0.22)' : run.status === 'running' ? 'rgba(0,196,184,0.22)' : 'rgba(120,168,220,0.11)';
+  const glowColor   = run.status === 'completed' ? 'rgba(56,207,138,0.08)' : run.status === 'failed' ? 'rgba(226,90,110,0.06)' : run.status === 'running' ? 'rgba(0,196,184,0.07)' : 'transparent';
 
   return (
     <div style={{
-      background: 'rgba(8,14,32,0.75)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      border: `1px solid ${borderColor}`,
-      borderRadius: 14,
+      background: 'rgba(8,14,32,0.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+      border: `1px solid ${borderColor}`, borderRadius: 14,
       boxShadow: `inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 24px rgba(0,0,0,0.4), 0 0 32px ${glowColor}`,
-      overflow: 'hidden',
-      animation: 'jarvis-fadein 0.25s ease both',
+      overflow: 'hidden', animation: 'jarvis-fadein 0.25s ease both',
       ...(isActive && { animation: 'task-pulse 3s ease-in-out infinite' }),
     }}>
-      {/* Card header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: expanded ? `1px solid rgba(120,168,220,0.07)` : 'none' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, overflow: 'hidden' }}>
-          {run.status === 'running' ? (
-            <Loader2 size={12} style={{ color: 'var(--j-teal)', animation: 'jarvis-spin 1s linear infinite', flexShrink: 0 }} />
-          ) : run.status === 'completed' ? (
-            <CheckCircle2 size={12} style={{ color: 'var(--j-green)', flexShrink: 0 }} />
-          ) : run.status === 'failed' ? (
-            <AlertTriangle size={12} style={{ color: 'var(--j-coral)', flexShrink: 0 }} />
-          ) : (
-            <Clock size={12} style={{ color: 'var(--j-text-muted)', flexShrink: 0 }} />
-          )}
+          {run.status === 'running'   ? <Loader2 size={12} style={{ color: 'var(--j-teal)', animation: 'jarvis-spin 1s linear infinite', flexShrink: 0 }} />
+          : run.status === 'completed'? <CheckCircle2 size={12} style={{ color: 'var(--j-green)', flexShrink: 0 }} />
+          : run.status === 'failed'   ? <AlertTriangle size={12} style={{ color: 'var(--j-coral)', flexShrink: 0 }} />
+          : <Clock size={12} style={{ color: 'var(--j-text-muted)', flexShrink: 0 }} />}
           <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, fontWeight: 600, color: 'var(--j-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {run.commandText.length > 60 ? run.commandText.slice(0, 58) + '…' : run.commandText}
           </span>
@@ -203,95 +789,67 @@ function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
           <TriggerBadge type={run.triggerType} />
           <StatusBadge status={run.status} />
-          <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>
-            {relativeTime(run.createdAt)}
-          </span>
-          {/* Controls */}
+          <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{relativeTime(run.createdAt)}</span>
           {run.status === 'completed' && (
-            <button onClick={() => setExpanded((e) => !e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', padding: '0 2px', display: 'flex', alignItems: 'center' }}>
+            <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', padding: '0 2px', display: 'flex', alignItems: 'center' }}>
               {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             </button>
           )}
           {run.status === 'failed' && (
-            <button onClick={handleRetry} disabled={retrying} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-amber)', padding: '0 2px', display: 'flex', alignItems: 'center' }} title="Retry from failed step">
+            <button onClick={handleRetry} disabled={retrying} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-amber)', padding: '0 2px', display: 'flex' }}>
               <RotateCcw size={11} style={{ animation: retrying ? 'jarvis-spin 0.7s linear infinite' : 'none' }} />
             </button>
           )}
           {isActive && (
-            <button onClick={handleCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', padding: '0 2px', display: 'flex', alignItems: 'center' }} title="Cancel">
+            <button onClick={handleCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', padding: '0 2px', display: 'flex' }}>
               <X size={11} />
             </button>
           )}
-          <button onClick={() => onRemove(run.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(120,168,220,0.25)', padding: '0 2px', display: 'flex', alignItems: 'center' }} title="Dismiss">
+          <button onClick={() => onRemove(run.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(120,168,220,0.25)', padding: '0 2px', display: 'flex' }}>
             <X size={10} />
           </button>
         </div>
       </div>
-
-      {/* Completed summary (collapsed) */}
       {!expanded && run.status === 'completed' && run.resultSummary && (
-        <div style={{ padding: '7px 12px', fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', lineHeight: 1.4 }}>
-          {run.resultSummary}
-        </div>
+        <div style={{ padding: '7px 12px', fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', lineHeight: 1.4 }}>{run.resultSummary}</div>
       )}
-
-      {/* Failed summary */}
       {!expanded && run.status === 'failed' && (
         <div style={{ padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-coral)', flex: 1 }}>
-            {(run.errorMessage ?? 'Unknown error').slice(0, 100)}
-          </span>
+          <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-coral)', flex: 1 }}>{(run.errorMessage ?? 'Unknown error').slice(0, 100)}</span>
           <button onClick={handleRetry} disabled={retrying} className="j-btn-ghost" style={{ height: 22, padding: '0 8px', fontSize: 9, borderColor: 'rgba(226,90,110,0.35)', color: 'var(--j-coral)', borderRadius: 6 }}>
             <RotateCcw size={9} /> RETRY
           </button>
         </div>
       )}
-
-      {/* Expanded body — steps + preview */}
       {expanded && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {/* Step trace */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           {run.steps.length > 0 && (
             <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(120,168,220,0.06)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
                 <Terminal size={10} style={{ color: 'var(--j-text-faint)' }} />
                 <span className="j-mono" style={{ fontSize: 9, color: 'var(--j-text-faint)', letterSpacing: '0.1em' }}>TRACE</span>
               </div>
-              {run.steps.map((step) => (
-                <StepRow key={step.index} step={step} />
-              ))}
+              {run.steps.map(step => <StepRow key={step.index} step={step} />)}
             </div>
           )}
-
-          {/* Queued/no-steps state */}
           {run.steps.length === 0 && (run.status === 'queued' || run.status === 'running') && (
             <div style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--j-text-faint)', fontFamily: 'var(--j-font-mono)', fontSize: 10 }}>
               <Loader2 size={12} style={{ animation: 'jarvis-spin 1s linear infinite' }} />
-              Analyzing command and planning steps…
+              Analysing command and planning steps…
             </div>
           )}
-
-          {/* Live preview */}
           {run.previewContent && (
             <div style={{ padding: '8px 12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
                 <FileText size={10} style={{ color: 'var(--j-text-faint)' }} />
                 <span className="j-mono" style={{ fontSize: 9, color: 'var(--j-text-faint)', letterSpacing: '0.1em' }}>LIVE PREVIEW</span>
               </div>
-              <div style={{
-                fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text)',
-                lineHeight: 1.65, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                maxHeight: 220, overflowY: 'auto', padding: '8px 10px',
-                background: 'rgba(0,196,184,0.03)', border: '1px solid rgba(0,196,184,0.09)',
-                borderRadius: 8,
-              }} className="scrollbar-jarvis">
+              <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text)', lineHeight: 1.65, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 220, overflowY: 'auto', padding: '8px 10px', background: 'rgba(0,196,184,0.03)', border: '1px solid rgba(0,196,184,0.09)', borderRadius: 8 }} className="scrollbar-jarvis">
                 {run.previewContent}
                 {run.status === 'running' && <span className="j-blink" style={{ color: 'var(--j-teal)' }}>▌</span>}
               </div>
             </div>
           )}
-
-          {/* Failure detail + retry */}
           {run.status === 'failed' && (
             <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <AlertTriangle size={12} style={{ color: 'var(--j-coral)', flexShrink: 0, marginTop: 2 }} />
@@ -314,141 +872,81 @@ function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
 
 // ── Command bar ───────────────────────────────────────────────
 
-interface CommandBarProps {
-  onSubmit: (text: string) => void;
-  loading: boolean;
-}
-
-function CommandBar({ onSubmit, loading }: CommandBarProps) {
-  const [input, setInput]       = useState('');
+function CommandBar({ onSubmit, loading }: { onSubmit: (text: string) => void; loading: boolean }) {
+  const [input,     setInput]     = useState('');
   const [listening, setListening] = useState(false);
-  const inputRef                = useRef<HTMLInputElement>(null);
+  const inputRef                  = useRef<HTMLInputElement>(null);
   const pendingVoiceQuery    = useJarvisStore(s => s.pendingVoiceQuery);
   const setPendingVoiceQuery = useJarvisStore(s => s.setPendingVoiceQuery);
 
-  // Consume voice queries from the orb
   useEffect(() => {
-    if (pendingVoiceQuery) {
-      setInput(pendingVoiceQuery);
-      setPendingVoiceQuery(null);
-      inputRef.current?.focus();
-    }
+    if (pendingVoiceQuery) { setInput(pendingVoiceQuery); setPendingVoiceQuery(null); inputRef.current?.focus(); }
   }, [pendingVoiceQuery, setPendingVoiceQuery]);
 
-  const submit = () => {
-    if (!input.trim() || loading) return;
-    onSubmit(input.trim());
-    setInput('');
-  };
+  const submit = () => { if (!input.trim() || loading) return; onSubmit(input.trim()); setInput(''); };
 
   const startVoice = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRec) {
-      alert('Speech recognition is only available in Chrome/Edge.');
-      return;
-    }
+    if (!SpeechRec) { alert('Speech recognition is only available in Chrome/Edge.'); return; }
     const rec = new SpeechRec();
-    rec.lang = 'en-US';
-    rec.continuous = false;
-    rec.onresult = (e: { results: { [x: string]: { [x: string]: { transcript: string } } } }) => {
-      const text = e.results[0][0].transcript;
-      setInput(text);
-      inputRef.current?.focus();
-    };
+    rec.lang = 'en-US'; rec.continuous = false;
+    rec.onresult = (e: { results: { [x: string]: { [x: string]: { transcript: string } } } }) => { setInput(e.results[0][0].transcript); inputRef.current?.focus(); };
     rec.onend = () => setListening(false);
     rec.onerror = () => setListening(false);
-    rec.start();
-    setListening(true);
+    rec.start(); setListening(true);
   };
 
   return (
-    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+    <div style={{ display: 'flex', gap: 8 }}>
       <div style={{ position: 'relative', flex: 1 }}>
-        <input
-          ref={inputRef}
-          className="j-input"
-          style={{ height: 48, fontSize: 14, paddingLeft: 16, paddingRight: 16, borderRadius: 12, letterSpacing: '0.02em' }}
+        <input ref={inputRef} className="j-input" style={{ height: 48, fontSize: 14, paddingLeft: 16, paddingRight: 16, borderRadius: 12, letterSpacing: '0.02em' }}
           placeholder="Issue any command — ask, create, research, schedule, delegate…"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && submit()}
-          disabled={loading}
-        />
+          value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submit()} disabled={loading} />
       </div>
-      <button
-        onClick={startVoice}
-        className="j-btn-ghost"
-        title={listening ? 'Listening…' : 'Voice input'}
-        style={{
-          height: 48, width: 48, padding: 0, flexShrink: 0, borderRadius: 12,
-          borderColor: listening ? 'rgba(226,90,110,0.5)' : undefined,
-          color: listening ? 'var(--j-coral)' : undefined,
-          animation: listening ? 'jarvis-pulse 0.8s ease-in-out infinite' : 'none',
-        }}
-      >
+      <button onClick={startVoice} className="j-btn-ghost" title={listening ? 'Listening…' : 'Voice input'}
+        style={{ height: 48, width: 48, padding: 0, flexShrink: 0, borderRadius: 12, borderColor: listening ? 'rgba(226,90,110,0.5)' : undefined, color: listening ? 'var(--j-coral)' : undefined, animation: listening ? 'jarvis-pulse 0.8s ease-in-out infinite' : 'none' }}>
         {listening ? <MicOff size={16} /> : <Mic size={16} />}
       </button>
-      <button
-        className="j-btn-primary"
-        style={{ height: 48, padding: '0 28px', borderRadius: 12, fontSize: 13, letterSpacing: '0.12em' }}
-        onClick={submit}
-        disabled={!input.trim() || loading}
-      >
-        {loading
-          ? <Loader2 size={14} style={{ animation: 'jarvis-spin 0.7s linear infinite' }} />
-          : <Send size={14} />}
+      <button className="j-btn-primary" style={{ height: 48, padding: '0 28px', borderRadius: 12, fontSize: 13, letterSpacing: '0.12em' }} onClick={submit} disabled={!input.trim() || loading}>
+        {loading ? <Loader2 size={14} style={{ animation: 'jarvis-spin 0.7s linear infinite' }} /> : <Send size={14} />}
         EXECUTE
       </button>
     </div>
   );
 }
 
-// ── Auto-trigger config panel ─────────────────────────────────
+// ── Auto-triggers ─────────────────────────────────────────────
 
 const DEFAULT_SCHEDULES = [
-  { id: 'morning', label: 'Morning digest', cron: '7:00 AM daily', active: false },
+  { id: 'morning', label: 'Morning digest', cron: '7:00 AM daily',  active: false },
   { id: 'weekly',  label: 'Weekly summary', cron: 'Monday 9:00 AM', active: false },
 ];
 const DEFAULT_EVENTS = [
-  { id: 'email', label: 'New email arrives', icon: <Mail size={11} />, active: false },
-  { id: 'calendar', label: 'Calendar event starting', icon: <Calendar size={11} />, active: false },
+  { id: 'email',    label: 'New email arrives',        icon: <Mail size={11} />,     active: false },
+  { id: 'calendar', label: 'Calendar event starting',  icon: <Calendar size={11} />, active: false },
 ];
 
 function AutoTriggers() {
   const [schedules, setSchedules] = useState(DEFAULT_SCHEDULES);
-  const [events, setEvents]       = useState(DEFAULT_EVENTS);
-  const [expanded, setExpanded]   = useState(false);
+  const [events,    setEvents]    = useState(DEFAULT_EVENTS);
+  const [expanded,  setExpanded]  = useState(false);
 
   return (
-    <div style={{
-      background: 'rgba(8,14,32,0.65)', backdropFilter: 'blur(16px)',
-      border: '1px solid rgba(120,96,194,0.15)', borderRadius: 12,
-      overflow: 'hidden', flexShrink: 0,
-    }}>
-      <div
-        onClick={() => setExpanded((e) => !e)}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', userSelect: 'none' }}
-      >
+    <div style={{ background: 'rgba(8,14,32,0.65)', backdropFilter: 'blur(16px)', border: '1px solid rgba(120,96,194,0.15)', borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
+      <div onClick={() => setExpanded(e => !e)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', userSelect: 'none' }}>
         <Zap size={11} style={{ color: 'var(--j-violet)' }} />
         <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 10, color: 'var(--j-text-muted)', letterSpacing: '0.15em', flex: 1 }}>AUTO TRIGGERS</span>
-        <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>
-          {schedules.filter((s) => s.active).length + events.filter((e) => e.active).length} active
-        </span>
+        <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{schedules.filter(s => s.active).length + events.filter(e => e.active).length} active</span>
         {expanded ? <ChevronDown size={10} style={{ color: 'var(--j-text-faint)' }} /> : <ChevronRight size={10} style={{ color: 'var(--j-text-faint)' }} />}
       </div>
-
       {expanded && (
         <div style={{ padding: '0 12px 10px', display: 'flex', gap: 20 }}>
-          {/* Schedules */}
           <div style={{ flex: 1 }}>
             <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', letterSpacing: '0.12em', marginBottom: 6 }}>SCHEDULED</div>
-            {schedules.map((s) => (
+            {schedules.map(s => (
               <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                <button
-                  onClick={() => setSchedules((prev) => prev.map((x) => x.id === s.id ? { ...x, active: !x.active } : x))}
-                  style={{ width: 28, height: 16, borderRadius: 8, border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s', background: s.active ? 'var(--j-violet)' : 'rgba(120,168,220,0.15)', position: 'relative' }}
-                >
+                <button onClick={() => setSchedules(prev => prev.map(x => x.id === s.id ? { ...x, active: !x.active } : x))} style={{ width: 28, height: 16, borderRadius: 8, border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s', background: s.active ? 'var(--j-violet)' : 'rgba(120,168,220,0.15)', position: 'relative' }}>
                   <div style={{ position: 'absolute', top: 2, left: s.active ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
                 </button>
                 <div>
@@ -458,15 +956,11 @@ function AutoTriggers() {
               </div>
             ))}
           </div>
-          {/* Events */}
           <div style={{ flex: 1 }}>
             <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', letterSpacing: '0.12em', marginBottom: 6 }}>EVENT-TRIGGERED</div>
-            {events.map((e) => (
+            {events.map(e => (
               <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                <button
-                  onClick={() => setEvents((prev) => prev.map((x) => x.id === e.id ? { ...x, active: !x.active } : x))}
-                  style={{ width: 28, height: 16, borderRadius: 8, border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s', background: e.active ? 'var(--j-amber)' : 'rgba(120,168,220,0.15)', position: 'relative' }}
-                >
+                <button onClick={() => setEvents(prev => prev.map(x => x.id === e.id ? { ...x, active: !x.active } : x))} style={{ width: 28, height: 16, borderRadius: 8, border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s', background: e.active ? 'var(--j-amber)' : 'rgba(120,168,220,0.15)', position: 'relative' }}>
                   <div style={{ position: 'absolute', top: 2, left: e.active ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -488,92 +982,59 @@ function HistoryRow({ run, onRerun }: { run: TaskRun; onRerun: (text: string) =>
   const [expanded, setExpanded] = useState(false);
   return (
     <div style={{ borderBottom: '1px solid rgba(120,168,220,0.06)', animation: 'jarvis-fadein 0.2s ease both' }}>
-      <div
-        onClick={() => setExpanded((e) => !e)}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', cursor: 'pointer', userSelect: 'none' }}
-      >
+      <div onClick={() => setExpanded(e => !e)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', cursor: 'pointer', userSelect: 'none' }}>
         {expanded ? <ChevronDown size={9} style={{ color: 'var(--j-text-faint)', flexShrink: 0 }} /> : <ChevronRight size={9} style={{ color: 'var(--j-text-faint)', flexShrink: 0 }} />}
         <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', flexShrink: 0 }}>{relativeTime(run.createdAt)}</span>
         <TriggerBadge type={run.triggerType} />
         <StatusBadge status={run.status} />
-        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {run.commandText}
-        </span>
-        <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', flexShrink: 0 }}>
-          {run.steps.length} steps
-        </span>
-        <button
-          onClick={(e) => { e.stopPropagation(); onRerun(run.commandText); }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', padding: '0 2px', display: 'flex', alignItems: 'center' }}
-          title="Run again"
-        >
+        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{run.commandText}</span>
+        <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', flexShrink: 0 }}>{run.steps.length} steps</span>
+        <button onClick={e => { e.stopPropagation(); onRerun(run.commandText); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', padding: '0 2px', display: 'flex' }} title="Run again">
           <Play size={9} />
         </button>
       </div>
       {expanded && (
         <div style={{ paddingLeft: 16, paddingBottom: 8 }}>
-          {run.resultSummary && (
-            <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', marginBottom: 4, lineHeight: 1.5 }}>
-              {run.resultSummary}
-            </div>
-          )}
-          {run.steps.map((s) => (
-            <StepRow key={s.index} step={s} />
-          ))}
-          {run.previewContent && (
-            <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-muted)', background: 'rgba(0,196,184,0.03)', border: '1px solid rgba(0,196,184,0.08)', borderRadius: 6, padding: '6px 8px', maxHeight: 100, overflowY: 'auto' }} className="scrollbar-jarvis">
-              {run.previewContent.slice(0, 800)}
-            </div>
-          )}
+          {run.resultSummary && <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', marginBottom: 4, lineHeight: 1.5 }}>{run.resultSummary}</div>}
+          {run.steps.map(s => <StepRow key={s.index} step={s} />)}
+          {run.previewContent && <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-muted)', background: 'rgba(0,196,184,0.03)', border: '1px solid rgba(0,196,184,0.08)', borderRadius: 6, padding: '6px 8px', maxHeight: 100, overflowY: 'auto' }} className="scrollbar-jarvis">{run.previewContent.slice(0, 800)}</div>}
         </div>
       )}
     </div>
   );
 }
 
-// ── Main Tasks page ───────────────────────────────────────────
+// ── Commands panel ────────────────────────────────────────────
 
 const STATUS_FILTERS: { value: TaskRunStatus | 'all'; label: string }[] = [
-  { value: 'all',       label: 'ALL' },
-  { value: 'running',   label: 'RUNNING' },
-  { value: 'completed', label: 'DONE' },
-  { value: 'failed',    label: 'FAILED' },
+  { value: 'all', label: 'ALL' }, { value: 'running', label: 'RUNNING' },
+  { value: 'completed', label: 'DONE' }, { value: 'failed', label: 'FAILED' },
 ];
 const TRIGGER_FILTERS: { value: TriggerType | 'all'; label: string }[] = [
-  { value: 'all',       label: 'ANY SOURCE' },
-  { value: 'manual',    label: 'MANUAL' },
-  { value: 'scheduled', label: 'SCHEDULED' },
-  { value: 'event',     label: 'EVENT' },
+  { value: 'all', label: 'ANY SOURCE' }, { value: 'manual', label: 'MANUAL' },
+  { value: 'scheduled', label: 'SCHEDULED' }, { value: 'event', label: 'EVENT' },
 ];
 
-export default function Tasks() {
-  const [activeRuns, setActiveRuns]   = useState<TaskRun[]>([]);
+function CommandsPanel() {
+  const [activeRuns,  setActiveRuns]  = useState<TaskRun[]>([]);
   const [historyRuns, setHistoryRuns] = useState<TaskRun[]>([]);
-  const [submitting, setSubmitting]   = useState(false);
-  const [searchQ, setSearchQ]         = useState('');
-  const [statusFilter, setStatusFilter]   = useState<TaskRunStatus | 'all'>('all');
-  const [triggerFilter, setTriggerFilter] = useState<TriggerType | 'all'>('all');
+  const [submitting,  setSubmitting]  = useState(false);
+  const [searchQ,     setSearchQ]     = useState('');
+  const [statusFilter,   setStatusFilter]   = useState<TaskRunStatus | 'all'>('all');
+  const [triggerFilter,  setTriggerFilter]  = useState<TriggerType | 'all'>('all');
   const addActiveTask = useJarvisStore(s => s.addActiveTask);
 
-  // Load recent task runs on mount and every 10s
   const loadHistory = useCallback(async () => {
     const params: Parameters<typeof getTaskRuns>[0] = { limit: 80 };
     if (statusFilter !== 'all')  params.status      = statusFilter;
     if (triggerFilter !== 'all') params.triggerType  = triggerFilter;
     if (searchQ.length > 1)      params.q            = searchQ;
     const runs = await getTaskRuns(params);
-    // Split into active (running/queued) and history (everything else)
-    const active  = runs.filter((r) => r.status === 'running' || r.status === 'queued');
-    const history = runs.filter((r) => r.status !== 'running' && r.status !== 'queued');
-    setActiveRuns(active);
-    setHistoryRuns(history);
+    setActiveRuns(runs.filter(r => r.status === 'running' || r.status === 'queued'));
+    setHistoryRuns(runs.filter(r => r.status !== 'running' && r.status !== 'queued'));
   }, [searchQ, statusFilter, triggerFilter]);
 
-  useEffect(() => {
-    loadHistory();
-    const id = setInterval(loadHistory, 8000);
-    return () => clearInterval(id);
-  }, [loadHistory]);
+  useEffect(() => { loadHistory(); const id = setInterval(loadHistory, 8000); return () => clearInterval(id); }, [loadHistory]);
 
   const handleCommand = async (text: string) => {
     setSubmitting(true);
@@ -581,31 +1042,17 @@ export default function Tasks() {
       const { taskRunId } = await submitCommand(text, { triggerType: 'manual' });
       if (taskRunId) {
         addActiveTask(taskRunId);
-        // Optimistically add to active runs
         const optimistic: TaskRun = {
-          id: taskRunId, commandText: text, triggerType: 'manual',
-          agentId: 'claude', status: 'queued', steps: [],
-          retryCount: 0, createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          id: taskRunId, commandText: text, triggerType: 'manual', agentId: 'claude',
+          status: 'queued', steps: [], retryCount: 0,
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         };
-        setActiveRuns((prev) => [optimistic, ...prev]);
+        setActiveRuns(prev => [optimistic, ...prev]);
       }
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
-  const removeCard = (id: string) => {
-    setActiveRuns((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  // When a running card completes, move it to history after a short delay
-  const onCardStatusChange = useCallback(() => {
-    setTimeout(loadHistory, 2000);
-  }, [loadHistory]);
-
-  // Combined filter for history
-  const filteredHistory = historyRuns.filter((r) => {
+  const filteredHistory = historyRuns.filter(r => {
     if (statusFilter !== 'all'  && r.status      !== statusFilter)  return false;
     if (triggerFilter !== 'all' && r.triggerType !== triggerFilter) return false;
     if (searchQ.length > 1 && !r.commandText.toLowerCase().includes(searchQ.toLowerCase())) return false;
@@ -613,97 +1060,125 @@ export default function Tasks() {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 10, gap: 8, overflow: 'hidden' }}>
-
-      {/* ── Command bar ── */}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 8 }}>
+      {/* Command bar */}
       <CommandBar onSubmit={handleCommand} loading={submitting} />
 
-      {/* ── Auto triggers ── */}
-      <AutoTriggers />
-
-      {/* ── Active tasks grid ── */}
+      {/* Active runs */}
       {activeRuns.length > 0 && (
-        <div style={{ flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 10, color: 'var(--j-text-muted)', letterSpacing: '0.18em' }}>ACTIVE</span>
-            <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-teal)', background: 'rgba(0,196,184,0.12)', border: '1px solid rgba(0,196,184,0.2)', borderRadius: 8, padding: '1px 6px' }}>
-              {activeRuns.length}
-            </span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: activeRuns.length === 1 ? '1fr' : 'repeat(2, 1fr)', gap: 8 }}>
-            {activeRuns.map((run) => (
-              <TaskRunCard key={run.id} run={run} onRemove={removeCard} />
-            ))}
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {activeRuns.map(run => (
+            <TaskRunCard key={run.id} run={run} onRemove={id => setActiveRuns(prev => prev.filter(r => r.id !== id))} />
+          ))}
         </div>
       )}
 
-      {/* ── History ── */}
+      {/* Auto-triggers */}
+      <AutoTriggers />
+
+      {/* History panel */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {/* History header with search + filters */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0, flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 10, color: 'var(--j-text-muted)', letterSpacing: '0.18em', flexShrink: 0 }}>HISTORY</span>
-          <div style={{ position: 'relative', flex: '0 1 180px' }}>
-            <Search size={10} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--j-text-faint)', pointerEvents: 'none' }} />
-            <input
-              className="j-input"
-              style={{ height: 26, paddingLeft: 24, fontSize: 10 }}
-              placeholder="Search commands…"
-              value={searchQ}
-              onChange={(e) => setSearchQ(e.target.value)}
-            />
-          </div>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {STATUS_FILTERS.map((f) => (
-              <button key={f.value} onClick={() => setStatusFilter(f.value)}
-                className="j-mono"
-                style={{ height: 22, padding: '0 8px', fontSize: 8, letterSpacing: '0.08em', cursor: 'pointer', borderRadius: 8, border: '1px solid', transition: 'all 0.15s',
-                  background: statusFilter === f.value ? 'rgba(0,196,184,0.12)' : 'transparent',
-                  borderColor: statusFilter === f.value ? 'rgba(0,196,184,0.35)' : 'rgba(120,168,220,0.12)',
-                  color: statusFilter === f.value ? 'var(--j-teal)' : 'var(--j-text-faint)',
-                }}>
-                {f.label}
-              </button>
-            ))}
-            <span style={{ color: 'rgba(120,168,220,0.2)', alignSelf: 'center' }}>|</span>
-            {TRIGGER_FILTERS.map((f) => (
-              <button key={f.value} onClick={() => setTriggerFilter(f.value)}
-                className="j-mono"
-                style={{ height: 22, padding: '0 8px', fontSize: 8, letterSpacing: '0.08em', cursor: 'pointer', borderRadius: 8, border: '1px solid', transition: 'all 0.15s',
-                  background: triggerFilter === f.value ? 'rgba(120,96,194,0.12)' : 'transparent',
-                  borderColor: triggerFilter === f.value ? 'rgba(120,96,194,0.35)' : 'rgba(120,168,220,0.12)',
-                  color: triggerFilter === f.value ? 'var(--j-violet)' : 'var(--j-text-faint)',
-                }}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <button onClick={loadHistory} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', padding: 0, display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
+        <JPanel title="Command history" badge="LOG" action={
+          <button onClick={loadHistory} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', display: 'flex' }}>
             <RefreshCw size={11} />
           </button>
-        </div>
-
-        {/* History list */}
-        <div className="scrollbar-jarvis" style={{ flex: 1, overflowY: 'auto' }}>
-          {filteredHistory.length === 0 && (
-            <div className="j-empty">
-              {historyRuns.length === 0
-                ? 'NO TASK HISTORY YET — ISSUE YOUR FIRST COMMAND ABOVE'
-                : 'NO RESULTS MATCH THE CURRENT FILTERS'}
+        }>
+          {/* Filter bar inside history */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 100 }}>
+              <Search size={9} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--j-text-faint)' }} />
+              <input className="j-input" style={{ height: 26, paddingLeft: 24, fontSize: 10 }} placeholder="Search…" value={searchQ} onChange={e => setSearchQ(e.target.value)} />
             </div>
-          )}
-          {filteredHistory.map((run) => (
-            <HistoryRow key={run.id} run={run} onRerun={handleCommand} />
-          ))}
-        </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {STATUS_FILTERS.map(f => (
+                <button key={f.value} onClick={() => setStatusFilter(f.value)} className="j-mono"
+                  style={{ fontSize: 8, padding: '2px 7px', borderRadius: 8, border: '1px solid', cursor: 'pointer',
+                    background: statusFilter === f.value ? 'rgba(0,196,184,0.12)' : 'transparent',
+                    borderColor: statusFilter === f.value ? 'rgba(0,196,184,0.35)' : 'rgba(120,168,220,0.15)',
+                    color: statusFilter === f.value ? 'var(--j-teal)' : 'var(--j-text-faint)' }}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {TRIGGER_FILTERS.map(f => (
+                <button key={f.value} onClick={() => setTriggerFilter(f.value)} className="j-mono"
+                  style={{ fontSize: 8, padding: '2px 7px', borderRadius: 8, border: '1px solid', cursor: 'pointer',
+                    background: triggerFilter === f.value ? 'rgba(120,96,194,0.12)' : 'transparent',
+                    borderColor: triggerFilter === f.value ? 'rgba(120,96,194,0.35)' : 'rgba(120,168,220,0.15)',
+                    color: triggerFilter === f.value ? 'var(--j-violet)' : 'var(--j-text-faint)' }}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        {/* Footer stats */}
-        <div className="j-mono" style={{ fontSize: 9, color: 'var(--j-text-faint)', display: 'flex', gap: 14, paddingTop: 6, flexShrink: 0 }}>
-          <span>{historyRuns.length} TOTAL</span>
-          <span>{historyRuns.filter((r) => r.status === 'completed').length} COMPLETED</span>
-          <span>{historyRuns.filter((r) => r.status === 'failed').length} FAILED</span>
-          <span>{historyRuns.filter((r) => r.triggerType === 'scheduled').length} SCHEDULED</span>
-        </div>
+          {filteredHistory.length === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 32, color: 'var(--j-text-faint)' }}>
+              <Terminal size={16} style={{ opacity: 0.4 }} />
+              <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12 }}>No command history yet</span>
+            </div>
+          ) : (
+            filteredHistory.map(run => (
+              <HistoryRow key={run.id} run={run} onRerun={handleCommand} />
+            ))
+          )}
+        </JPanel>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Main Tasks page
+// ═══════════════════════════════════════════════════════════════
+
+export default function Tasks() {
+  const [mainTab, setMainTab] = useState<'tasks' | 'commands'>('tasks');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* ── Tab bar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'stretch', gap: 0, flexShrink: 0,
+        borderBottom: '1px solid rgba(120,168,220,0.10)',
+        background: 'rgba(6,9,20,0.6)',
+        padding: '0 12px',
+      }}>
+        {[
+          { id: 'tasks',    icon: <CheckSquare size={12} />, label: 'My Tasks' },
+          { id: 'commands', icon: <Terminal size={12} />,    label: 'Commands' },
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setMainTab(t.id as 'tasks' | 'commands')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              height: 38, padding: '0 16px', border: 'none', cursor: 'pointer',
+              background: 'transparent',
+              borderBottom: mainTab === t.id ? '2px solid var(--j-teal)' : '2px solid transparent',
+              color: mainTab === t.id ? '#fff' : 'var(--j-text-muted)',
+              fontFamily: 'var(--j-font-ui)', fontSize: 12, fontWeight: mainTab === t.id ? 600 : 400,
+              transition: 'color 0.15s',
+            }}
+          >
+            <span style={{ color: mainTab === t.id ? 'var(--j-teal)' : 'inherit', display: 'flex' }}>{t.icon}</span>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Content ── */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {mainTab === 'tasks' ? (
+          <JPanel title="My Tasks" badge="LIVE" noPadding>
+            <MyTasksPanel />
+          </JPanel>
+        ) : (
+          <div style={{ padding: 10, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <CommandsPanel />
+          </div>
+        )}
       </div>
     </div>
   );

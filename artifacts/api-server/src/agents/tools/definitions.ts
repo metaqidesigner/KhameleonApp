@@ -125,4 +125,119 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.Tool[] = [
       required: [],
     },
   },
+  // ── Task management tools ──────────────────────────────────────────────────
+  {
+    name: "create_task",
+    description:
+      "Create a new task in the Khameleon task system. Use this to add tasks during morning digest generation, orchestrator decomposition, or any time you need to track an action item.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Clear, actionable task title.",
+        },
+        description: {
+          type: "string",
+          description: "Optional additional context or notes.",
+        },
+        category: {
+          type: "string",
+          enum: ["communication", "meetings", "deep_work", "task_project_management", "administrative", "planning"],
+          description: "Task category: communication (emails/chat), meetings (prep/notes/AIs), deep_work (primary deliverables), task_project_management (status/blockers), administrative (expenses/approvals), planning (prioritization).",
+        },
+        priority: {
+          type: "string",
+          enum: ["urgent", "high", "medium", "low"],
+          description: "Task priority level.",
+        },
+        recurrence: {
+          type: "string",
+          enum: ["one_off", "daily", "weekly", "custom"],
+          description: "How often this task recurs. Use daily/weekly for standing tasks.",
+        },
+        due_date: {
+          type: "string",
+          description: "Optional due date in YYYY-MM-DD format.",
+        },
+        parent_task_id: {
+          type: "number",
+          description: "Optional parent task ID — use when creating subtasks under a Deep Work task.",
+        },
+        calendar_event_id: {
+          type: "string",
+          description: "Optional ID of a related calendar event.",
+        },
+        thread_id: {
+          type: "string",
+          description: "Optional ID of a related email or chat thread.",
+        },
+      },
+      required: ["title", "category"],
+    },
+  },
+  {
+    name: "list_tasks",
+    description:
+      "List tasks from the Khameleon task system, optionally filtered. Returns JSON array of tasks. Use before creating a morning digest to see what's already tracked.",
+    input_schema: {
+      type: "object",
+      properties: {
+        category: {
+          type: "string",
+          enum: ["communication", "meetings", "deep_work", "task_project_management", "administrative", "planning"],
+          description: "Filter by category.",
+        },
+        priority: {
+          type: "string",
+          enum: ["urgent", "high", "medium", "low"],
+          description: "Filter by priority.",
+        },
+        recurrence: {
+          type: "string",
+          enum: ["one_off", "daily", "weekly", "custom"],
+          description: "Filter by recurrence.",
+        },
+        status: {
+          type: "string",
+          enum: ["todo", "in_progress", "done", "blocked"],
+          description: "Filter by status. Defaults to excluding 'done' tasks.",
+        },
+        limit: {
+          type: "number",
+          description: "Max number of tasks to return (default 50).",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "update_task",
+    description:
+      "Update an existing task's fields (status, priority, category, etc.).",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "number",
+          description: "Task ID to update.",
+        },
+        status: {
+          type: "string",
+          enum: ["todo", "in_progress", "done", "blocked"],
+        },
+        priority: {
+          type: "string",
+          enum: ["urgent", "high", "medium", "low"],
+        },
+        category: {
+          type: "string",
+          enum: ["communication", "meetings", "deep_work", "task_project_management", "administrative", "planning"],
+        },
+        title: { type: "string" },
+        description: { type: "string" },
+      },
+      required: ["id"],
+    },
+  },
 ];

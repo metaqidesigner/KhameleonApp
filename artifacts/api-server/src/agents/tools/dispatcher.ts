@@ -7,6 +7,7 @@ import {
   readFile, writeFile, listFiles, runBuild, runCommand,
   gitStatus, gitLog, checkWorkflow, readLogs,
 } from "./shell.js";
+import { createTask, listTasks, updateTask } from "./taskOps.js";
 
 export type ToolInput = Record<string, unknown>;
 
@@ -63,6 +64,45 @@ export async function dispatchTool(name: string, input: ToolInput): Promise<stri
       return readLogs(lines, filter);
     }
 
+    // ── Task management tools ──────────────────────────────────────────────
+    case "create_task": {
+      const title           = requireString(input, "title");
+      const category        = optionalString(input, "category") ?? "deep_work";
+      const priority        = optionalString(input, "priority") ?? "medium";
+      const recurrence      = optionalString(input, "recurrence") ?? "one_off";
+      const description     = optionalString(input, "description");
+      const dueDate         = optionalString(input, "due_date");
+      const parentTaskId    = optionalNumber(input, "parent_task_id");
+      const calendarEventId = optionalString(input, "calendar_event_id");
+      const threadId        = optionalString(input, "thread_id");
+      return createTask({ title, category, priority, recurrence, description, dueDate, parentTaskId, calendarEventId, threadId });
+    }
+
+    case "list_tasks": {
+      const category   = optionalString(input, "category");
+      const priority   = optionalString(input, "priority");
+      const recurrence = optionalString(input, "recurrence");
+      const status     = optionalString(input, "status");
+      const limit      = optionalNumber(input, "limit");
+      return listTasks({ category, priority, recurrence, status, limit: limit ?? undefined });
+    }
+
+    case "update_task": {
+      const id          = requireNumber(input, "id");
+      const patch: Record<string, string> = {};
+      const status      = optionalString(input, "status");
+      const priority    = optionalString(input, "priority");
+      const category    = optionalString(input, "category");
+      const title       = optionalString(input, "title");
+      const description = optionalString(input, "description");
+      if (status)      patch.status      = status;
+      if (priority)    patch.priority    = priority;
+      if (category)    patch.category    = category;
+      if (title)       patch.title       = title;
+      if (description) patch.description = description;
+      return updateTask(id, patch);
+    }
+
     default:
       throw new Error(`Unknown tool: '${name}'. No handler registered.`);
   }
@@ -76,6 +116,15 @@ function requireString(input: ToolInput, key: string): string {
     throw new Error(`Tool input missing required string field: '${key}'`);
   }
   return v;
+}
+
+function requireNumber(input: ToolInput, key: string): number {
+  const v = input[key];
+  const n = Number(v);
+  if (v === undefined || v === null || isNaN(n)) {
+    throw new Error(`Tool input missing required number field: '${key}'`);
+  }
+  return n;
 }
 
 function optionalString(input: ToolInput, key: string): string | undefined {
