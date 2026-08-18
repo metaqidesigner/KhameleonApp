@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Database, Clock, DollarSign, Zap, Activity, Cpu, Settings as SettingsIcon,
   Coffee, Sparkles, Users, MessageSquare, FileText, SunMedium,
-  CalendarDays, ChevronDown, ChevronRight, Plus, Bot,
+  CalendarDays, ChevronDown, ChevronRight, Plus, Bot, AlarmClock,
 } from 'lucide-react';
 import { useJarvisHealth, useJarvisTelemetry } from '@/hooks/useJarvis';
-import { getDailyTasks, type Task, OFFLINE_HEALTH, MOCK_TELEMETRY } from '@/lib/jarvisApi';
+import { getDailyTasks, getSchedulerStatus, type Task, type SchedulerStatus, OFFLINE_HEALTH, MOCK_TELEMETRY } from '@/lib/jarvisApi';
 import { useJarvisStore } from '@/store/jarvisStore';
 import JPanel from '@/components/JPanel';
 import HUDRings from '@/components/HUDRings';
@@ -247,6 +247,98 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
   );
 }
 
+// ── Digest countdown badge ────────────────────────────────────
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return '0m';
+  const totalMin = Math.floor(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+}
+
+function DigestCountdownBadge({ onClick }: { onClick: () => void }) {
+  const [status, setStatus]       = useState<SchedulerStatus | null>(null);
+  const [countdown, setCountdown] = useState<string>('');
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    getSchedulerStatus().then(setStatus);
+  }, []);
+
+  useEffect(() => {
+    if (!status) return;
+
+    const tick = () => {
+      if (!status.nextRunAt) { setCountdown(''); return; }
+      const diff = new Date(status.nextRunAt).getTime() - Date.now();
+      setCountdown(diff > 0 ? formatCountdown(diff) : 'now');
+    };
+
+    tick();
+    timerRef.current = setInterval(tick, 30000); // refresh every 30 s
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [status]);
+
+  if (!status) return null;
+
+  // Determine label and color
+  let label: string;
+  let accentR: string;
+  let accentC: string;
+
+  if (!status.enabled) {
+    label   = 'Digest disabled';
+    accentR = '196,212,236';
+    accentC = 'var(--j-text-faint)';
+  } else if (!status.nextRunAt) {
+    label   = 'Digest not scheduled';
+    accentR = '196,212,236';
+    accentC = 'var(--j-text-faint)';
+  } else {
+    // Always show countdown to nextRunAt — the API advances it to tomorrow after today's run
+    label   = `Next digest in ${countdown}`;
+    accentR = '240,163,76';
+    accentC = '#F0A34C';
+  }
+
+  // Supplementary "ran today" note — shown alongside, not instead of the countdown
+  const ranTodayStr = status.lastRunAt && isSameDay(new Date(status.lastRunAt), new Date())
+    ? new Date(status.lastRunAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+    : null;
+
+  return (
+    <button
+      onClick={onClick}
+      title={ranTodayStr ? `Ran today at ${ranTodayStr} · Click to open Auto Triggers` : 'Click to open Auto Triggers'}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 5,
+        background: `rgba(${accentR},0.08)`,
+        border: `1px solid rgba(${accentR},0.25)`,
+        borderRadius: 8, padding: '3px 8px',
+        cursor: 'pointer', flexShrink: 0,
+        boxShadow: `0 0 8px rgba(${accentR},0.10)`,
+      }}
+    >
+      <AlarmClock size={9} style={{ color: accentC, flexShrink: 0 }} />
+      <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: accentC, whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+      {ranTodayStr && (
+        <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: '#6FE6BD', whiteSpace: 'nowrap' }}>
+          · ✓{ranTodayStr}
+        </span>
+      )}
+    </button>
+  );
+}
+
 function TodaysPlan() {
   const [dailyData, setDailyData]   = useState<Record<string, Task[]>>({});
   const [totalTasks, setTotalTasks] = useState(0);
@@ -286,6 +378,9 @@ function TodaysPlan() {
         <span className="j-mono" style={{ fontSize: 9, color: 'var(--j-text-faint)' }}>
           {totalTasks} task{totalTasks !== 1 ? 's' : ''} total
         </span>
+        <div onClick={e => e.stopPropagation()}>
+          <DigestCountdownBadge onClick={() => setActiveTab('tasks')} />
+        </div>
         <button
           onClick={e => { e.stopPropagation(); setActiveTab('tasks'); }}
           style={{
