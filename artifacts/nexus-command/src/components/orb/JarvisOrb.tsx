@@ -158,12 +158,13 @@ export function JarvisOrb() {
       setOrbStatus('online');
       return;
     }
+    // if minimized, restore
     if (orbMinimized) {
       setOrbMinimized(false);
       return;
     }
-    toggleOrbChat();
-  }, [orbStatus, orbMinimized, setOrbMinimized, setOrbStatus, toggleOrbChat]);
+    // left-click no longer opens chat — use right-click instead
+  }, [orbStatus, orbMinimized, setOrbMinimized, setOrbStatus]);
 
   const onDoubleClick = useCallback(() => {
     dblClickRef.current = true;
@@ -176,9 +177,13 @@ export function JarvisOrb() {
   }, [orbChatOpen, setOrbChatOpen]);
 
   const onContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, subMenu: null });
-  }, []);
+    e.preventDefault(); // suppress browser native context menu
+    // Right-click opens (or closes) the chat panel
+    if (orbMinimized) {
+      setOrbMinimized(false);
+    }
+    toggleOrbChat();
+  }, [orbMinimized, setOrbMinimized, toggleOrbChat]);
 
   return (
     <>

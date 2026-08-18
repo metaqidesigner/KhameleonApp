@@ -153,32 +153,86 @@
 .offline .orb-ring-2 { animation-duration: 12s; border-color: transparent transparent rgba(192,21,42,0.3) rgba(192,21,42,0.3); }
 .offline .orb-ring-3 { animation-duration: 20s; border-color: rgba(192,21,42,0.2) transparent transparent rgba(192,21,42,0.2); }
 
-/* ── Core ──────────────────────────────────────────────────── */
+/* ── Core — nebula texture with state tinting ──────────────── */
 .orb-core {
   position: absolute;
   top: 50%; left: 50%;
   width: 38px; height: 38px;
   margin-left: -19px; margin-top: -19px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #67e8f9, #00d4ff, #0369a1);
+  overflow: hidden;                      /* clip ::before / ::after to circle */
+
+  /* Nebula texture — desaturated at rest so it reads as neutral gray */
+  background-image: url('/nexus-command/nebula-core.png');
+  background-size: cover;
+  background-position: center;
+  filter: saturate(0.18) brightness(0.85);
+
   box-shadow: 0 0 18px #00d4ff, 0 0 36px rgba(0,212,255,0.4);
   animation: orb-pulse-online 2s ease-in-out infinite;
-  transition: background 0.4s ease, box-shadow 0.4s ease, width 0.3s ease, height 0.3s ease, margin 0.3s ease;
+  transition: box-shadow 0.4s ease, filter 0.4s ease,
+              width 0.3s ease, height 0.3s ease, margin 0.3s ease;
   cursor: pointer;
 }
+
+/* Color tint layer — recolors the nebula without covering its detail */
+.orb-core::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* Online / idle: muted cyan-slate — keeps the base nearly desaturated */
+  background: hsl(195, 40%, 55%);
+  mix-blend-mode: color;
+  opacity: 0.7;
+  transition: background 0.4s ease, opacity 0.4s ease;
+  pointer-events: none;
+}
+
+/* Sphere lighting: soft highlight upper-left, shadow lower-right */
+.orb-core::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255,255,255,0.48) 0%, transparent 54%),
+    radial-gradient(circle at 72% 74%, rgba(0,0,0,0.52)       0%, transparent 52%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* speaking — bright vivid cyan tint, filter lifted */
 .speaking .orb-core {
+  filter: saturate(1) brightness(1);
   animation: orb-pulse-speaking 0.4s ease-in-out infinite;
   box-shadow: 0 0 18px #00d4ff, 0 0 36px rgba(0,212,255,0.4), 0 0 90px rgba(0,212,255,0.2);
 }
+.speaking .orb-core::before {
+  background: hsl(191, 100%, 50%);
+  opacity: 0.78;
+}
+
+/* listening — gold tint */
 .listening .orb-core {
-  background: radial-gradient(circle at 35% 35%, #fcd34d, #c9a84c, #78350f);
+  filter: saturate(0.5) brightness(0.9);
   box-shadow: 0 0 20px #c9a84c, 0 0 40px rgba(201,168,76,0.4);
   animation: orb-pulse-listening 0.8s ease-in-out infinite;
 }
+.listening .orb-core::before {
+  background: hsl(40, 65%, 55%);
+  opacity: 0.8;
+}
+
+/* offline — deep red tint */
 .offline .orb-core {
-  background: radial-gradient(circle at 35% 35%, #f87171, #c0152a, #450a0a);
+  filter: saturate(0.3) brightness(0.75);
   box-shadow: 0 0 14px #c0152a, 0 0 28px rgba(192,21,42,0.3);
   animation: orb-pulse-offline 3s ease-in-out infinite;
+}
+.offline .orb-core::before {
+  background: hsl(350, 82%, 42%);
+  opacity: 0.8;
 }
 
 /* minimized core */
