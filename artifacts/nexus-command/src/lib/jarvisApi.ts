@@ -276,6 +276,7 @@ export interface UpdateTaskInput {
   category?:        TaskCategory;
   recurrence?:      TaskRecurrence;
   dueDate?:         string | null;
+  parentTaskId?:    number | null;
 }
 
 export interface DailyTasksResponse {

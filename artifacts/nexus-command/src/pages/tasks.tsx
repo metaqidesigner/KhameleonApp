@@ -5,7 +5,7 @@ import {
   Terminal, FileText, Clock, Zap, Filter, Search,
   Calendar, Mail, Play, Plus, Tag, Repeat, CheckSquare,
   Square, Trash2, SunMedium, Coffee, Users, MessageSquare,
-  ClipboardList, LayoutList, CalendarDays, Sparkles, Bot, ListTree,
+  ClipboardList, LayoutList, CalendarDays, Sparkles, Bot, ListTree, Pencil,
 } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
@@ -144,6 +144,24 @@ function SubtaskProgressPill({ done, total }: { done: number; total: number }) {
   );
 }
 
+// ── Descendant-ID collector (for cycle prevention) ────────────
+
+/** Returns the set of IDs that are descendants of `rootId` in `allTasks`. */
+function collectDescendants(rootId: number, allTasks: Task[]): Set<number> {
+  const result = new Set<number>();
+  const queue = [rootId];
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const t of allTasks) {
+      if (t.parentTaskId === id && !result.has(t.id)) {
+        result.add(t.id);
+        queue.push(t.id);
+      }
+    }
+  }
+  return result;
+}
+
 // ── Task card ─────────────────────────────────────────────────
 
 interface TaskCardProps {
@@ -151,100 +169,195 @@ interface TaskCardProps {
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
   onBreakdown?: (task: Task) => void;
+  /** Full unfiltered task list — enables the inline parent-picker edit */
+  allTasks?: Task[];
+  onSetParent?: (id: number, parentTaskId: number | null) => Promise<void>;
   compact?: boolean;
   indent?: boolean;
   subtaskProgress?: { done: number; total: number };
 }
 
-function TaskCard({ task, onToggle, onDelete, onBreakdown, compact, indent, subtaskProgress }: TaskCardProps) {
+function TaskCard({ task, onToggle, onDelete, onBreakdown, allTasks, onSetParent, compact, indent, subtaskProgress }: TaskCardProps) {
   const pri = getPri(task.priority);
   const isDone = task.status === 'done';
+  const [editingParent, setEditingParent] = useState(false);
+  const [pendingParent, setPendingParent] = useState<number | null>(task.parentTaskId ?? null);
+  const [savingParent, setSavingParent] = useState(false);
+
+  // Candidates: top-level tasks only, excluding this task and all its descendants
+  const descendants = allTasks ? collectDescendants(task.id, allTasks) : new Set<number>();
+  const parentCandidates = (allTasks ?? []).filter(
+    t => !t.parentTaskId && t.id !== task.id && !descendants.has(t.id),
+  );
+
+  const handleSaveParent = async () => {
+    if (!onSetParent) return;
+    setSavingParent(true);
+    try {
+      await onSetParent(task.id, pendingParent);
+      setEditingParent(false);
+    } finally {
+      setSavingParent(false);
+    }
+  };
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 8,
-      padding: compact ? '5px 10px' : '7px 12px',
-      paddingLeft: indent ? (compact ? 26 : 28) : (compact ? 10 : 12),
-      borderLeft: indent ? 'none' : `2px solid ${pri.color}`,
-      borderBottom: '1px solid rgba(120,168,220,0.06)',
-      background: isDone ? 'rgba(0,0,0,0.1)' : indent ? 'rgba(120,96,194,0.03)' : 'transparent',
-      transition: 'background 0.15s',
-      opacity: isDone ? 0.5 : 1,
-      position: 'relative',
-    }}>
-      {/* Subtask connector */}
-      {indent && (
-        <span style={{
-          position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-          color: 'rgba(120,96,194,0.35)', fontSize: 9, lineHeight: 1, userSelect: 'none',
-        }}>└</span>
-      )}
-
-      {/* Status toggle */}
-      <button
-        onClick={() => onToggle(task.id, !isDone)}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: isDone ? 'var(--j-green)' : 'var(--j-text-faint)', flexShrink: 0 }}
-        title={isDone ? 'Mark to-do' : 'Mark done'}
-      >
-        {isDone ? <CheckCircle2 size={14} /> : <Square size={14} />}
-      </button>
-
-      {/* Priority dot */}
-      <PriorityDot value={task.priority} />
-
-      {/* Title */}
-      <span style={{
-        flex: 1, fontFamily: 'var(--j-font-ui)', fontSize: indent ? 11 : 12,
-        color: isDone ? 'var(--j-text-muted)' : indent ? 'var(--j-text-muted)' : 'var(--j-text)',
-        textDecoration: isDone ? 'line-through' : 'none',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    <div style={{ borderBottom: '1px solid rgba(120,168,220,0.06)' }}>
+      {/* ── Main card row ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: compact ? '5px 10px' : '7px 12px',
+        paddingLeft: indent ? (compact ? 26 : 28) : (compact ? 10 : 12),
+        borderLeft: indent ? 'none' : `2px solid ${pri.color}`,
+        background: isDone ? 'rgba(0,0,0,0.1)' : indent ? 'rgba(120,96,194,0.03)' : 'transparent',
+        transition: 'background 0.15s',
+        opacity: isDone ? 0.5 : 1,
+        position: 'relative',
       }}>
-        {task.title}
-      </span>
+        {/* Subtask connector */}
+        {indent && (
+          <span style={{
+            position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+            color: 'rgba(120,96,194,0.35)', fontSize: 9, lineHeight: 1, userSelect: 'none',
+          }}>└</span>
+        )}
 
-      {/* Right-side badges */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-        {!indent && subtaskProgress && subtaskProgress.total > 0 && (
-          <SubtaskProgressPill done={subtaskProgress.done} total={subtaskProgress.total} />
-        )}
-        {!indent && <CategoryBadge value={task.category} />}
-        <RecurrencePill value={task.recurrence} />
-        {task.source === 'agent' && (
-          <span title="Created by agent" style={{ color: 'var(--j-violet)', display: 'flex' }}>
-            <Bot size={10} />
-          </span>
-        )}
-        {task.dueDate && (
-          <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>
-            {task.dueDate}
-          </span>
-        )}
-        {!task.parentTaskId && onBreakdown && (
-          <button
-            onClick={() => onBreakdown(task)}
-            style={{
-              background: 'rgba(120,96,194,0.12)',
-              border: '1px solid rgba(120,96,194,0.28)',
-              borderRadius: 5,
-              cursor: 'pointer', padding: '1px 5px',
-              display: 'flex', alignItems: 'center', gap: 3,
-              color: 'rgba(180,150,255,0.85)', flexShrink: 0,
-              fontFamily: 'var(--j-font-ui)', fontSize: 9, fontWeight: 600,
-              letterSpacing: '0.04em',
-            }}
-            title="Break into subtasks (Orchestrator)"
-          >
-            <Zap size={8} /> Decompose
-          </button>
-        )}
+        {/* Status toggle */}
         <button
-          onClick={() => onDelete(task.id)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'rgba(120,168,220,0.2)', flexShrink: 0 }}
-          title="Delete"
+          onClick={() => onToggle(task.id, !isDone)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: isDone ? 'var(--j-green)' : 'var(--j-text-faint)', flexShrink: 0 }}
+          title={isDone ? 'Mark to-do' : 'Mark done'}
         >
-          <Trash2 size={10} />
+          {isDone ? <CheckCircle2 size={14} /> : <Square size={14} />}
         </button>
+
+        {/* Priority dot */}
+        <PriorityDot value={task.priority} />
+
+        {/* Title */}
+        <span style={{
+          flex: 1, fontFamily: 'var(--j-font-ui)', fontSize: indent ? 11 : 12,
+          color: isDone ? 'var(--j-text-muted)' : indent ? 'var(--j-text-muted)' : 'var(--j-text)',
+          textDecoration: isDone ? 'line-through' : 'none',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {task.title}
+        </span>
+
+        {/* Right-side badges */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+          {!indent && subtaskProgress && subtaskProgress.total > 0 && (
+            <SubtaskProgressPill done={subtaskProgress.done} total={subtaskProgress.total} />
+          )}
+          {!indent && <CategoryBadge value={task.category} />}
+          <RecurrencePill value={task.recurrence} />
+          {task.source === 'agent' && (
+            <span title="Created by agent" style={{ color: 'var(--j-violet)', display: 'flex' }}>
+              <Bot size={10} />
+            </span>
+          )}
+          {task.dueDate && (
+            <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>
+              {task.dueDate}
+            </span>
+          )}
+          {!task.parentTaskId && onBreakdown && (
+            <button
+              onClick={() => onBreakdown(task)}
+              style={{
+                background: 'rgba(120,96,194,0.12)',
+                border: '1px solid rgba(120,96,194,0.28)',
+                borderRadius: 5,
+                cursor: 'pointer', padding: '1px 5px',
+                display: 'flex', alignItems: 'center', gap: 3,
+                color: 'rgba(180,150,255,0.85)', flexShrink: 0,
+                fontFamily: 'var(--j-font-ui)', fontSize: 9, fontWeight: 600,
+                letterSpacing: '0.04em',
+              }}
+              title="Break into subtasks (Orchestrator)"
+            >
+              <Zap size={8} /> Decompose
+            </button>
+          )}
+          {/* Set / change parent button */}
+          {onSetParent && (
+            <button
+              onClick={() => { setPendingParent(task.parentTaskId ?? null); setEditingParent(e => !e); }}
+              title={task.parentTaskId ? 'Change parent task' : 'Set parent task'}
+              style={{
+                background: editingParent
+                  ? 'rgba(0,196,184,0.12)'
+                  : task.parentTaskId ? 'rgba(120,96,194,0.1)' : 'none',
+                border: editingParent
+                  ? '1px solid rgba(0,196,184,0.3)'
+                  : task.parentTaskId ? '1px solid rgba(120,96,194,0.25)' : 'none',
+                borderRadius: 5,
+                cursor: 'pointer', padding: editingParent || task.parentTaskId ? '1px 5px' : '0',
+                display: 'flex', alignItems: 'center', gap: 3,
+                color: editingParent ? 'var(--j-teal)' : task.parentTaskId ? 'rgba(120,96,194,0.8)' : 'rgba(120,168,220,0.25)',
+                flexShrink: 0,
+              }}
+            >
+              <ListTree size={9} />
+            </button>
+          )}
+          <button
+            onClick={() => onDelete(task.id)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'rgba(120,168,220,0.2)', flexShrink: 0 }}
+            title="Delete"
+          >
+            <Trash2 size={10} />
+          </button>
+        </div>
       </div>
+
+      {/* ── Inline parent-edit tray ── */}
+      {editingParent && onSetParent && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '6px 12px 6px',
+          paddingLeft: indent ? 28 : 12,
+          background: 'rgba(0,196,184,0.04)',
+          borderTop: '1px solid rgba(0,196,184,0.1)',
+          animation: 'jarvis-fadein 0.15s ease both',
+        }}>
+          <ListTree size={9} style={{ color: 'var(--j-teal)', flexShrink: 0 }} />
+          <select
+            value={pendingParent ?? ''}
+            onChange={e => setPendingParent(e.target.value ? Number(e.target.value) : null)}
+            style={{
+              flex: 1, minWidth: 0,
+              background: 'rgba(8,14,32,0.9)', border: '1px solid rgba(0,196,184,0.25)',
+              color: 'var(--j-text)', fontFamily: 'var(--j-font-ui)', fontSize: 10,
+              borderRadius: 5, padding: '3px 7px', cursor: 'pointer',
+            }}
+          >
+            <option value="">No parent (top-level task)</option>
+            {parentCandidates.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.title.length > 60 ? t.title.slice(0, 57) + '…' : t.title}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleSaveParent}
+            disabled={savingParent}
+            className="j-btn-primary"
+            style={{ height: 24, padding: '0 10px', fontSize: 10, flexShrink: 0 }}
+          >
+            {savingParent
+              ? <Loader2 size={9} style={{ animation: 'jarvis-spin 0.7s linear infinite' }} />
+              : 'Save'}
+          </button>
+          <button
+            onClick={() => setEditingParent(false)}
+            className="j-btn-ghost"
+            style={{ height: 24, padding: '0 8px', fontSize: 10, flexShrink: 0 }}
+          >
+            <X size={9} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -255,15 +368,18 @@ interface CreateTaskFormProps {
   onSave: (task: Omit<Parameters<typeof createTask>[0], never>) => Promise<void>;
   onCancel: () => void;
   defaultCategory?: TaskCategory;
+  /** All existing tasks — used to populate the "Parent task" picker */
+  availableTasks?: Task[];
 }
 
-function CreateTaskForm({ onSave, onCancel, defaultCategory }: CreateTaskFormProps) {
-  const [title,      setTitle]      = useState('');
-  const [category,   setCategory]   = useState<TaskCategory>(defaultCategory ?? 'deep_work');
-  const [priority,   setPriority]   = useState<TaskPriority>('medium');
-  const [recurrence, setRecurrence] = useState<TaskRecurrence>('one_off');
-  const [dueDate,    setDueDate]    = useState('');
-  const [saving,     setSaving]     = useState(false);
+function CreateTaskForm({ onSave, onCancel, defaultCategory, availableTasks }: CreateTaskFormProps) {
+  const [title,        setTitle]        = useState('');
+  const [category,     setCategory]     = useState<TaskCategory>(defaultCategory ?? 'deep_work');
+  const [priority,     setPriority]     = useState<TaskPriority>('medium');
+  const [recurrence,   setRecurrence]   = useState<TaskRecurrence>('one_off');
+  const [dueDate,      setDueDate]      = useState('');
+  const [parentTaskId, setParentTaskId] = useState<number | null>(null);
+  const [saving,       setSaving]       = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { titleRef.current?.focus(); }, []);
@@ -272,7 +388,7 @@ function CreateTaskForm({ onSave, onCancel, defaultCategory }: CreateTaskFormPro
     if (!title.trim() || saving) return;
     setSaving(true);
     try {
-      await onSave({ title: title.trim(), category, priority, recurrence, dueDate: dueDate || null });
+      await onSave({ title: title.trim(), category, priority, recurrence, dueDate: dueDate || null, parentTaskId });
     } finally { setSaving(false); }
   };
 
@@ -281,6 +397,9 @@ function CreateTaskForm({ onSave, onCancel, defaultCategory }: CreateTaskFormPro
     color: 'var(--j-text)', fontFamily: 'var(--j-font-ui)', fontSize: 11,
     borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
   };
+
+  // Only non-subtask tasks can be selected as parent (prevents deep nesting)
+  const parentCandidates = (availableTasks ?? []).filter(t => !t.parentTaskId);
 
   return (
     <div style={{
@@ -315,6 +434,35 @@ function CreateTaskForm({ onSave, onCancel, defaultCategory }: CreateTaskFormPro
           placeholder="Due date (optional)"
         />
       </div>
+
+      {/* Parent task picker */}
+      {parentCandidates.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <select
+            value={parentTaskId ?? ''}
+            onChange={e => setParentTaskId(e.target.value ? Number(e.target.value) : null)}
+            style={{ ...selStyle, width: '100%', color: parentTaskId ? 'var(--j-text)' : 'var(--j-text-faint)' }}
+          >
+            <option value="">No parent (top-level task)</option>
+            {parentCandidates.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.title.length > 60 ? t.title.slice(0, 57) + '…' : t.title}
+              </option>
+            ))}
+          </select>
+          {parentTaskId && (
+            <div style={{
+              marginTop: 4, fontFamily: 'var(--j-font-ui)', fontSize: 10,
+              color: 'rgba(120,96,194,0.9)',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              <ListTree size={9} />
+              Will appear as a subtask indented under the selected parent
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 6 }}>
         <button
           onClick={handleSave}
@@ -377,9 +525,10 @@ interface TaskListViewProps {
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
   onBreakdown?: (task: Task) => void;
+  onSetParent?: (id: number, parentTaskId: number | null) => Promise<void>;
 }
 
-function TaskListView({ tasks, allTasks, unfilteredTasks, groupBy, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
+function TaskListView({ tasks, allTasks, unfilteredTasks, groupBy, onToggle, onDelete, onBreakdown, onSetParent }: TaskListViewProps) {
   // A task is a "root" in the current view if it has no parent OR its parent isn't currently visible.
   // This preserves filter semantics: a filtered-in subtask whose parent is filtered out still appears.
   const visibleIds = new Set(tasks.map(t => t.id));
@@ -449,9 +598,9 @@ function TaskListView({ tasks, allTasks, unfilteredTasks, groupBy, onToggle, onD
                 : undefined;
               return (
                 <React.Fragment key={t.id}>
-                  <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} subtaskProgress={subtaskProgress} />
+                  <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} allTasks={progressPool} onSetParent={onSetParent} subtaskProgress={subtaskProgress} />
                   {children.map(child => (
-                    <TaskCard key={child.id} task={child} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} indent />
+                    <TaskCard key={child.id} task={child} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} allTasks={progressPool} onSetParent={onSetParent} indent />
                   ))}
                 </React.Fragment>
               );
@@ -474,9 +623,10 @@ interface DailySectionProps {
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
   onBreakdown?: (task: Task) => void;
+  onSetParent?: (id: number, parentTaskId: number | null) => Promise<void>;
 }
 
-function DailySection({ section, tasks, allTasks, unfilteredTasks, onToggle, onDelete, onBreakdown }: DailySectionProps) {
+function DailySection({ section, tasks, allTasks, unfilteredTasks, onToggle, onDelete, onBreakdown, onSetParent }: DailySectionProps) {
   const progressPool = unfilteredTasks ?? allTasks;
   const [open, setOpen] = useState(true);
   // tasks = pre-computed roots for this section (from TaskDailyView).
@@ -497,9 +647,9 @@ function DailySection({ section, tasks, allTasks, unfilteredTasks, onToggle, onD
       : undefined;
     return (
       <React.Fragment key={t.id}>
-        <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} compact={compact} subtaskProgress={subtaskProgress} />
+        <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} allTasks={progressPool} onSetParent={onSetParent} compact={compact} subtaskProgress={subtaskProgress} />
         {children.map(child => (
-          <TaskCard key={child.id} task={child} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} compact={compact} indent />
+          <TaskCard key={child.id} task={child} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} allTasks={progressPool} onSetParent={onSetParent} compact={compact} indent />
         ))}
       </React.Fragment>
     );
@@ -556,7 +706,7 @@ function DailySection({ section, tasks, allTasks, unfilteredTasks, onToggle, onD
   );
 }
 
-function TaskDailyView({ tasks, allTasks, unfilteredTasks, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
+function TaskDailyView({ tasks, allTasks, unfilteredTasks, onToggle, onDelete, onBreakdown, onSetParent }: TaskListViewProps) {
   // taskPool = all currently-visible tasks (after filters), used as the full relationship pool
   const taskPool = allTasks ?? tasks;
   // Determine roots from the full visible pool:
@@ -580,6 +730,7 @@ function TaskDailyView({ tasks, allTasks, unfilteredTasks, onToggle, onDelete, o
           onToggle={onToggle}
           onDelete={onDelete}
           onBreakdown={onBreakdown}
+          onSetParent={onSetParent}
         />
       ))}
     </div>
@@ -764,6 +915,14 @@ function MyTasksPanel() {
     setCreating(false);
   };
 
+  const handleSetParent = async (id: number, parentTaskId: number | null) => {
+    await updateTask(id, { parentTaskId });
+    // Update local state optimistically so the hierarchy re-renders immediately
+    const patcher = (t: Task) => t.id === id ? { ...t, parentTaskId } : t;
+    setTasks(prev => prev.map(patcher));
+    setAllTasksUnfiltered(prev => prev.map(patcher));
+  };
+
   const handleBreakdown = (task: Task) => {
     setBreakdownTask(task);
   };
@@ -902,7 +1061,7 @@ function MyTasksPanel() {
       {/* ── Create task form ── */}
       {creating && (
         <div style={{ padding: '8px 12px', flexShrink: 0 }}>
-          <CreateTaskForm onSave={handleCreate} onCancel={() => setCreating(false)} />
+          <CreateTaskForm onSave={handleCreate} onCancel={() => setCreating(false)} availableTasks={allTasksUnfiltered} />
         </div>
       )}
 
@@ -915,10 +1074,10 @@ function MyTasksPanel() {
           </div>
         ) : view === 'daily' ? (
           <div style={{ padding: 8 }}>
-            <TaskDailyView tasks={tasks} allTasks={tasks} unfilteredTasks={allTasksUnfiltered} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
+            <TaskDailyView tasks={tasks} allTasks={tasks} unfilteredTasks={allTasksUnfiltered} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} onSetParent={handleSetParent} />
           </div>
         ) : (
-          <TaskListView tasks={tasks} allTasks={tasks} unfilteredTasks={allTasksUnfiltered} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
+          <TaskListView tasks={tasks} allTasks={tasks} unfilteredTasks={allTasksUnfiltered} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} onSetParent={handleSetParent} />
         )}
       </div>
 
