@@ -17,6 +17,7 @@ import {
   getTasks, createTask, updateTask, deleteTask,
   type Task, type TaskCategory, type TaskPriority, type TaskRecurrence,
 } from '@/lib/jarvisApi';
+import { computeRoots, computeChildren } from '@/lib/taskNesting';
 import { streamAgentChat } from '@/lib/agentsApi';
 
 // ── Task taxonomy constants ───────────────────────────────────
@@ -127,9 +128,10 @@ interface TaskCardProps {
   onDelete: (id: number) => void;
   onBreakdown?: (task: Task) => void;
   compact?: boolean;
+  indent?: boolean;
 }
 
-function TaskCard({ task, onToggle, onDelete, onBreakdown, compact }: TaskCardProps) {
+function TaskCard({ task, onToggle, onDelete, onBreakdown, compact, indent }: TaskCardProps) {
   const pri = getPri(task.priority);
   const isDone = task.status === 'done';
 
@@ -137,12 +139,22 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown, compact }: TaskCardPr
     <div style={{
       display: 'flex', alignItems: 'center', gap: 8,
       padding: compact ? '5px 10px' : '7px 12px',
-      borderLeft: `2px solid ${pri.color}`,
+      paddingLeft: indent ? (compact ? 26 : 28) : (compact ? 10 : 12),
+      borderLeft: indent ? 'none' : `2px solid ${pri.color}`,
       borderBottom: '1px solid rgba(120,168,220,0.06)',
-      background: isDone ? 'rgba(0,0,0,0.1)' : 'transparent',
+      background: isDone ? 'rgba(0,0,0,0.1)' : indent ? 'rgba(120,96,194,0.03)' : 'transparent',
       transition: 'background 0.15s',
       opacity: isDone ? 0.5 : 1,
+      position: 'relative',
     }}>
+      {/* Subtask connector */}
+      {indent && (
+        <span style={{
+          position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+          color: 'rgba(120,96,194,0.35)', fontSize: 9, lineHeight: 1, userSelect: 'none',
+        }}>└</span>
+      )}
+
       {/* Status toggle */}
       <button
         onClick={() => onToggle(task.id, !isDone)}
@@ -157,8 +169,8 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown, compact }: TaskCardPr
 
       {/* Title */}
       <span style={{
-        flex: 1, fontFamily: 'var(--j-font-ui)', fontSize: 12,
-        color: isDone ? 'var(--j-text-muted)' : 'var(--j-text)',
+        flex: 1, fontFamily: 'var(--j-font-ui)', fontSize: indent ? 11 : 12,
+        color: isDone ? 'var(--j-text-muted)' : indent ? 'var(--j-text-muted)' : 'var(--j-text)',
         textDecoration: isDone ? 'line-through' : 'none',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
@@ -167,7 +179,7 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown, compact }: TaskCardPr
 
       {/* Right-side badges */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-        <CategoryBadge value={task.category} />
+        {!indent && <CategoryBadge value={task.category} />}
         <RecurrencePill value={task.recurrence} />
         {task.source === 'agent' && (
           <span title="Created by agent" style={{ color: 'var(--j-violet)', display: 'flex' }}>
@@ -179,13 +191,22 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown, compact }: TaskCardPr
             {task.dueDate}
           </span>
         )}
-        {task.category === 'deep_work' && onBreakdown && (
+        {!task.parentTaskId && onBreakdown && (
           <button
             onClick={() => onBreakdown(task)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'rgba(120,96,194,0.5)', flexShrink: 0 }}
+            style={{
+              background: 'rgba(120,96,194,0.12)',
+              border: '1px solid rgba(120,96,194,0.28)',
+              borderRadius: 5,
+              cursor: 'pointer', padding: '1px 5px',
+              display: 'flex', alignItems: 'center', gap: 3,
+              color: 'rgba(180,150,255,0.85)', flexShrink: 0,
+              fontFamily: 'var(--j-font-ui)', fontSize: 9, fontWeight: 600,
+              letterSpacing: '0.04em',
+            }}
             title="Break into subtasks (Orchestrator)"
           >
-            <ListTree size={10} />
+            <Zap size={8} /> Decompose
           </button>
         )}
         <button
@@ -321,14 +342,21 @@ function groupTasks(tasks: Task[], by: GroupByKey): { key: string; label: string
 
 interface TaskListViewProps {
   tasks: Task[];
+  allTasks?: Task[];
   groupBy: GroupByKey;
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
   onBreakdown?: (task: Task) => void;
 }
 
-function TaskListView({ tasks, groupBy, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
-  const groups = groupTasks(tasks, groupBy);
+function TaskListView({ tasks, allTasks, groupBy, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
+  // A task is a "root" in the current view if it has no parent OR its parent isn't currently visible.
+  // This preserves filter semantics: a filtered-in subtask whose parent is filtered out still appears.
+  const visibleIds = new Set(tasks.map(t => t.id));
+  const rootTasks = tasks.filter(t => !t.parentTaskId || !visibleIds.has(t.parentTaskId));
+  const groups = groupTasks(rootTasks, groupBy);
+  // Use allTasks pool if provided (for unfiltered child lookup), else fall back to visible tasks
+  const taskPool = allTasks ?? tasks;
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   if (tasks.length === 0) {
@@ -347,6 +375,8 @@ function TaskListView({ tasks, groupBy, onToggle, onDelete, onBreakdown }: TaskL
     <div>
       {groups.map(g => {
         const isCollapsed = collapsed[g.key];
+        // Count includes subtasks for the group total
+        const subtaskCount = g.tasks.reduce((n, t) => n + taskPool.filter(s => s.parentTaskId === t.id).length, 0);
         return (
           <div key={g.key} style={{ marginBottom: 2 }}>
             <div
@@ -374,12 +404,21 @@ function TaskListView({ tasks, groupBy, onToggle, onDelete, onBreakdown }: TaskL
                 background: 'rgba(120,168,220,0.1)',
                 borderRadius: 8, padding: '1px 6px',
               }}>
-                {g.tasks.length}
+                {g.tasks.length + subtaskCount}
               </span>
             </div>
-            {!isCollapsed && g.tasks.map(t => (
-              <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} />
-            ))}
+            {!isCollapsed && g.tasks.map(t => {
+              // Only nest children that are also in the visible set
+              const children = taskPool.filter(s => s.parentTaskId === t.id && visibleIds.has(s.id));
+              return (
+                <React.Fragment key={t.id}>
+                  <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} />
+                  {children.map(child => (
+                    <TaskCard key={child.id} task={child} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} indent />
+                  ))}
+                </React.Fragment>
+              );
+            })}
           </div>
         );
       })}
@@ -392,15 +431,34 @@ function TaskListView({ tasks, groupBy, onToggle, onDelete, onBreakdown }: TaskL
 interface DailySectionProps {
   section: typeof DAY_SECTIONS[number];
   tasks: Task[];
+  allTasks: Task[];
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
   onBreakdown?: (task: Task) => void;
 }
 
-function DailySection({ section, tasks, onToggle, onDelete, onBreakdown }: DailySectionProps) {
+function DailySection({ section, tasks, allTasks, onToggle, onDelete, onBreakdown }: DailySectionProps) {
   const [open, setOpen] = useState(true);
+  // tasks = pre-computed roots for this section (from TaskDailyView).
+  // allTasks = ALL currently-visible tasks — use this pool for child lookup so
+  // children (which may have a different category) are always findable.
   const recurring = tasks.filter(t => t.recurrence !== 'one_off');
   const oneOff    = tasks.filter(t => t.recurrence === 'one_off');
+  // Total count = roots + their visible children
+  const subtaskCount = tasks.reduce((n, t) => n + computeChildren(t.id, allTasks).length, 0);
+  const total = tasks.length + subtaskCount;
+
+  function renderWithChildren(t: Task, compact: boolean) {
+    const children = computeChildren(t.id, allTasks);
+    return (
+      <React.Fragment key={t.id}>
+        <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} compact={compact} />
+        {children.map(child => (
+          <TaskCard key={child.id} task={child} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} compact={compact} indent />
+        ))}
+      </React.Fragment>
+    );
+  }
 
   return (
     <div style={{
@@ -423,13 +481,13 @@ function DailySection({ section, tasks, onToggle, onDelete, onBreakdown }: Daily
           {section.label}
         </span>
         <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{section.time}</span>
-        {tasks.length > 0 && (
+        {total > 0 && (
           <span style={{
             fontFamily: 'var(--j-font-mono)', fontSize: 8, fontWeight: 700,
             color: section.color,
             background: `color-mix(in srgb, ${section.color} 15%, transparent)`,
             borderRadius: 8, padding: '1px 6px',
-          }}>{tasks.length}</span>
+          }}>{total}</span>
         )}
         {open
           ? <ChevronDown size={10} style={{ color: 'var(--j-text-faint)' }} />
@@ -438,10 +496,10 @@ function DailySection({ section, tasks, onToggle, onDelete, onBreakdown }: Daily
 
       {open && (
         <div>
-          {/* Recurring tasks first */}
-          {recurring.map(t => <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} compact />)}
-          {/* One-off tasks */}
-          {oneOff.map(t => <TaskCard key={t.id} task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} compact />)}
+          {/* Recurring tasks + their subtasks first */}
+          {recurring.map(t => renderWithChildren(t, true))}
+          {/* One-off tasks + their subtasks */}
+          {oneOff.map(t => renderWithChildren(t, true))}
           {tasks.length === 0 && (
             <div style={{ padding: '8px 12px', fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-faint)' }}>
               No tasks in this section
@@ -453,16 +511,30 @@ function DailySection({ section, tasks, onToggle, onDelete, onBreakdown }: Daily
   );
 }
 
-function TaskDailyView({ tasks, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
+function TaskDailyView({ tasks, allTasks, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
+  // taskPool = all currently-visible tasks (after filters), used as the full relationship pool
+  const taskPool = allTasks ?? tasks;
+  // Determine roots from the full visible pool:
+  // - tasks with no parent, OR tasks whose parent was filtered out (promoted to independent rows)
+  const roots = computeRoots(taskPool);
+  // Bucket roots into day sections; orphaned subtasks are bucketed by their own category
   const bucketed = DAY_SECTIONS.map(s => ({
     section: s,
-    tasks: tasks.filter(t => categoryForSection(t) === s.id),
+    sectionTasks: roots.filter(t => categoryForSection(t) === s.id),
   }));
 
   return (
     <div>
       {bucketed.map(b => (
-        <DailySection key={b.section.id} section={b.section} tasks={b.tasks} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} />
+        <DailySection
+          key={b.section.id}
+          section={b.section}
+          tasks={b.sectionTasks}
+          allTasks={taskPool}
+          onToggle={onToggle}
+          onDelete={onDelete}
+          onBreakdown={onBreakdown}
+        />
       ))}
     </div>
   );
@@ -487,8 +559,9 @@ function BreakdownPanel({ task, onClose, onDone }: BreakdownPanelProps) {
       {
         role: 'user' as const,
         content:
-          `Break down this Deep Work task into actionable subtasks:\n\n` +
+          `Break down this task into actionable subtasks:\n\n` +
           `Task ID: ${task.id}\n` +
+          `Category: ${task.category}\n` +
           `Title: ${task.title}` +
           (task.description ? `\nDescription: ${task.description}` : '') +
           `\n\nPlease create 3–8 concrete, ordered subtasks. ` +
@@ -787,10 +860,10 @@ function MyTasksPanel() {
           </div>
         ) : view === 'daily' ? (
           <div style={{ padding: 8 }}>
-            <TaskDailyView tasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
+            <TaskDailyView tasks={tasks} allTasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
           </div>
         ) : (
-          <TaskListView tasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
+          <TaskListView tasks={tasks} allTasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
         )}
       </div>
 
