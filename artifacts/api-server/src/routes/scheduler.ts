@@ -68,8 +68,9 @@ router.get('/status', (_req: Request, res: Response) => {
  *
  * Protected by SCHEDULER_ADMIN_KEY (set as a Replit Secret).
  * Strictly validates all fields — returns 400 for any out-of-range or wrong-type value.
+ * Writes through to the database before responding so config survives restarts.
  */
-router.put('/config', requireAdminKey, (req: Request, res: Response) => {
+router.put('/config', requireAdminKey, async (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
   const patch: Parameters<typeof updateSchedulerConfig>[0] = {};
 
@@ -102,8 +103,13 @@ router.put('/config', requireAdminKey, (req: Request, res: Response) => {
     patch.digestMinute = m;
   }
 
-  const status = updateSchedulerConfig(patch);
-  res.json(status);
+  try {
+    const status = await updateSchedulerConfig(patch);
+    res.json(status);
+  } catch (err) {
+    logger.error({ err }, 'Scheduler route: failed to update config');
+    res.status(500).json({ error: 'Internal server error while saving scheduler config' });
+  }
 });
 
 export default router;

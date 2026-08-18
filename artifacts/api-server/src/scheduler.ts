@@ -1,8 +1,16 @@
+import { db, settingsTable } from '@workspace/db';
+import { inArray } from 'drizzle-orm';
 import { findAgent } from './agents/defaults.js';
 import { askAgent } from './agents/gateway.js';
 import { logger } from './lib/logger.js';
 
-// ── In-memory scheduler state ─────────────────────────────────
+// ── Scheduler config keys ──────────────────────────────────────
+
+const KEY_ENABLED       = 'scheduler.enabled';
+const KEY_DIGEST_HOUR   = 'scheduler.digestHour';
+const KEY_DIGEST_MINUTE = 'scheduler.digestMinute';
+
+// ── Types ─────────────────────────────────────────────────────
 
 export interface SchedulerConfig {
   enabled:      boolean;
@@ -14,6 +22,8 @@ export interface SchedulerStatus extends SchedulerConfig {
   nextRunAt: string | null;   // ISO timestamp
   lastRunAt: string | null;   // ISO timestamp
 }
+
+// ── In-memory state (seeded from DB on startup) ───────────────
 
 /** Parse an integer from an environment variable, returning the fallback if invalid/out-of-range. */
 function envInt(key: string, fallback: number, min: number, max: number): number {
@@ -38,6 +48,61 @@ const state: SchedulerConfig & { lastRunAt: string | null } = {
 };
 
 let pendingTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ── DB persistence helpers ────────────────────────────────────
+
+/**
+ * Read all scheduler-related settings from the database and apply them to in-memory state.
+ * Falls back to the current in-memory defaults if a key is missing or invalid.
+ */
+async function loadConfigFromDb(): Promise<void> {
+  const rows = await db
+    .select()
+    .from(settingsTable)
+    .where(inArray(settingsTable.key, [KEY_ENABLED, KEY_DIGEST_HOUR, KEY_DIGEST_MINUTE]));
+
+  const map: Record<string, string> = {};
+  for (const row of rows) map[row.key] = row.value;
+
+  if (map[KEY_ENABLED] !== undefined) {
+    state.enabled = map[KEY_ENABLED] === 'true';
+  }
+
+  if (map[KEY_DIGEST_HOUR] !== undefined) {
+    const h = Number(map[KEY_DIGEST_HOUR]);
+    if (Number.isInteger(h) && h >= 0 && h <= 23) state.digestHour = h;
+  }
+
+  if (map[KEY_DIGEST_MINUTE] !== undefined) {
+    const m = Number(map[KEY_DIGEST_MINUTE]);
+    if (Number.isInteger(m) && m >= 0 && m <= 59) state.digestMinute = m;
+  }
+
+  logger.info(
+    { enabled: state.enabled, digestHour: state.digestHour, digestMinute: state.digestMinute },
+    'Scheduler: config loaded from database',
+  );
+}
+
+/**
+ * Persist the current in-memory config to the database atomically.
+ * All three keys are upserted inside a single transaction so a partial
+ * write can never leave the DB in an inconsistent state.
+ */
+async function saveConfigToDb(): Promise<void> {
+  await db.transaction(async (tx) => {
+    for (const [key, value] of [
+      [KEY_ENABLED,       String(state.enabled)],
+      [KEY_DIGEST_HOUR,   String(state.digestHour)],
+      [KEY_DIGEST_MINUTE, String(state.digestMinute)],
+    ] as const) {
+      await tx
+        .insert(settingsTable)
+        .values({ key, value })
+        .onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
+    }
+  });
+}
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -132,11 +197,35 @@ function scheduleNextTick(): void {
 // ── Public API ────────────────────────────────────────────────
 
 /**
- * Start the daily morning-digest scheduler.
- * Called once on server startup.
+ * Initialise the scheduler: load persisted config from the database, then start the timer.
+ * Call once on server startup instead of startScheduler().
+ */
+export async function initScheduler(): Promise<void> {
+  try {
+    await loadConfigFromDb();
+  } catch (err) {
+    logger.error({ err }, 'Scheduler: failed to load config from DB — using defaults');
+  }
+  scheduleNextTick();
+}
+
+/**
+ * Start the daily morning-digest scheduler (no DB load — kept for backward compatibility).
+ * Prefer initScheduler() for new code.
  */
 export function startScheduler(): void {
   scheduleNextTick();
+}
+
+/**
+ * Cancel any pending scheduler timer.
+ * Primarily used in tests to let the process exit cleanly.
+ */
+export function stopScheduler(): void {
+  if (pendingTimer !== null) {
+    clearTimeout(pendingTimer);
+    pendingTimer = null;
+  }
 }
 
 /**
@@ -154,13 +243,35 @@ export function getSchedulerStatus(): SchedulerStatus {
 }
 
 /**
- * Update scheduler config and reschedule.
+ * Update scheduler config, persist to the database, and reschedule.
  * All values MUST already be validated by the caller — this function trusts its input.
+ *
+ * If the database write fails, the in-memory state is rolled back to its previous
+ * values and the error is re-thrown so the caller can return a 500 to the client.
+ * The scheduler timer is NOT rescheduled on failure.
  */
-export function updateSchedulerConfig(patch: Partial<SchedulerConfig>): SchedulerStatus {
+export async function updateSchedulerConfig(patch: Partial<SchedulerConfig>): Promise<SchedulerStatus> {
+  // Snapshot previous state so we can roll back on failure
+  const prev: SchedulerConfig = {
+    enabled:      state.enabled,
+    digestHour:   state.digestHour,
+    digestMinute: state.digestMinute,
+  };
+
   if (patch.enabled      !== undefined) state.enabled      = patch.enabled;
   if (patch.digestHour   !== undefined) state.digestHour   = patch.digestHour;
   if (patch.digestMinute !== undefined) state.digestMinute = patch.digestMinute;
+
+  try {
+    await saveConfigToDb();
+  } catch (err) {
+    // Roll back in-memory state so it stays consistent with the DB
+    state.enabled      = prev.enabled;
+    state.digestHour   = prev.digestHour;
+    state.digestMinute = prev.digestMinute;
+    logger.error({ err }, 'Scheduler: failed to persist config to DB — state rolled back');
+    throw err;
+  }
 
   scheduleNextTick();
   return getSchedulerStatus();
