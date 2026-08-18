@@ -13,19 +13,19 @@
   --j-border-dim:  rgba(120, 168, 220, 0.055);
 
   /* Primary — teal */
-  --j-teal:  #00c4b8;
-  --j-cyan:  #00c4b8;          /* backwards compat */
+  --j-teal:  #6FE6BD;
+  --j-cyan:  #6FE6BD;          /* backwards compat */
 
   /* Secondary — violet */
-  --j-violet: #7860c2;
+  --j-violet: #8C7CF0;
 
   /* Tertiary — amber (worth noticing) */
-  --j-amber: #e2aa34;
+  --j-amber: #F0A34C;
 
   /* Alerts/errors — coral (replaces heavy red) */
-  --j-coral:    #e25a6e;
-  --j-red:      #e25a6e;       /* backwards compat */
-  --j-red-dark: rgba(226, 90, 110, 0.35);
+  --j-coral:    #E77A7A;
+  --j-red:      #E77A7A;       /* backwards compat */
+  --j-red-dark: rgba(231, 122, 122, 0.35);
 
   /* Status */
   --j-green: #38cf8a;
@@ -93,9 +93,9 @@ html, body, #root {
     /* Secondary violet wash — mid right */
     radial-gradient(ellipse 45% 50% at 100% 55%, rgba(96, 52, 200, 0.22) 0%, transparent 60%),
     /* Teal bloom — bottom right corner (orb) */
-    radial-gradient(ellipse 46% 40% at 98% 96%,  rgba(0, 196, 184, 0.20) 0%, transparent 58%),
+    radial-gradient(ellipse 46% 40% at 98% 96%,  rgba(111, 230, 189, 0.16) 0%, transparent 58%),
     /* Very faint teal — far left edge */
-    radial-gradient(ellipse 25% 35% at 0% 65%,  rgba(0, 196, 184, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse 25% 35% at 0% 65%,  rgba(111, 230, 189, 0.07) 0%, transparent 55%),
     /* Fine dot grid — simulates PCB substrate */
     radial-gradient(circle, rgba(100, 150, 210, 0.20) 1px, transparent 1px),
     #080b1c;
@@ -106,7 +106,7 @@ html, body, #root {
   position: absolute;
   inset: 0;
   width: 2px;
-  background: rgba(0, 196, 184, 0.05);
+  background: rgba(111, 230, 189, 0.05);
   animation: jarvis-scan 12s linear infinite;
   pointer-events: none;
 }
@@ -589,3 +589,97 @@ html, body, #root {
 .react-grid-item > .react-resizable-handle.react-resizable-handle-s { bottom: 0; transform: rotate(45deg); }
 .react-resizable { position: relative; }
 .react-resizable-handle { position: absolute; width: 20px; height: 20px; background-repeat: no-repeat; background-origin: content-box; box-sizing: border-box; background-position: bottom right; padding: 0 3px 3px 0; }
+
+/* ── Panel glow rim variants ─────────────────────────────── */
+/* Override box-shadow to include base shadows + colored rim glow.
+   Pass as className on JPanel: "j-panel-glow-teal" etc.       */
+.j-panel-thick {
+  backdrop-filter: blur(52px) saturate(1.9) brightness(1.10);
+  -webkit-backdrop-filter: blur(52px) saturate(1.9) brightness(1.10);
+  border-top: 1px solid rgba(255,255,255,0.24);
+}
+.j-panel-glow-teal {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.10),
+    inset 1px 0 0 rgba(255,255,255,0.04),
+    0 8px 40px rgba(0,0,0,0.50),
+    0 2px 8px rgba(0,0,0,0.30),
+    0 0 0 1px rgba(111,230,189,0.18),
+    0 0 28px rgba(111,230,189,0.07);
+}
+.j-panel-glow-violet {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.10),
+    inset 1px 0 0 rgba(255,255,255,0.04),
+    0 8px 40px rgba(0,0,0,0.50),
+    0 2px 8px rgba(0,0,0,0.30),
+    0 0 0 1px rgba(140,124,240,0.18),
+    0 0 28px rgba(140,124,240,0.07);
+}
+.j-panel-glow-amber {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.10),
+    inset 1px 0 0 rgba(255,255,255,0.04),
+    0 8px 40px rgba(0,0,0,0.50),
+    0 2px 8px rgba(0,0,0,0.30),
+    0 0 0 1px rgba(240,163,76,0.18),
+    0 0 28px rgba(240,163,76,0.07);
+}
+
+/* ── Icon button — TopBar right-side controls ────────────── */
+.j-icon-btn {
+  opacity: 0.5;
+  transition: opacity 0.18s ease, color 0.18s ease;
+}
+.j-icon-btn:hover { opacity: 1; }
+
+/* ── Light theme overrides ───────────────────────────────── */
+/* Applied via document.documentElement.classList.add('light') */
+.light {
+  --j-bg:          #f0f4f8;
+  --j-surface:     rgba(255,255,255,0.78);
+  --j-surface-alt: rgba(245,247,252,0.85);
+  --j-border:      rgba(60,80,140,0.12);
+  --j-border-dim:  rgba(60,80,140,0.06);
+  --j-text:        #1a2040;
+  --j-text-muted:  #4a5580;
+  --j-text-faint:  #7888b8;
+  --background:    214 40% 95%;
+  --foreground:    225 52% 16%;
+}
+.light html,
+.light body,
+html.light,
+html.light body {
+  background: var(--j-bg);
+  color: var(--j-text);
+}
+.light .j-bg-layer::before {
+  background:
+    radial-gradient(ellipse 75% 70% at 93% 8%,  rgba(140,124,240,0.10) 0%, transparent 65%),
+    radial-gradient(ellipse 46% 40% at 98% 96%,  rgba(111,230,189,0.14) 0%, transparent 58%),
+    radial-gradient(ellipse 25% 35% at 0%  65%,  rgba(240,163,76,0.08)  0%, transparent 55%),
+    radial-gradient(circle, rgba(100,130,200,0.14) 1px, transparent 1px),
+    #f0f4f8;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 36px 36px, 100%;
+}
+.light .j-panel {
+  background: rgba(255,255,255,0.72);
+  border-top:    1px solid rgba(255,255,255,0.95);
+  border-left:   1px solid rgba(255,255,255,0.75);
+  border-right:  1px solid rgba(180,200,240,0.25);
+  border-bottom: 1px solid rgba(180,200,240,0.15);
+}
+.light .j-panel-header {
+  background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.00) 100%);
+  border-bottom: 1px solid rgba(60,80,140,0.08);
+}
+.light .j-panel-title { color: #1a2040; }
+.light .j-input,
+.light .j-textarea {
+  background: rgba(240,244,252,0.90);
+  border-color: rgba(60,80,140,0.18);
+  color: #1a2040;
+}
+.light .j-input::placeholder,
+.light .j-textarea::placeholder { color: #7888b8; }
