@@ -976,8 +976,12 @@ components:
           type: string
         status:
           type: string
+          enum: [todo, in_progress, done, blocked]
+          default: todo
         priority:
           type: string
+          enum: [urgent, high, medium, low]
+          default: medium
         projectId:
           type: ["integer", "null"]
         assignee:
@@ -992,8 +996,10 @@ components:
           type: string
         status:
           type: string
+          enum: [todo, in_progress, done, blocked]
         priority:
           type: string
+          enum: [urgent, high, medium, low]
         dueDate:
           type: ["string", "null"]
 
