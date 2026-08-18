@@ -4,102 +4,106 @@ import { useJarvisStore } from '@/store/jarvisStore';
 import { OrbChatPanel } from './OrbChatPanel';
 import { OutputWaveform } from './VoiceWaveform';
 
-const ORB_SIZE = 90;
+const ORB_SIZE     = 90;
 const ORB_SIZE_MIN = 48;
-const PANEL_W = 310;
-const PANEL_H = 420;
+const PANEL_W      = 310;
+const PANEL_H      = 420;
 
 function getDefaultPos(): { x: number; y: number } {
   return {
-    x: window.innerWidth - ORB_SIZE - 44,
+    x: window.innerWidth  - ORB_SIZE - 44,
     y: window.innerHeight - ORB_SIZE - 40,
   };
 }
 
 function clampPos(x: number, y: number, size: number): { x: number; y: number } {
   return {
-    x: Math.max(0, Math.min(x, window.innerWidth - size)),
+    x: Math.max(0, Math.min(x, window.innerWidth  - size)),
     y: Math.max(0, Math.min(y, window.innerHeight - size)),
   };
 }
 
-function calcPanelPos(orbX: number, orbY: number, orbSize: number): { left: number; top: number } {
+function calcPanelPos(
+  orbX: number, orbY: number, orbSize: number,
+): { left: number; top: number } {
   let left = orbX - PANEL_W + orbSize;
-  let top = orbY - PANEL_H - 10;
+  let top  = orbY - PANEL_H - 10;
   if (left < 4) left = 4;
-  if (left + PANEL_W > window.innerWidth - 4) left = window.innerWidth - PANEL_W - 4;
-  if (top < 4) top = orbY + orbSize + 10;
-  if (top + PANEL_H > window.innerHeight - 4) top = window.innerHeight - PANEL_H - 4;
+  if (left + PANEL_W > window.innerWidth  - 4) left = window.innerWidth  - PANEL_W - 4;
+  if (top  < 4) top  = orbY + orbSize + 10;
+  if (top  + PANEL_H > window.innerHeight - 4) top  = window.innerHeight - PANEL_H - 4;
   return { left, top };
 }
 
-interface ContextMenuState {
-  x: number;
-  y: number;
-  subMenu: 'agent' | null;
-}
+interface ContextMenuState { x: number; y: number; subMenu: 'agent' | null; }
 
 const QUICK_AGENTS = [
-  { id: 'claude', label: 'Claude' },
-  { id: 'gpt4o', label: 'GPT-4o' },
-  { id: 'gemini', label: 'Gemini' },
-  { id: 'local', label: 'Local' },
+  { id: 'claude', label: 'Claude'  },
+  { id: 'gpt4o',  label: 'GPT-4o'  },
+  { id: 'gemini', label: 'Gemini'  },
+  { id: 'local',  label: 'Local'   },
 ];
 
-function TickSVG({ size }: { size: number }) {
-  const centre = size / 2;
-  const r = size / 2 - 4;
-  const ticks = Array.from({ length: 24 }, (_, i) => {
-    const angle = (i * 15 * Math.PI) / 180;
-    const major = i % 6 === 0;
-    const len = major ? 8 : 4;
-    const opacity = major ? 0.6 : 0.25;
-    const x1 = centre + Math.cos(angle) * r;
-    const y1 = centre + Math.sin(angle) * r;
-    const x2 = centre + Math.cos(angle) * (r - len);
-    const y2 = centre + Math.sin(angle) * (r - len);
-    return { x1, y1, x2, y2, opacity };
-  });
-  return (
-    <svg className="orb-tick-svg" viewBox={`0 0 ${size} ${size}`}>
-      {ticks.map((t, i) => (
-        <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
-          stroke="#00d4ff" strokeWidth="1" opacity={t.opacity} strokeLinecap="round" />
-      ))}
-    </svg>
-  );
-}
-
 export function JarvisOrb() {
-  const orbStatus          = useJarvisStore(s => s.orbStatus);
-  const orbPosition        = useJarvisStore(s => s.orbPosition);
-  const setOrbPosition     = useJarvisStore(s => s.setOrbPosition);
-  const orbMinimized       = useJarvisStore(s => s.orbMinimized);
-  const setOrbMinimized    = useJarvisStore(s => s.setOrbMinimized);
-  const orbChatOpen        = useJarvisStore(s => s.orbChatOpen);
-  const toggleOrbChat      = useJarvisStore(s => s.toggleOrbChat);
-  const setOrbChatOpen     = useJarvisStore(s => s.setOrbChatOpen);
+  const orbStatus           = useJarvisStore(s => s.orbStatus);
+  const orbPosition         = useJarvisStore(s => s.orbPosition);
+  const setOrbPosition      = useJarvisStore(s => s.setOrbPosition);
+  const orbMinimized        = useJarvisStore(s => s.orbMinimized);
+  const setOrbMinimized     = useJarvisStore(s => s.setOrbMinimized);
+  const orbChatOpen         = useJarvisStore(s => s.orbChatOpen);
+  const toggleOrbChat       = useJarvisStore(s => s.toggleOrbChat);
+  const setOrbChatOpen      = useJarvisStore(s => s.setOrbChatOpen);
   const setOrbActiveAgentId = useJarvisStore(s => s.setOrbActiveAgentId);
-  const toggleVoice        = useJarvisStore(s => s.toggleVoice);
-  const setOrbStatus       = useJarvisStore(s => s.setOrbStatus);
+  const toggleVoice         = useJarvisStore(s => s.toggleVoice);
+  const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
 
-  const pos = orbPosition ?? getDefaultPos();
+  const pos     = orbPosition ?? getDefaultPos();
   const orbSize = orbMinimized ? ORB_SIZE_MIN : ORB_SIZE;
 
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
-  const didDragRef = useRef(false);
+  const wrapperRef   = useRef<HTMLDivElement>(null);
+  const coreRef      = useRef<HTMLDivElement>(null);
+  const dragRef      = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const didDragRef   = useRef(false);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dblClickRef = useRef(false);
+  const dblClickRef  = useRef(false);
+  const ampRafRef    = useRef<number>(0);
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const panelPos = calcPanelPos(pos.x, pos.y, orbSize);
 
-  // Keyboard shortcuts
+  // ── Speaking amplitude pulse ──────────────────────────────────
+  // Overlapping sine waves simulate organic TTS amplitude so the core
+  // visibly breathes in sync with speech louder/quieter moments.
+  useEffect(() => {
+    cancelAnimationFrame(ampRafRef.current);
+    if (orbStatus !== 'speaking') {
+      if (coreRef.current) {
+        coreRef.current.style.transform = 'translate(-50%, -50%) scale(1)';
+      }
+      return;
+    }
+    const animate = () => {
+      if (coreRef.current) {
+        const t   = Date.now() / 1000;
+        const amp =
+          0.45 * Math.abs(Math.sin(t * 3.1))      +
+          0.30 * Math.abs(Math.sin(t * 5.7 + 1.2)) +
+          0.25 * Math.abs(Math.sin(t * 2.1 + 0.7));
+        const scale = 1 + amp * 0.14; // breathes between 1.0 and ~1.14
+        coreRef.current.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      }
+      ampRafRef.current = requestAnimationFrame(animate);
+    };
+    ampRafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(ampRafRef.current);
+  }, [orbStatus]);
+
+  // ── Keyboard shortcuts ────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
+      if ((e.target as HTMLElement).tagName === 'INPUT' ||
+          (e.target as HTMLElement).tagName === 'TEXTAREA') return;
       if (e.key === 'Escape') {
         if (contextMenu) { setContextMenu(null); return; }
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
@@ -114,7 +118,7 @@ export function JarvisOrb() {
     return () => window.removeEventListener('keydown', handler);
   }, [contextMenu, setContextMenu, setOrbStatus, toggleOrbChat]);
 
-  // Close context menu on outside click
+  // ── Close context menu on outside click ───────────────────────
   useEffect(() => {
     if (!contextMenu) return;
     const close = () => setContextMenu(null);
@@ -122,6 +126,7 @@ export function JarvisOrb() {
     return () => window.removeEventListener('pointerdown', close, true);
   }, [contextMenu]);
 
+  // ── Drag ──────────────────────────────────────────────────────
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -143,45 +148,37 @@ export function JarvisOrb() {
 
   const onPointerUp = useCallback(() => {
     dragRef.current = null;
-    if (!didDragRef.current) {
-      // handled in onClick
-    }
     didDragRef.current = false;
   }, []);
 
+  // ── Click — left click: cancel speech / restore only ─────────
   const onClick = useCallback(() => {
     if (didDragRef.current) return;
-    if (dblClickRef.current) return; // double click handled separately
-    // if speaking, cancel it
+    if (dblClickRef.current) return;
     if (orbStatus === 'speaking') {
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       setOrbStatus('online');
       return;
     }
-    // if minimized, restore
     if (orbMinimized) {
       setOrbMinimized(false);
       return;
     }
-    // left-click no longer opens chat — use right-click instead
+    // left-click does not open chat — use right-click
   }, [orbStatus, orbMinimized, setOrbMinimized, setOrbStatus]);
 
+  // ── Double-click: open chat + start listening ─────────────────
   const onDoubleClick = useCallback(() => {
     dblClickRef.current = true;
     setTimeout(() => { dblClickRef.current = false; }, 300);
-    // double click = toggle listening (handled by voice in OrbChatPanel)
-    // here we just open the chat panel and let it start listening
     if (!orbChatOpen) setOrbChatOpen(true);
-    // dispatch a custom event that OrbChatPanel can listen to
     window.dispatchEvent(new CustomEvent('jarvis-orb-toggle-listen'));
   }, [orbChatOpen, setOrbChatOpen]);
 
+  // ── Right-click: open / close chat panel ─────────────────────
   const onContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault(); // suppress browser native context menu
-    // Right-click opens (or closes) the chat panel
-    if (orbMinimized) {
-      setOrbMinimized(false);
-    }
+    e.preventDefault();
+    if (orbMinimized) setOrbMinimized(false);
     toggleOrbChat();
   }, [orbMinimized, setOrbMinimized, toggleOrbChat]);
 
@@ -199,17 +196,31 @@ export function JarvisOrb() {
         onContextMenu={onContextMenu}
       >
         <div className={`jarvis-orb-container ${orbStatus}${orbMinimized ? ' minimized' : ''}`}>
+          {/* Ambient bloom behind everything */}
           <div className={`orb-glow ${orbStatus}`} />
-          <TickSVG size={orbSize} />
-          <div className="orb-ring orb-ring-3" />
-          <div className="orb-ring orb-ring-2" />
-          <div className="orb-ring orb-ring-1" />
-          <div className="orb-core" />
+
+          {/* Layer 1 — outer decorative partial arcs (slow, counter-rotating) */}
+          <div className="orb-arc orb-arc-1" />
+          <div className="orb-arc orb-arc-2" />
+
+          {/* Layer 2 — inner functional rings */}
+          {/* Outer ring: carries an orbiting "moon" dot */}
+          <div className="orb-ring orb-ring-outer">
+            <div className="orb-moon" />
+          </div>
+          {/* Inner ring: has a fixed bright beacon that sweeps around */}
+          <div className="orb-ring orb-ring-inner">
+            <div className="orb-beacon" />
+          </div>
+
+          {/* Layer 3 — core sphere with nebula texture */}
+          <div className="orb-core" ref={coreRef} />
         </div>
+
         <OutputWaveform visible={orbStatus === 'speaking'} />
       </div>
 
-      {/* Chat panel */}
+      {/* Chat panel — functionality completely unchanged */}
       {orbChatOpen && !orbMinimized && (
         <OrbChatPanel
           style={{ left: panelPos.left, top: panelPos.top }}
@@ -217,7 +228,7 @@ export function JarvisOrb() {
         />
       )}
 
-      {/* Context menu */}
+      {/* Context menu (still wired, accessible via code) */}
       {contextMenu && (
         <div
           className="orb-context-menu"
@@ -228,13 +239,14 @@ export function JarvisOrb() {
             className="orb-context-menu-item"
             style={{ position: 'relative' }}
             onMouseEnter={() => setContextMenu(m => m ? { ...m, subMenu: 'agent' } : m)}
-            onMouseLeave={() => setContextMenu(m => m ? { ...m, subMenu: null } : m)}
+            onMouseLeave={() => setContextMenu(m => m ? { ...m, subMenu: null  } : m)}
           >
             SWITCH AGENT <span className="arrow">▶</span>
             {contextMenu.subMenu === 'agent' && (
               <div className="orb-context-submenu" style={{ top: 0 }}>
                 {QUICK_AGENTS.map(a => (
-                  <div key={a.id} className="orb-context-menu-item" onClick={() => { setOrbActiveAgentId(a.id); setContextMenu(null); }}>
+                  <div key={a.id} className="orb-context-menu-item"
+                    onClick={() => { setOrbActiveAgentId(a.id); setContextMenu(null); }}>
                     {a.label}
                   </div>
                 ))}
@@ -245,10 +257,12 @@ export function JarvisOrb() {
             VOICE MODE
           </div>
           <div className="orb-context-menu-divider" />
-          <div className="orb-context-menu-item" onClick={() => { setOrbMinimized(true); setOrbChatOpen(false); setContextMenu(null); }}>
+          <div className="orb-context-menu-item"
+            onClick={() => { setOrbMinimized(true); setOrbChatOpen(false); setContextMenu(null); }}>
             MINIMIZE
           </div>
-          <div className="orb-context-menu-item" onClick={() => { setOrbPosition(getDefaultPos()); setContextMenu(null); }}>
+          <div className="orb-context-menu-item"
+            onClick={() => { setOrbPosition(getDefaultPos()); setContextMenu(null); }}>
             RESET POSITION
           </div>
         </div>

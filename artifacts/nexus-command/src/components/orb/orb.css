@@ -1,50 +1,58 @@
-/* ── Orb keyframes ─────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   KHAMELEON ORB  —  visual assembly
+   Layout (outside → in):
+     1. orb-glow        ambient bloom
+     2. orb-arc-1/2     outer decorative partial arcs, counter-rotating
+     3. orb-ring-outer  ring + orbiting moon dot
+     4. orb-ring-inner  ring + fixed beacon dot
+     5. orb-core        nebula sphere
+   All chat / context / waveform CSS is below the orb section.
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Keyframes ─────────────────────────────────────────────── */
 @keyframes orb-breathe {
-  0%, 100% { opacity: 0.45; transform: scale(1); }
-  50%       { opacity: 1;    transform: scale(1.18); }
+  0%, 100% { opacity: 0.4; transform: scale(1);    }
+  50%       { opacity: 1;   transform: scale(1.22); }
 }
-@keyframes orb-pulse-online {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.1); }
+/* outer arcs — CW starts at 45° tilt, CCW at −20° tilt */
+@keyframes orb-arc-cw {
+  from { transform: rotate(45deg);  }
+  to   { transform: rotate(405deg); }
 }
-@keyframes orb-pulse-speaking {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.18); }
+@keyframes orb-arc-ccw {
+  from { transform: rotate(-20deg);  }
+  to   { transform: rotate(-380deg); }
 }
-@keyframes orb-pulse-listening {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.06); }
-}
-@keyframes orb-pulse-offline {
-  0%, 100% { transform: scale(1);    opacity: 1; }
-  50%       { transform: scale(0.95); opacity: 0.65; }
-}
-@keyframes orb-tick-ccw {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(-360deg); }
-}
+/* inner ring rotation */
 @keyframes orb-ring-cw {
-  from { transform: rotate(0deg); }
+  from { transform: rotate(0deg);   }
   to   { transform: rotate(360deg); }
 }
 @keyframes orb-ring-ccw {
-  from { transform: rotate(0deg); }
+  from { transform: rotate(0deg);    }
   to   { transform: rotate(-360deg); }
 }
+/* beacon / moon pulse */
+@keyframes orb-beacon-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1);    }
+  50%       { opacity: 0.6; transform: scale(0.75); }
+}
+/* waveform bars */
 @keyframes orb-waveform {
   0%, 100% { transform: scaleY(0.3); }
-  50%       { transform: scaleY(1); }
+  50%       { transform: scaleY(1);   }
 }
+/* UI overlays */
 @keyframes orb-context-fadein {
   from { opacity: 0; transform: scale(0.95) translateY(-4px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
 }
 @keyframes orb-panel-fadein {
   from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0);   }
 }
 
-/* ── Orb wrapper ───────────────────────────────────────────── */
+/* ── Wrapper + container ───────────────────────────────────── */
 .jarvis-orb-wrapper {
   position: fixed;
   z-index: 9999;
@@ -57,6 +65,7 @@
   position: relative;
   width: 90px;
   height: 90px;
+  overflow: visible;          /* arcs extend slightly beyond 90px */
   transition: width 0.3s ease, height 0.3s ease;
 }
 .jarvis-orb-container.minimized {
@@ -64,183 +73,352 @@
   height: 48px;
 }
 
-/* ── Glow ──────────────────────────────────────────────────── */
+/* ── Ambient glow bloom ────────────────────────────────────── */
 .orb-glow {
   position: absolute;
-  inset: -16px;
+  inset: -20px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(0,212,255,0.25) 0%, transparent 70%);
-  animation: orb-breathe 2s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(0,212,255,0.22) 0%, transparent 68%);
+  animation: orb-breathe 2.4s ease-in-out infinite;
   pointer-events: none;
-  transition: background 0.4s ease;
+  transition: background 0.5s ease;
 }
 .orb-glow.speaking {
-  animation-duration: 0.4s;
-  background: radial-gradient(circle, rgba(0,212,255,0.45) 0%, transparent 70%);
-}
-.orb-glow.speaking-scale {
-  transform: scale(1.6);
+  background: radial-gradient(circle, rgba(100,60,220,0.35) 0%, rgba(0,180,255,0.18) 40%, transparent 70%);
+  animation-duration: 0.5s;
 }
 .orb-glow.listening {
-  animation-duration: 0.8s;
-  background: radial-gradient(circle, rgba(201,168,76,0.3) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(0,200,220,0.28) 0%, transparent 68%);
+  animation-duration: 1s;
 }
 .orb-glow.offline {
-  background: radial-gradient(circle, rgba(192,21,42,0.15) 0%, transparent 70%);
-  animation-duration: 3s;
+  background: radial-gradient(circle, rgba(100,100,100,0.12) 0%, transparent 68%);
+  animation-duration: 4s;
 }
 
-/* ── Tick SVG ──────────────────────────────────────────────── */
-.orb-tick-svg {
+/* ── Outer decorative arcs ─────────────────────────────────── */
+/* Partial circles (3 of 4 border sides visible ≈ 270° arc with a gap).
+   Each starts at a different rotation angle so the gaps are offset.    */
+.orb-arc {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  animation: orb-tick-ccw 12s linear infinite;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  border-style: solid;
   pointer-events: none;
+  transition: border-color 0.5s ease;
 }
 
-/* ── Rings ─────────────────────────────────────────────────── */
+/* Arc 1 — wider, cyan-ish, clockwise, 18 s */
+.orb-arc-1 {
+  width: 96px;
+  height: 96px;
+  margin-left: -48px;
+  margin-top: -48px;
+  border-width: 1.5px;
+  /* gap at bottom-right (border-bottom transparent) */
+  border-color: rgba(0,200,240,0.38) rgba(0,200,240,0.38) transparent rgba(0,200,240,0.38);
+  animation: orb-arc-cw 18s linear infinite;
+}
+
+/* Arc 2 — slightly narrower, violet-tinted, counter-clockwise, 32 s (noticeably slower) */
+.orb-arc-2 {
+  width: 84px;
+  height: 84px;
+  margin-left: -42px;
+  margin-top: -42px;
+  border-width: 1px;
+  /* gap at top-left (border-top transparent) */
+  border-color: transparent rgba(140,90,210,0.30) rgba(140,90,210,0.30) rgba(140,90,210,0.30);
+  animation: orb-arc-ccw 32s linear infinite;
+}
+
+/* speaking — arcs brighten and speed up */
+.speaking .orb-arc-1 {
+  border-color: rgba(0,212,255,0.6) rgba(0,212,255,0.6) transparent rgba(0,212,255,0.6);
+  animation-duration: 10s;
+}
+.speaking .orb-arc-2 {
+  border-color: transparent rgba(160,80,255,0.5) rgba(160,80,255,0.5) rgba(160,80,255,0.5);
+  animation-duration: 18s;
+}
+
+/* listening — arcs teal, normal-ish speed */
+.listening .orb-arc-1 {
+  border-color: rgba(0,210,220,0.45) rgba(0,210,220,0.45) transparent rgba(0,210,220,0.45);
+  animation-duration: 22s;
+}
+.listening .orb-arc-2 {
+  border-color: transparent rgba(0,180,200,0.28) rgba(0,180,200,0.28) rgba(0,180,200,0.28);
+  animation-duration: 38s;
+}
+
+/* offline — arcs dim down */
+.offline .orb-arc-1 {
+  border-color: rgba(120,120,130,0.18) rgba(120,120,130,0.18) transparent rgba(120,120,130,0.18);
+  animation-duration: 30s;
+}
+.offline .orb-arc-2 {
+  border-color: transparent rgba(100,100,110,0.12) rgba(100,100,110,0.12) rgba(100,100,110,0.12);
+  animation-duration: 50s;
+}
+
+/* minimized — hide outer arcs */
+.minimized .orb-arc { display: none; }
+
+/* ── Inner rings ───────────────────────────────────────────── */
 .orb-ring {
   position: absolute;
   top: 50%;
   left: 50%;
   border-radius: 50%;
   border-style: solid;
-  transform-origin: center center;
-  transition: border-color 0.4s ease, animation-duration 0.4s ease, width 0.3s ease, height 0.3s ease, margin 0.3s ease;
+  pointer-events: none;
+  transition: border-color 0.4s ease;
 }
 
-.orb-ring-3 {
-  width: 90px; height: 90px;
-  margin-left: -45px; margin-top: -45px;
+/* Outer ring — full circle, dim, carries the orbiting moon.
+   Rotates CW at medium speed.                                  */
+.orb-ring-outer {
+  width: 72px;
+  height: 72px;
+  margin-left: -36px;
+  margin-top: -36px;
+  border-width: 1px;
+  border-color: rgba(0,212,255,0.20);
+  animation: orb-ring-cw 5s linear infinite;
+}
+
+/* Inner ring — partial arcs (2 opposite sides visible), faster.
+   Rotates CCW.                                                  */
+.orb-ring-inner {
+  width: 60px;
+  height: 60px;
+  margin-left: -30px;
+  margin-top: -30px;
   border-width: 1.5px;
-  border-color: rgba(192,21,42,0.5) transparent transparent rgba(192,21,42,0.5);
-  animation: orb-ring-cw 7s linear infinite;
-}
-.orb-ring-2 {
-  width: 74px; height: 74px;
-  margin-left: -37px; margin-top: -37px;
-  border-width: 1.5px;
-  border-color: transparent transparent rgba(0,212,255,0.6) rgba(0,212,255,0.6);
-  animation: orb-ring-ccw 4s linear infinite;
-}
-.orb-ring-1 {
-  width: 70px; height: 70px;
-  margin-left: -35px; margin-top: -35px;
-  border-width: 2px;
-  border-color: rgba(0,212,255,0.9) rgba(0,212,255,0.9) transparent transparent;
-  animation: orb-ring-cw 2.5s linear infinite;
-  box-shadow: 0 0 8px rgba(0,212,255,0.5);
+  border-color: rgba(0,212,255,0.75) rgba(0,212,255,0.75) transparent transparent;
+  box-shadow: 0 0 6px rgba(0,212,255,0.3);
+  animation: orb-ring-ccw 3s linear infinite;
 }
 
-/* speaking ring overrides */
-.speaking .orb-ring-1 {
-  animation-duration: 0.7s;
-  border-color: rgba(224,242,254,0.95) rgba(224,242,254,0.95) transparent transparent;
-  box-shadow: 0 0 18px rgba(0,212,255,0.9);
+/* speaking — rings faster and more vivid */
+.speaking .orb-ring-outer {
+  border-color: rgba(0,212,255,0.30);
+  animation-duration: 2s;
 }
-.speaking .orb-ring-2 { animation-duration: 1s; border-color: transparent transparent rgba(0,212,255,1) rgba(0,212,255,1); }
-.speaking .orb-ring-3 { animation-duration: 2s; border-color: rgba(0,212,255,0.4) transparent transparent rgba(0,212,255,0.4); }
+.speaking .orb-ring-inner {
+  border-color: rgba(0,212,255,0.9) rgba(160,80,255,0.9) transparent transparent;
+  box-shadow: 0 0 12px rgba(100,60,220,0.5);
+  animation-duration: 1s;
+}
 
-/* listening ring overrides */
-.listening .orb-ring-1 { animation-duration: 4s; border-color: rgba(201,168,76,0.9) rgba(201,168,76,0.9) transparent transparent; box-shadow: 0 0 10px rgba(201,168,76,0.5); }
-.listening .orb-ring-2 { animation-duration: 6s; border-color: transparent transparent rgba(201,168,76,0.5) rgba(201,168,76,0.5); }
-.listening .orb-ring-3 { animation-duration: 14s; }
+/* listening — teal/cyan */
+.listening .orb-ring-outer {
+  border-color: rgba(0,210,220,0.22);
+  animation-duration: 7s;
+}
+.listening .orb-ring-inner {
+  border-color: rgba(0,210,220,0.8) rgba(0,210,220,0.8) transparent transparent;
+  box-shadow: 0 0 8px rgba(0,210,220,0.35);
+  animation-duration: 4.5s;
+}
 
-/* offline ring overrides */
-.offline .orb-ring-1 { animation-duration: 8s; border-color: rgba(239,68,68,0.6) rgba(239,68,68,0.6) transparent transparent; box-shadow: 0 0 4px rgba(192,21,42,0.3); }
-.offline .orb-ring-2 { animation-duration: 12s; border-color: transparent transparent rgba(192,21,42,0.3) rgba(192,21,42,0.3); }
-.offline .orb-ring-3 { animation-duration: 20s; border-color: rgba(192,21,42,0.2) transparent transparent rgba(192,21,42,0.2); }
+/* offline — everything dims */
+.offline .orb-ring-outer {
+  border-color: rgba(120,120,130,0.12);
+  animation-duration: 12s;
+}
+.offline .orb-ring-inner {
+  border-color: rgba(100,100,110,0.25) rgba(100,100,110,0.25) transparent transparent;
+  box-shadow: none;
+  animation-duration: 9s;
+}
 
-/* ── Core — nebula texture with state tinting ──────────────── */
+/* minimized — show only inner ring at reduced size */
+.minimized .orb-ring-outer { display: none; }
+.minimized .orb-ring-inner {
+  width: 36px;
+  height: 36px;
+  margin-left: -18px;
+  margin-top: -18px;
+}
+
+/* ── Orbiting moon (child of outer ring) ───────────────────── */
+/* Sits at the top-center of the ring div; orbits as the ring rotates. */
+.orb-moon {
+  position: absolute;
+  top: -4px;
+  left: calc(50% - 4px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 6px 2px rgba(0,212,255,0.95),
+    0 0 14px rgba(0,212,255,0.55);
+  animation: orb-beacon-pulse 2s ease-in-out infinite;
+}
+
+.speaking .orb-moon {
+  background: rgba(200,160,255,0.95);
+  box-shadow:
+    0 0 8px 3px rgba(160,80,255,1),
+    0 0 20px rgba(100,60,220,0.7);
+  animation-duration: 0.6s;
+}
+.listening .orb-moon {
+  box-shadow:
+    0 0 6px 2px rgba(0,210,220,0.95),
+    0 0 14px rgba(0,210,220,0.5);
+}
+.offline .orb-moon {
+  background: rgba(160,160,170,0.5);
+  box-shadow: 0 0 4px rgba(120,120,130,0.4);
+}
+.minimized .orb-moon { display: none; }
+
+/* ── Beacon (child of inner ring) ──────────────────────────── */
+/* Sits at the top-center; sweeps around as the inner ring rotates. */
+.orb-beacon {
+  position: absolute;
+  top: -3px;
+  left: calc(50% - 3px);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(0,212,255,0.95);
+  box-shadow:
+    0 0 5px 2px rgba(0,212,255,1),
+    0 0 12px rgba(0,212,255,0.6);
+  animation: orb-beacon-pulse 1.6s ease-in-out infinite;
+}
+
+.speaking .orb-beacon {
+  background: rgba(180,120,255,0.95);
+  box-shadow:
+    0 0 6px 2px rgba(160,80,255,1),
+    0 0 16px rgba(100,60,220,0.6);
+  animation-duration: 0.5s;
+}
+.listening .orb-beacon {
+  background: rgba(0,210,220,0.95);
+  box-shadow:
+    0 0 5px 2px rgba(0,210,220,1),
+    0 0 12px rgba(0,210,220,0.5);
+}
+.offline .orb-beacon {
+  background: rgba(130,130,140,0.4);
+  box-shadow: 0 0 3px rgba(100,100,110,0.3);
+}
+
+/* ── Core sphere ───────────────────────────────────────────── */
+/* translate(-50%,-50%) keeps it centered; JS overrides transform
+   during speaking to add scale() for the amplitude pulse.       */
 .orb-core {
   position: absolute;
-  top: 50%; left: 50%;
-  width: 62px; height: 62px;
-  margin-left: -31px; margin-top: -31px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1);
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
-  overflow: hidden;                      /* clip ::before / ::after to circle */
+  overflow: hidden;
 
-  /* Nebula texture — fully desaturated at idle, contrast+brightness boosted so swirls read clearly */
+  /* Nebula texture — desaturated + high contrast so cloud detail reads clearly */
   background-image: url('/nexus-command/nebula-core.png');
   background-size: cover;
   background-position: center;
-  filter: saturate(0) contrast(1.7) brightness(1.25);
+  filter: saturate(0) contrast(1.85) brightness(1.3);
 
-  box-shadow: 0 0 18px #00d4ff, 0 0 36px rgba(0,212,255,0.4);
-  animation: orb-pulse-online 2s ease-in-out infinite;
-  transition: box-shadow 0.4s ease, filter 0.4s ease,
-              width 0.3s ease, height 0.3s ease, margin 0.3s ease;
+  /* Soft outer glow/bloom ring */
+  box-shadow:
+    0 0 14px rgba(0,212,255,0.45),
+    0 0 28px rgba(0,212,255,0.18),
+    0 0 0 1px rgba(0,212,255,0.12);
+
+  transition: box-shadow 0.45s ease, filter 0.45s ease;
+  /* NOTE: no 'transform' in transition — JS drives scale() directly */
   cursor: pointer;
 }
 
-/* Color tint layer — hidden at idle; active states re-enable it */
+/* ── Core: color tint layer (::before) ─────────────────────── */
+/* mix-blend-mode: color recolors the nebula luminosity without
+   flattening the swirl/wisp detail. Opacity 0 at idle = no tint. */
 .orb-core::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: hsl(195, 40%, 55%);
+  background: hsl(190, 80%, 50%);
   mix-blend-mode: color;
-  opacity: 0;                        /* no tint at idle — let bare nebula show */
-  transition: background 0.4s ease, opacity 0.4s ease;
+  opacity: 0;
+  transition: background 0.45s ease, opacity 0.45s ease;
   pointer-events: none;
+  z-index: 1;
 }
 
-/* Sphere lighting: soft highlight upper-left, shadow lower-right */
+/* ── Core: sphere lighting (::after) ───────────────────────── */
+/* Upper-left highlight + lower-right shadow → reads as a lit planet. */
 .orb-core::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 30% 28%, rgba(255,255,255,0.48) 0%, transparent 54%),
-    radial-gradient(circle at 72% 74%, rgba(0,0,0,0.52)       0%, transparent 52%);
+    radial-gradient(circle at 28% 26%, rgba(255,255,255,0.52) 0%, transparent 50%),
+    radial-gradient(circle at 74% 76%, rgba(0,0,0,0.56)       0%, transparent 50%);
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
 
-/* speaking — bright vivid cyan tint, filter lifted */
-.speaking .orb-core {
-  filter: saturate(1) brightness(1);
-  animation: orb-pulse-speaking 0.4s ease-in-out infinite;
-  box-shadow: 0 0 18px #00d4ff, 0 0 36px rgba(0,212,255,0.4), 0 0 90px rgba(0,212,255,0.2);
-}
-.speaking .orb-core::before {
-  background: hsl(191, 100%, 50%);
-  opacity: 0.78;
-}
+/* ── Core state overrides ──────────────────────────────────── */
 
-/* listening — gold tint */
+/* Listening — teal/cyan tint */
 .listening .orb-core {
-  filter: saturate(0.5) brightness(0.9);
-  box-shadow: 0 0 20px #c9a84c, 0 0 40px rgba(201,168,76,0.4);
-  animation: orb-pulse-listening 0.8s ease-in-out infinite;
+  filter: saturate(0.55) contrast(1.5) brightness(1.0);
+  box-shadow:
+    0 0 18px rgba(0,210,220,0.60),
+    0 0 36px rgba(0,210,220,0.22),
+    0 0 0 1px rgba(0,210,220,0.18);
 }
 .listening .orb-core::before {
-  background: hsl(40, 65%, 55%);
-  opacity: 0.8;
+  background: hsl(185, 88%, 48%);
+  opacity: 0.62;
 }
 
-/* offline — deep red tint */
+/* Speaking — teal-to-violet blended tint; scale driven by JS rAF */
+.speaking .orb-core {
+  filter: saturate(0.75) contrast(1.4) brightness(1.1);
+  box-shadow:
+    0 0 22px rgba(100,60,220,0.60),
+    0 0 44px rgba(0,180,255,0.22),
+    0 0 0 1px rgba(120,80,220,0.20);
+}
+.speaking .orb-core::before {
+  /* gradient tint: teal on one side, violet on the other */
+  background: linear-gradient(135deg, hsl(185, 88%, 50%) 0%, hsl(265, 76%, 58%) 100%);
+  opacity: 0.70;
+}
+
+/* Offline — dimmed gray, no tint */
 .offline .orb-core {
-  filter: saturate(0.3) brightness(0.75);
-  box-shadow: 0 0 14px #c0152a, 0 0 28px rgba(192,21,42,0.3);
-  animation: orb-pulse-offline 3s ease-in-out infinite;
+  filter: saturate(0) contrast(1.2) brightness(0.55);
+  box-shadow:
+    0 0 8px rgba(100,100,110,0.25),
+    0 0 0 1px rgba(80,80,90,0.10);
 }
 .offline .orb-core::before {
-  background: hsl(350, 82%, 42%);
-  opacity: 0.8;
+  opacity: 0; /* no tint */
 }
 
-/* minimized core */
-.minimized .orb-core { width: 20px; height: 20px; margin-left: -10px; margin-top: -10px; }
-.minimized .orb-ring-1 { width: 36px; height: 36px; margin-left: -18px; margin-top: -18px; }
-.minimized .orb-ring-2, .minimized .orb-ring-3 { display: none; }
-.minimized .orb-tick-svg { display: none; }
+/* ── Minimized core ────────────────────────────────────────── */
+.minimized .orb-core {
+  width: 22px;
+  height: 22px;
+}
 
-/* ── Output waveform ───────────────────────────────────────── */
+/* ── Output waveform (below orb while speaking) ────────────── */
 .orb-output-waveform {
   position: absolute;
   bottom: -28px;
@@ -301,7 +479,9 @@
 }
 .orb-context-menu-item .arrow { opacity: 0.5; font-size: 8px; }
 
-/* ── Chat Panel ────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   CHAT PANEL  —  completely unchanged from original
+══════════════════════════════════════════════════════════════ */
 .orb-chat-panel {
   position: fixed;
   width: 310px;
@@ -325,13 +505,13 @@
 }
 .orb-chat-panel::before {
   top: 0; left: 0;
-  border-top: 1px solid rgba(0,212,255,0.7);
+  border-top:  1px solid rgba(0,212,255,0.7);
   border-left: 1px solid rgba(0,212,255,0.7);
 }
 .orb-chat-panel::after {
   bottom: 0; right: 0;
   border-bottom: 1px solid rgba(0,212,255,0.7);
-  border-right: 1px solid rgba(0,212,255,0.7);
+  border-right:  1px solid rgba(0,212,255,0.7);
 }
 
 .orb-chat-header {
@@ -554,7 +734,7 @@
 .orb-send-btn:hover { border-color: #c0152a; box-shadow: 0 0 8px rgba(192,21,42,0.4); }
 .orb-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ── Input waveform ────────────────────────────────────────── */
+/* ── Input waveform (mic active) ───────────────────────────── */
 .orb-input-waveform {
   display: flex;
   align-items: flex-end;
@@ -573,7 +753,7 @@
 
 /* ── Reduced motion ────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .orb-core, .orb-glow, .orb-tick-svg, .orb-ring { animation-duration: 12s !important; }
-  .speaking .orb-core  { animation-duration: 5s !important; }
-  .listening .orb-core { animation-duration: 4s !important; }
+  .orb-arc, .orb-ring, .orb-glow, .orb-beacon, .orb-moon {
+    animation-duration: 20s !important;
+  }
 }
