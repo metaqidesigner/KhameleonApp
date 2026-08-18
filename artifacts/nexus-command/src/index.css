@@ -840,7 +840,7 @@ html.light body {
   height: 44px;
   flex-shrink: 0;
   background: rgba(4, 6, 14, 0.96);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
   display: flex;
   align-items: center;
   padding: 0 16px 0 18px;
@@ -893,13 +893,47 @@ html.light body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 36px 36px;
+  padding: 30px 28px;
+}
+
+/* ── Today's Focus card (bottom-left, fixed) ─────────────── */
+.ac-focus-card {
+  position: fixed;
+  left: 60px;
+  bottom: 28px;
+  width: 76px;
+  background: rgba(8, 10, 18, 0.90);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px;
+  padding: 9px 9px 7px;
+  z-index: 50;
+  overflow: hidden;
+}
+.ac-focus-label {
+  font-family: var(--j-font-mono);
+  font-size: 6.5px;
+  letter-spacing: 0.14em;
+  color: rgba(196,212,236,0.32);
+  margin-bottom: 7px;
+  line-height: 1.4;
+  white-space: pre-line;
+}
+.ac-focus-ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.light .ac-focus-card {
+  background: rgba(245,248,255,0.90);
+  border-color: rgba(60,80,140,0.13);
 }
 .ac-concept-pills {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-width: 258px;
+  gap: 8px;
+  max-width: 192px;
 }
 .ac-pill {
   background: rgba(10, 14, 28, 0.65);
@@ -950,9 +984,9 @@ html.light body {
 /* ── Right assistant card ────────────────────────────────── */
 .ac-card {
   position: fixed;
-  right: 20px;
+  right: 22px;
   top: 56px;
-  width: 308px;
+  width: 244px;
   background: rgba(8, 11, 22, 0.90);
   backdrop-filter: blur(44px) saturate(1.8);
   -webkit-backdrop-filter: blur(44px) saturate(1.8);
@@ -985,7 +1019,7 @@ html.light body {
 }
 /* Scale up the orb visual inside the card */
 .ac-orb-area .jarvis-orb-container {
-  transform: scale(1.55);
+  transform: scale(1.82);
   transform-origin: center center;
 }
 
@@ -1141,6 +1175,33 @@ html.light body {
   color: var(--j-teal);
   background: rgba(111, 230, 189, 0.06);
 }
+
+/* ════════════════════════════════════════════════════════════
+   ASSISTANT MODE — background override
+   (body.assistant-mode set by AppShell.tsx via useEffect)
+   ════════════════════════════════════════════════════════════ */
+
+/* Kill the heavy violet/blue bloom — replace with a very subtle dark-teal bloom top-left */
+body.assistant-mode .j-bg-layer::before {
+  background:
+    radial-gradient(ellipse 55% 55% at 5% 0%,  rgba(20, 55, 38, 0.35) 0%, transparent 60%),
+    radial-gradient(ellipse 30% 35% at 0% 60%,  rgba(12, 40, 28, 0.20) 0%, transparent 55%),
+    radial-gradient(circle, rgba(60, 80, 70, 0.035) 1px, transparent 1px);
+  background-size: auto, auto, 28px 28px;
+}
+/* Suppress scan lines on assistant page */
+body.assistant-mode .j-bg-layer::after {
+  opacity: 0.018;
+}
+/* Hide circuit traces SVG on assistant page */
+body.assistant-mode .j-bg-layer svg {
+  opacity: 0;
+}
+/* Deeper black base */
+body.assistant-mode { background: #06080d; }
+
+/* Light mode: assistant-mode keep light bg */
+body.assistant-mode.light { background: var(--j-bg); }
 
 /* Light mode overrides for assistant card */
 .light .ac-card {

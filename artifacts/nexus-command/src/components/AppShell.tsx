@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import Background from './Background';
 import TopBar from './TopBar';
 import NewsTicker from './NewsTicker';
@@ -57,6 +57,12 @@ function PageRouter() {
 export function AppShell() {
   const activeTab = useJarvisStore(s => s.activeTab);
   const isAssistant = activeTab === 'assistant';
+
+  // Toggle body class so CSS can suppress the violet/blue blooms on assistant page
+  useEffect(() => {
+    document.body.classList.toggle('assistant-mode', isAssistant);
+    return () => document.body.classList.remove('assistant-mode');
+  }, [isAssistant]);
 
   return (
     <>
