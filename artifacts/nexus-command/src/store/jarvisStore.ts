@@ -7,6 +7,7 @@ export type AgentType =
   | 'channel_agent' | 'proactive_agent' | 'operative';
 
 export type TabId =
+  | 'assistant'
   | 'overview' | 'agents' | 'research' | 'memory'
   | 'comms' | 'analytics' | 'security' | 'vault'
   | 'skills' | 'settings' | 'tasks';
@@ -127,7 +128,7 @@ interface JarvisStore {
 export const useJarvisStore = create<JarvisStore>()(
   persist(
     (set) => ({
-      activeTab: 'overview',
+      activeTab: 'assistant',
       chatOpen: false,
       chatMessages: [],
       isStreaming: false,

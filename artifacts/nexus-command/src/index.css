@@ -783,3 +783,379 @@ html.light body {
     0 0 0 1px rgba(140,124,240,0.28),
     0 0 28px rgba(140,124,240,0.10);
 }
+
+/* ════════════════════════════════════════════════════════════
+   NEW ASSISTANT LAYOUT
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Body row: sidebar + main area ───────────────────────── */
+.j-body-row {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+.j-main-area {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Left icon sidebar ────────────────────────────────────── */
+.j-left-sidebar {
+  width: 52px;
+  flex-shrink: 0;
+  background: rgba(4, 6, 14, 0.92);
+  border-right: 1px solid rgba(255,255,255,0.045);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 0 0;
+  gap: 2px;
+}
+.j-sidebar-icon-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  cursor: pointer;
+  color: rgba(196, 212, 236, 0.28);
+  border: none;
+  background: none;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.j-sidebar-icon-btn:hover {
+  color: rgba(111, 230, 189, 0.75);
+  background: rgba(111, 230, 189, 0.07);
+}
+.j-sidebar-icon-btn.active {
+  color: var(--j-teal);
+}
+
+/* ── Slim top bar (replaces j-topbar for assistant layout) ── */
+.j-topbar-slim {
+  height: 44px;
+  flex-shrink: 0;
+  background: rgba(4, 6, 14, 0.96);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  padding: 0 16px 0 18px;
+  position: relative;
+  z-index: 20;
+}
+.j-topbar-nav-btn {
+  height: 100%;
+  padding: 0 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--j-font-ui);
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+.j-topbar-icon-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(196, 212, 236, 0.38);
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+  position: relative;
+}
+.j-topbar-icon-btn:hover {
+  color: rgba(196, 212, 236, 0.80);
+  background: rgba(255, 255, 255, 0.05);
+}
+.light .j-topbar-slim {
+  background: rgba(242, 245, 252, 0.96);
+  border-bottom: 1px solid rgba(60, 80, 140, 0.11);
+}
+.light .j-topbar-nav-btn { color: #1a2040; }
+.light .j-topbar-icon-btn { color: #586898; }
+.light .j-left-sidebar {
+  background: rgba(238, 242, 250, 0.96);
+  border-right: 1px solid rgba(60, 80, 140, 0.09);
+}
+
+/* ── Assistant home page ─────────────────────────────────── */
+.ac-home {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 36px 36px;
+}
+.ac-concept-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 258px;
+}
+.ac-pill {
+  background: rgba(10, 14, 28, 0.65);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 12px 16px;
+  cursor: default;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ac-pill:hover {
+  background: rgba(14, 18, 34, 0.75);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.ac-pill-label {
+  font-family: var(--j-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.ac-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ac-pill-sub {
+  font-family: var(--j-font-ui);
+  font-size: 12.5px;
+  color: var(--j-text-muted);
+  padding-left: 13px;
+  line-height: 1.4;
+}
+.light .ac-pill {
+  background: rgba(255, 255, 255, 0.68);
+  border-color: rgba(60, 80, 140, 0.12);
+}
+.light .ac-pill:hover {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(60, 80, 140, 0.20);
+}
+
+/* ── Right assistant card ────────────────────────────────── */
+.ac-card {
+  position: fixed;
+  right: 20px;
+  top: 56px;
+  width: 308px;
+  background: rgba(8, 11, 22, 0.90);
+  backdrop-filter: blur(44px) saturate(1.8);
+  -webkit-backdrop-filter: blur(44px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  z-index: 200;
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.10),
+    0 24px 80px rgba(0,0,0,0.55),
+    0 4px 16px rgba(0,0,0,0.30);
+}
+
+/* Orb zone inside card */
+.ac-orb-area {
+  position: relative;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  /* subtle radial glow behind orb */
+  background: radial-gradient(
+    ellipse 80% 70% at 50% 60%,
+    rgba(111,230,189,0.06) 0%,
+    transparent 70%
+  );
+}
+/* Scale up the orb visual inside the card */
+.ac-orb-area .jarvis-orb-container {
+  transform: scale(1.55);
+  transform-origin: center center;
+}
+
+/* Greeting */
+.ac-greeting {
+  padding: 4px 22px 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.ac-greeting-title {
+  font-family: var(--j-font-ui);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--j-text);
+  margin-bottom: 4px;
+  letter-spacing: 0.01em;
+}
+.ac-greeting-sub {
+  font-family: var(--j-font-ui);
+  font-size: 11.5px;
+  color: var(--j-text-muted);
+  line-height: 1.45;
+}
+
+/* Messages (shown when chat has history) */
+.ac-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 14px 2px;
+  min-height: 0;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+.ac-msg-user {
+  align-self: flex-end;
+  max-width: 82%;
+  font-family: var(--j-font-ui);
+  font-size: 12px;
+  color: var(--j-text);
+  background: rgba(111,230,189,0.09);
+  border: 1px solid rgba(111,230,189,0.14);
+  border-radius: 10px 10px 2px 10px;
+  padding: 7px 11px;
+}
+.ac-msg-assistant {
+  align-self: flex-start;
+  max-width: 88%;
+  font-family: var(--j-font-ui);
+  font-size: 12px;
+  color: var(--j-text);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 2px 10px 10px 10px;
+  padding: 7px 11px;
+  line-height: 1.5;
+}
+.ac-msg-error {
+  align-self: flex-start;
+  font-family: var(--j-font-mono);
+  font-size: 10px;
+  color: var(--j-coral);
+  padding: 4px 0;
+}
+
+/* Input row */
+.ac-input-row {
+  padding: 10px 12px;
+  flex-shrink: 0;
+}
+.ac-input-wrap {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 11px;
+  padding: 0 5px 0 13px;
+  gap: 4px;
+  transition: border-color 0.15s;
+}
+.ac-input-wrap:focus-within {
+  border-color: rgba(111, 230, 189, 0.25);
+}
+.ac-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: var(--j-font-ui);
+  font-size: 13px;
+  color: var(--j-text);
+  padding: 10px 0;
+}
+.ac-input::placeholder {
+  color: rgba(196, 212, 236, 0.28);
+}
+.ac-send-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--j-teal);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #061210;
+  flex-shrink: 0;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.ac-send-btn:hover:not(:disabled) { opacity: 0.88; transform: scale(1.04); }
+.ac-send-btn:disabled { opacity: 0.28; cursor: default; }
+
+/* Connected agents row */
+.ac-agents-row {
+  padding: 0 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.ac-connected-label {
+  font-family: var(--j-font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.14em;
+  color: rgba(196, 212, 236, 0.22);
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+.ac-agent-pill {
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--j-font-mono);
+  font-size: 7.5px;
+  font-weight: 700;
+  color: rgba(196, 212, 236, 0.45);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  letter-spacing: 0.04em;
+}
+.ac-agent-pill:hover {
+  border-color: rgba(111, 230, 189, 0.4);
+  color: var(--j-teal);
+  background: rgba(111, 230, 189, 0.06);
+}
+
+/* Light mode overrides for assistant card */
+.light .ac-card {
+  background: rgba(245, 248, 255, 0.90);
+  border-color: rgba(60, 80, 140, 0.13);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    0 24px 80px rgba(60,80,140,0.15),
+    0 4px 16px rgba(60,80,140,0.08);
+}
+.light .ac-input-wrap {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(60, 80, 140, 0.16);
+}
+.light .ac-input { color: #1a2040; }
+.light .ac-input::placeholder { color: rgba(60, 80, 140, 0.35); }
+.light .ac-msg-user { background: rgba(111,230,189,0.14); border-color: rgba(111,230,189,0.22); }
+.light .ac-msg-assistant { background: rgba(0,0,0,0.04); border-color: rgba(60,80,140,0.10); }
