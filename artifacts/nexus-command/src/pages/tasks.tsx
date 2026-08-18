@@ -122,6 +122,28 @@ function RecurrencePill({ value }: { value: string }) {
   );
 }
 
+// ── Subtask progress pill ─────────────────────────────────────
+
+function SubtaskProgressPill({ done, total }: { done: number; total: number }) {
+  const allDone = done === total;
+  const color = allDone ? 'var(--j-green)' : 'rgba(120,168,220,0.7)';
+  return (
+    <span title={`${done} of ${total} subtasks done`} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      fontFamily: 'var(--j-font-mono)', fontSize: 9, fontWeight: 700,
+      color,
+      background: allDone
+        ? 'color-mix(in srgb, var(--j-green) 12%, transparent)'
+        : 'rgba(120,168,220,0.08)',
+      border: `1px solid ${allDone ? 'color-mix(in srgb, var(--j-green) 28%, transparent)' : 'rgba(120,168,220,0.18)'}`,
+      borderRadius: 6, padding: '2px 6px',
+      flexShrink: 0,
+    }}>
+      {done}&thinsp;/&thinsp;{total}&nbsp;✓
+    </span>
+  );
+}
+
 // ── Task card ─────────────────────────────────────────────────
 
 interface TaskCardProps {
@@ -131,9 +153,10 @@ interface TaskCardProps {
   onBreakdown?: (task: Task) => void;
   compact?: boolean;
   indent?: boolean;
+  subtaskProgress?: { done: number; total: number };
 }
 
-function TaskCard({ task, onToggle, onDelete, onBreakdown, compact, indent }: TaskCardProps) {
+function TaskCard({ task, onToggle, onDelete, onBreakdown, compact, indent, subtaskProgress }: TaskCardProps) {
   const pri = getPri(task.priority);
   const isDone = task.status === 'done';
 
@@ -181,6 +204,9 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown, compact, indent }: Ta
 
       {/* Right-side badges */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+        {!indent && subtaskProgress && subtaskProgress.total > 0 && (
+          <SubtaskProgressPill done={subtaskProgress.done} total={subtaskProgress.total} />
+        )}
         {!indent && <CategoryBadge value={task.category} />}
         <RecurrencePill value={task.recurrence} />
         {task.source === 'agent' && (
@@ -345,13 +371,15 @@ function groupTasks(tasks: Task[], by: GroupByKey): { key: string; label: string
 interface TaskListViewProps {
   tasks: Task[];
   allTasks?: Task[];
+  /** Unfiltered full task list — used to compute accurate subtask progress regardless of active filters */
+  unfilteredTasks?: Task[];
   groupBy: GroupByKey;
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
   onBreakdown?: (task: Task) => void;
 }
 
-function TaskListView({ tasks, allTasks, groupBy, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
+function TaskListView({ tasks, allTasks, unfilteredTasks, groupBy, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
   // A task is a "root" in the current view if it has no parent OR its parent isn't currently visible.
   // This preserves filter semantics: a filtered-in subtask whose parent is filtered out still appears.
   const visibleIds = new Set(tasks.map(t => t.id));
@@ -359,6 +387,8 @@ function TaskListView({ tasks, allTasks, groupBy, onToggle, onDelete, onBreakdow
   const groups = groupTasks(rootTasks, groupBy);
   // Use allTasks pool if provided (for unfiltered child lookup), else fall back to visible tasks
   const taskPool = allTasks ?? tasks;
+  // Use unfiltered pool for accurate subtask progress counts (unaffected by active filters)
+  const progressPool = unfilteredTasks ?? taskPool;
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   if (tasks.length === 0) {
@@ -410,11 +440,16 @@ function TaskListView({ tasks, allTasks, groupBy, onToggle, onDelete, onBreakdow
               </span>
             </div>
             {!isCollapsed && g.tasks.map(t => {
-              // Only nest children that are also in the visible set
+              // Only nest children that are also in the visible set (for rendering)
               const children = taskPool.filter(s => s.parentTaskId === t.id && visibleIds.has(s.id));
+              // Compute progress from unfiltered pool so counts are accurate regardless of active filters
+              const allChildren = progressPool.filter(s => s.parentTaskId === t.id);
+              const subtaskProgress = allChildren.length > 0
+                ? { done: allChildren.filter(c => c.status === 'done').length, total: allChildren.length }
+                : undefined;
               return (
                 <React.Fragment key={t.id}>
-                  <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} />
+                  <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} subtaskProgress={subtaskProgress} />
                   {children.map(child => (
                     <TaskCard key={child.id} task={child} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} indent />
                   ))}
@@ -434,12 +469,15 @@ interface DailySectionProps {
   section: typeof DAY_SECTIONS[number];
   tasks: Task[];
   allTasks: Task[];
+  /** Unfiltered full task list — for accurate subtask progress counts */
+  unfilteredTasks?: Task[];
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
   onBreakdown?: (task: Task) => void;
 }
 
-function DailySection({ section, tasks, allTasks, onToggle, onDelete, onBreakdown }: DailySectionProps) {
+function DailySection({ section, tasks, allTasks, unfilteredTasks, onToggle, onDelete, onBreakdown }: DailySectionProps) {
+  const progressPool = unfilteredTasks ?? allTasks;
   const [open, setOpen] = useState(true);
   // tasks = pre-computed roots for this section (from TaskDailyView).
   // allTasks = ALL currently-visible tasks — use this pool for child lookup so
@@ -452,9 +490,14 @@ function DailySection({ section, tasks, allTasks, onToggle, onDelete, onBreakdow
 
   function renderWithChildren(t: Task, compact: boolean) {
     const children = computeChildren(t.id, allTasks);
+    // Use unfiltered pool for accurate progress counts regardless of active filters
+    const allChildren = progressPool.filter(s => s.parentTaskId === t.id);
+    const subtaskProgress = allChildren.length > 0
+      ? { done: allChildren.filter(c => c.status === 'done').length, total: allChildren.length }
+      : undefined;
     return (
       <React.Fragment key={t.id}>
-        <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} compact={compact} />
+        <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} compact={compact} subtaskProgress={subtaskProgress} />
         {children.map(child => (
           <TaskCard key={child.id} task={child} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} compact={compact} indent />
         ))}
@@ -513,7 +556,7 @@ function DailySection({ section, tasks, allTasks, onToggle, onDelete, onBreakdow
   );
 }
 
-function TaskDailyView({ tasks, allTasks, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
+function TaskDailyView({ tasks, allTasks, unfilteredTasks, onToggle, onDelete, onBreakdown }: TaskListViewProps) {
   // taskPool = all currently-visible tasks (after filters), used as the full relationship pool
   const taskPool = allTasks ?? tasks;
   // Determine roots from the full visible pool:
@@ -533,6 +576,7 @@ function TaskDailyView({ tasks, allTasks, onToggle, onDelete, onBreakdown }: Tas
           section={b.section}
           tasks={b.sectionTasks}
           allTasks={taskPool}
+          unfilteredTasks={unfilteredTasks}
           onToggle={onToggle}
           onDelete={onDelete}
           onBreakdown={onBreakdown}
@@ -669,45 +713,54 @@ function BreakdownPanel({ task, onClose, onDone }: BreakdownPanelProps) {
 // ── My Tasks panel ────────────────────────────────────────────
 
 function MyTasksPanel() {
-  const [tasks,         setTasks]         = useState<Task[]>([]);
-  const [loading,       setLoading]       = useState(true);
-  const [view,          setView]          = useState<'list' | 'daily'>('list');
-  const [groupBy,       setGroupBy]       = useState<GroupByKey>('category');
-  const [catFilter,     setCatFilter]     = useState('');
-  const [priFilter,     setPriFilter]     = useState('');
-  const [recFilter,     setRecFilter]     = useState('');
-  const [statusFilter,  setStatusFilter]  = useState('');
-  const [searchQ,       setSearchQ]       = useState('');
-  const [creating,      setCreating]      = useState(false);
-  const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
+  const [tasks,               setTasks]               = useState<Task[]>([]);
+  const [allTasksUnfiltered,  setAllTasksUnfiltered]  = useState<Task[]>([]);
+  const [loading,             setLoading]             = useState(true);
+  const [view,                setView]                = useState<'list' | 'daily'>('list');
+  const [groupBy,             setGroupBy]             = useState<GroupByKey>('category');
+  const [catFilter,           setCatFilter]           = useState('');
+  const [priFilter,           setPriFilter]           = useState('');
+  const [recFilter,           setRecFilter]           = useState('');
+  const [statusFilter,        setStatusFilter]        = useState('');
+  const [searchQ,             setSearchQ]             = useState('');
+  const [creating,            setCreating]            = useState(false);
+  const [breakdownTask,       setBreakdownTask]       = useState<Task | null>(null);
 
   const loadTasks = useCallback(async () => {
-    const data = await getTasks({
-      category:   catFilter   || undefined,
-      priority:   priFilter   || undefined,
-      recurrence: recFilter   || undefined,
-      status:     statusFilter || undefined,
-      q:          searchQ.length > 1 ? searchQ : undefined,
-    });
+    const [data, allData] = await Promise.all([
+      getTasks({
+        category:   catFilter   || undefined,
+        priority:   priFilter   || undefined,
+        recurrence: recFilter   || undefined,
+        status:     statusFilter || undefined,
+        q:          searchQ.length > 1 ? searchQ : undefined,
+      }),
+      getTasks(), // unfiltered — for accurate subtask progress counts
+    ]);
     setTasks(data);
+    setAllTasksUnfiltered(allData);
     setLoading(false);
   }, [catFilter, priFilter, recFilter, statusFilter, searchQ]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
   const handleToggle = async (id: number, done: boolean) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: done ? 'done' : 'todo' } : t));
-    await updateTask(id, { status: done ? 'done' : 'todo' });
+    const nextStatus = done ? 'done' : 'todo';
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: nextStatus } : t));
+    setAllTasksUnfiltered(prev => prev.map(t => t.id === id ? { ...t, status: nextStatus } : t));
+    await updateTask(id, { status: nextStatus });
   };
 
   const handleDelete = async (id: number) => {
     setTasks(prev => prev.filter(t => t.id !== id));
+    setAllTasksUnfiltered(prev => prev.filter(t => t.id !== id));
     await deleteTask(id);
   };
 
   const handleCreate = async (input: Parameters<typeof createTask>[0]) => {
     const task = await createTask(input);
     setTasks(prev => [task, ...prev]);
+    setAllTasksUnfiltered(prev => [task, ...prev]);
     setCreating(false);
   };
 
@@ -862,10 +915,10 @@ function MyTasksPanel() {
           </div>
         ) : view === 'daily' ? (
           <div style={{ padding: 8 }}>
-            <TaskDailyView tasks={tasks} allTasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
+            <TaskDailyView tasks={tasks} allTasks={tasks} unfilteredTasks={allTasksUnfiltered} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
           </div>
         ) : (
-          <TaskListView tasks={tasks} allTasks={tasks} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
+          <TaskListView tasks={tasks} allTasks={tasks} unfilteredTasks={allTasksUnfiltered} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} />
         )}
       </div>
 
