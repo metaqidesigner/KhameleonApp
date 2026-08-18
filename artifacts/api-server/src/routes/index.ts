@@ -25,6 +25,7 @@ import authRouter from "./auth";
 import agentConversationsRouter from "./agent-conversations";
 import commandRouter from "./command";
 import taskRunsRouter from "./task-runs";
+import schedulerRouter from "./scheduler";
 
 const router: IRouter = Router();
 
@@ -54,5 +55,6 @@ router.use("/marketplace", marketplaceRouter);
 router.use("/agent-conversations", agentConversationsRouter);
 router.use("/command", commandRouter);
 router.use("/task-runs", taskRunsRouter);
+router.use("/scheduler", schedulerRouter);
 
 export default router;

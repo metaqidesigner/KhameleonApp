@@ -15,7 +15,9 @@ import {
 } from '@/lib/taskRunApi';
 import {
   getTasks, createTask, updateTask, deleteTask,
+  getSchedulerStatus,
   type Task, type TaskCategory, type TaskPriority, type TaskRecurrence,
+  type SchedulerStatus,
 } from '@/lib/jarvisApi';
 import { computeRoots, computeChildren } from '@/lib/taskNesting';
 import { streamAgentChat } from '@/lib/agentsApi';
@@ -1146,58 +1148,137 @@ function CommandBar({ onSubmit, loading }: { onSubmit: (text: string) => void; l
 
 // ── Auto-triggers ─────────────────────────────────────────────
 
-const DEFAULT_SCHEDULES = [
-  { id: 'morning', label: 'Morning digest', cron: '7:00 AM daily',  active: false },
-  { id: 'weekly',  label: 'Weekly summary', cron: 'Monday 9:00 AM', active: false },
+const STATIC_EVENTS = [
+  { id: 'email',    label: 'New email arrives',       icon: <Mail size={11} /> },
+  { id: 'calendar', label: 'Calendar event starting', icon: <Calendar size={11} /> },
 ];
-const DEFAULT_EVENTS = [
-  { id: 'email',    label: 'New email arrives',        icon: <Mail size={11} />,     active: false },
-  { id: 'calendar', label: 'Calendar event starting',  icon: <Calendar size={11} />, active: false },
-];
+
+function ToggleSwitch({ active, onChange, color = 'var(--j-violet)' }: { active: boolean; onChange: () => void; color?: string }) {
+  return (
+    <button
+      onClick={onChange}
+      style={{
+        width: 28, height: 16, borderRadius: 8, border: 'none', cursor: 'pointer',
+        flexShrink: 0, transition: 'background 0.2s',
+        background: active ? color : 'rgba(120,168,220,0.15)', position: 'relative',
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: 2, left: active ? 14 : 2,
+        width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+      }} />
+    </button>
+  );
+}
+
+function pad2(n: number) { return String(n).padStart(2, '0'); }
+
+function formatNextRun(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const diff = d.getTime() - Date.now();
+  if (diff < 0) return 'now';
+  const hh = Math.floor(diff / 3_600_000);
+  const mm = Math.floor((diff % 3_600_000) / 60_000);
+  if (hh > 0) return `in ${hh}h ${mm}m`;
+  return `in ${mm}m`;
+}
 
 function AutoTriggers() {
-  const [schedules, setSchedules] = useState(DEFAULT_SCHEDULES);
-  const [events,    setEvents]    = useState(DEFAULT_EVENTS);
-  const [expanded,  setExpanded]  = useState(false);
+  const [status,   setStatus]   = useState<SchedulerStatus | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => { getSchedulerStatus().then(setStatus); }, []);
+
+  const activeCount = status?.enabled ? 1 : 0;
 
   return (
-    <div style={{ background: 'rgba(8,14,32,0.65)', backdropFilter: 'blur(16px)', border: '1px solid rgba(120,96,194,0.15)', borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
-      <div onClick={() => setExpanded(e => !e)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', userSelect: 'none' }}>
+    <div style={{
+      background: 'rgba(8,14,32,0.65)', backdropFilter: 'blur(16px)',
+      border: '1px solid rgba(120,96,194,0.15)', borderRadius: 12,
+      overflow: 'hidden', flexShrink: 0,
+    }}>
+      <div
+        onClick={() => setExpanded(e => !e)}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', userSelect: 'none' }}
+      >
         <Zap size={11} style={{ color: 'var(--j-violet)' }} />
-        <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 10, color: 'var(--j-text-muted)', letterSpacing: '0.15em', flex: 1 }}>AUTO TRIGGERS</span>
-        <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{schedules.filter(s => s.active).length + events.filter(e => e.active).length} active</span>
-        {expanded ? <ChevronDown size={10} style={{ color: 'var(--j-text-faint)' }} /> : <ChevronRight size={10} style={{ color: 'var(--j-text-faint)' }} />}
+        <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 10, color: 'var(--j-text-muted)', letterSpacing: '0.15em', flex: 1 }}>
+          AUTO TRIGGERS
+        </span>
+        <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{activeCount} active</span>
+        {expanded
+          ? <ChevronDown size={10} style={{ color: 'var(--j-text-faint)' }} />
+          : <ChevronRight size={10} style={{ color: 'var(--j-text-faint)' }} />}
       </div>
+
       {expanded && (
-        <div style={{ padding: '0 12px 10px', display: 'flex', gap: 20 }}>
-          <div style={{ flex: 1 }}>
-            <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', letterSpacing: '0.12em', marginBottom: 6 }}>SCHEDULED</div>
-            {schedules.map(s => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                <button onClick={() => setSchedules(prev => prev.map(x => x.id === s.id ? { ...x, active: !x.active } : x))} style={{ width: 28, height: 16, borderRadius: 8, border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s', background: s.active ? 'var(--j-violet)' : 'rgba(120,168,220,0.15)', position: 'relative' }}>
-                  <div style={{ position: 'absolute', top: 2, left: s.active ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-                </button>
-                <div>
-                  <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: s.active ? 'var(--j-text)' : 'var(--j-text-muted)' }}>{s.label}</div>
-                  <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{s.cron}</div>
-                </div>
+        <div style={{ padding: '0 12px 12px' }}>
+          <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', letterSpacing: '0.12em', marginBottom: 8 }}>SCHEDULED</div>
+
+          {/* Morning digest — read-only status display */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+            {/* Status indicator (non-interactive) */}
+            <div style={{
+              width: 28, height: 16, borderRadius: 8, flexShrink: 0,
+              background: status?.enabled ? 'var(--j-violet)' : 'rgba(120,168,220,0.15)',
+              position: 'relative', opacity: 0.6,
+            }}>
+              <div style={{
+                position: 'absolute', top: 2, left: status?.enabled ? 14 : 2,
+                width: 12, height: 12, borderRadius: '50%', background: '#fff',
+              }} />
+            </div>
+
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontFamily: 'var(--j-font-ui)', fontSize: 11,
+                color: status?.enabled ? 'var(--j-text)' : 'var(--j-text-muted)',
+                marginBottom: 2,
+              }}>
+                Morning digest
               </div>
-            ))}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', letterSpacing: '0.12em', marginBottom: 6 }}>EVENT-TRIGGERED</div>
-            {events.map(e => (
-              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                <button onClick={() => setEvents(prev => prev.map(x => x.id === e.id ? { ...x, active: !x.active } : x))} style={{ width: 28, height: 16, borderRadius: 8, border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s', background: e.active ? 'var(--j-amber)' : 'rgba(120,168,220,0.15)', position: 'relative' }}>
-                  <div style={{ position: 'absolute', top: 2, left: e.active ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ color: 'var(--j-amber)', display: 'flex' }}>{e.icon}</span>
-                  <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: e.active ? 'var(--j-text)' : 'var(--j-text-muted)' }}>{e.label}</span>
-                </div>
+
+              {status ? (
+                <>
+                  <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>
+                    <Clock size={7} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />
+                    {pad2(status.digestHour)}:{pad2(status.digestMinute)} daily
+                  </div>
+                  {status.enabled && status.nextRunAt && (
+                    <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-violet)', marginTop: 2 }}>
+                      ⏰ {formatNextRun(status.nextRunAt)}
+                    </div>
+                  )}
+                  {status.lastRunAt && (
+                    <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', marginTop: 1 }}>
+                      last: {relativeTime(status.lastRunAt)}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>Loading…</div>
+              )}
+
+              <div className="j-mono" style={{ fontSize: 8, color: 'rgba(201,168,76,0.65)', marginTop: 4, lineHeight: 1.5 }}>
+                ⚙ Configure via DIGEST_HOUR / DIGEST_MINUTE Replit Secrets
               </div>
-            ))}
+            </div>
           </div>
+
+          {/* Event-triggered — UI-only placeholders */}
+          <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', letterSpacing: '0.12em', marginBottom: 6, marginTop: 4 }}>EVENT-TRIGGERED</div>
+          {STATIC_EVENTS.map(e => (
+            <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, opacity: 0.45 }}>
+              <div style={{ width: 28, height: 16, borderRadius: 8, background: 'rgba(120,168,220,0.15)', position: 'relative', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: 2, left: 2, width: 12, height: 12, borderRadius: '50%', background: '#fff' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ color: 'var(--j-amber)', display: 'flex' }}>{e.icon}</span>
+                <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)' }}>{e.label}</span>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

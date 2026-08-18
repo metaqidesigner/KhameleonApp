@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
-import { getHealth } from '@/lib/jarvisApi';
+import { getHealth, getSchedulerStatus, type SchedulerStatus } from '@/lib/jarvisApi';
 
 type Section = 'GENERAL' | 'ENGINE' | 'APPEARANCE' | 'CONNECTORS' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED';
 const SECTIONS: Section[] = ['GENERAL', 'ENGINE', 'APPEARANCE', 'CONNECTORS', 'MEMORY', 'TELEMETRY', 'ADVANCED'];
@@ -302,9 +302,77 @@ function AppearanceSection() {
   );
 }
 
+function pad2(n: number) { return String(n).padStart(2, '0'); }
+
+function GeneralSection() {
+  const [sched, setSched] = useState<SchedulerStatus | null>(null);
+  useEffect(() => { getSchedulerStatus().then(setSched); }, []);
+
+  return (
+    <>
+      <Row>
+        <Label>WORKSPACE NAME</Label>
+        <input className="j-input" defaultValue="My Khameleon" />
+      </Row>
+      <Row>
+        <Label>LANGUAGE</Label>
+        <input className="j-input" defaultValue="en" />
+      </Row>
+
+      {/* ── Morning Digest ── */}
+      <div style={{
+        marginTop: 8, marginBottom: 16, padding: '14px 16px',
+        background: 'rgba(56,207,138,0.04)', border: '1px solid rgba(56,207,138,0.18)',
+      }}>
+        <div style={{
+          fontFamily: 'var(--j-font-ui)', fontSize: 11, fontWeight: 700,
+          color: '#38cf8a', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 12,
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <Clock size={12} /> Morning Digest — Status
+        </div>
+
+        {/* Read-only status */}
+        {sched ? (
+          <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: 'var(--j-text-muted)', lineHeight: 1.9 }}>
+            <div>
+              <span style={{ color: sched.enabled ? '#38cf8a' : 'rgba(226,90,110,0.7)' }}>
+                {sched.enabled ? '● Active' : '○ Disabled'}
+              </span>
+            </div>
+            <div>Time: <strong>{pad2(sched.digestHour)}:{pad2(sched.digestMinute)}</strong> (server local time)</div>
+            {sched.enabled && sched.nextRunAt && (
+              <div>⏰ Next run: {new Date(sched.nextRunAt).toLocaleString()}</div>
+            )}
+            {sched.lastRunAt && (
+              <div>Last run: {new Date(sched.lastRunAt).toLocaleString()}</div>
+            )}
+          </div>
+        ) : (
+          <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: 'var(--j-text-faint)' }}>
+            Loading…
+          </div>
+        )}
+
+        {/* Configuration instructions */}
+        <div style={{
+          marginTop: 14, padding: '10px 12px',
+          background: 'rgba(120,168,220,0.04)', border: '1px solid rgba(120,168,220,0.15)',
+          fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', lineHeight: 1.7,
+        }}>
+          <strong style={{ color: 'var(--j-text)' }}>To change the digest time</strong>, set these Replit Secrets and restart the server:<br />
+          <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: 'rgba(120,168,220,0.7)' }}>
+            DIGEST_HOUR — hour to run (0–23, default 7)<br />
+            DIGEST_MINUTE — minute to run (0–59, default 0)
+          </span>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function GenericSection({ section }: { section: Section }) {
   const fields: Record<string, string[][]> = {
-    GENERAL:   [['WORKSPACE NAME', 'My Khameleon'], ['DEFAULT AGENT', 'simple'], ['LANGUAGE', 'en']],
     MEMORY:    [['MAX CHUNKS', '10000'], ['CHUNK SIZE', '512'], ['OVERLAP', '50']],
     TELEMETRY: [['RETENTION DAYS', '30'], ['EXPORT FORMAT', 'json']],
     ADVANCED:  [['API TIMEOUT (ms)', '30000'], ['STREAM BUFFER', '2048'], ['LOG LEVEL', 'info']],
@@ -363,10 +431,11 @@ export default function Settings() {
       {/* Content */}
       <JPanel title={`SETTINGS — ${active}`} icon={<SettingsIcon size={13} />}>
         <div style={{ maxWidth: 520 }}>
+          {active === 'GENERAL'    && <GeneralSection />}
           {active === 'ENGINE'     && <EngineSection health="" />}
           {active === 'APPEARANCE' && <AppearanceSection />}
           {active === 'CONNECTORS' && <ConnectorsSection />}
-          {!['ENGINE', 'APPEARANCE', 'CONNECTORS'].includes(active) && <GenericSection section={active} />}
+          {!['GENERAL', 'ENGINE', 'APPEARANCE', 'CONNECTORS'].includes(active) && <GenericSection section={active} />}
         </div>
       </JPanel>
     </div>

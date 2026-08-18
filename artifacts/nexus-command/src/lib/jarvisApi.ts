@@ -329,6 +329,27 @@ export async function deleteTask(id: number): Promise<void> {
   await fetch(`${BASE}/tasks/${id}`, { method: 'DELETE' });
 }
 
+// ── Scheduler ──────────────────────────────────────────────
+export interface SchedulerStatus {
+  enabled:      boolean;
+  digestHour:   number;
+  digestMinute: number;
+  nextRunAt:    string | null;
+  lastRunAt:    string | null;
+}
+
+export async function getSchedulerStatus(): Promise<SchedulerStatus> {
+  return safeFetch<SchedulerStatus>(
+    `${BASE}/scheduler/status`,
+    undefined,
+    { enabled: true, digestHour: 7, digestMinute: 0, nextRunAt: null, lastRunAt: null },
+  );
+}
+
+// Scheduler config is intentionally read-only from the browser.
+// To change the digest time, set DIGEST_HOUR and DIGEST_MINUTE as Replit Secrets
+// and restart the server. This keeps the control plane out of the browser bundle.
+
 // ── WebSocket streaming ────────────────────────────────────
 export interface StreamDonePayload {
   model: string | null;
