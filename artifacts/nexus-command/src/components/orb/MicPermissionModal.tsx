@@ -78,7 +78,7 @@ export function MicPermissionModal({ onGranted, onSkipped }: Props) {
 
         {/* Body text */}
         <p style={{
-          fontFamily: 'Rajdhani, var(--j-font-mono)',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif',
           fontSize: 13,
           color: '#b8d4e8',
           lineHeight: 1.6,

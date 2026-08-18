@@ -11,13 +11,13 @@ import { MOCK_TELEMETRY } from '@/lib/jarvisApi';
 const CHART_STYLE = {
   background:'transparent',
   cartesianGrid: 'rgba(0,212,255,0.08)',
-  tick: { fontFamily:'Share Tech Mono, monospace', fontSize:9, fill:'var(--j-text-muted)' },
+  tick: { fontFamily:'-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif', fontSize:9, fill:'var(--j-text-muted)' },
 };
 
 const TT = ({ active, payload }: { active?:boolean; payload?:{name?:string; value?:number}[] }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background:'rgba(0,4,12,0.97)', border:'1px solid rgba(0,212,255,0.3)', padding:'5px 10px', fontFamily:'Share Tech Mono, monospace', fontSize:10, color:'var(--j-text)' }}>
+    <div style={{ background:'rgba(0,4,12,0.97)', border:'1px solid rgba(0,212,255,0.3)', padding:'5px 10px', fontFamily:'-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif', fontSize:10, color:'var(--j-text)' }}>
       {payload.map(p => <div key={p.name}>{p.name}: {p.value}</div>)}
     </div>
   );
