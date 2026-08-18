@@ -30,7 +30,6 @@ function Sparkline({ color }: { color: string }) {
 // ── Section status indicator ──────────────────────────────────
 function StatusIcon({ active, done, color }: { active: number; done: number; color: string }) {
   if (done > 0 && active === 0) {
-    // all done — checkmark circle
     return (
       <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
         <circle cx="6.5" cy="6.5" r="5.5" stroke="#6FE6BD" strokeWidth="1.2" />
@@ -39,14 +38,12 @@ function StatusIcon({ active, done, color }: { active: number; done: number; col
     );
   }
   if (active > 0) {
-    // in progress — spinning dashed ring
     return (
       <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ animation: 'jarvis-spin 2s linear infinite' }}>
         <circle cx="6.5" cy="6.5" r="5.5" stroke={color} strokeWidth="1.3" strokeDasharray="5 3" strokeLinecap="round" />
       </svg>
     );
   }
-  // queued / upcoming — faint dashed circle
   return (
     <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
       <circle cx="6.5" cy="6.5" r="5.5" stroke="rgba(196,212,236,0.18)" strokeWidth="1.1" strokeDasharray="2 2" />
@@ -56,32 +53,51 @@ function StatusIcon({ active, done, color }: { active: number; done: number; col
 
 // ── Metric box — glass card ───────────────────────────────────
 function MetricBox({
-  icon, label, value, dotColor = 'rgba(111,230,189,0.6)', amber,
+  icon, label, value, amber,
 }: {
   icon: React.ReactNode; label: string; value: string; dotColor?: string; amber?: boolean;
 }) {
   const accentRgb = amber ? '240,163,76' : '111,230,189';
   return (
-    <div style={{
+    <div className="j-metric-box" style={{
       display: 'flex', flexDirection: 'column', gap: 6,
-      background: `rgba(${accentRgb},0.04)`,
-      border: `1px solid rgba(${accentRgb},0.14)`,
+      background: `rgba(${accentRgb},0.05)`,
+      border: `1px solid rgba(${accentRgb},0.16)`,
       borderRadius: 14,
       padding: '9px 11px',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
-      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06), 0 0 16px rgba(${accentRgb},0.05)`,
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
+      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.10), 0 0 16px rgba(${accentRgb},0.05)`,
       position: 'relative', overflow: 'hidden',
     }}>
-      {/* diagonal sheen */}
-      <div style={{ position: 'absolute', inset: 0, borderRadius: 14, background: 'linear-gradient(140deg, rgba(255,255,255,0.04) 0%, transparent 60%)', pointerEvents: 'none' }} />
+      {/* diagonal sheen — brighter so it reads as glass */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 14,
+        background: 'linear-gradient(140deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 50%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, position: 'relative' }}>
-        {/* colored dot */}
-        <span style={{ width: 5, height: 5, borderRadius: '50%', background: amber ? 'var(--j-amber)' : 'var(--j-teal)', flexShrink: 0, boxShadow: `0 0 4px ${amber ? 'var(--j-amber)' : 'var(--j-teal)'}` }} />
-        <span style={{ color: amber ? 'var(--j-amber)' : 'rgba(196,212,236,0.35)', display: 'flex', flexShrink: 0 }}>{icon}</span>
-        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, fontWeight: 500, color: amber ? 'rgba(240,163,76,0.6)' : 'rgba(196,212,236,0.42)', whiteSpace: 'nowrap', letterSpacing: '0.01em' }}>{label}</span>
+        {/* colored accent dot */}
+        <span style={{
+          width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
+          background: amber ? 'var(--j-amber)' : 'var(--j-teal)',
+          boxShadow: `0 0 4px ${amber ? 'var(--j-amber)' : 'var(--j-teal)'}`,
+        }} />
+        {/* icon — use CSS var so it shifts in light mode */}
+        <span style={{ color: 'var(--j-text-faint)', display: 'flex', flexShrink: 0 }}>{icon}</span>
+        {/* label — CSS var for light-mode contrast */}
+        <span style={{
+          fontFamily: 'var(--j-font-ui)', fontSize: 10, fontWeight: 500,
+          color: amber ? 'var(--j-amber)' : 'var(--j-text-muted)',
+          whiteSpace: 'nowrap', letterSpacing: '0.01em',
+        }}>{label}</span>
       </div>
-      <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 17, fontWeight: 700, color: amber ? 'var(--j-amber)' : '#fff', letterSpacing: '-0.01em', lineHeight: 1, position: 'relative' }}>{value}</div>
+      {/* value — CSS var shifts dark → light */}
+      <div style={{
+        fontFamily: 'var(--j-font-mono)', fontSize: 17, fontWeight: 700,
+        color: amber ? 'var(--j-amber)' : 'var(--j-text)',
+        letterSpacing: '-0.01em', lineHeight: 1, position: 'relative',
+      }}>{value}</div>
     </div>
   );
 }
@@ -92,20 +108,19 @@ function KVRow({ icon, label, value }: { icon: React.ReactNode; label: string; v
     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
       <td style={{ padding: '7px 0', width: '36%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ color: 'rgba(196,212,236,0.25)', display: 'flex', flexShrink: 0 }}>{icon}</span>
-          <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'rgba(196,212,236,0.42)' }}>{label}</span>
+          <span style={{ color: 'var(--j-text-faint)', display: 'flex', flexShrink: 0 }}>{icon}</span>
+          <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'var(--j-text-muted)' }}>{label}</span>
         </div>
       </td>
       <td style={{ padding: '7px 0 7px 6px' }}>
-        <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 12, color: 'rgba(196,212,236,0.28)', marginRight: 8 }}>—</span>
-        <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.65)' }}>{value}</span>
+        <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 12, color: 'var(--j-text-faint)', marginRight: 8 }}>—</span>
+        <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 12, color: 'var(--j-text)' }}>{value}</span>
       </td>
     </tr>
   );
 }
 
 // ── Today's Plan sections ─────────────────────────────────────
-
 const DAY_SECTIONS = [
   { id: 'start_of_day',   label: 'Start of Day',  time: '7–9 AM',       color: '#8C7CF0', icon: <Coffee size={11} /> },
   { id: 'core_work',      label: 'Core Work',      time: '9 AM–12 PM',   color: '#F0A34C', icon: <Sparkles size={11} /> },
@@ -120,7 +135,7 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
   const active = tasks.filter(t => t.status !== 'done');
   const done   = tasks.filter(t => t.status === 'done');
   const col    = section.color;
-  // Convert hex to rgb for rgba() usage
+
   const hexToRgb = (hex: string) => {
     const r = parseInt(hex.slice(1,3),16);
     const g = parseInt(hex.slice(3,5),16);
@@ -130,19 +145,24 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
   const rgb = hexToRgb(col);
 
   return (
-    <div style={{
+    // j-section-pill → enables .light .j-section-pill override in CSS
+    <div className="j-section-pill" style={{
       flex: '1 1 0', minWidth: 120,
-      background: `rgba(${rgb},0.04)`,
-      border: `1px solid rgba(${rgb},0.18)`,
+      background: `rgba(${rgb},0.05)`,
+      border: `1px solid rgba(${rgb},0.20)`,
       borderRadius: 14,
       overflow: 'hidden',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.07), 0 0 20px rgba(${rgb},0.06)`,
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.10), 0 0 20px rgba(${rgb},0.06)`,
       position: 'relative',
     }}>
-      {/* Diagonal sheen */}
-      <div style={{ position: 'absolute', inset: 0, borderRadius: 14, background: 'linear-gradient(140deg, rgba(255,255,255,0.05) 0%, transparent 55%)', pointerEvents: 'none', zIndex: 0 }} />
+      {/* Diagonal sheen — visible light-source streak */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 14,
+        background: 'linear-gradient(140deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 45%, transparent 65%)',
+        pointerEvents: 'none', zIndex: 0,
+      }} />
 
       {/* Sparkline strip */}
       <div style={{ position: 'relative', zIndex: 1, padding: '6px 10px 0', opacity: active.length > 0 ? 1 : 0.4 }}>
@@ -152,15 +172,12 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
       {/* Header */}
       <div
         onClick={() => active.length > 0 && setOpen(o => !o)}
-        style={{
-          padding: '6px 10px 8px',
-          cursor: active.length > 0 ? 'pointer' : 'default',
-          position: 'relative', zIndex: 1,
-        }}
+        style={{ padding: '6px 10px 8px', cursor: active.length > 0 ? 'pointer' : 'default', position: 'relative', zIndex: 1 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
           <span style={{ color: col, display: 'flex', flexShrink: 0 }}>{section.icon}</span>
-          <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, fontWeight: 700, color: '#fff', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {/* CSS var — dark: white; light: #1a2040 */}
+          <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, fontWeight: 700, color: 'var(--j-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {section.label}
           </span>
           <StatusIcon active={active.length} done={done.length} color={col} />
@@ -171,13 +188,13 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
           )}
         </div>
 
-        {/* Time as timestamp-style badge */}
+        {/* Timestamp badge */}
         <div style={{
           display: 'inline-flex', alignItems: 'center',
           fontFamily: 'var(--j-font-mono)', fontSize: 8,
-          color: col, opacity: 0.6,
+          color: col, opacity: 0.65,
           background: `rgba(${rgb},0.10)`,
-          border: `1px solid rgba(${rgb},0.18)`,
+          border: `1px solid rgba(${rgb},0.20)`,
           borderRadius: 4, padding: '1px 5px', marginBottom: 4,
         }}>
           {section.time}
@@ -187,7 +204,7 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{
             fontFamily: 'var(--j-font-mono)', fontSize: 13, fontWeight: 700,
-            color: active.length > 0 ? col : 'rgba(196,212,236,0.25)',
+            color: active.length > 0 ? col : 'var(--j-text-faint)',
           }}>
             {active.length}
           </span>
@@ -244,19 +261,14 @@ function TodaysPlan() {
   }, []);
 
   return (
-    <div style={{
-      flexShrink: 0,
-      background: 'rgba(12,16,36,0.48)',
-      border: '1px solid rgba(240,163,76,0.14)',
-      borderRadius: 14,
-      backdropFilter: 'blur(24px)',
-      WebkitBackdropFilter: 'blur(24px)',
-      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07), 0 0 32px rgba(240,163,76,0.07)',
-      overflow: 'hidden',
-      position: 'relative',
-    }}>
-      {/* sheen */}
-      <div style={{ position: 'absolute', inset: 0, borderRadius: 14, background: 'linear-gradient(145deg, rgba(255,255,255,0.04) 0%, transparent 50%)', pointerEvents: 'none' }} />
+    // j-plan-strip → background/border/blur live in CSS so .light can override
+    <div className="j-plan-strip">
+      {/* diagonal sheen */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 14,
+        background: 'linear-gradient(145deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 45%, transparent 60%)',
+        pointerEvents: 'none',
+      }} />
 
       {/* Header */}
       <div
@@ -265,11 +277,12 @@ function TodaysPlan() {
           display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px',
           cursor: 'pointer', userSelect: 'none',
           borderBottom: open ? '1px solid rgba(240,163,76,0.10)' : 'none',
-          position: 'relative',
+          position: 'relative', zIndex: 1,
         }}
       >
         <CalendarDays size={13} style={{ color: 'var(--j-amber)', flexShrink: 0 }} />
-        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, fontWeight: 600, color: '#fff', flex: 1 }}>Today's Plan</span>
+        {/* CSS var: dark = white, light = #1a2040 */}
+        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, fontWeight: 600, color: 'var(--j-text)', flex: 1 }}>Today's Plan</span>
         <span className="j-mono" style={{ fontSize: 9, color: 'var(--j-text-faint)' }}>
           {totalTasks} task{totalTasks !== 1 ? 's' : ''} total
         </span>
@@ -285,12 +298,14 @@ function TodaysPlan() {
         >
           <Plus size={8} /> Add Tasks
         </button>
-        {open ? <ChevronDown size={11} style={{ color: 'var(--j-text-faint)' }} /> : <ChevronRight size={11} style={{ color: 'var(--j-text-faint)' }} />}
+        {open
+          ? <ChevronDown size={11} style={{ color: 'var(--j-text-faint)' }} />
+          : <ChevronRight size={11} style={{ color: 'var(--j-text-faint)' }} />}
       </div>
 
       {/* Section pills filmstrip */}
       {open && (
-        <div style={{ display: 'flex', gap: 7, padding: '10px 12px', flexWrap: 'wrap', position: 'relative' }}>
+        <div style={{ display: 'flex', gap: 7, padding: '10px 12px', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
           {DAY_SECTIONS.map(s => (
             <SectionPill key={s.id} section={s} tasks={dailyData[s.id] ?? []} />
           ))}
@@ -313,12 +328,9 @@ export default function Overview() {
       {/* ── Top row: System Status + Agent Activity ─── */}
       <div style={{ display: 'flex', gap: 10, flex: '1 1 0', minHeight: 0 }}>
 
-        {/* System Status — thick glass, teal glow rim */}
+        {/* System Status — thicker glass, teal glow rim */}
         <div style={{ flex: '0 0 52%', minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <JPanel
-            title="System status"
-            className="j-panel-thick j-panel-glow-teal"
-          >
+          <JPanel title="System status" className="j-panel-thick j-panel-glow-teal">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <HUDRings health={health} telemetry={telemetry} />
 
@@ -338,8 +350,11 @@ export default function Overview() {
               </table>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, paddingTop: 2 }}>
-                <Activity size={11} style={{ color: isOnline ? 'var(--j-teal)' : 'rgba(196,212,236,0.2)', animation: isOnline ? 'jarvis-pulse 2.5s ease-in-out infinite' : undefined }} />
-                <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, fontStyle: 'italic', color: 'rgba(196,212,236,0.28)' }}>
+                <Activity size={11} style={{
+                  color: isOnline ? 'var(--j-teal)' : 'var(--j-text-faint)',
+                  animation: isOnline ? 'jarvis-pulse 2.5s ease-in-out infinite' : undefined,
+                }} />
+                <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, fontStyle: 'italic', color: 'var(--j-text-faint)' }}>
                   Listening for 'Hello Khameleon'
                 </span>
               </div>
@@ -352,12 +367,18 @@ export default function Overview() {
           <JPanel title="Agent activity" badge="LIVE" className="j-panel-glow-violet">
             {agentHistory.length === 0 ? (
               <div style={{
-                flex: 1, border: '1px dashed rgba(140,124,240,0.15)',
+                flex: 1, border: '1px dashed rgba(140,124,240,0.18)',
                 borderRadius: 12, display: 'flex', flexDirection: 'column',
                 alignItems: 'center', justifyContent: 'center', gap: 18, minHeight: 200,
               }}>
-                <div style={{ width: 44, height: 44, border: '1.5px solid rgba(140,124,240,0.15)', borderTop: '1.5px solid rgba(140,124,240,0.65)', borderRadius: '50%', animation: 'jarvis-spin 2.2s linear infinite' }} />
-                <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'rgba(196,212,236,0.32)', textAlign: 'center', lineHeight: 1.5 }}>
+                <div style={{
+                  width: 44, height: 44,
+                  border: '1.5px solid rgba(140,124,240,0.15)',
+                  borderTop: '1.5px solid rgba(140,124,240,0.65)',
+                  borderRadius: '50%',
+                  animation: 'jarvis-spin 2.2s linear infinite',
+                }} />
+                <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'var(--j-text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
                   No activity — query Khameleon to begin
                 </span>
               </div>
@@ -365,11 +386,11 @@ export default function Overview() {
               <div className="scrollbar-jarvis" style={{ overflowY: 'auto', flex: 1 }}>
                 {agentHistory.slice(0, 30).map(ev => (
                   <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'rgba(196,212,236,0.28)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                       {new Date(ev.ts).toLocaleTimeString('en-US', { hour12: false })}
                     </span>
                     <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-teal)', flexShrink: 0 }}>{ev.agent}</span>
-                    <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {ev.prompt.slice(0, 80)}
                     </span>
                   </div>
