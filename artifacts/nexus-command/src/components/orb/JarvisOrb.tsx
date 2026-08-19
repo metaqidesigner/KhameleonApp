@@ -3,17 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { OrbChatPanel } from './OrbChatPanel';
 import { OutputWaveform } from './VoiceWaveform';
+import { getDefaultOrbPosition, ORB_SIZE, ORB_SIZE_MIN } from '@/lib/orbLayout';
 
-const ORB_SIZE     = 90;
-const ORB_SIZE_MIN = 48;
 const PANEL_W      = 310;
 const PANEL_H      = 420;
 
 function getDefaultPos(): { x: number; y: number } {
-  return {
-    x: window.innerWidth  - ORB_SIZE - 44,
-    y: window.innerHeight - ORB_SIZE - 40,
-  };
+  return getDefaultOrbPosition(window.innerWidth, window.innerHeight);
 }
 
 function clampPos(x: number, y: number, size: number): { x: number; y: number } {
