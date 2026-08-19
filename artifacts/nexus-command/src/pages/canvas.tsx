@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Database, Clock, DollarSign, Zap, Activity, Cpu, Settings as SettingsIcon,
   Coffee, Sparkles, Users, MessageSquare, FileText, SunMedium,
@@ -262,27 +262,50 @@ function isSameDay(a: Date, b: Date) {
 function DigestCountdownBadge({ onClick }: { onClick: () => void }) {
   const [status, setStatus]       = useState<SchedulerStatus | null>(null);
   const [countdown, setCountdown] = useState<string>('');
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const refetchRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
+  const fetchStatus = useCallback(() => {
     getSchedulerStatus().then(setStatus);
   }, []);
 
+  // Initial fetch + 5-minute periodic refresh + re-fetch on window focus
+  useEffect(() => {
+    fetchStatus();
+    refetchRef.current = setInterval(fetchStatus, 5 * 60 * 1000);
+    window.addEventListener('focus', fetchStatus);
+    return () => {
+      if (refetchRef.current) clearInterval(refetchRef.current);
+      window.removeEventListener('focus', fetchStatus);
+    };
+  }, [fetchStatus]);
+
+  // 30-second tick to update the local countdown display
   useEffect(() => {
     if (!status) return;
 
     const tick = () => {
       if (!status.nextRunAt) { setCountdown(''); return; }
       const diff = new Date(status.nextRunAt).getTime() - Date.now();
-      setCountdown(diff > 0 ? formatCountdown(diff) : 'now');
+      if (diff > 0) {
+        setCountdown(formatCountdown(diff));
+      } else {
+        // Countdown expired — re-fetch so we pick up the fresh nextRunAt/lastRunAt
+        setCountdown('now');
+        fetchStatus();
+      }
     };
 
     tick();
     timerRef.current = setInterval(tick, 30000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [status]);
+  }, [status, fetchStatus]);
 
   if (!status) return null;
+
+  const ranTodayStr = status.lastRunAt && isSameDay(new Date(status.lastRunAt), new Date())
+    ? new Date(status.lastRunAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+    : null;
 
   let label: string;
   let accentR: string;
@@ -292,6 +315,11 @@ function DigestCountdownBadge({ onClick }: { onClick: () => void }) {
     label   = 'Digest disabled';
     accentR = '196,212,236';
     accentC = 'var(--j-text-faint)';
+  } else if (ranTodayStr) {
+    // Digest already fired today — show confirmation instead of next-run countdown
+    label   = `Ran today at ${ranTodayStr}`;
+    accentR = '111,230,189';
+    accentC = '#6FE6BD';
   } else if (!status.nextRunAt) {
     label   = 'Digest not scheduled';
     accentR = '196,212,236';
@@ -302,14 +330,10 @@ function DigestCountdownBadge({ onClick }: { onClick: () => void }) {
     accentC = '#F0A34C';
   }
 
-  const ranTodayStr = status.lastRunAt && isSameDay(new Date(status.lastRunAt), new Date())
-    ? new Date(status.lastRunAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-    : null;
-
   return (
     <button
       onClick={onClick}
-      title={ranTodayStr ? `Ran today at ${ranTodayStr} · Click to open Auto Triggers` : 'Click to open Auto Triggers'}
+      title="Click to open Auto Triggers"
       style={{
         display: 'flex', alignItems: 'center', gap: 5,
         background: `rgba(${accentR},0.08)`,
@@ -323,11 +347,6 @@ function DigestCountdownBadge({ onClick }: { onClick: () => void }) {
       <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: accentC, whiteSpace: 'nowrap' }}>
         {label}
       </span>
-      {ranTodayStr && (
-        <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: '#6FE6BD', whiteSpace: 'nowrap' }}>
-          · ✓{ranTodayStr}
-        </span>
-      )}
     </button>
   );
 }
