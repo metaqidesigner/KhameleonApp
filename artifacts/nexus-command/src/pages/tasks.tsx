@@ -1400,7 +1400,13 @@ function AutoTriggers() {
   const [status,   setStatus]   = useState<SchedulerStatus | null>(null);
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => { getSchedulerStatus().then(setStatus); }, []);
+  useEffect(() => {
+    const fetch = () => { getSchedulerStatus().then(setStatus); };
+    fetch();
+    const interval = setInterval(fetch, 5 * 60 * 1000);
+    window.addEventListener('focus', fetch);
+    return () => { clearInterval(interval); window.removeEventListener('focus', fetch); };
+  }, []);
 
   const activeCount = status?.enabled ? 1 : 0;
 

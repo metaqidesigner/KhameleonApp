@@ -306,7 +306,14 @@ function pad2(n: number) { return String(n).padStart(2, '0'); }
 
 function GeneralSection() {
   const [sched, setSched] = useState<SchedulerStatus | null>(null);
-  useEffect(() => { getSchedulerStatus().then(setSched); }, []);
+
+  useEffect(() => {
+    const fetch = () => { getSchedulerStatus().then(setSched); };
+    fetch();
+    const interval = setInterval(fetch, 5 * 60 * 1000);
+    window.addEventListener('focus', fetch);
+    return () => { clearInterval(interval); window.removeEventListener('focus', fetch); };
+  }, []);
 
   return (
     <>
