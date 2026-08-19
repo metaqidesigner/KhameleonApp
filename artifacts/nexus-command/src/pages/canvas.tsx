@@ -68,22 +68,11 @@ function MetricBox({
 }) {
   const accentRgb = amber ? '240,163,76' : '111,230,189';
   return (
-    <div className="j-metric-box" style={{
+    <div className={`j-metric-box${amber ? ' j-metric-box-amber' : ''}`} style={{
       display: 'flex', flexDirection: 'column', gap: 6,
-      background: `rgba(${accentRgb},0.05)`,
-      border: `1px solid rgba(${accentRgb},0.16)`,
-      borderRadius: 14,
       padding: '9px 11px',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.10), 0 0 16px rgba(${accentRgb},0.05)`,
-      position: 'relative', overflow: 'hidden',
+      position: 'relative',
     }}>
-      <div style={{
-        position: 'absolute', inset: 0, borderRadius: 14,
-        background: 'linear-gradient(140deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 50%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, position: 'relative' }}>
         <span style={{
           width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
@@ -149,23 +138,11 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
   const rgb = hexToRgb(col);
 
   return (
-    <div className="j-section-pill" style={{
+    <div className={`j-section-pill j-section-pill-${section.id}`} style={{
       flex: '1 1 0', minWidth: 120,
-      background: `rgba(${rgb},0.05)`,
-      border: `1px solid rgba(${rgb},0.20)`,
-      borderRadius: 14,
       overflow: 'hidden',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.10), 0 0 20px rgba(${rgb},0.06)`,
       position: 'relative',
     }}>
-      <div style={{
-        position: 'absolute', inset: 0, borderRadius: 14,
-        background: 'linear-gradient(140deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 45%, transparent 65%)',
-        pointerEvents: 'none', zIndex: 0,
-      }} />
-
       <div style={{ position: 'relative', zIndex: 1, padding: '6px 10px 0', opacity: active.length > 0 ? 1 : 0.4 }}>
         <Sparkline color={col} />
       </div>
@@ -537,7 +514,7 @@ export default function UnifiedCanvas() {
         <FloatingWindow icon={<Compass size={11} />} label="Khameleon" windowId="khameleon">
           <div className="ac-concept-pills" style={{ maxWidth: 'none' }}>
             {PILLS.map(pill => (
-              <div key={pill.id} className="ac-pill">
+              <div key={pill.id} className={`ac-pill ac-pill-${pill.id}`}>
                 <div className="ac-pill-label">
                   <span className="ac-pill-dot" style={{ background: pill.dot }} />
                   <span style={{ color: pill.dot }}>{pill.label}</span>

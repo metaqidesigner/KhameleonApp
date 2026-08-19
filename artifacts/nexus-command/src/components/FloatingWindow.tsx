@@ -57,7 +57,7 @@ export function FloatingWindow({
 
   return (
     <div
-      className={`kc-window${focused ? ' kc-window-focused' : ''}${minimized ? ' kc-window-min' : ''}`}
+      className={`kc-window${windowId ? ` kc-window-${windowId}` : ''}${focused ? ' kc-window-focused' : ''}${minimized ? ' kc-window-min' : ''}`}
       style={grow && !minimized ? { flex: '1 1 0', minHeight: 0 } : undefined}
     >
       <div className="kc-window-titlebar">
