@@ -149,6 +149,7 @@ export function VoiceController() {
       }
     }
     prevOrbStatus.current = orbStatus;
+    return undefined;
   }, [orbStatus, wakeWordActive, wakeWordBlocked, startWakeListener]);
 
   // Boot sequence on mount
