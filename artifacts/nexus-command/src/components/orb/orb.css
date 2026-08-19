@@ -614,7 +614,7 @@
 .orb-msg {
   max-width: 90%;
   padding: 6px 8px;
-  font-family: var(--j-font-head);
+  font-family: var(--j-font-ui);
   font-size: 12px;
   line-height: 1.5;
   word-break: break-word;
@@ -703,7 +703,7 @@
   background: rgba(0,212,255,0.05);
   border: 1px solid rgba(0,212,255,0.2);
   color: #b8d4e8;
-  font-family: var(--j-font-head);
+  font-family: var(--j-font-ui);
   font-size: 12px;
   padding: 4px 8px;
   outline: none;

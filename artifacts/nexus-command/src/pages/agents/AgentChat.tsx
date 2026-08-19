@@ -185,12 +185,12 @@ export default function AgentChat() {
 
       {/* ── Agent picker ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(0,4,12,0.8)', border: '1px solid rgba(0,212,255,0.12)', position: 'relative', flexShrink: 0 }}>
-        <div style={{ width: 28, height: 28, borderRadius: '50%', background: agent?.color ?? '#00d4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-head)', fontSize: 10, fontWeight: 700, color: '#000' }}>
+        <div style={{ width: 28, height: 28, borderRadius: '50%', background: agent?.color ?? '#00d4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-ui)', fontSize: 10, fontWeight: 700, color: '#000' }}>
           {agent?.initials ?? '?'}
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 12, color: '#fff', letterSpacing: '0.08em' }}>{agent?.name ?? '—'}</span>
+            <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: '#fff', letterSpacing: '0.08em' }}>{agent?.name ?? '—'}</span>
             {agent?.useTools && (
               <span title="Tool-use enabled" style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#c9a84c', fontSize: 8 }}>
                 <Wrench size={9} /> TOOLS
@@ -211,10 +211,10 @@ export default function AgentChat() {
                 style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', cursor: 'pointer', background: a.id === agentId ? 'rgba(0,212,255,0.08)' : 'transparent', borderBottom: '1px solid rgba(0,212,255,0.05)' }}
               >
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLOR.standby, flexShrink: 0 }} />
-                <div style={{ width: 24, height: 24, borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-head)', fontSize: 9, fontWeight: 700, color: '#000' }}>{a.initials}</div>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-ui)', fontSize: 9, fontWeight: 700, color: '#000' }}>{a.initials}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 11, color: '#fff' }}>{a.name}</span>
+                    <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: '#fff' }}>{a.name}</span>
                     {a.useTools && <Wrench size={8} style={{ color: '#c9a84c' }} />}
                   </div>
                   <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-muted)' }}>{a.model}</div>
@@ -229,7 +229,7 @@ export default function AgentChat() {
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }} className="scrollbar-jarvis">
         {messages.length === 0 ? (
           <div className="j-empty" style={{ margin: 'auto', flexDirection: 'column', gap: 8 }}>
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: agent?.color ?? '#00d4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-head)', fontSize: 16, fontWeight: 700, color: '#000' }}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: agent?.color ?? '#00d4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-ui)', fontSize: 16, fontWeight: 700, color: '#000' }}>
               {agent?.initials ?? '?'}
             </div>
             <span>DIRECT CHANNEL TO {agent?.name ?? 'AGENT'}</span>

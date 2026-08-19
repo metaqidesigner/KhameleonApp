@@ -42,7 +42,7 @@ export default function JPanel({
             </span>
           )}
           <span style={{
-            fontFamily: 'var(--j-font-ui)',
+            fontFamily: 'var(--j-font-head)',
             fontSize: 14,
             fontWeight: 600,
             color: '#fff',

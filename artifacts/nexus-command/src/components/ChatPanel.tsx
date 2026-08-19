@@ -179,7 +179,7 @@ export default function ChatPanel() {
             flexShrink: 0,
           }}>
             <Bot size={14} style={{ color: 'var(--j-teal)' }} />
-            <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 11, color: '#fff', letterSpacing: '0.22em', flex: 1 }}>
+            <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: '#fff', letterSpacing: '0.22em', flex: 1 }}>
               COMMAND INTERFACE
             </span>
             {/* Agent selector */}

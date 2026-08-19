@@ -3,7 +3,7 @@ export default function Projects() {
     <div className="j-page">
       <div className="j-page-header">
         <div>
-          <h1>Projects</h1>
+          <h1 className="j-brand">Projects</h1>
           <p>Task boards and project tracking powered by Jarvis</p>
         </div>
         <button className="j-btn j-btn-primary">+ New Project</button>

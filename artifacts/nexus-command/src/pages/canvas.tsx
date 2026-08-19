@@ -411,7 +411,7 @@ function FocusRing({ pct }: { pct: number }) {
       />
       <text x={cx} y={cy + 1}
         textAnchor="middle" dominantBaseline="middle"
-        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif"
+        fontFamily="var(--j-font-ui)"
         fontSize="9" fontWeight="600" fill="rgba(196,212,236,0.80)">
         {Math.round(pct * 100)}%
       </text>

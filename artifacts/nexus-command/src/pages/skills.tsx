@@ -57,7 +57,7 @@ export default function Skills() {
               <tbody>
                 {skills.map(s => (
                   <tr key={s.id}>
-                    <td style={{ fontFamily:'var(--j-font-head)', fontSize:11 }}>{s.name.toUpperCase()}</td>
+                    <td style={{ fontFamily:'var(--j-font-ui)', fontSize:11 }}>{s.name.toUpperCase()}</td>
                     <td className="j-mono" style={{ fontSize:10, color:'var(--j-cyan)' }}>{s.source}</td>
                     <td><span className="j-badge j-badge-green" style={{ fontSize:8 }}>ACTIVE</span></td>
                     <td className="j-mono" style={{ fontSize:10, color:'var(--j-text-muted)' }}>—</td>

@@ -229,7 +229,7 @@ export default function Memory() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%' }}>
               <input
                 className="j-input"
-                style={{ fontFamily: 'var(--j-font-head)', fontSize: 13, letterSpacing: '0.04em', height: 40, flexShrink: 0 }}
+                style={{ fontFamily: 'var(--j-font-ui)', fontSize: 13, letterSpacing: '0.04em', height: 40, flexShrink: 0 }}
                 placeholder="SEARCH INDEXED MEMORY..."
                 value={searchQ}
                 onChange={e => setSearchQ(e.target.value)}

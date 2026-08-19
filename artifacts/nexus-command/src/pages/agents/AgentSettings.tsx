@@ -55,9 +55,9 @@ export default function AgentSettings() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {roster.map(a => (
             <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'rgba(0,212,255,0.02)', border: '1px solid rgba(0,212,255,0.07)' }}>
-              <div style={{ width: 26, height: 26, borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-head)', fontSize: 9, fontWeight: 700, color: '#000', flexShrink: 0 }}>{a.initials}</div>
+              <div style={{ width: 26, height: 26, borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-ui)', fontSize: 9, fontWeight: 700, color: '#000', flexShrink: 0 }}>{a.initials}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: 'var(--j-font-head)', fontSize: 11, color: '#fff' }}>{a.name}</div>
+                <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: '#fff' }}>{a.name}</div>
                 <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-muted)' }}>{a.model}</div>
               </div>
               <span className="j-badge" style={{ fontSize: 7, color: 'var(--j-text-faint)' }}>{a.apiKey === 'SET' ? '●KEY' : a.apiKey === 'NOT SET' ? '○KEY' : '●INT'}</span>

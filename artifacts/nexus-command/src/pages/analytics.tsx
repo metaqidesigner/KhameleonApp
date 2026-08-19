@@ -11,13 +11,13 @@ import { MOCK_TELEMETRY } from '@/lib/jarvisApi';
 const CHART_STYLE = {
   background:'transparent',
   cartesianGrid: 'rgba(0,212,255,0.08)',
-  tick: { fontFamily:'-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif', fontSize:9, fill:'var(--j-text-muted)' },
+  tick: { fontFamily:'var(--j-font-ui)', fontSize:9, fill:'var(--j-text-muted)' },
 };
 
 const TT = ({ active, payload }: { active?:boolean; payload?:{name?:string; value?:number}[] }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background:'rgba(0,4,12,0.97)', border:'1px solid rgba(0,212,255,0.3)', padding:'5px 10px', fontFamily:'-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif', fontSize:10, color:'var(--j-text)' }}>
+    <div style={{ background:'rgba(0,4,12,0.97)', border:'1px solid rgba(0,212,255,0.3)', padding:'5px 10px', fontFamily:'var(--j-font-ui)', fontSize:10, color:'var(--j-text)' }}>
       {payload.map(p => <div key={p.name}>{p.name}: {p.value}</div>)}
     </div>
   );
@@ -101,7 +101,7 @@ export default function Analytics() {
                   const st = s as { queries:number; avg_latency:number; avg_tokens:number; avg_cost:number; total_cost:number; p95_latency?:number };
                   return (
                     <tr key={agent}>
-                      <td style={{ fontFamily:'var(--j-font-head)', fontSize:11 }}>{String(agent).replace('_',' ').toUpperCase()}</td>
+                      <td style={{ fontFamily:'var(--j-font-ui)', fontSize:11 }}>{String(agent).replace('_',' ').toUpperCase()}</td>
                       <td className="j-mono">{st.queries}</td>
                       <td className="j-mono">{st.avg_latency.toFixed(0)}ms</td>
                       <td className="j-mono">{(st.p95_latency ?? st.avg_latency * 1.8).toFixed(0)}ms</td>

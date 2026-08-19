@@ -36,7 +36,7 @@ export default function Agents() {
             onClick={() => setSubTab(t.id)}
             style={{
               padding: '4px 12px',
-              fontFamily: 'var(--j-font-head)',
+              fontFamily: 'var(--j-font-ui)',
               fontSize: 10,
               letterSpacing: '0.08em',
               color: subTab === t.id ? 'var(--j-cyan)' : 'var(--j-text-muted)',

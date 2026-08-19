@@ -52,7 +52,7 @@ export default function Compare() {
         {roster.map(a => {
           const sel = selectedIds.includes(a.id);
           return (
-            <button key={a.id} onClick={() => toggleAgent(a.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', background: sel ? `${a.color}20` : 'rgba(0,212,255,0.03)', border: `1px solid ${sel ? a.color : 'rgba(0,212,255,0.1)'}`, cursor: 'pointer', color: sel ? a.color : 'var(--j-text-muted)', fontFamily: 'var(--j-font-head)', fontSize: 9, transition: 'all 0.15s' }}>
+            <button key={a.id} onClick={() => toggleAgent(a.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', background: sel ? `${a.color}20` : 'rgba(0,212,255,0.03)', border: `1px solid ${sel ? a.color : 'rgba(0,212,255,0.1)'}`, cursor: 'pointer', color: sel ? a.color : 'var(--j-text-muted)', fontFamily: 'var(--j-font-ui)', fontSize: 9, transition: 'all 0.15s' }}>
               <div style={{ width: 16, height: 16, borderRadius: '50%', background: sel ? a.color : '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: sel ? '#000' : 'var(--j-text-muted)' }}>{a.initials}</div>
               {a.name}
             </button>
@@ -74,7 +74,7 @@ export default function Compare() {
                   <tr key={r.agentId}>
                     <td style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ width: 18, height: 18, borderRadius: '50%', background: cfg?.color ?? '#00d4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: '#000' }}>{cfg?.initials ?? '?'}</div>
-                      <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 11 }}>{cfg?.name ?? r.agentId}</span>
+                      <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11 }}>{cfg?.name ?? r.agentId}</span>
                     </td>
                     <td className="j-mono" style={{ color: r.agentId === fastest?.agentId ? 'var(--j-green)' : undefined }}>{r.error ? '—' : `${r.latencyMs}ms`}</td>
                     <td className="j-mono">{r.error ? '—' : r.tokens}</td>

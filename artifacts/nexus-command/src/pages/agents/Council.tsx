@@ -52,7 +52,7 @@ export default function Council() {
           const sel = selectedIds.includes(a.id);
           return (
             <button key={a.id} onClick={() => setSelectedIds(prev => prev.includes(a.id) ? prev.filter(x => x !== a.id) : [...prev, a.id])}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', background: sel ? `${a.color}20` : 'rgba(0,212,255,0.03)', border: `1px solid ${sel ? a.color : 'rgba(0,212,255,0.1)'}`, cursor: 'pointer', color: sel ? a.color : 'var(--j-text-muted)', fontFamily: 'var(--j-font-head)', fontSize: 9, transition: 'all 0.15s' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', background: sel ? `${a.color}20` : 'rgba(0,212,255,0.03)', border: `1px solid ${sel ? a.color : 'rgba(0,212,255,0.1)'}`, cursor: 'pointer', color: sel ? a.color : 'var(--j-text-muted)', fontFamily: 'var(--j-font-ui)', fontSize: 9, transition: 'all 0.15s' }}>
               <div style={{ width: 16, height: 16, borderRadius: '50%', background: sel ? a.color : '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: sel ? '#000' : 'var(--j-text-muted)' }}>{a.initials}</div>
               {a.name}
             </button>
@@ -83,7 +83,7 @@ export default function Council() {
                       <div key={r.agentId} style={{ padding: '8px 10px', background: 'rgba(0,212,255,0.03)', border: '1px solid rgba(0,212,255,0.08)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                           <div style={{ width: 20, height: 20, borderRadius: '50%', background: cfg?.color ?? '#00d4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: '#000' }}>{cfg?.initials ?? '?'}</div>
-                          <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 10, color: '#fff' }}>{cfg?.name ?? r.agentId}</span>
+                          <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, color: '#fff' }}>{cfg?.name ?? r.agentId}</span>
                           <span className="j-mono" style={{ marginLeft: 'auto', fontSize: 8, color: 'var(--j-text-faint)' }}>{r.latencyMs}ms</span>
                         </div>
                         <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: r.error ? 'var(--j-red)' : 'var(--j-text)', lineHeight: 1.55, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }} className="scrollbar-jarvis">
@@ -96,7 +96,7 @@ export default function Council() {
                 {/* synthesis */}
                 {round.synthesis && (
                   <div style={{ padding: '10px 12px', background: 'rgba(192,21,42,0.06)', border: '1px solid rgba(192,21,42,0.3)', borderLeft: '3px solid var(--j-red)' }}>
-                    <div style={{ fontFamily: 'var(--j-font-head)', fontSize: 10, color: 'var(--j-red)', letterSpacing: '0.08em', marginBottom: 8 }}>⚖ COUNCIL SYNTHESIS</div>
+                    <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, color: 'var(--j-red)', letterSpacing: '0.08em', marginBottom: 8 }}>⚖ COUNCIL SYNTHESIS</div>
                     <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 11, color: 'var(--j-text)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{round.synthesis.content}</div>
                   </div>
                 )}

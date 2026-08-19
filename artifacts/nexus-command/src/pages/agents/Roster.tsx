@@ -75,13 +75,13 @@ export default function Roster({ onSelectAgent }: { onSelectAgent?: (id: string)
                   {/* status dot */}
                   <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0, boxShadow: `0 0 6px ${color}` }} />
                   {/* avatar */}
-                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: cfg.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-head)', fontSize: 11, fontWeight: 700, color: '#000', flexShrink: 0 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: cfg.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-ui)', fontSize: 11, fontWeight: 700, color: '#000', flexShrink: 0 }}>
                     {cfg.initials}
                   </div>
                   {/* name + model */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 12, color: '#fff', letterSpacing: '0.08em' }}>{cfg.name}</span>
+                      <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: '#fff', letterSpacing: '0.08em' }}>{cfg.name}</span>
                       <span className="j-badge" style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.2)', color: 'var(--j-text-muted)', fontSize: 8 }}>{PROVIDER_LABELS[cfg.provider]}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
@@ -128,11 +128,11 @@ export default function Roster({ onSelectAgent }: { onSelectAgent?: (id: string)
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* identity */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 14px', background: 'rgba(0,212,255,0.03)', border: '1px solid rgba(0,212,255,0.1)' }}>
-              <div style={{ width: 56, height: 56, borderRadius: '50%', background: selRow.config.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-head)', fontSize: 18, fontWeight: 700, color: '#000', flexShrink: 0 }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: selRow.config.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-ui)', fontSize: 18, fontWeight: 700, color: '#000', flexShrink: 0 }}>
                 {selRow.config.initials}
               </div>
               <div>
-                <div style={{ fontFamily: 'var(--j-font-head)', fontSize: 16, color: '#fff', letterSpacing: '0.1em' }}>{selRow.config.name}</div>
+                <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 16, color: '#fff', letterSpacing: '0.1em' }}>{selRow.config.name}</div>
                 <div className="j-mono" style={{ fontSize: 11, color: 'var(--j-text-muted)', marginTop: 3 }}>{selRow.config.model}</div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
                   <span className="j-badge j-badge-cyan">{PROVIDER_LABELS[selRow.config.provider]}</span>

@@ -23,7 +23,7 @@ export default function ProjectDetail() {
       
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{project.name}</h1>
+          <h1 className="j-brand text-3xl font-bold tracking-tight text-foreground">{project.name}</h1>
           <p className="text-muted-foreground mt-2">{project.description}</p>
           <div className="flex gap-2 mt-3">
             {project.tags?.map(tag => (

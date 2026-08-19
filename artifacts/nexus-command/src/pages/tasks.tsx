@@ -798,7 +798,7 @@ function BreakdownPanel({ task, onClose, onDone }: BreakdownPanelProps) {
       }}>
         <Bot size={12} style={{ color: orchColor }} />
         <span style={{
-          fontFamily: 'var(--j-font-head)', fontSize: 10, color: orchColor,
+          fontFamily: 'var(--j-font-ui)', fontSize: 10, color: orchColor,
           letterSpacing: '0.12em',
         }}>ORCHESTRATOR</span>
         <span style={{
@@ -1421,7 +1421,7 @@ function AutoTriggers() {
         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', userSelect: 'none' }}
       >
         <Zap size={11} style={{ color: 'var(--j-violet)' }} />
-        <span style={{ fontFamily: 'var(--j-font-head)', fontSize: 10, color: 'var(--j-text-muted)', letterSpacing: '0.15em', flex: 1 }}>
+        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, color: 'var(--j-text-muted)', letterSpacing: '0.15em', flex: 1 }}>
           AUTO TRIGGERS
         </span>
         <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{activeCount} active</span>

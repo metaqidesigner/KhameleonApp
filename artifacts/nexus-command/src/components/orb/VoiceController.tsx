@@ -232,7 +232,7 @@ export function VoiceController() {
             bottom: 36,
             left: 14,
             zIndex: 9997,
-            fontFamily: '"Share Tech Mono", var(--j-font-mono)',
+            fontFamily: 'var(--j-font-mono)',
             fontSize: 10,
             color: indicatorColor,
             letterSpacing: '0.08em',

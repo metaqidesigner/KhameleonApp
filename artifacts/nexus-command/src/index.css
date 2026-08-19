@@ -1,4 +1,4 @@
-/* system sans-serif — no external font import needed */
+/* Typography is loaded from Google Fonts in index.html. */
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -35,10 +35,12 @@
   --j-text-muted: #586898;
   --j-text-faint: #283258;
 
-  /* Fonts */
-  --j-font-ui:   -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
-  --j-font-head: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
-  --j-font-mono: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  /* Fonts — Inter for scanned interface text, Jakarta for display moments */
+  --j-font-ui:   "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --j-font-head: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --j-font-mono: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: var(--j-font-ui);
+  --font-mono: var(--j-font-mono);
 
   /* Tailwind compat */
   --background: 228 55% 7%;
@@ -383,6 +385,7 @@ html, body, #root {
 .j-mono    { font-family: var(--j-font-mono); }
 .j-orbitron { font-family: var(--j-font-head); }
 .j-rajdhani { font-family: var(--j-font-ui); }
+.j-brand    { font-family: var(--j-font-head); }
 .j-muted   { color: var(--j-text-muted); }
 .j-faint   { color: var(--j-text-faint); }
 .j-cyan    { color: var(--j-teal); }
@@ -1122,7 +1125,7 @@ html.light body {
   flex-shrink: 0;
 }
 .ac-greeting-title {
-  font-family: var(--j-font-ui);
+  font-family: var(--j-font-head);
   font-size: 17px;
   font-weight: 600;
   color: var(--j-text);
