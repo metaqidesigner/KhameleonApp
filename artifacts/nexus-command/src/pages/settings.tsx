@@ -304,8 +304,19 @@ function AppearanceSection() {
 
 function pad2(n: number) { return String(n).padStart(2, '0'); }
 
+function formatNextRun(iso: string | null, now = Date.now()): string {
+  if (!iso) return '—';
+  const diff = new Date(iso).getTime() - now;
+  if (diff < 0) return 'now';
+  const hh = Math.floor(diff / 3_600_000);
+  const mm = Math.floor((diff % 3_600_000) / 60_000);
+  if (hh > 0) return `in ${hh}h ${mm}m`;
+  return `in ${mm}m`;
+}
+
 function GeneralSection() {
   const [sched, setSched] = useState<SchedulerStatus | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const fetch = () => { getSchedulerStatus().then(setSched); };
@@ -313,6 +324,11 @@ function GeneralSection() {
     const interval = setInterval(fetch, 5 * 60 * 1000);
     window.addEventListener('focus', fetch);
     return () => { clearInterval(interval); window.removeEventListener('focus', fetch); };
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -349,7 +365,7 @@ function GeneralSection() {
             </div>
             <div>Time: <strong>{pad2(sched.digestHour)}:{pad2(sched.digestMinute)}</strong> (server local time)</div>
             {sched.enabled && sched.nextRunAt && (
-              <div>⏰ Next run: {new Date(sched.nextRunAt).toLocaleString()}</div>
+              <div>⏰ Next run: {new Date(sched.nextRunAt).toLocaleString()} ({formatNextRun(sched.nextRunAt, now)})</div>
             )}
             {sched.lastRunAt && (
               <div>Last run: {new Date(sched.lastRunAt).toLocaleString()}</div>

@@ -1385,10 +1385,10 @@ function ToggleSwitch({ active, onChange, color = 'var(--j-violet)' }: { active:
 
 function pad2(n: number) { return String(n).padStart(2, '0'); }
 
-function formatNextRun(iso: string | null): string {
+function formatNextRun(iso: string | null, now = Date.now()): string {
   if (!iso) return '—';
   const d = new Date(iso);
-  const diff = d.getTime() - Date.now();
+  const diff = d.getTime() - now;
   if (diff < 0) return 'now';
   const hh = Math.floor(diff / 3_600_000);
   const mm = Math.floor((diff % 3_600_000) / 60_000);
@@ -1399,6 +1399,7 @@ function formatNextRun(iso: string | null): string {
 function AutoTriggers() {
   const [status,   setStatus]   = useState<SchedulerStatus | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const fetch = () => { getSchedulerStatus().then(setStatus); };
@@ -1406,6 +1407,11 @@ function AutoTriggers() {
     const interval = setInterval(fetch, 5 * 60 * 1000);
     window.addEventListener('focus', fetch);
     return () => { clearInterval(interval); window.removeEventListener('focus', fetch); };
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const activeCount = status?.enabled ? 1 : 0;
@@ -1465,7 +1471,7 @@ function AutoTriggers() {
                   </div>
                   {status.enabled && status.nextRunAt && (
                     <div className="j-mono" style={{ fontSize: 8, color: 'var(--j-violet)', marginTop: 2 }}>
-                      ⏰ {formatNextRun(status.nextRunAt)}
+                      ⏰ {formatNextRun(status.nextRunAt, now)}
                     </div>
                   )}
                   {status.lastRunAt && (
