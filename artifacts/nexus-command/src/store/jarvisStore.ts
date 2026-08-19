@@ -68,6 +68,8 @@ export interface VoiceSettings {
 interface JarvisStore {
   activeTab: TabId;
   chatOpen: boolean;
+  /** Persisted minimised state for each named canvas window */
+  canvasWindowsMinimized: Record<string, boolean>;
   chatMessages: ChatMessage[];
   isStreaming: boolean;
   selectedAgent: AgentType;
@@ -106,6 +108,7 @@ interface JarvisStore {
   setScanLines: (v: boolean) => void;
   setCornerBrackets: (v: boolean) => void;
   setTickerSpeed: (v: number) => void;
+  setCanvasWindowMinimized: (id: string, v: boolean) => void;
 
   addActiveTask: (id: string) => void;
   removeActiveTask: (id: string) => void;
@@ -129,6 +132,7 @@ export const useJarvisStore = create<JarvisStore>()(
   persist(
     (set) => ({
       activeTab: 'overview',
+      canvasWindowsMinimized: {},
       chatOpen: false,
       chatMessages: [],
       isStreaming: false,
@@ -182,6 +186,9 @@ export const useJarvisStore = create<JarvisStore>()(
       setScanLines:          (v)      => set({ scanLinesEnabled: v }),
       setCornerBrackets:     (v)      => set({ cornerBracketsEnabled: v }),
       setTickerSpeed:        (v)      => set({ tickerSpeed: v }),
+      setCanvasWindowMinimized: (id, v) => set(s => ({
+        canvasWindowsMinimized: { ...s.canvasWindowsMinimized, [id]: v },
+      })),
 
       addActiveTask:    (id) => set(s => ({ activeTaskIds: [...new Set([...s.activeTaskIds, id])] })),
       removeActiveTask: (id) => set(s => ({ activeTaskIds: s.activeTaskIds.filter(x => x !== id) })),
@@ -204,6 +211,7 @@ export const useJarvisStore = create<JarvisStore>()(
       name: 'jarvis-ui',
       partialize: (s) => ({
         activeTab: s.activeTab,
+        canvasWindowsMinimized: s.canvasWindowsMinimized,
         panelLayouts: s.panelLayouts,
         scanLinesEnabled: s.scanLinesEnabled,
         cornerBracketsEnabled: s.cornerBracketsEnabled,

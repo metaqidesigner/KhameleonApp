@@ -534,7 +534,7 @@ export default function UnifiedCanvas() {
     <div className="kc-canvas">
       {/* ── Left zone: in-progress work ─────────────────── */}
       <div className="kc-col kc-col-left">
-        <FloatingWindow icon={<Compass size={11} />} label="Khameleon">
+        <FloatingWindow icon={<Compass size={11} />} label="Khameleon" windowId="khameleon">
           <div className="ac-concept-pills" style={{ maxWidth: 'none' }}>
             {PILLS.map(pill => (
               <div key={pill.id} className="ac-pill">
@@ -548,21 +548,21 @@ export default function UnifiedCanvas() {
           </div>
         </FloatingWindow>
 
-        <FloatingWindow icon={<ListTodo size={11} />} label="Today's Plan" grow>
+        <FloatingWindow icon={<ListTodo size={11} />} label="Today's Plan" windowId="todays-plan" grow>
           <TodaysPlanBody />
         </FloatingWindow>
       </div>
 
       {/* ── Centre zone: finished / result-ready ─────────── */}
       <div className="kc-col kc-col-centre">
-        <FloatingWindow icon={<Radio size={11} />} label="Agent Activity" badge="LIVE" focused={activityFocused} grow>
+        <FloatingWindow icon={<Radio size={11} />} label="Agent Activity" windowId="agent-activity" badge="LIVE" focused={activityFocused} grow>
           <AgentActivityBody />
         </FloatingWindow>
       </div>
 
       {/* ── Right zone: supporting info + chat ───────────── */}
       <div className="kc-col kc-col-right">
-        <FloatingWindow icon={<Gauge size={11} />} label="System Status">
+        <FloatingWindow icon={<Gauge size={11} />} label="System Status" windowId="system-status">
           <SystemStatusBody />
         </FloatingWindow>
 
