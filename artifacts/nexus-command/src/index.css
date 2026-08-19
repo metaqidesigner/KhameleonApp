@@ -924,6 +924,7 @@ html.light body {
   left: 60px;
   bottom: 28px;
   width: 76px;
+  height: 100px;
   background: rgba(8, 10, 18, 0.90);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);

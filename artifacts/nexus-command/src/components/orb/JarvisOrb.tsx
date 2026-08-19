@@ -3,20 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { OrbChatPanel } from './OrbChatPanel';
 import { OutputWaveform } from './VoiceWaveform';
-import { getDefaultOrbPosition, ORB_SIZE, ORB_SIZE_MIN } from '@/lib/orbLayout';
+import { clampOrbPosition, getDefaultOrbPosition, ORB_SIZE, ORB_SIZE_MIN } from '@/lib/orbLayout';
 
 const PANEL_W      = 310;
 const PANEL_H      = 420;
 
 function getDefaultPos(): { x: number; y: number } {
   return getDefaultOrbPosition(window.innerWidth, window.innerHeight);
-}
-
-function clampPos(x: number, y: number, size: number): { x: number; y: number } {
-  return {
-    x: Math.max(0, Math.min(x, window.innerWidth  - size)),
-    y: Math.max(0, Math.min(y, window.innerHeight - size)),
-  };
 }
 
 function calcPanelPos(
@@ -67,6 +60,28 @@ export function JarvisOrb() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const panelPos = calcPanelPos(pos.x, pos.y, orbSize);
+
+  // A saved position can outlive a viewport resize. Normalize it before the
+  // next interaction so the orb never starts on top of the focus card.
+  useEffect(() => {
+    if (!orbPosition) return;
+    const normalizePosition = () => {
+      const safePosition = clampOrbPosition(
+        orbPosition.x,
+        orbPosition.y,
+        window.innerWidth,
+        window.innerHeight,
+        orbSize,
+      );
+      if (safePosition.x !== orbPosition.x || safePosition.y !== orbPosition.y) {
+        setOrbPosition(safePosition);
+      }
+    };
+
+    normalizePosition();
+    window.addEventListener('resize', normalizePosition);
+    return () => window.removeEventListener('resize', normalizePosition);
+  }, [orbPosition, orbSize, setOrbPosition]);
 
   // ── Speaking amplitude pulse ──────────────────────────────────
   // Overlapping sine waves simulate organic TTS amplitude so the core
@@ -137,7 +152,13 @@ export function JarvisOrb() {
     if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
       didDragRef.current = true;
       if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
-      const clamped = clampPos(dragRef.current.origX + dx, dragRef.current.origY + dy, orbSize);
+      const clamped = clampOrbPosition(
+        dragRef.current.origX + dx,
+        dragRef.current.origY + dy,
+        window.innerWidth,
+        window.innerHeight,
+        orbSize,
+      );
       setOrbPosition(clamped);
     }
   }, [orbSize, setOrbPosition]);

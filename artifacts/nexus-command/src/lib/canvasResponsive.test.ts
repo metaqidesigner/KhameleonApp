@@ -2,10 +2,13 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   FOCUS_CARD_BOTTOM,
+  FOCUS_CARD_HEIGHT,
   FOCUS_CARD_LEFT,
   FOCUS_CARD_WIDTH,
+  clampOrbPosition,
   getFocusCardRect,
   getOrbRect,
+  getOrbVisualRect,
   rectsOverlap,
 } from './orbLayout';
 
@@ -111,18 +114,86 @@ describe('canvas floating controls', () => {
     expect(declaration(focusCard, 'left')).toBe(`${FOCUS_CARD_LEFT}px`);
     expect(declaration(focusCard, 'bottom')).toBe(`${FOCUS_CARD_BOTTOM}px`);
     expect(declaration(focusCard, 'width')).toBe(`${FOCUS_CARD_WIDTH}px`);
+    expect(declaration(focusCard, 'height')).toBe(`${FOCUS_CARD_HEIGHT}px`);
   });
 
-  it.each([1000, 1200, 1401])(
-    'keeps the default orb separate from the fixed focus card at %dpx',
+  it.each([320, 360, 1000, 1200, 1401])(
+    'keeps the default orb envelope separate from the fixed focus card at %dpx',
     width => {
       const viewportHeight = 800;
+      const orb = getOrbRect(width, viewportHeight);
       expect(
         rectsOverlap(
           getFocusCardRect(viewportHeight),
-          getOrbRect(width, viewportHeight),
+          getOrbVisualRect(orb.left, orb.top),
         ),
       ).toBe(false);
     },
   );
+
+  it.each([360, 768, 1000, 1200, 1401, 1920])(
+    'keeps a dragged full-size orb out of the focus card at %dpx',
+    width => {
+      const viewportHeight = 800;
+      const focus = getFocusCardRect(viewportHeight);
+      const position = clampOrbPosition(focus.left, focus.top, width, viewportHeight);
+
+      expect(rectsOverlap(
+        getOrbVisualRect(position.x, position.y),
+        focus,
+      )).toBe(false);
+    },
+  );
+
+  it.each([
+    ['left', { x: 250, y: 320 }, 'left'],
+    ['right', { x: 410, y: 320 }, 'right'],
+    ['top', { x: 320, y: 250 }, 'top'],
+    ['bottom', { x: 320, y: 420 }, 'bottom'],
+  ] as const)(
+    'keeps the full orb envelope clear when clamping from the %s card edge',
+    (_edge, target, clearSide) => {
+      const protectedRect = { left: 300, top: 300, width: 100, height: 100 };
+      const position = clampOrbPosition(target.x, target.y, 1000, 800, 90, protectedRect);
+      const visualRect = getOrbVisualRect(position.x, position.y);
+
+      expect(rectsOverlap(visualRect, protectedRect)).toBe(false);
+
+      if (clearSide === 'right') {
+        expect(visualRect.left).toBeGreaterThanOrEqual(protectedRect.left + protectedRect.width);
+      } else if (clearSide === 'left') {
+        expect(visualRect.left + visualRect.width).toBeLessThanOrEqual(protectedRect.left);
+      } else if (clearSide === 'bottom') {
+        expect(visualRect.top).toBeGreaterThanOrEqual(protectedRect.top + protectedRect.height);
+      } else {
+        expect(visualRect.top + visualRect.height).toBeLessThanOrEqual(protectedRect.top);
+      }
+    },
+  );
+
+  it('keeps the orb within every viewport edge while avoiding the focus card', () => {
+    const viewports = [
+      { width: 320, height: 568 },
+      { width: 1024, height: 768 },
+      { width: 1440, height: 900 },
+    ];
+
+    for (const { width, height } of viewports) {
+      const focus = getFocusCardRect(height);
+      for (const target of [
+        { x: -200, y: -200 },
+        { x: width + 200, y: height + 200 },
+        { x: focus.left + 2, y: focus.top + 2 },
+      ]) {
+        const position = clampOrbPosition(target.x, target.y, width, height);
+        const orb = { left: position.x, top: position.y, width: 90, height: 90 };
+
+        expect(position.x).toBeGreaterThanOrEqual(0);
+        expect(position.y).toBeGreaterThanOrEqual(0);
+        expect(position.x + orb.width).toBeLessThanOrEqual(width);
+        expect(position.y + orb.height).toBeLessThanOrEqual(height);
+        expect(rectsOverlap(getOrbVisualRect(position.x, position.y), focus)).toBe(false);
+      }
+    }
+  });
 });
