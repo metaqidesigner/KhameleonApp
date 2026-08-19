@@ -125,7 +125,23 @@ router.patch("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [deleted] = await db.delete(tasksTable).where(eq(tasksTable.id, id)).returning();
+
+    const deleted = await db.transaction(async (tx) => {
+      // Verify the task exists before touching any children
+      const [existing] = await tx.select({ id: tasksTable.id })
+        .from(tasksTable)
+        .where(eq(tasksTable.id, id));
+      if (!existing) return null;
+
+      // Promote direct children to root tasks (atomic with the delete)
+      await tx.update(tasksTable)
+        .set({ parentTaskId: null })
+        .where(eq(tasksTable.parentTaskId, id));
+
+      const [row] = await tx.delete(tasksTable).where(eq(tasksTable.id, id)).returning();
+      return row ?? null;
+    });
+
     if (!deleted) return res.status(404).json({ error: "Task not found" });
     res.json({ ok: true });
   } catch (err) {
