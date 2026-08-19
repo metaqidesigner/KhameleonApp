@@ -120,6 +120,7 @@ interface JarvisStore {
   setCornerBrackets: (v: boolean) => void;
   setTickerSpeed: (v: number) => void;
   setCanvasWindowMinimized: (id: string, v: boolean) => void;
+  resetCanvasLayout: () => void;
   setCanvasWindowPositions: (positions: Record<string, CanvasWindowPosition>) => void;
 
   addActiveTask: (id: string) => void;
@@ -204,6 +205,10 @@ export const useJarvisStore = create<JarvisStore>()(
       setCanvasWindowMinimized: (id, v) => set(s => ({
         canvasWindowsMinimized: { ...s.canvasWindowsMinimized, [id]: v },
       })),
+      resetCanvasLayout: () => set({
+        canvasWindowsMinimized: {},
+        canvasWindowsPositions: {},
+      }),
       setCanvasWindowPositions: (positions) => set({ canvasWindowsPositions: positions }),
 
       addActiveTask:    (id) => set(s => ({ activeTaskIds: [...new Set([...s.activeTaskIds, id])] })),

@@ -3,7 +3,7 @@ import {
   Database, Clock, DollarSign, Zap, Activity, Cpu, Settings as SettingsIcon,
   Coffee, Sparkles, Users, MessageSquare, FileText, SunMedium,
   CalendarDays, ChevronDown, ChevronRight, Plus, Bot, AlarmClock,
-  Compass, ListTodo, Radio, Gauge,
+  Compass, ListTodo, Radio, Gauge, RotateCcw,
 } from 'lucide-react';
 import { useJarvisHealth, useJarvisTelemetry } from '@/hooks/useJarvis';
 import { getDailyTasks, getSchedulerStatus, type Task, type SchedulerStatus, OFFLINE_HEALTH, MOCK_TELEMETRY } from '@/lib/jarvisApi';
@@ -581,6 +581,7 @@ export default function UnifiedCanvas() {
   const latestEventId = useJarvisStore(s => s.agentHistory[0]?.id);
   const canvasWindowPositions = useJarvisStore(s => s.canvasWindowsPositions);
   const setCanvasWindowPositions = useJarvisStore(s => s.setCanvasWindowPositions);
+  const resetCanvasLayout = useJarvisStore(s => s.resetCanvasLayout);
 
   const windowsInZone = useCallback((zone: CanvasWindowZone) => (
     CANVAS_WINDOW_IDS
@@ -669,6 +670,17 @@ export default function UnifiedCanvas() {
 
   return (
     <div className="kc-canvas">
+      <button
+        type="button"
+        className="kc-canvas-reset"
+        onClick={resetCanvasLayout}
+        title="Expand all canvas windows"
+        aria-label="Reset canvas layout"
+      >
+        <RotateCcw size={11} />
+        <span>Reset layout</span>
+      </button>
+
       {/* ── Left zone: in-progress work ─────────────────── */}
       <div
         className="kc-col kc-col-left"
