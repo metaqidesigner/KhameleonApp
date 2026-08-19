@@ -1389,6 +1389,24 @@ html.light body {
   position: relative;
   z-index: 1;
 }
+.kc-window-drag-handle {
+  cursor: grab;
+}
+.kc-window-drag-handle:active {
+  cursor: grabbing;
+}
+.kc-window-dragging {
+  opacity: 0.65;
+  z-index: 10;
+}
+.kc-window-drop-target {
+  border-color: rgba(111, 230, 189, 0.70);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    0 40px 74px rgba(0,0,0,0.60),
+    0 0 0 2px rgba(111, 230, 189, 0.18),
+    0 0 28px rgba(111, 230, 189, 0.26);
+}
 .kc-window-min .kc-window-titlebar { border-bottom: none; }
 .kc-window-icon { color: var(--j-teal); display: flex; flex-shrink: 0; }
 .kc-window-label {

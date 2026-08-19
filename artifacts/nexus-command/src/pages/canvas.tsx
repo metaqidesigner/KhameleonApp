@@ -7,9 +7,18 @@ import {
 } from 'lucide-react';
 import { useJarvisHealth, useJarvisTelemetry } from '@/hooks/useJarvis';
 import { getDailyTasks, getSchedulerStatus, type Task, type SchedulerStatus, OFFLINE_HEALTH, MOCK_TELEMETRY } from '@/lib/jarvisApi';
-import { useJarvisStore } from '@/store/jarvisStore';
+import {
+  useJarvisStore,
+  type CanvasWindowPosition,
+  type CanvasWindowZone,
+} from '@/store/jarvisStore';
 import HUDRings from '@/components/HUDRings';
-import { FloatingWindow } from '@/components/FloatingWindow';
+import {
+  FLOATING_WINDOW_DRAG_TYPE,
+  FloatingWindow,
+  type CanvasZone,
+  type WindowDropPlacement,
+} from '@/components/FloatingWindow';
 import { AssistantCard } from '@/components/AssistantCard';
 
 function fmtMs(n?: number)     { return n != null ? `${n.toFixed(0)}ms`  : '0ms'; }
@@ -23,6 +32,27 @@ const PILLS = [
   { id: 'context', label: 'CONTEXT', sub: 'I understand what matters.', dot: '#F0A34C' },
   { id: 'status',  label: 'STATUS',  sub: 'I keep you in the loop.',    dot: '#8C7CF0' },
 ];
+
+const CANVAS_ZONES: CanvasZone[] = ['left', 'centre', 'right'];
+const CANVAS_WINDOW_IDS = ['khameleon', 'todays-plan', 'agent-activity', 'system-status'] as const;
+type CanvasWindowId = typeof CANVAS_WINDOW_IDS[number];
+
+const DEFAULT_CANVAS_WINDOW_POSITIONS: Record<CanvasWindowId, CanvasWindowPosition> = {
+  khameleon: { zone: 'left', order: 0 },
+  'todays-plan': { zone: 'left', order: 1 },
+  'agent-activity': { zone: 'centre', order: 0 },
+  'system-status': { zone: 'right', order: 0 },
+};
+
+function getCanvasWindowPosition(
+  positions: Record<string, CanvasWindowPosition>,
+  windowId: CanvasWindowId,
+): CanvasWindowPosition {
+  const position = positions[windowId];
+  return position && CANVAS_ZONES.includes(position.zone) && Number.isFinite(position.order)
+    ? position
+    : DEFAULT_CANVAS_WINDOW_POSITIONS[windowId];
+}
 
 // ── Small wavy sparkline ──────────────────────────────────────
 function Sparkline({ color }: { color: string }) {
@@ -481,11 +511,131 @@ function AgentActivityBody() {
   );
 }
 
+function KhameleonBody() {
+  return (
+    <div className="ac-concept-pills" style={{ maxWidth: 'none' }}>
+      {PILLS.map(pill => (
+        <div key={pill.id} className={`ac-pill ac-pill-${pill.id}`}>
+          <div className="ac-pill-label">
+            <span className="ac-pill-dot" style={{ background: pill.dot }} />
+            <span style={{ color: pill.dot }}>{pill.label}</span>
+          </div>
+          <div className="ac-pill-sub">{pill.sub}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface CanvasWindowProps {
+  windowId: CanvasWindowId;
+  zone: CanvasWindowZone;
+  activityFocused: boolean;
+  onMove: (
+    draggedWindowId: string,
+    destinationZone: CanvasWindowZone,
+    targetWindowId?: string,
+    placement?: WindowDropPlacement,
+  ) => void;
+}
+
+function CanvasWindow({ windowId, zone, activityFocused, onMove }: CanvasWindowProps) {
+  const onWindowDrop = (
+    draggedWindowId: string,
+    targetWindowId: string,
+    placement: WindowDropPlacement,
+  ) => onMove(draggedWindowId, zone, targetWindowId, placement);
+
+  switch (windowId) {
+    case 'khameleon':
+      return (
+        <FloatingWindow icon={<Compass size={11} />} label="Khameleon" windowId={windowId} onWindowDrop={onWindowDrop}>
+          <KhameleonBody />
+        </FloatingWindow>
+      );
+    case 'todays-plan':
+      return (
+        <FloatingWindow icon={<ListTodo size={11} />} label="Today's Plan" windowId={windowId} grow onWindowDrop={onWindowDrop}>
+          <TodaysPlanBody />
+        </FloatingWindow>
+      );
+    case 'agent-activity':
+      return (
+        <FloatingWindow icon={<Radio size={11} />} label="Agent Activity" windowId={windowId} badge="LIVE" focused={activityFocused} grow onWindowDrop={onWindowDrop}>
+          <AgentActivityBody />
+        </FloatingWindow>
+      );
+    case 'system-status':
+      return (
+        <FloatingWindow icon={<Gauge size={11} />} label="System Status" windowId={windowId} onWindowDrop={onWindowDrop}>
+          <SystemStatusBody />
+        </FloatingWindow>
+      );
+  }
+}
+
 // ── Unified Canvas page ───────────────────────────────────────
 export default function UnifiedCanvas() {
   // Newest event is always prepended, so its id changes on every push —
   // this keeps working even after the history hits its 50-item cap.
   const latestEventId = useJarvisStore(s => s.agentHistory[0]?.id);
+  const canvasWindowPositions = useJarvisStore(s => s.canvasWindowsPositions);
+  const setCanvasWindowPositions = useJarvisStore(s => s.setCanvasWindowPositions);
+
+  const windowsInZone = useCallback((zone: CanvasWindowZone) => (
+    CANVAS_WINDOW_IDS
+      .filter(windowId => getCanvasWindowPosition(canvasWindowPositions, windowId).zone === zone)
+      .sort((a, b) =>
+        getCanvasWindowPosition(canvasWindowPositions, a).order -
+        getCanvasWindowPosition(canvasWindowPositions, b).order,
+      )
+  ), [canvasWindowPositions]);
+
+  const moveCanvasWindow = useCallback((
+    draggedWindowId: string,
+    destinationZone: CanvasWindowZone,
+    targetWindowId?: string,
+    placement: WindowDropPlacement = 'after',
+  ) => {
+    if (!CANVAS_WINDOW_IDS.includes(draggedWindowId as CanvasWindowId)) return;
+
+    const draggedId = draggedWindowId as CanvasWindowId;
+    const nextByZone: Record<CanvasWindowZone, CanvasWindowId[]> = {
+      left: windowsInZone('left').filter(id => id !== draggedId),
+      centre: windowsInZone('centre').filter(id => id !== draggedId),
+      right: windowsInZone('right').filter(id => id !== draggedId),
+    };
+    const destination = nextByZone[destinationZone];
+    const targetIndex = targetWindowId
+      ? destination.indexOf(targetWindowId as CanvasWindowId)
+      : -1;
+    const insertionIndex = targetIndex < 0
+      ? destination.length
+      : targetIndex + (placement === 'after' ? 1 : 0);
+
+    destination.splice(insertionIndex, 0, draggedId);
+
+    const nextPositions: Record<string, CanvasWindowPosition> = {};
+    CANVAS_ZONES.forEach(zone => {
+      nextByZone[zone].forEach((windowId, order) => {
+        nextPositions[windowId] = { zone, order };
+      });
+    });
+    setCanvasWindowPositions(nextPositions);
+  }, [setCanvasWindowPositions, windowsInZone]);
+
+  const handleColumnDrop = useCallback((event: React.DragEvent<HTMLDivElement>, zone: CanvasWindowZone) => {
+    const draggedWindowId = event.dataTransfer.getData(FLOATING_WINDOW_DRAG_TYPE);
+    if (!draggedWindowId) return;
+    event.preventDefault();
+    moveCanvasWindow(draggedWindowId, zone);
+  }, [moveCanvasWindow]);
+
+  const handleColumnDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes(FLOATING_WINDOW_DRAG_TYPE)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
 
   // ── Today's Focus ring — real progress from daily tasks ───
   const [focusPct, setFocusPct] = useState(0);
@@ -520,38 +670,36 @@ export default function UnifiedCanvas() {
   return (
     <div className="kc-canvas">
       {/* ── Left zone: in-progress work ─────────────────── */}
-      <div className="kc-col kc-col-left">
-        <FloatingWindow icon={<Compass size={11} />} label="Khameleon" windowId="khameleon">
-          <div className="ac-concept-pills" style={{ maxWidth: 'none' }}>
-            {PILLS.map(pill => (
-              <div key={pill.id} className={`ac-pill ac-pill-${pill.id}`}>
-                <div className="ac-pill-label">
-                  <span className="ac-pill-dot" style={{ background: pill.dot }} />
-                  <span style={{ color: pill.dot }}>{pill.label}</span>
-                </div>
-                <div className="ac-pill-sub">{pill.sub}</div>
-              </div>
-            ))}
-          </div>
-        </FloatingWindow>
-
-        <FloatingWindow icon={<ListTodo size={11} />} label="Today's Plan" windowId="todays-plan" grow>
-          <TodaysPlanBody />
-        </FloatingWindow>
+      <div
+        className="kc-col kc-col-left"
+        onDragOver={handleColumnDragOver}
+        onDrop={event => handleColumnDrop(event, 'left')}
+      >
+        {windowsInZone('left').map(windowId => (
+          <CanvasWindow key={windowId} windowId={windowId} zone="left" activityFocused={activityFocused} onMove={moveCanvasWindow} />
+        ))}
       </div>
 
       {/* ── Centre zone: finished / result-ready ─────────── */}
-      <div className="kc-col kc-col-centre">
-        <FloatingWindow icon={<Radio size={11} />} label="Agent Activity" windowId="agent-activity" badge="LIVE" focused={activityFocused} grow>
-          <AgentActivityBody />
-        </FloatingWindow>
+      <div
+        className="kc-col kc-col-centre"
+        onDragOver={handleColumnDragOver}
+        onDrop={event => handleColumnDrop(event, 'centre')}
+      >
+        {windowsInZone('centre').map(windowId => (
+          <CanvasWindow key={windowId} windowId={windowId} zone="centre" activityFocused={activityFocused} onMove={moveCanvasWindow} />
+        ))}
       </div>
 
       {/* ── Right zone: supporting info + chat ───────────── */}
-      <div className="kc-col kc-col-right">
-        <FloatingWindow icon={<Gauge size={11} />} label="System Status" windowId="system-status">
-          <SystemStatusBody />
-        </FloatingWindow>
+      <div
+        className="kc-col kc-col-right"
+        onDragOver={handleColumnDragOver}
+        onDrop={event => handleColumnDrop(event, 'right')}
+      >
+        {windowsInZone('right').map(windowId => (
+          <CanvasWindow key={windowId} windowId={windowId} zone="right" activityFocused={activityFocused} onMove={moveCanvasWindow} />
+        ))}
 
         <div className="kc-assistant-slot">
           <AssistantCard />

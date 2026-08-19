@@ -52,6 +52,13 @@ export interface PanelLayout {
   maxH?: number;
 }
 
+export type CanvasWindowZone = 'left' | 'centre' | 'right';
+
+export interface CanvasWindowPosition {
+  zone: CanvasWindowZone;
+  order: number;
+}
+
 export interface VoiceSettings {
   voice: string;
   rate: number;
@@ -70,6 +77,8 @@ interface JarvisStore {
   chatOpen: boolean;
   /** Persisted minimised state for each named canvas window */
   canvasWindowsMinimized: Record<string, boolean>;
+  /** Persisted column and order for each named canvas window */
+  canvasWindowsPositions: Record<string, CanvasWindowPosition>;
   chatMessages: ChatMessage[];
   isStreaming: boolean;
   selectedAgent: AgentType;
@@ -111,6 +120,7 @@ interface JarvisStore {
   setCornerBrackets: (v: boolean) => void;
   setTickerSpeed: (v: number) => void;
   setCanvasWindowMinimized: (id: string, v: boolean) => void;
+  setCanvasWindowPositions: (positions: Record<string, CanvasWindowPosition>) => void;
 
   addActiveTask: (id: string) => void;
   removeActiveTask: (id: string) => void;
@@ -136,6 +146,7 @@ export const useJarvisStore = create<JarvisStore>()(
     (set) => ({
       activeTab: 'overview',
       canvasWindowsMinimized: {},
+      canvasWindowsPositions: {},
       chatOpen: false,
       chatMessages: [],
       isStreaming: false,
@@ -193,6 +204,7 @@ export const useJarvisStore = create<JarvisStore>()(
       setCanvasWindowMinimized: (id, v) => set(s => ({
         canvasWindowsMinimized: { ...s.canvasWindowsMinimized, [id]: v },
       })),
+      setCanvasWindowPositions: (positions) => set({ canvasWindowsPositions: positions }),
 
       addActiveTask:    (id) => set(s => ({ activeTaskIds: [...new Set([...s.activeTaskIds, id])] })),
       removeActiveTask: (id) => set(s => ({ activeTaskIds: s.activeTaskIds.filter(x => x !== id) })),
@@ -217,6 +229,7 @@ export const useJarvisStore = create<JarvisStore>()(
       partialize: (s) => ({
         activeTab: s.activeTab,
         canvasWindowsMinimized: s.canvasWindowsMinimized,
+        canvasWindowsPositions: s.canvasWindowsPositions,
         panelLayouts: s.panelLayouts,
         scanLinesEnabled: s.scanLinesEnabled,
         cornerBracketsEnabled: s.cornerBracketsEnabled,
