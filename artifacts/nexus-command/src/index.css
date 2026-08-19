@@ -1323,6 +1323,37 @@ html.light body {
 .kc-col-centre { flex: 1 1 40%; }
 .kc-col-right  { flex: 0 0 30%; }
 
+/* ── Tablet canvas: left + centre stacked beside right ──────── */
+@media (min-width: 1001px) and (max-width: 1400px) {
+  .kc-canvas {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  .kc-col-left,
+  .kc-col-centre,
+  .kc-col-right {
+    flex: none;
+    width: auto;
+  }
+
+  .kc-col-left {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .kc-col-centre {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .kc-col-right {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
 /* ── Narrow-screen responsive: stack columns vertically ─────── */
 @media (max-width: 1000px) {
   /* Let the main area scroll instead of clipping */
