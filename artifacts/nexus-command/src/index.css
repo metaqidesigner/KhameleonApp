@@ -1292,6 +1292,36 @@ html.light body {
 .kc-col-centre { flex: 1 1 40%; }
 .kc-col-right  { flex: 0 0 30%; }
 
+/* ── Narrow-screen responsive: stack columns vertically ─────── */
+@media (max-width: 1000px) {
+  /* Let the main area scroll instead of clipping */
+  .j-main-area {
+    overflow-y: auto;
+  }
+
+  /* Stack columns top-to-bottom; canvas grows with content */
+  .kc-canvas {
+    flex-direction: column;
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+    /* Extra room at the bottom so the fixed focus card
+       and orb don't obscure the last piece of content */
+    padding-bottom: 100px;
+  }
+
+  /* Each column takes the full width and scrolls with the page */
+  .kc-col {
+    overflow-y: visible;
+  }
+  .kc-col-left,
+  .kc-col-centre,
+  .kc-col-right {
+    flex: none;
+    width: 100%;
+  }
+}
+
 /* ── Floating glass window ──────────────────────────────── */
 .kc-window {
   position: relative;

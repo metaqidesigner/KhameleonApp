@@ -59,7 +59,7 @@ export function AppShell() {
         <TopBar />
         <div className="j-body-row">
           <LeftSidebar />
-          <div className="j-main-area" style={{ overflow: 'hidden', flex: 1 }}>
+          <div className="j-main-area" style={{ flex: 1 }}>
             <PageRouter />
           </div>
         </div>
