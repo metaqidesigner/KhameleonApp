@@ -128,7 +128,7 @@ interface JarvisStore {
 export const useJarvisStore = create<JarvisStore>()(
   persist(
     (set) => ({
-      activeTab: 'assistant',
+      activeTab: 'overview',
       chatOpen: false,
       chatMessages: [],
       isStreaming: false,

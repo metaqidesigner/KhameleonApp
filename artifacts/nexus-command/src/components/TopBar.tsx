@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Bell, MoreHorizontal, User, Sun, Moon } from 'lucide-react';
-import { useJarvisStore, type TabId } from '@/store/jarvisStore';
 
 // Theme toggle — kept from previous version
 function ThemeToggle() {
@@ -39,14 +38,6 @@ function BrandPipe() {
 }
 
 export default function TopBar() {
-  const activeTab    = useJarvisStore(s => s.activeTab);
-  const setActiveTab = useJarvisStore(s => s.setActiveTab);
-
-  const navItems: { id: TabId; label: string }[] = [
-    { id: 'assistant', label: 'Assistant' },
-    { id: 'overview',  label: 'Workspace' },
-  ];
-
   return (
     <div className="j-topbar-slim">
       {/* ── Left: brand + nav ─────────────────────────────── */}
@@ -63,24 +54,6 @@ export default function TopBar() {
         }}>
           Khameleon
         </span>
-
-        {navItems.map(item => {
-          const active = item.id === activeTab ||
-            (item.id === 'overview' && !['assistant','overview'].includes(activeTab));
-          return (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className="j-topbar-nav-btn"
-              style={{
-                fontWeight: active ? 600 : 400,
-                color: active ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.36)',
-              }}
-            >
-              {item.label}
-            </button>
-          );
-        })}
       </div>
 
       {/* ── Right: icon actions ───────────────────────────── */}

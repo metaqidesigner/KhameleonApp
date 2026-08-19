@@ -3,17 +3,26 @@ import {
   Database, Clock, DollarSign, Zap, Activity, Cpu, Settings as SettingsIcon,
   Coffee, Sparkles, Users, MessageSquare, FileText, SunMedium,
   CalendarDays, ChevronDown, ChevronRight, Plus, Bot, AlarmClock,
+  Compass, ListTodo, Radio, Gauge,
 } from 'lucide-react';
 import { useJarvisHealth, useJarvisTelemetry } from '@/hooks/useJarvis';
 import { getDailyTasks, getSchedulerStatus, type Task, type SchedulerStatus, OFFLINE_HEALTH, MOCK_TELEMETRY } from '@/lib/jarvisApi';
 import { useJarvisStore } from '@/store/jarvisStore';
-import JPanel from '@/components/JPanel';
 import HUDRings from '@/components/HUDRings';
+import { FloatingWindow } from '@/components/FloatingWindow';
+import { AssistantCard } from '@/components/AssistantCard';
 
 function fmtMs(n?: number)     { return n != null ? `${n.toFixed(0)}ms`  : '0ms'; }
 function fmtCost(n?: number)   { return n != null ? `$${n.toFixed(4)}`   : '$0.0000'; }
 function fmtEnergy(n?: number) { return n != null ? `${n.toFixed(2)} Wh` : '0.00 Wh'; }
 function fmtUptime(s: number)  { if (!s) return '0h 0m'; return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`; }
+
+// ── Concept pills ─────────────────────────────────────────────
+const PILLS = [
+  { id: 'command', label: 'COMMAND', sub: 'You ask. I execute.',        dot: '#38cf8a' },
+  { id: 'context', label: 'CONTEXT', sub: 'I understand what matters.', dot: '#F0A34C' },
+  { id: 'status',  label: 'STATUS',  sub: 'I keep you in the loop.',    dot: '#8C7CF0' },
+];
 
 // ── Small wavy sparkline ──────────────────────────────────────
 function Sparkline({ color }: { color: string }) {
@@ -70,29 +79,24 @@ function MetricBox({
       boxShadow: `inset 0 1px 0 rgba(255,255,255,0.10), 0 0 16px rgba(${accentRgb},0.05)`,
       position: 'relative', overflow: 'hidden',
     }}>
-      {/* diagonal sheen — brighter so it reads as glass */}
       <div style={{
         position: 'absolute', inset: 0, borderRadius: 14,
         background: 'linear-gradient(140deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 50%, transparent 70%)',
         pointerEvents: 'none',
       }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, position: 'relative' }}>
-        {/* colored accent dot */}
         <span style={{
           width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
           background: amber ? 'var(--j-amber)' : 'var(--j-teal)',
           boxShadow: `0 0 4px ${amber ? 'var(--j-amber)' : 'var(--j-teal)'}`,
         }} />
-        {/* icon — use CSS var so it shifts in light mode */}
         <span style={{ color: 'var(--j-text-faint)', display: 'flex', flexShrink: 0 }}>{icon}</span>
-        {/* label — CSS var for light-mode contrast */}
         <span style={{
           fontFamily: 'var(--j-font-ui)', fontSize: 10, fontWeight: 500,
           color: amber ? 'var(--j-amber)' : 'var(--j-text-muted)',
           whiteSpace: 'nowrap', letterSpacing: '0.01em',
         }}>{label}</span>
       </div>
-      {/* value — CSS var shifts dark → light */}
       <div style={{
         fontFamily: 'var(--j-font-mono)', fontSize: 17, fontWeight: 700,
         color: amber ? 'var(--j-amber)' : 'var(--j-text)',
@@ -145,7 +149,6 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
   const rgb = hexToRgb(col);
 
   return (
-    // j-section-pill → enables .light .j-section-pill override in CSS
     <div className="j-section-pill" style={{
       flex: '1 1 0', minWidth: 120,
       background: `rgba(${rgb},0.05)`,
@@ -157,26 +160,22 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
       boxShadow: `inset 0 1px 0 rgba(255,255,255,0.10), 0 0 20px rgba(${rgb},0.06)`,
       position: 'relative',
     }}>
-      {/* Diagonal sheen — visible light-source streak */}
       <div style={{
         position: 'absolute', inset: 0, borderRadius: 14,
         background: 'linear-gradient(140deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 45%, transparent 65%)',
         pointerEvents: 'none', zIndex: 0,
       }} />
 
-      {/* Sparkline strip */}
       <div style={{ position: 'relative', zIndex: 1, padding: '6px 10px 0', opacity: active.length > 0 ? 1 : 0.4 }}>
         <Sparkline color={col} />
       </div>
 
-      {/* Header */}
       <div
         onClick={() => active.length > 0 && setOpen(o => !o)}
         style={{ padding: '6px 10px 8px', cursor: active.length > 0 ? 'pointer' : 'default', position: 'relative', zIndex: 1 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
           <span style={{ color: col, display: 'flex', flexShrink: 0 }}>{section.icon}</span>
-          {/* CSS var — dark: white; light: #1a2040 */}
           <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, fontWeight: 700, color: 'var(--j-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {section.label}
           </span>
@@ -188,7 +187,6 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
           )}
         </div>
 
-        {/* Timestamp badge */}
         <div style={{
           display: 'inline-flex', alignItems: 'center',
           fontFamily: 'var(--j-font-mono)', fontSize: 8,
@@ -200,7 +198,6 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
           {section.time}
         </div>
 
-        {/* Task count */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{
             fontFamily: 'var(--j-font-mono)', fontSize: 13, fontWeight: 700,
@@ -217,7 +214,6 @@ function SectionPill({ section, tasks }: { section: typeof DAY_SECTIONS[number];
         </div>
       </div>
 
-      {/* Task preview (expanded) */}
       {open && active.length > 0 && (
         <div style={{ borderTop: `1px solid rgba(${rgb},0.14)`, padding: '4px 0', position: 'relative', zIndex: 1 }}>
           {active.slice(0, 4).map(t => (
@@ -282,13 +278,12 @@ function DigestCountdownBadge({ onClick }: { onClick: () => void }) {
     };
 
     tick();
-    timerRef.current = setInterval(tick, 30000); // refresh every 30 s
+    timerRef.current = setInterval(tick, 30000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [status]);
 
   if (!status) return null;
 
-  // Determine label and color
   let label: string;
   let accentR: string;
   let accentC: string;
@@ -302,13 +297,11 @@ function DigestCountdownBadge({ onClick }: { onClick: () => void }) {
     accentR = '196,212,236';
     accentC = 'var(--j-text-faint)';
   } else {
-    // Always show countdown to nextRunAt — the API advances it to tomorrow after today's run
     label   = `Next digest in ${countdown}`;
     accentR = '240,163,76';
     accentC = '#F0A34C';
   }
 
-  // Supplementary "ran today" note — shown alongside, not instead of the countdown
   const ranTodayStr = status.lastRunAt && isSameDay(new Date(status.lastRunAt), new Date())
     ? new Date(status.lastRunAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
     : null;
@@ -339,10 +332,10 @@ function DigestCountdownBadge({ onClick }: { onClick: () => void }) {
   );
 }
 
-function TodaysPlan() {
+// ── Today's Plan window body ──────────────────────────────────
+function TodaysPlanBody() {
   const [dailyData, setDailyData]   = useState<Record<string, Task[]>>({});
   const [totalTasks, setTotalTasks] = useState(0);
-  const [open, setOpen]             = useState(true);
   const setActiveTab                = useJarvisStore(s => s.setActiveTab);
 
   useEffect(() => {
@@ -353,36 +346,15 @@ function TodaysPlan() {
   }, []);
 
   return (
-    // j-plan-strip → background/border/blur live in CSS so .light can override
-    <div className="j-plan-strip">
-      {/* diagonal sheen */}
-      <div style={{
-        position: 'absolute', inset: 0, borderRadius: 14,
-        background: 'linear-gradient(145deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 45%, transparent 60%)',
-        pointerEvents: 'none',
-      }} />
-
-      {/* Header */}
-      <div
-        onClick={() => setOpen(o => !o)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px',
-          cursor: 'pointer', userSelect: 'none',
-          borderBottom: open ? '1px solid rgba(240,163,76,0.10)' : 'none',
-          position: 'relative', zIndex: 1,
-        }}
-      >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <CalendarDays size={13} style={{ color: 'var(--j-amber)', flexShrink: 0 }} />
-        {/* CSS var: dark = white, light = #1a2040 */}
-        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, fontWeight: 600, color: 'var(--j-text)', flex: 1 }}>Today's Plan</span>
-        <span className="j-mono" style={{ fontSize: 9, color: 'var(--j-text-faint)' }}>
+        <span className="j-mono" style={{ fontSize: 9, color: 'var(--j-text-faint)', flex: 1 }}>
           {totalTasks} task{totalTasks !== 1 ? 's' : ''} total
         </span>
-        <div onClick={e => e.stopPropagation()}>
-          <DigestCountdownBadge onClick={() => setActiveTab('tasks')} />
-        </div>
+        <DigestCountdownBadge onClick={() => setActiveTab('tasks')} />
         <button
-          onClick={e => { e.stopPropagation(); setActiveTab('tasks'); }}
+          onClick={() => setActiveTab('tasks')}
           style={{
             background: 'rgba(240,163,76,0.08)', border: '1px solid rgba(240,163,76,0.22)',
             color: 'var(--j-amber)', fontFamily: 'var(--j-font-ui)', fontSize: 9,
@@ -393,111 +365,190 @@ function TodaysPlan() {
         >
           <Plus size={8} /> Add Tasks
         </button>
-        {open
-          ? <ChevronDown size={11} style={{ color: 'var(--j-text-faint)' }} />
-          : <ChevronRight size={11} style={{ color: 'var(--j-text-faint)' }} />}
       </div>
-
-      {/* Section pills filmstrip */}
-      {open && (
-        <div style={{ display: 'flex', gap: 7, padding: '10px 12px', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
-          {DAY_SECTIONS.map(s => (
-            <SectionPill key={s.id} section={s} tasks={dailyData[s.id] ?? []} />
-          ))}
-        </div>
-      )}
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+        {DAY_SECTIONS.map(s => (
+          <SectionPill key={s.id} section={s} tasks={dailyData[s.id] ?? []} />
+        ))}
+      </div>
     </div>
   );
 }
 
-// ── Overview ──────────────────────────────────────────────────
-export default function Overview() {
+// ── Today's Focus ring (fixed bottom-left) ────────────────────
+function FocusRing({ pct }: { pct: number }) {
+  const r = 22, cx = 28, cy = 28;
+  const circ = 2 * Math.PI * r;
+  const dash  = circ * pct;
+  return (
+    <svg width="56" height="56" viewBox="0 0 56 56">
+      <circle cx={cx} cy={cy} r={r} fill="none"
+        stroke="rgba(255,255,255,0.07)" strokeWidth="3" />
+      <circle cx={cx} cy={cy} r={r} fill="none"
+        stroke="#6FE6BD" strokeWidth="3"
+        strokeDasharray={`${dash} ${circ}`}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${cx} ${cy})`}
+      />
+      <text x={cx} y={cy + 1}
+        textAnchor="middle" dominantBaseline="middle"
+        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif"
+        fontSize="9" fontWeight="600" fill="rgba(196,212,236,0.80)">
+        {Math.round(pct * 100)}%
+      </text>
+    </svg>
+  );
+}
+
+// ── System Status window body ─────────────────────────────────
+function SystemStatusBody() {
   const { data: health    = OFFLINE_HEALTH } = useJarvisHealth();
   const { data: telemetry = MOCK_TELEMETRY } = useJarvisTelemetry();
-  const agentHistory = useJarvisStore(s => s.agentHistory);
-  const isOnline     = health.status !== 'offline';
+  const isOnline = health.status !== 'offline';
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 10, padding: 10, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <HUDRings health={health} telemetry={telemetry} />
 
-      {/* ── Top row: System Status + Agent Activity ─── */}
-      <div style={{ display: 'flex', gap: 10, flex: '1 1 0', minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7 }}>
+        <MetricBox icon={<Database size={9} />}   label="Total queries" value={String(health.total_queries ?? 0)} />
+        <MetricBox icon={<Clock size={9} />}      label="Avg latency"   value={fmtMs(health.avg_latency_ms)} />
+        <MetricBox icon={<DollarSign size={9} />} label="Total cost"    value={fmtCost(health.total_cost_usd)} amber />
+        <MetricBox icon={<Zap size={9} />}        label="Energy"        value={fmtEnergy(telemetry.energy_wh)} />
+      </div>
 
-        {/* System Status — thicker glass, teal glow rim */}
-        <div style={{ flex: '0 0 52%', minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <JPanel title="System status" className="j-panel-thick j-panel-glow-teal">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <HUDRings health={health} telemetry={telemetry} />
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <tbody>
+          <KVRow icon={<SettingsIcon size={10} />} label="Engine" value={health.engine || 'replit-ai'} />
+          <KVRow icon={<Cpu size={10} />}          label="Model"  value={health.model  || 'claude-3-5-sonnet / gpt-4o'} />
+          <KVRow icon={<Clock size={10} />}        label="Uptime" value={fmtUptime(health.uptime ?? 0)} />
+        </tbody>
+      </table>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 7 }}>
-                <MetricBox icon={<Database size={9} />}   label="Total queries" value={String(health.total_queries ?? 0)} />
-                <MetricBox icon={<Clock size={9} />}      label="Avg latency"   value={fmtMs(health.avg_latency_ms)} />
-                <MetricBox icon={<DollarSign size={9} />} label="Total cost"    value={fmtCost(health.total_cost_usd)} amber />
-                <MetricBox icon={<Zap size={9} />}        label="Energy"        value={fmtEnergy(telemetry.energy_wh)} />
-              </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, paddingTop: 2 }}>
+        <Activity size={11} style={{
+          color: isOnline ? 'var(--j-teal)' : 'var(--j-text-faint)',
+          animation: isOnline ? 'jarvis-pulse 2.5s ease-in-out infinite' : undefined,
+        }} />
+        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, fontStyle: 'italic', color: 'var(--j-text-faint)' }}>
+          Listening for 'Hello Khameleon'
+        </span>
+      </div>
+    </div>
+  );
+}
 
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  <KVRow icon={<SettingsIcon size={10} />} label="Engine" value={health.engine || 'replit-ai'} />
-                  <KVRow icon={<Cpu size={10} />}          label="Model"  value={health.model  || 'claude-3-5-sonnet / gpt-4o'} />
-                  <KVRow icon={<Clock size={10} />}        label="Uptime" value={fmtUptime(health.uptime ?? 0)} />
-                </tbody>
-              </table>
+// ── Agent Activity window body ────────────────────────────────
+function AgentActivityBody() {
+  const agentHistory = useJarvisStore(s => s.agentHistory);
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, paddingTop: 2 }}>
-                <Activity size={11} style={{
-                  color: isOnline ? 'var(--j-teal)' : 'var(--j-text-faint)',
-                  animation: isOnline ? 'jarvis-pulse 2.5s ease-in-out infinite' : undefined,
-                }} />
-                <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, fontStyle: 'italic', color: 'var(--j-text-faint)' }}>
-                  Listening for 'Hello Khameleon'
-                </span>
-              </div>
-            </div>
-          </JPanel>
+  if (agentHistory.length === 0) {
+    return (
+      <div style={{
+        border: '1px dashed rgba(140,124,240,0.18)',
+        borderRadius: 12, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 18, minHeight: 200, height: '100%',
+      }}>
+        <div style={{
+          width: 44, height: 44,
+          border: '1.5px solid rgba(140,124,240,0.15)',
+          borderTop: '1.5px solid rgba(140,124,240,0.65)',
+          borderRadius: '50%',
+          animation: 'jarvis-spin 2.2s linear infinite',
+        }} />
+        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'var(--j-text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
+          No activity — query Khameleon to begin
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="scrollbar-jarvis" style={{ overflowY: 'auto', height: '100%' }}>
+      {agentHistory.slice(0, 30).map(ev => (
+        <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {new Date(ev.ts).toLocaleTimeString('en-US', { hour12: false })}
+          </span>
+          <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-teal)', flexShrink: 0 }}>{ev.agent}</span>
+          <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {ev.prompt.slice(0, 80)}
+          </span>
         </div>
+      ))}
+    </div>
+  );
+}
 
-        {/* Agent Activity — violet glow rim */}
-        <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <JPanel title="Agent activity" badge="LIVE" className="j-panel-glow-violet">
-            {agentHistory.length === 0 ? (
-              <div style={{
-                flex: 1, border: '1px dashed rgba(140,124,240,0.18)',
-                borderRadius: 12, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center', gap: 18, minHeight: 200,
-              }}>
-                <div style={{
-                  width: 44, height: 44,
-                  border: '1.5px solid rgba(140,124,240,0.15)',
-                  borderTop: '1.5px solid rgba(140,124,240,0.65)',
-                  borderRadius: '50%',
-                  animation: 'jarvis-spin 2.2s linear infinite',
-                }} />
-                <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'var(--j-text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
-                  No activity — query Khameleon to begin
-                </span>
+// ── Unified Canvas page ───────────────────────────────────────
+export default function UnifiedCanvas() {
+  // Newest event is always prepended, so its id changes on every push —
+  // this keeps working even after the history hits its 50-item cap.
+  const latestEventId = useJarvisStore(s => s.agentHistory[0]?.id);
+
+  // When a new agent event lands, pull the Agent Activity window into focus
+  // (animated lift toward canvas centre) for 4 s, then settle back.
+  const [activityFocused, setActivityFocused] = useState(false);
+  const prevIdRef = useRef(latestEventId);
+  useEffect(() => {
+    if (latestEventId !== undefined && latestEventId !== prevIdRef.current) {
+      prevIdRef.current = latestEventId;
+      setActivityFocused(true);
+      const t = setTimeout(() => setActivityFocused(false), 4000);
+      return () => clearTimeout(t);
+    }
+    prevIdRef.current = latestEventId;
+    return undefined;
+  }, [latestEventId]);
+
+  return (
+    <div className="kc-canvas">
+      {/* ── Left zone: in-progress work ─────────────────── */}
+      <div className="kc-col kc-col-left">
+        <FloatingWindow icon={<Compass size={11} />} label="Khameleon">
+          <div className="ac-concept-pills" style={{ maxWidth: 'none' }}>
+            {PILLS.map(pill => (
+              <div key={pill.id} className="ac-pill">
+                <div className="ac-pill-label">
+                  <span className="ac-pill-dot" style={{ background: pill.dot }} />
+                  <span style={{ color: pill.dot }}>{pill.label}</span>
+                </div>
+                <div className="ac-pill-sub">{pill.sub}</div>
               </div>
-            ) : (
-              <div className="scrollbar-jarvis" style={{ overflowY: 'auto', flex: 1 }}>
-                {agentHistory.slice(0, 30).map(ev => (
-                  <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      {new Date(ev.ts).toLocaleTimeString('en-US', { hour12: false })}
-                    </span>
-                    <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-teal)', flexShrink: 0 }}>{ev.agent}</span>
-                    <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {ev.prompt.slice(0, 80)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </JPanel>
+            ))}
+          </div>
+        </FloatingWindow>
+
+        <FloatingWindow icon={<ListTodo size={11} />} label="Today's Plan" grow>
+          <TodaysPlanBody />
+        </FloatingWindow>
+      </div>
+
+      {/* ── Centre zone: finished / result-ready ─────────── */}
+      <div className="kc-col kc-col-centre">
+        <FloatingWindow icon={<Radio size={11} />} label="Agent Activity" badge="LIVE" focused={activityFocused} grow>
+          <AgentActivityBody />
+        </FloatingWindow>
+      </div>
+
+      {/* ── Right zone: supporting info + chat ───────────── */}
+      <div className="kc-col kc-col-right">
+        <FloatingWindow icon={<Gauge size={11} />} label="System Status">
+          <SystemStatusBody />
+        </FloatingWindow>
+
+        <div className="kc-assistant-slot">
+          <AssistantCard />
         </div>
       </div>
 
-      {/* ── Today's Plan ───────────────────────────── */}
-      <TodaysPlan />
+      {/* ── Today's Focus — fixed bottom-left ────────────── */}
+      <div className="ac-focus-card">
+        <div className="ac-focus-label">TODAY'S{'\n'}FOCUS</div>
+        <div className="ac-focus-ring">
+          <FocusRing pct={0.72} />
+        </div>
+      </div>
     </div>
   );
 }
