@@ -7,6 +7,16 @@ export const ORB_SIZE_MIN = 48;
 export const ORB_VISUAL_OVERFLOW = 40;
 export const ORB_RIGHT_OFFSET = 44;
 export const ORB_BOTTOM_OFFSET = 40;
+export const ORB_CHAT_PANEL_WIDTH = 310;
+export const ORB_CHAT_PANEL_HEIGHT = 420;
+export const ORB_CHAT_PANEL_GAP = 10;
+export const ORB_CHAT_PANEL_EDGE_GAP = 4;
+/**
+ * The panel shadow is intentionally included when checking protected UI.
+ * This prevents the panel from visually washing out the focus card even
+ * when their layout rectangles only touch.
+ */
+export const ORB_CHAT_PANEL_VISUAL_OVERFLOW = 24;
 export const FOCUS_CARD_LEFT = 60;
 export const FOCUS_CARD_BOTTOM = 28;
 export const FOCUS_CARD_WIDTH = 76;
@@ -70,6 +80,30 @@ export function getOrbVisualRect(
   };
 }
 
+export function getOrbChatPanelRect(
+  left: number,
+  top: number,
+  width = ORB_CHAT_PANEL_WIDTH,
+  height = ORB_CHAT_PANEL_HEIGHT,
+): LayoutRect {
+  return { left, top, width, height };
+}
+
+export function getOrbChatPanelVisualRect(
+  left: number,
+  top: number,
+  width = ORB_CHAT_PANEL_WIDTH,
+  height = ORB_CHAT_PANEL_HEIGHT,
+  overflow = ORB_CHAT_PANEL_VISUAL_OVERFLOW,
+): LayoutRect {
+  return {
+    left: left - overflow,
+    top: top - overflow,
+    width: width + overflow * 2,
+    height: height + overflow * 2,
+  };
+}
+
 export function rectsOverlap(a: LayoutRect, b: LayoutRect): boolean {
   return (
     a.left < b.left + b.width &&
@@ -77,6 +111,70 @@ export function rectsOverlap(a: LayoutRect, b: LayoutRect): boolean {
     a.top < b.top + b.height &&
     a.top + a.height > b.top
   );
+}
+
+function clampPanelToViewport(
+  left: number,
+  top: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  width: number,
+  height: number,
+): { left: number; top: number } {
+  return {
+    left: Math.max(
+      ORB_CHAT_PANEL_EDGE_GAP,
+      Math.min(left, Math.max(ORB_CHAT_PANEL_EDGE_GAP, viewportWidth - width - ORB_CHAT_PANEL_EDGE_GAP)),
+    ),
+    top: Math.max(
+      ORB_CHAT_PANEL_EDGE_GAP,
+      Math.min(top, Math.max(ORB_CHAT_PANEL_EDGE_GAP, viewportHeight - height - ORB_CHAT_PANEL_EDGE_GAP)),
+    ),
+  };
+}
+
+/**
+ * Chooses a panel position around the orb that stays inside the viewport and
+ * avoids the focus card whenever the viewport has another usable placement.
+ * The first candidate preserves the original above-and-left presentation;
+ * the remaining candidates let the panel move around an orb near an edge.
+ */
+export function getOrbChatPanelPosition(
+  orbX: number,
+  orbY: number,
+  orbSize: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  protectedRect = getFocusCardRect(viewportHeight),
+  panelWidth = ORB_CHAT_PANEL_WIDTH,
+  panelHeight = ORB_CHAT_PANEL_HEIGHT,
+): { left: number; top: number } {
+  const preferredLeft = orbX - panelWidth + orbSize;
+  const candidates = [
+    { left: preferredLeft, top: orbY - panelHeight - ORB_CHAT_PANEL_GAP },
+    { left: preferredLeft, top: orbY + orbSize + ORB_CHAT_PANEL_GAP },
+    { left: orbX + orbSize + ORB_CHAT_PANEL_GAP, top: orbY - panelHeight + orbSize },
+    { left: orbX - panelWidth - ORB_CHAT_PANEL_GAP, top: orbY - panelHeight + orbSize },
+  ].map(candidate => clampPanelToViewport(
+    candidate.left,
+    candidate.top,
+    viewportWidth,
+    viewportHeight,
+    panelWidth,
+    panelHeight,
+  ));
+
+  const safeCandidate = candidates.find(candidate => !rectsOverlap(
+    getOrbChatPanelVisualRect(
+      candidate.left,
+      candidate.top,
+      panelWidth,
+      panelHeight,
+    ),
+    protectedRect,
+  ));
+
+  return safeCandidate ?? candidates[0];
 }
 
 function clampToViewport(

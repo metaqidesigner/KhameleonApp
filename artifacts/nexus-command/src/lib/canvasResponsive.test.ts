@@ -7,7 +7,10 @@ import {
   FOCUS_CARD_WIDTH,
   clampOrbPosition,
   getFocusCardRect,
+  getOrbChatPanelPosition,
   getOrbRect,
+  getOrbChatPanelRect,
+  getOrbChatPanelVisualRect,
   getOrbVisualRect,
   rectsOverlap,
 } from './orbLayout';
@@ -195,5 +198,46 @@ describe('canvas floating controls', () => {
         expect(rectsOverlap(getOrbVisualRect(position.x, position.y), focus)).toBe(false);
       }
     }
+  });
+
+  it('keeps the chat panel clear of the focus card when the orb is nearby', () => {
+    const viewportWidth = 1000;
+    const viewportHeight = 800;
+    const focus = getFocusCardRect(viewportHeight);
+    const orb = clampOrbPosition(focus.left + 2, focus.top + 2, viewportWidth, viewportHeight);
+    const panelPosition = getOrbChatPanelPosition(
+      orb.x,
+      orb.y,
+      90,
+      viewportWidth,
+      viewportHeight,
+      focus,
+    );
+
+    expect(rectsOverlap(
+      getOrbChatPanelVisualRect(panelPosition.left, panelPosition.top),
+      focus,
+    )).toBe(false);
+  });
+
+  it.each([
+    { name: 'top-left', width: 320, height: 568, x: 0, y: 0 },
+    { name: 'top-right', width: 1024, height: 768, x: 934, y: 0 },
+    { name: 'bottom-left', width: 1024, height: 768, x: 0, y: 678 },
+    { name: 'bottom-right', width: 1440, height: 900, x: 1350, y: 810 },
+  ])('keeps the chat panel fully usable at the $name edge', viewport => {
+    const panelPosition = getOrbChatPanelPosition(
+      viewport.x,
+      viewport.y,
+      90,
+      viewport.width,
+      viewport.height,
+    );
+    const panel = getOrbChatPanelRect(panelPosition.left, panelPosition.top);
+
+    expect(panel.left).toBeGreaterThanOrEqual(4);
+    expect(panel.top).toBeGreaterThanOrEqual(4);
+    expect(panel.left + panel.width).toBeLessThanOrEqual(viewport.width - 4);
+    expect(panel.top + panel.height).toBeLessThanOrEqual(viewport.height - 4);
   });
 });

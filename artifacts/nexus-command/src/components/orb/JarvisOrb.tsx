@@ -3,25 +3,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { OrbChatPanel } from './OrbChatPanel';
 import { OutputWaveform } from './VoiceWaveform';
-import { clampOrbPosition, getDefaultOrbPosition, ORB_SIZE, ORB_SIZE_MIN } from '@/lib/orbLayout';
-
-const PANEL_W      = 310;
-const PANEL_H      = 420;
+import {
+  clampOrbPosition,
+  getDefaultOrbPosition,
+  getOrbChatPanelPosition,
+  ORB_SIZE,
+  ORB_SIZE_MIN,
+} from '@/lib/orbLayout';
 
 function getDefaultPos(): { x: number; y: number } {
   return getDefaultOrbPosition(window.innerWidth, window.innerHeight);
-}
-
-function calcPanelPos(
-  orbX: number, orbY: number, orbSize: number,
-): { left: number; top: number } {
-  let left = orbX - PANEL_W + orbSize;
-  let top  = orbY - PANEL_H - 10;
-  if (left < 4) left = 4;
-  if (left + PANEL_W > window.innerWidth  - 4) left = window.innerWidth  - PANEL_W - 4;
-  if (top  < 4) top  = orbY + orbSize + 10;
-  if (top  + PANEL_H > window.innerHeight - 4) top  = window.innerHeight - PANEL_H - 4;
-  return { left, top };
 }
 
 interface ContextMenuState { x: number; y: number; subMenu: 'agent' | null; }
@@ -58,8 +49,27 @@ export function JarvisOrb() {
   const ampRafRef    = useRef<number>(0);
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [viewport, setViewport] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
 
-  const panelPos = calcPanelPos(pos.x, pos.y, orbSize);
+  const panelPos = getOrbChatPanelPosition(
+    pos.x,
+    pos.y,
+    orbSize,
+    viewport.width,
+    viewport.height,
+  );
+
+  useEffect(() => {
+    const updateViewport = () => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
 
   // A saved position can outlive a viewport resize. Normalize it before the
   // next interaction so the orb never starts on top of the focus card.
