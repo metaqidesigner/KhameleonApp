@@ -314,7 +314,7 @@ function formatNextRun(iso: string | null, now = Date.now()): string {
   return `in ${mm}m`;
 }
 
-function GeneralSection() {
+export function GeneralSection() {
   const [sched, setSched] = useState<SchedulerStatus | null>(null);
   const [now, setNow] = useState(() => Date.now());
 

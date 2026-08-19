@@ -1396,7 +1396,7 @@ function formatNextRun(iso: string | null, now = Date.now()): string {
   return `in ${mm}m`;
 }
 
-function AutoTriggers() {
+export function AutoTriggers() {
   const [status,   setStatus]   = useState<SchedulerStatus | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
