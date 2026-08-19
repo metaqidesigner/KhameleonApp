@@ -5,7 +5,13 @@ import {
   FOCUS_CARD_HEIGHT,
   FOCUS_CARD_LEFT,
   FOCUS_CARD_WIDTH,
+  FEED_SHORTCUT_HEIGHT,
+  FEED_SHORTCUT_LEFT,
+  FEED_SHORTCUT_WIDTH,
+  FEED_TICKER_HEIGHT,
   clampOrbPosition,
+  getDashboardProtectedRects,
+  getFeedShortcutRect,
   getFocusCardRect,
   getOrbChatPanelPosition,
   getOrbRect,
@@ -68,6 +74,7 @@ const baseLeft = ruleBlock(desktopRules, '.kc-col-left');
 const baseCentre = ruleBlock(desktopRules, '.kc-col-centre');
 const baseRight = ruleBlock(desktopRules, '.kc-col-right');
 const focusCard = ruleBlock(desktopRules, '.ac-focus-card');
+const feedShortcut = ruleBlock(desktopRules, '.kc-feed-shortcut');
 const tablet = mediaBlock('(min-width: 1001px) and (max-width: 1400px)');
 const narrow = mediaBlock('(max-width: 1000px)');
 
@@ -118,6 +125,17 @@ describe('canvas floating controls', () => {
     expect(declaration(focusCard, 'bottom')).toBe(`${FOCUS_CARD_BOTTOM}px`);
     expect(declaration(focusCard, 'width')).toBe(`${FOCUS_CARD_WIDTH}px`);
     expect(declaration(focusCard, 'height')).toBe(`${FOCUS_CARD_HEIGHT}px`);
+  });
+
+  it('keeps the Khameleon feed shortcut in its fixed ticker safe area', () => {
+    expect(declaration(feedShortcut, 'width')).toBe(`${FEED_SHORTCUT_WIDTH}px`);
+    expect(declaration(feedShortcut, 'height')).toBe(`${FEED_SHORTCUT_HEIGHT}px`);
+
+    const shortcut = getFeedShortcutRect(800);
+    expect(shortcut.left).toBe(FEED_SHORTCUT_LEFT);
+    expect(shortcut.top).toBe(
+      800 - FEED_TICKER_HEIGHT + (FEED_TICKER_HEIGHT - FEED_SHORTCUT_HEIGHT) / 2,
+    );
   });
 
   it.each([320, 360, 1000, 1200, 1401])(
@@ -218,6 +236,27 @@ describe('canvas floating controls', () => {
       getOrbChatPanelVisualRect(panelPosition.left, panelPosition.top),
       focus,
     )).toBe(false);
+  });
+
+  it('keeps the chat panel clear of both fixed dashboard controls', () => {
+    const viewportWidth = 1024;
+    const viewportHeight = 768;
+    const protectedRects = getDashboardProtectedRects(viewportHeight);
+    const orb = clampOrbPosition(0, viewportHeight - 90, viewportWidth, viewportHeight);
+    const panelPosition = getOrbChatPanelPosition(
+      orb.x,
+      orb.y,
+      90,
+      viewportWidth,
+      viewportHeight,
+      protectedRects,
+    );
+    const panel = getOrbChatPanelVisualRect(panelPosition.left, panelPosition.top);
+
+    expect(protectedRects).toHaveLength(2);
+    for (const protectedRect of protectedRects) {
+      expect(rectsOverlap(panel, protectedRect)).toBe(false);
+    }
   });
 
   it.each([

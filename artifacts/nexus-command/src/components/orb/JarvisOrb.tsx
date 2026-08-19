@@ -6,6 +6,7 @@ import { OutputWaveform } from './VoiceWaveform';
 import {
   clampOrbPosition,
   getDefaultOrbPosition,
+  getDashboardProtectedRects,
   getOrbChatPanelPosition,
   ORB_SIZE,
   ORB_SIZE_MIN,
@@ -60,6 +61,7 @@ export function JarvisOrb() {
     orbSize,
     viewport.width,
     viewport.height,
+    getDashboardProtectedRects(viewport.height),
   );
 
   useEffect(() => {

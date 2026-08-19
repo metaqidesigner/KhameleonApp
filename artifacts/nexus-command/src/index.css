@@ -918,6 +918,13 @@ html.light body {
   padding: 30px 28px;
 }
 
+/* Persistent control reserved by the orb chat panel's layout model. */
+.kc-feed-shortcut {
+  width: 126px;
+  height: 22px;
+  box-sizing: border-box;
+}
+
 /* ── Today's Focus card (bottom-left, fixed) ─────────────── */
 .ac-focus-card {
   position: fixed;

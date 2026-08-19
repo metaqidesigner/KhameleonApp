@@ -34,7 +34,7 @@ export default function NewsTicker() {
       zIndex: 50,
     }}>
       {/* Feed label — coral rounded pill */}
-      <div style={{
+      <div className="kc-feed-shortcut" style={{
         display: 'flex',
         alignItems: 'center',
         gap: 6,

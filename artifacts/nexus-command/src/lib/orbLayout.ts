@@ -21,6 +21,15 @@ export const FOCUS_CARD_LEFT = 60;
 export const FOCUS_CARD_BOTTOM = 28;
 export const FOCUS_CARD_WIDTH = 76;
 export const FOCUS_CARD_HEIGHT = 100;
+/**
+ * The Khameleon feed shortcut is the fixed pill at the left of the bottom
+ * ticker. Keep its layout footprint separate from the ticker's scrolling
+ * content so the chat panel only avoids the persistent control.
+ */
+export const FEED_SHORTCUT_LEFT = 8;
+export const FEED_SHORTCUT_WIDTH = 126;
+export const FEED_SHORTCUT_HEIGHT = 22;
+export const FEED_TICKER_HEIGHT = 34;
 
 export interface LayoutRect {
   left: number;
@@ -55,6 +64,26 @@ export function getFocusCardRect(viewportHeight: number, height = FOCUS_CARD_HEI
     width: FOCUS_CARD_WIDTH,
     height,
   };
+}
+
+export function getFeedShortcutRect(
+  viewportHeight: number,
+  width = FEED_SHORTCUT_WIDTH,
+  height = FEED_SHORTCUT_HEIGHT,
+): LayoutRect {
+  return {
+    left: FEED_SHORTCUT_LEFT,
+    top: viewportHeight - FEED_TICKER_HEIGHT + (FEED_TICKER_HEIGHT - height) / 2,
+    width,
+    height,
+  };
+}
+
+export function getDashboardProtectedRects(viewportHeight: number): LayoutRect[] {
+  return [
+    getFocusCardRect(viewportHeight),
+    getFeedShortcutRect(viewportHeight),
+  ];
 }
 
 export function getOrbRect(
@@ -145,7 +174,7 @@ export function getOrbChatPanelPosition(
   orbSize: number,
   viewportWidth: number,
   viewportHeight: number,
-  protectedRect = getFocusCardRect(viewportHeight),
+  protectedRect: LayoutRect | readonly LayoutRect[] = getDashboardProtectedRects(viewportHeight),
   panelWidth = ORB_CHAT_PANEL_WIDTH,
   panelHeight = ORB_CHAT_PANEL_HEIGHT,
 ): { left: number; top: number } {
@@ -164,15 +193,16 @@ export function getOrbChatPanelPosition(
     panelHeight,
   ));
 
-  const safeCandidate = candidates.find(candidate => !rectsOverlap(
-    getOrbChatPanelVisualRect(
+  const protectedRects = Array.isArray(protectedRect) ? protectedRect : [protectedRect];
+  const safeCandidate = candidates.find(candidate => {
+    const panelRect = getOrbChatPanelVisualRect(
       candidate.left,
       candidate.top,
       panelWidth,
       panelHeight,
-    ),
-    protectedRect,
-  ));
+    );
+    return protectedRects.every(rect => !rectsOverlap(panelRect, rect));
+  });
 
   return safeCandidate ?? candidates[0];
 }
