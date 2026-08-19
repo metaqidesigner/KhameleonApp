@@ -505,6 +505,16 @@ export default function UnifiedCanvas() {
   // this keeps working even after the history hits its 50-item cap.
   const latestEventId = useJarvisStore(s => s.agentHistory[0]?.id);
 
+  // ── Today's Focus ring — real progress from daily tasks ───
+  const [focusPct, setFocusPct] = useState(0);
+  useEffect(() => {
+    getDailyTasks().then(d => {
+      const done  = d.doneCount ?? 0;
+      const grand = (d.total ?? 0) + done;  // active + done = all tasks ever
+      setFocusPct(grand > 0 ? done / grand : 0);
+    });
+  }, []);
+
   // When a new agent event lands, pull the Agent Activity window into focus
   // (animated lift toward canvas centre) for 4 s, then settle back.
   const [activityFocused, setActivityFocused] = useState(false);
@@ -565,7 +575,7 @@ export default function UnifiedCanvas() {
       <div className="ac-focus-card">
         <div className="ac-focus-label">TODAY'S{'\n'}FOCUS</div>
         <div className="ac-focus-ring">
-          <FocusRing pct={0.72} />
+          <FocusRing pct={focusPct} />
         </div>
       </div>
     </div>

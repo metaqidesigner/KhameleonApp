@@ -54,11 +54,15 @@ router.get("/", async (req, res) => {
 // ── GET /tasks/daily — today's tasks bucketed by day section ──────────────────
 router.get("/daily", async (req, res) => {
   try {
-    const tasks = await db.select().from(tasksTable)
-      .where(ne(tasksTable.status, "done"))
-      .orderBy(tasksTable.createdAt);
+    const [activeTasks, doneTasks] = await Promise.all([
+      db.select().from(tasksTable)
+        .where(ne(tasksTable.status, "done"))
+        .orderBy(tasksTable.createdAt),
+      db.select({ id: tasksTable.id }).from(tasksTable)
+        .where(eq(tasksTable.status, "done")),
+    ]);
 
-    const sections: Record<string, typeof tasks> = {
+    const sections: Record<string, typeof activeTasks> = {
       start_of_day:  [],
       core_work:     [],
       meetings:      [],
@@ -67,7 +71,7 @@ router.get("/daily", async (req, res) => {
       end_of_day:    [],
     };
 
-    for (const task of tasks) {
+    for (const task of activeTasks) {
       const section = toSection(task);
       sections[section].push(task);
 
@@ -79,10 +83,11 @@ router.get("/daily", async (req, res) => {
 
     res.json({
       sections,
-      total: tasks.length,
+      total: activeTasks.length,
+      doneCount: doneTasks.length,
       byCategory: Object.fromEntries(
         ["communication","meetings","deep_work","task_project_management","administrative","planning"]
-          .map(cat => [cat, tasks.filter(t => t.category === cat).length])
+          .map(cat => [cat, activeTasks.filter(t => t.category === cat).length])
       ),
     });
   } catch (err) {

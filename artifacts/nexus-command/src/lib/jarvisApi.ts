@@ -280,8 +280,9 @@ export interface UpdateTaskInput {
 }
 
 export interface DailyTasksResponse {
-  sections: Record<string, Task[]>;
-  total:    number;
+  sections:  Record<string, Task[]>;
+  total:     number;
+  doneCount: number;
   byCategory: Record<string, number>;
 }
 
@@ -302,7 +303,7 @@ export async function getDailyTasks(): Promise<DailyTasksResponse> {
   return safeFetch<DailyTasksResponse>(
     `${BASE}/tasks/daily`,
     undefined,
-    { sections: { start_of_day: [], core_work: [], meetings: [], communication: [], administrative: [], end_of_day: [] }, total: 0, byCategory: {} },
+    { sections: { start_of_day: [], core_work: [], meetings: [], communication: [], administrative: [], end_of_day: [] }, total: 0, doneCount: 0, byCategory: {} },
   );
 }
 
