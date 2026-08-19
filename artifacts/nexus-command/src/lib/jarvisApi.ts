@@ -1,3 +1,5 @@
+import { useJarvisStore } from '@/store/jarvisStore';
+
 const BASE = import.meta.env.VITE_API_URL || '/api';
 
 async function safeFetch<T>(url: string, opts?: RequestInit, fallback?: T): Promise<T> {
@@ -314,7 +316,9 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
     body:    JSON.stringify({ priority: 'medium', category: 'deep_work', recurrence: 'one_off', ...input }),
   });
   if (!res.ok) throw new Error('Failed to create task');
-  return res.json() as Promise<Task>;
+  const task = await res.json() as Task;
+  useJarvisStore.getState().notifyTasksChanged();
+  return task;
 }
 
 export async function updateTask(id: number, input: UpdateTaskInput): Promise<Task> {
@@ -324,11 +328,15 @@ export async function updateTask(id: number, input: UpdateTaskInput): Promise<Ta
     body:    JSON.stringify(input),
   });
   if (!res.ok) throw new Error('Failed to update task');
-  return res.json() as Promise<Task>;
+  const task = await res.json() as Task;
+  useJarvisStore.getState().notifyTasksChanged();
+  return task;
 }
 
 export async function deleteTask(id: number): Promise<void> {
-  await fetch(`${BASE}/tasks/${id}`, { method: 'DELETE' });
+  const res = await fetch(`${BASE}/tasks/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete task');
+  useJarvisStore.getState().notifyTasksChanged();
 }
 
 // ── Scheduler ──────────────────────────────────────────────

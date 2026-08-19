@@ -333,13 +333,18 @@ function TodaysPlanBody() {
   const [dailyData, setDailyData]   = useState<Record<string, Task[]>>({});
   const [totalTasks, setTotalTasks] = useState(0);
   const setActiveTab                = useJarvisStore(s => s.setActiveTab);
+  const taskRevision                = useJarvisStore(s => s.taskRevision);
 
-  useEffect(() => {
+  const loadDailyTasks = useCallback(() => {
     getDailyTasks().then(d => {
       setDailyData(d.sections ?? {});
       setTotalTasks(d.total ?? 0);
     });
   }, []);
+
+  useEffect(() => {
+    loadDailyTasks();
+  }, [loadDailyTasks, taskRevision]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -484,13 +489,18 @@ export default function UnifiedCanvas() {
 
   // ── Today's Focus ring — real progress from daily tasks ───
   const [focusPct, setFocusPct] = useState(0);
-  useEffect(() => {
+  const taskRevision = useJarvisStore(s => s.taskRevision);
+  const refreshFocus = useCallback(() => {
     getDailyTasks().then(d => {
       const done  = d.doneCount ?? 0;
       const grand = (d.total ?? 0) + done;  // active + done = all tasks ever
       setFocusPct(grand > 0 ? done / grand : 0);
     });
   }, []);
+
+  useEffect(() => {
+    refreshFocus();
+  }, [refreshFocus, taskRevision]);
 
   // When a new agent event lands, pull the Agent Activity window into focus
   // (animated lift toward canvas centre) for 4 s, then settle back.

@@ -82,6 +82,8 @@ interface JarvisStore {
 
   /** IDs of currently active (running) task runs — drives the badge on the TASKS tab */
   activeTaskIds: string[];
+  /** Incremented after a task mutation so other surfaces can refresh their task data. */
+  taskRevision: number;
 
   orbStatus: OrbStatus;
   orbPosition: { x: number; y: number } | null;
@@ -112,6 +114,7 @@ interface JarvisStore {
 
   addActiveTask: (id: string) => void;
   removeActiveTask: (id: string) => void;
+  notifyTasksChanged: () => void;
 
   setOrbStatus: (s: OrbStatus) => void;
   setOrbPosition: (p: { x: number; y: number }) => void;
@@ -144,6 +147,7 @@ export const useJarvisStore = create<JarvisStore>()(
       cornerBracketsEnabled: true,
       tickerSpeed: 60,
       activeTaskIds: [],
+      taskRevision: 0,
 
       orbStatus: 'online',
       orbPosition: null,
@@ -192,6 +196,7 @@ export const useJarvisStore = create<JarvisStore>()(
 
       addActiveTask:    (id) => set(s => ({ activeTaskIds: [...new Set([...s.activeTaskIds, id])] })),
       removeActiveTask: (id) => set(s => ({ activeTaskIds: s.activeTaskIds.filter(x => x !== id) })),
+      notifyTasksChanged: () => set(s => ({ taskRevision: s.taskRevision + 1 })),
 
       setOrbStatus:          (s)      => set({ orbStatus: s }),
       setOrbPosition:        (p)      => set({ orbPosition: p }),
