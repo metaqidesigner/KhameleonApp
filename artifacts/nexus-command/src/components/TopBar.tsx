@@ -27,19 +27,25 @@ function ThemeToggle() {
 }
 
 // Teal hexagon brand mark
-function BrandPipe() {
+function BrandMark() {
   return (
-    <span style={{
-      display: 'inline-block',
-      width: 22,
-      height: 22,
-      background: 'transparent',
-      border: '1.5px solid #6FE6BD',
-      clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-      boxShadow: '0 0 10px rgba(111,230,189,0.6)',
-      marginRight: 10,
-      flexShrink: 0,
-    }} />
+    <svg
+      width={22}
+      height={22}
+      viewBox="0 0 22 22"
+      style={{
+        filter: 'drop-shadow(0 0 5px rgba(111,230,189,0.6))',
+        marginRight: 10,
+        flexShrink: 0,
+      }}
+    >
+      <polygon
+        points="11,1 21,6 21,16 11,21 1,16 1,6"
+        fill="none"
+        stroke="#6FE6BD"
+        strokeWidth={1.5}
+      />
+    </svg>
   );
 }
 
@@ -48,7 +54,7 @@ export default function TopBar() {
     <div className="j-topbar-slim">
       {/* ── Left: brand + nav ─────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, flex: 1 }}>
-        <BrandPipe />
+        <BrandMark />
         <span style={{
           fontFamily: 'var(--j-font-head)',
           fontSize: 13,
