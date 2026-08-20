@@ -26,13 +26,19 @@ function ThemeToggle() {
   );
 }
 
-// Thin cursor/pipe brand mark
+// Teal hexagon brand mark
 function BrandPipe() {
   return (
     <span style={{
-      display: 'inline-block', width: 2, height: 18,
-      background: 'rgba(255,255,255,0.35)',
-      borderRadius: 1, marginRight: 10, flexShrink: 0,
+      display: 'inline-block',
+      width: 22,
+      height: 22,
+      background: 'transparent',
+      border: '1.5px solid #6FE6BD',
+      clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+      boxShadow: '0 0 10px rgba(111,230,189,0.6)',
+      marginRight: 10,
+      flexShrink: 0,
     }} />
   );
 }
