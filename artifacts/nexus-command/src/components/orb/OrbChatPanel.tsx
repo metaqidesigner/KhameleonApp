@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Mic, Send, Volume2, X } from 'lucide-react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import {
   streamAgentChat,
@@ -53,6 +54,14 @@ function getVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
+function getGreeting(): { title: string; sub: string } {
+  const h = new Date().getHours();
+  const title =
+    h >= 5  && h < 12 ? 'Good morning.'   :
+    h >= 12 && h < 18 ? 'Good afternoon.' : 'Good evening.';
+  return { title, sub: 'How can I help you blend in today?' };
+}
+
 export function OrbChatPanel({ style, onClose }: Props) {
   const orbActiveAgentId    = useJarvisStore(s => s.orbActiveAgentId);
   const setOrbActiveAgentId = useJarvisStore(s => s.setOrbActiveAgentId);
@@ -73,10 +82,16 @@ export function OrbChatPanel({ style, onClose }: Props) {
   const streamBufRef    = useRef('');
   const voicesRef       = useRef<SpeechSynthesisVoice[]>([]);
 
+  // Orb amplitude refs
+  const coreRef = useRef<HTMLDivElement>(null);
+  const ampRafRef = useRef<number>(0);
+
   // Countdown state for auto-send
   const [countdown, setCountdown] = useState<{ progress: number } | null>(null);
   const countdownRafRef = useRef<number | null>(null);
   const countdownStartRef = useRef<number>(0);
+
+  const greeting = getGreeting();
 
   useEffect(() => {
     getRoster().then(setRoster).catch(() => {});
@@ -88,6 +103,28 @@ export function OrbChatPanel({ style, onClose }: Props) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Speaking amplitude pulse
+  useEffect(() => {
+    cancelAnimationFrame(ampRafRef.current);
+    if (orbStatus !== 'speaking') {
+      if (coreRef.current) coreRef.current.style.transform = 'translate(-50%, -50%) scale(1)';
+      return;
+    }
+    const animate = () => {
+      if (coreRef.current) {
+        const t = Date.now() / 1000;
+        const amp =
+          0.45 * Math.abs(Math.sin(t * 3.1)) +
+          0.30 * Math.abs(Math.sin(t * 5.7 + 1.2)) +
+          0.25 * Math.abs(Math.sin(t * 2.1 + 0.7));
+        coreRef.current.style.transform = `translate(-50%, -50%) scale(${1 + amp * 0.14})`;
+      }
+      ampRafRef.current = requestAnimationFrame(animate);
+    };
+    ampRafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(ampRafRef.current);
+  }, [orbStatus]);
 
   // ── TTS with orbStatus wiring + Chrome keepalive ──────────────────────────
   const speakResponse = useCallback((text: string, settings: VoiceSettings) => {
@@ -131,7 +168,6 @@ export function OrbChatPanel({ style, onClose }: Props) {
     utterance.onend   = () => setOrbStatus('online');
     utterance.onerror = () => setOrbStatus('online');
 
-    // Chrome bug: TTS pauses after ~15s without this
     const keepAlive = setInterval(() => {
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.pause();
@@ -197,7 +233,6 @@ export function OrbChatPanel({ style, onClose }: Props) {
           tokens: done.tokens,
           costUsd: done.costUsd,
         });
-        // Orb chat always speaks — voice-first by design
         speakResponse(fullResponse, voiceSettings);
       },
       (err) => {
@@ -263,92 +298,75 @@ export function OrbChatPanel({ style, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [pendingTranscript, cancelAutoSend]);
 
-  const statusColor = orbStatus === 'listening' ? '#c9a84c'
-    : orbStatus === 'offline'  ? '#c0152a'
-    : '#00d4ff';
-
   const activeAgent = roster.find(a => a.id === orbActiveAgentId) ?? roster[0];
+  const hasMessages = messages.length > 0;
 
   return (
-    <div className="orb-chat-panel" style={style}>
-      {/* Header */}
-      <div className="orb-chat-header">
-        <div className="orb-status-dot" style={{ background: statusColor }} />
-        <span className="orb-chat-header-title">KHAMELEON</span>
-        <span className="orb-chat-header-agent">AGENT: {activeAgent?.name ?? orbActiveAgentId.toUpperCase()}</span>
-        <span className="orb-chat-header-status" style={{ color: orbStatus === 'offline' ? '#ef4444' : '#3fb950' }}>
-          ● {orbStatus.toUpperCase()}
-        </span>
-        <span className="j-badge j-badge-classified" style={{ fontSize: 8, padding: '1px 5px' }}>CLASSIFIED</span>
-        <button className="orb-chat-close" onClick={onClose}>✕</button>
-      </div>
+    <div className="orb-chat-panel j-panel j-panel-thick" style={style}>
+      <button className="orb-chat-close-btn" onClick={onClose} title="Close">
+        <X size={14} />
+      </button>
 
-      {/* Agent selector */}
-      <div className="orb-agent-selector">
-        {roster.slice(0, 6).map(agent => (
-          <button
-            key={agent.id}
-            className={`orb-agent-pill${agent.id === orbActiveAgentId ? ' active' : ''}`}
-            onClick={() => setOrbActiveAgentId(agent.id)}
-          >
-            <span className="orb-agent-pill-dot" style={{ background: AGENT_COLORS[agent.id] ?? agent.color }} />
-            {agent.initials}
-          </button>
-        ))}
-      </div>
-
-      {/* Messages */}
-      <div className="orb-messages">
-        {messages.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '20px 0', fontFamily: 'var(--j-font-mono)', fontSize: 10, color: 'rgba(0,212,255,0.3)', letterSpacing: '0.1em' }}>
-            QUERY KHAMELEON TO BEGIN
+      {/* Orb Visual Area */}
+      <div className="orb-chat-visual-area">
+        <div style={{ position: 'relative', width: 90, height: 90, transform: 'scale(1.15)' }}>
+          <div className={`jarvis-orb-container ${orbStatus}`}>
+            <div className={`orb-glow ${orbStatus}`} />
+            <div className="orb-arc orb-arc-1" />
+            <div className="orb-arc orb-arc-2" />
+            <div className="orb-ring orb-ring-outer"><div className="orb-moon" /></div>
+            <div className="orb-ring orb-ring-inner"><div className="orb-beacon" /></div>
+            <div className="orb-core" ref={coreRef} />
           </div>
-        )}
-        {messages.map(msg => (
-          <div key={msg.id} className={`orb-msg ${msg.role === 'user' ? 'orb-msg-user' : msg.role === 'error' ? 'orb-msg-error' : 'orb-msg-assistant'}`}>
-            {msg.role === 'assistant' && !msg.content && streaming ? (
-              <span className="orb-typing">PROCESSING...</span>
-            ) : msg.content}
-            {msg.role === 'assistant' && msg.content && (
-              <div className="orb-msg-footer">
-                <span>{(msg.agentId ?? orbActiveAgentId).toUpperCase()}</span>
-                {msg.latencyMs != null && <span>{msg.latencyMs}ms</span>}
-                {msg.tokens   != null && <span>{msg.tokens} tok</span>}
-                {msg.costUsd  != null && msg.costUsd > 0 && <span>${msg.costUsd.toFixed(4)}</span>}
-                {msg.wasSpoken && <span>🔊 SPOKEN</span>}
-                {'speechSynthesis' in window && (
-                  <button
-                    className="orb-msg-speak-btn"
-                    title="Replay"
-                    onClick={() => speakResponse(msg.content, voiceSettings)}
-                  >🔊</button>
+        </div>
+      </div>
+
+      {/* Content Area */}
+      <div className="orb-chat-content-area">
+        {!hasMessages ? (
+          <div className="orb-chat-greeting">
+            <div className="orb-chat-greeting-title">{greeting.title}</div>
+            <div className="orb-chat-greeting-sub">{greeting.sub}</div>
+          </div>
+        ) : (
+          <div className="orb-chat-messages">
+            {messages.map(msg => (
+              <div key={msg.id} className={`orb-chat-msg ${msg.role === 'user' ? 'orb-chat-msg-user' : msg.role === 'error' ? 'orb-chat-msg-error' : 'orb-chat-msg-assistant'}`}>
+                {msg.role === 'assistant' && !msg.content && streaming ? (
+                  <span className="orb-chat-typing">PROCESSING...</span>
+                ) : (
+                  msg.content
+                )}
+                {msg.role === 'assistant' && msg.content && (
+                  <div className="orb-chat-msg-footer">
+                    <span>{(msg.agentId ?? orbActiveAgentId).toUpperCase()}</span>
+                    {msg.latencyMs != null && <span>{msg.latencyMs}ms</span>}
+                    {msg.tokens   != null && <span>{msg.tokens} tok</span>}
+                    {msg.costUsd  != null && msg.costUsd > 0 && <span>${msg.costUsd.toFixed(4)}</span>}
+                    {msg.wasSpoken && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Volume2 size={10} /> SPOKEN</span>}
+                    {'speechSynthesis' in window && (
+                      <button
+                        className="orb-chat-msg-speak-btn"
+                        title="Replay"
+                        onClick={() => speakResponse(msg.content, voiceSettings)}
+                      >
+                        <Volume2 size={12} />
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input area */}
-      <div className="orb-chat-input-area" style={{ flexDirection: 'column', gap: 0 }}>
-        {/* Countdown bar */}
-        {pendingTranscript && countdown && (
-          <div style={{ width: '100%', marginBottom: 4 }}>
-            <div style={{ position: 'relative', height: 2, background: 'rgba(0,212,255,0.12)', borderRadius: 1, overflow: 'hidden' }}>
-              <div style={{
-                position: 'absolute', left: 0, top: 0, height: '100%',
-                width: `${(1 - countdown.progress) * 100}%`,
-                background: 'var(--j-cyan)',
-                transition: 'width 50ms linear',
-              }} />
-            </div>
+            ))}
+            <div ref={messagesEndRef} />
           </div>
         )}
+      </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+      {/* Input Area */}
+      <div className="orb-chat-input-container">
+        <div className="orb-chat-input-wrapper">
           <button
-            className={`orb-mic-btn${isListening ? ' listening' : ''}`}
+            className={`orb-chat-mic-btn ${isListening ? 'listening' : ''}`}
             title={voiceInputAvailable ? (isListening ? 'Stop listening' : 'Voice input') : 'Voice input requires Chrome or Edge'}
             disabled={!voiceInputAvailable}
             onClick={toggleListening}
@@ -356,50 +374,28 @@ export function OrbChatPanel({ style, onClose }: Props) {
             {isListening ? (
               <InputWaveform analyserRef={analyserRef} active={isListening} />
             ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                <line x1="12" y1="19" x2="12" y2="23"/>
-                <line x1="8" y1="23" x2="16" y2="23"/>
-                {!voiceInputAvailable && <line x1="4" y1="4" x2="20" y2="20" stroke="#c0152a"/>}
-              </svg>
+              <Mic size={14} />
             )}
           </button>
 
           {pendingTranscript ? (
             <>
-              <div style={{
-                flex: 1, fontFamily: 'var(--j-font-mono)', fontSize: 10,
-                color: 'rgba(0,212,255,0.7)', padding: '0 4px',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
+              <div className="orb-chat-pending-text">
                 {pendingTranscript}
               </div>
-              <button
-                onClick={cancelAutoSend}
-                style={{
-                  padding: '3px 8px', fontFamily: 'var(--j-font-mono)', fontSize: 9,
-                  letterSpacing: '0.1em', background: 'transparent',
-                  border: '1px solid rgba(192,21,42,0.5)', color: 'rgba(192,21,42,0.8)',
-                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                }}
-              >
-                ✕ CANCEL
+              <button onClick={cancelAutoSend} className="orb-chat-cancel-btn">
+                X CANCEL
               </button>
             </>
           ) : isListening && interim ? (
-            <div style={{
-              flex: 1, fontFamily: 'var(--j-font-mono)', fontSize: 10,
-              color: 'rgba(0,212,255,0.5)', padding: '0 4px',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
+            <div className="orb-chat-pending-text interim">
               Hearing: {interim}…
             </div>
           ) : (
             <input
               ref={inputRef}
-              className="orb-text-input"
-              placeholder="QUERY KHAMELEON..."
+              className="orb-chat-input"
+              placeholder="Ask anything..."
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSend(input); }}
@@ -408,12 +404,43 @@ export function OrbChatPanel({ style, onClose }: Props) {
           )}
 
           <button
-            className="orb-send-btn"
+            className="orb-chat-send-btn"
             disabled={streaming || (!input.trim() && !isListening && !pendingTranscript)}
             onClick={() => handleSend(input)}
           >
-            ➤
+            <Send size={14} strokeWidth={2.2} />
           </button>
+
+          {pendingTranscript && countdown && (
+            <div className="orb-chat-countdown-bar-container">
+              <div
+                className="orb-chat-countdown-bar-fill"
+                style={{ width: `${(1 - countdown.progress) * 100}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Agents Row */}
+        <div className="orb-chat-agents-row">
+          <span className="orb-chat-agents-label">CONNECTED</span>
+          {roster.slice(0, 6).map(agent => (
+            <button
+              key={agent.id}
+              className={`orb-chat-agent-pill ${agent.id === orbActiveAgentId ? 'active' : ''}`}
+              onClick={() => setOrbActiveAgentId(agent.id)}
+              style={{
+                borderColor: agent.id === orbActiveAgentId
+                  ? (AGENT_COLORS[agent.id] ?? 'var(--j-teal)')
+                  : undefined,
+                color: agent.id === orbActiveAgentId
+                  ? (AGENT_COLORS[agent.id] ?? 'var(--j-teal)')
+                  : undefined,
+              }}
+            >
+              {agent.initials}
+            </button>
+          ))}
         </div>
       </div>
     </div>

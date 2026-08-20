@@ -9,6 +9,7 @@ export const ORB_RIGHT_OFFSET = 44;
 export const ORB_BOTTOM_OFFSET = 40;
 export const ORB_CHAT_PANEL_WIDTH = 310;
 export const ORB_CHAT_PANEL_HEIGHT = 420;
+export const ORB_CHAT_PANEL_VIEWPORT_INSET = 16;
 export const ORB_CHAT_PANEL_GAP = 10;
 export const ORB_CHAT_PANEL_EDGE_GAP = 4;
 /**
@@ -30,6 +31,16 @@ export const FEED_SHORTCUT_LEFT = 8;
 export const FEED_SHORTCUT_WIDTH = 126;
 export const FEED_SHORTCUT_HEIGHT = 22;
 export const FEED_TICKER_HEIGHT = 34;
+
+export function getOrbChatPanelSize(
+  viewportWidth: number,
+  viewportHeight: number,
+): { width: number; height: number } {
+  return {
+    width: Math.min(ORB_CHAT_PANEL_WIDTH, Math.max(0, viewportWidth - ORB_CHAT_PANEL_VIEWPORT_INSET)),
+    height: Math.min(ORB_CHAT_PANEL_HEIGHT, Math.max(0, viewportHeight - ORB_CHAT_PANEL_VIEWPORT_INSET)),
+  };
+}
 
 export interface LayoutRect {
   left: number;

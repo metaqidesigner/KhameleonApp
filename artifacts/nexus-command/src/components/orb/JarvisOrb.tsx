@@ -8,6 +8,7 @@ import {
   getDefaultOrbPosition,
   getDashboardProtectedRects,
   getOrbChatPanelPosition,
+  getOrbChatPanelSize,
   ORB_SIZE,
   ORB_SIZE_MIN,
 } from '@/lib/orbLayout';
@@ -55,6 +56,7 @@ export function JarvisOrb() {
     height: window.innerHeight,
   }));
 
+  const panelSize = getOrbChatPanelSize(viewport.width, viewport.height);
   const panelPos = getOrbChatPanelPosition(
     pos.x,
     pos.y,
@@ -62,6 +64,8 @@ export function JarvisOrb() {
     viewport.width,
     viewport.height,
     getDashboardProtectedRects(viewport.height),
+    panelSize.width,
+    panelSize.height,
   );
 
   useEffect(() => {
