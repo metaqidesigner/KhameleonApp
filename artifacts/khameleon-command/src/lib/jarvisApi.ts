@@ -424,6 +424,51 @@ export async function saveWeatherDefault(lat: number, lon: number, label?: strin
   return res.json();
 }
 
+export interface WeatherCurrent {
+  label: string | null;
+  lat: number;
+  lon: number;
+  observedAt: string;
+  temperatureC: number;
+  feelsLikeC: number;
+  humidityPct: number;
+  precipitationMm: number;
+  windSpeedKmh: number;
+  conditions: string;
+}
+
+/** Current conditions at the saved default location. Returns null if none is set or the fetch fails - a missing widget, not an error banner. */
+export async function getWeatherCurrent(): Promise<WeatherCurrent | null> {
+  return safeFetch<WeatherCurrent | null>(`${BASE}/weather`, undefined, null);
+}
+
+// ── Spotify now playing ──────────────────────────────────────
+export interface SpotifyNowPlaying {
+  playing: boolean;
+  track?: string;
+  artists?: string[];
+  album?: string;
+  albumArt?: string | null;
+  progressMs?: number | null;
+  durationMs?: number;
+  url?: string;
+}
+
+/** Returns { playing: false } if nothing is playing, not connected, or the fetch fails - a quiet widget state, not an error. */
+export async function getSpotifyNowPlaying(): Promise<SpotifyNowPlaying> {
+  return safeFetch<SpotifyNowPlaying>(`${BASE}/spotify/now-playing`, undefined, { playing: false });
+}
+
+async function spotifyControl(action: 'play' | 'pause' | 'next' | 'previous'): Promise<void> {
+  const res = await fetch(`${BASE}/spotify/${action}`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Spotify ${action} failed (HTTP ${res.status})`);
+}
+
+export const spotifyPlay     = () => spotifyControl('play');
+export const spotifyPause    = () => spotifyControl('pause');
+export const spotifyNext     = () => spotifyControl('next');
+export const spotifyPrevious = () => spotifyControl('previous');
+
 // ── WebSocket streaming ────────────────────────────────────
 export interface StreamDonePayload {
   model: string | null;

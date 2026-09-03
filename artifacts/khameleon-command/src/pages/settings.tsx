@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin } from 'lucide-react';
+import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin, Music, Play, Pause, SkipForward, SkipBack } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
 import {
   getHealth, getSchedulerStatus, type SchedulerStatus,
   getApiKeyStatus, saveApiKey, clearApiKey, type ApiKeyProvider, type ApiKeyStatus,
-  getWeatherDefault, saveWeatherDefault,
+  getWeatherDefault, saveWeatherDefault, getWeatherCurrent, type WeatherCurrent,
+  getSpotifyNowPlaying, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, type SpotifyNowPlaying,
   getOnboardingStatus,
 } from '@/lib/jarvisApi';
 
@@ -154,7 +155,8 @@ function ConnectorsSection() {
           const connected = statuses[p.id] ?? false;
           const busy      = loading[p.id] ?? false;
           return (
-            <div key={p.id} style={{
+            <React.Fragment key={p.id}>
+            <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '14px 16px',
               background: connected ? 'rgba(0,212,255,0.04)' : 'rgba(0,4,8,0.6)',
@@ -222,6 +224,8 @@ function ConnectorsSection() {
                 )}
               </div>
             </div>
+            {p.id === 'spotify' && connected && <SpotifyNowPlayingRow />}
+            </React.Fragment>
           );
         })}
       </div>
@@ -242,6 +246,105 @@ function ConnectorsSection() {
   );
 }
 
+// ── Spotify now playing ──────────────────────────────────────────────────────
+// The Spotify connector row above only ever promised a status dot - the
+// actual "now playing + playback control" it advertises had no UI anywhere
+// until now. Polls every 8s while mounted (i.e. while connected), which is
+// frequent enough to feel live without hammering the Spotify API.
+
+export function formatMs(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}:${String(sec).padStart(2, '0')}`;
+}
+
+function SpotifyNowPlayingRow() {
+  const [state, setState]   = useState<SpotifyNowPlaying | null>(null);
+  const [busy, setBusy]     = useState(false);
+  const [error, setError]   = useState<string | null>(null);
+
+  const refresh = useCallback(() => {
+    getSpotifyNowPlaying().then(setState);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const interval = setInterval(refresh, 8000);
+    return () => clearInterval(interval);
+  }, [refresh]);
+
+  const control = async (action: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      // Spotify's own state takes a moment to update after a control call.
+      setTimeout(refresh, 500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Playback control failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!state) return null;
+
+  return (
+    <div style={{
+      marginTop: -1, padding: '12px 16px',
+      background: 'rgba(0,212,255,0.02)',
+      border: '1px solid rgba(0,212,255,0.15)', borderTop: 'none',
+    }}>
+      {!state.playing ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)' }}>
+          <Music size={13} /> Nothing playing right now
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {state.albumArt && (
+            <img src={state.albumArt} alt="" width={40} height={40} style={{ borderRadius: 3, flexShrink: 0 }} />
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, fontWeight: 700, color: 'var(--j-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {state.track}
+            </div>
+            <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, color: 'var(--j-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {state.artists?.join(', ')}
+              {state.durationMs != null && state.progressMs != null && (
+                <span> — {formatMs(state.progressMs)} / {formatMs(state.durationMs)}</span>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            {[
+              { icon: <SkipBack size={13} />, action: spotifyPrevious, label: 'Previous' },
+              { icon: <Pause size={13} />, action: spotifyPause, label: 'Pause' },
+              { icon: <Play size={13} />, action: spotifyPlay, label: 'Play' },
+              { icon: <SkipForward size={13} />, action: spotifyNext, label: 'Next' },
+            ].map(({ icon, action, label }) => (
+              <button
+                key={label}
+                onClick={() => control(action)}
+                disabled={busy}
+                title={label}
+                style={{
+                  width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.2)', borderRadius: 3,
+                  color: 'var(--j-cyan)', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.5 : 1,
+                }}
+              >
+                {icon}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {error && <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 10, color: '#f87171' }}>{error}</div>}
+    </div>
+  );
+}
+
 // ── Weather default location ────────────────────────────────────────────────
 // Weather has no OAuth "connect" step (Open-Meteo needs no API key) — the only
 // thing to set up is where. Lives in the Connectors section since it's the
@@ -254,6 +357,7 @@ function WeatherLocationRow() {
   const [saved, setSaved] = useState<{ lat: number; lon: number; label: string | null } | null>(null);
   const [busy, setBusy]   = useState(false);
   const [msg, setMsg]     = useState<string | null>(null);
+  const [current, setCurrent] = useState<WeatherCurrent | null>(null);
 
   useEffect(() => {
     getWeatherDefault().then((loc) => {
@@ -265,6 +369,13 @@ function WeatherLocationRow() {
       }
     });
   }, []);
+
+  // Once a default location exists (on load, or right after saving one),
+  // show what it's actually reporting right now - not just "SET".
+  useEffect(() => {
+    if (saved) getWeatherCurrent().then(setCurrent);
+    else setCurrent(null);
+  }, [saved]);
 
   const save = async () => {
     const latNum = Number(lat);
@@ -303,6 +414,16 @@ function WeatherLocationRow() {
           </span>
         )}
       </div>
+      {current && (
+        <div style={{
+          display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10,
+          fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'var(--j-text)',
+        }}>
+          <span style={{ fontSize: 18, fontWeight: 700 }}>{Math.round(current.temperatureC)}°C</span>
+          <span style={{ color: 'var(--j-text-muted)' }}>{current.conditions}</span>
+          <span style={{ color: 'var(--j-text-faint)', fontSize: 10 }}>feels like {Math.round(current.feelsLikeC)}°C</span>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <input className="j-input" placeholder="Latitude" value={lat} onChange={(e) => setLat(e.target.value)} style={{ flex: 1 }} />
         <input className="j-input" placeholder="Longitude" value={lon} onChange={(e) => setLon(e.target.value)} style={{ flex: 1 }} />
