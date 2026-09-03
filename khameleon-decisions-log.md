@@ -221,6 +221,28 @@ Added real `POST /index` (reads a file via the same path-traversal-guarded `read
 
 **Still open from the audit:** `pages/projects/index.tsx` (a hand-rolled stub with non-functional "Connect" buttons, not using the shared `JarvisStubPage` pattern the other honest stubs use) was flagged during this pass but not yet fixed — lower severity than the above since it doesn't claim anything false, it's just inert. `lib/jarvisApi.ts`'s other functions weren't individually re-verified against their backing routes beyond what this and the prior entry covered — this remains one audit pass, not a guarantee of completeness.
 
+## 2026-09-03 — Projects: not just disconnected from its backend, disconnected from the app entirely
+
+**Went back to fix the `pages/projects/index.tsx` stub flagged above — turned out to be the biggest gap of the whole audit.** Unlike Research/Memory (real backend, wrong frontend calls), Projects was unreachable end to end: `'projects'` wasn't a valid `TabId`, `AppShell` never imported anything under `pages/projects`, and no nav surface — sidebar or command palette — linked to it. `index.tsx` and `detail.tsx` both used wouter's real URL routing (`Link`/`useRoute`), but nothing else in this app reads `window.location` — every other page switches on Zustand `activeTab` state — so wouter's own routing had no way to ever get invoked either. Meanwhile `routes/projects.ts` already had real DB-backed CRUD (list/create/get/update, task counts) — the same backend-exists/frontend-doesn't-call-it shape as Outlook/Spotify/Weather, just one layer further back.
+
+**Built:**
+- Split the list view into `pages/projects/ProjectsList.tsx` — real data via the already-generated `useListProjects`/`useCreateProject` hooks from `@workspace/api-client-react` (the same Orval convention `detail.tsx` already used, not a new ad-hoc fetch wrapper), plus a real create-project dialog.
+- `pages/projects/index.tsx` is now a thin wouter `<Switch>` confined to this one feature (`/projects` ↔ `/projects/:id`) — the rest of the app's `activeTab` model didn't need retrofitting.
+- Added `'projects'` to `TabId`, wired it into `AppShell`, and added it to the command palette (alongside Research/Memory/Security, not the sidebar).
+- The "Required connectors" list (GitHub Issues/Linear/Notion/Jira/TickTick) has no OAuth flow for any of the five — changed from dead-but-clickable buttons to honestly disabled "Coming soon," matching the Security page's `NOT IMPLEMENTED` pattern.
+
+**Three real backend bugs in `routes/projects.ts`, all the same root issue in three forms:** `completedTaskCount` was wrong everywhere. The list endpoint ran the identical query for "total" and "completed" (no status filter on the second at all); the detail endpoint filtered on the string `"completed"`, but `tasksTable`'s real values are `todo`/`in_progress`/`done`/`blocked` — `"completed"` never matches anything; `PATCH` hardcoded it to `0` unconditionally. Extracted one `getTaskCounts()` helper used by all three instead of three chances to get it wrong.
+
+**`detail.tsx` had the identical class of bug independently:** it compared `task.status`/`priority` against `'Completed'`/`'In Progress'`/`'High'`/`'Medium'` (capitalized) — every task would have rendered with the default (todo) icon regardless of its real status. Fixed to the real lowercase enum values.
+
+**Root-caused the visual issue once real data started flowing:** Card/Badge/Progress/Dialog/Select all rendered as colorless outlines. `index.css` had a 4-variable "Tailwind compat" stub (even `--border-color` was misnamed — Tailwind expects `--border`) and **no `@theme` block at all**, so Tailwind v4 never generated `bg-primary`/`text-destructive`/`bg-secondary`/etc. as real utilities — only literal-palette classes like `border-white/10` worked, which is why every shadcn `ui/` component in this codebase (a couple dozen of them) rendered as a borderless, colorless shell. Completed the bridge: the full set of shadcn semantic tokens as `var(--j-*)` references (no new colors invented) plus the `@theme inline` mapping Tailwind v4 needs. Since these are all `var()` references, the existing `.light` theme override applies to them automatically with no duplication.
+
+**Verified:** `tsc --noEmit` clean in both packages (same 24 pre-existing errors), 43/43 frontend tests unaffected. Drove the running app via Playwright with realistic mocked project/task data: the palette opens Projects, the list renders real cards with correctly colored status/priority badges and real progress bars, clicking a card navigates to a working detail view with correctly-iconed tasks — before/after screenshots confirm the theming fix took badges and progress bars from invisible to fully colored.
+
+**Not verified here, on purpose:** creating a project against a real Postgres instance (the create-dialog's mutation itself, not just its UI).
+
+**This closes the item flagged as still-open in the entry above.** The theming fix is broader than Projects — it's the root cause for every shadcn `ui/` component in the codebase, so anything else built on those (nothing currently uses them besides Projects, as far as this session found) benefits automatically going forward.
+
 *Full detail: khameleon-design-spec.md §12.2; code in `artifacts/api-server/src/{agents/skills/outlookSummarizeThread.ts,routes/outlookSummarize.ts}`.*
 
 ## 2026-08-12 — Commercial readiness caveats (deferred)
