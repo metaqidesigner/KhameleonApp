@@ -4,11 +4,16 @@
  */
 
 import React, { useState } from 'react';
-import { AlertCircle, Mail, Send, FileSearch } from 'lucide-react';
+import { AlertCircle, Mail, Send, FileSearch, Inbox } from 'lucide-react';
 import { ActionReceiptList, type ActionReceiptProps } from '@/components/ActionReceipt';
 import { ConfirmGate } from '@/components/ConfirmGate';
 import { createApproval } from '@/lib/approvalsApi';
-import { runOutlookDraftEmail, sendOutlookDraft, rejectOutlookDraft, runOutlookSummarizeThread, type OutlookDraft } from '@/lib/outlookSkillsApi';
+import {
+  runOutlookDraftEmail, sendOutlookDraft, rejectOutlookDraft,
+  runOutlookSummarizeThread,
+  runOutlookTriageInbox, undoOutlookTriage,
+  type OutlookDraft,
+} from '@/lib/outlookSkillsApi';
 
 export default function Approvals() {
   const [showConfirmGate, setShowConfirmGate] = useState(false);
@@ -172,6 +177,48 @@ export default function Approvals() {
     }
   };
 
+  // ── Real skill: outlook-triage-inbox (§12.3) ─────────────────────────────
+  // No ConfirmGate: flagging/categorizing/archiving the user's own mail is
+  // local/cheap/reversible (§6.5.3). Real undo is offered on the resulting
+  // receipt instead (§6.5.2) - one receipt per run, not one per message.
+  const [triageLoading, setTriageLoading] = useState(false);
+  const [triageError, setTriageError] = useState<string>();
+
+  const handleTriage = async () => {
+    setTriageLoading(true);
+    setTriageError(undefined);
+    try {
+      const result = await runOutlookTriageInbox();
+      const receiptId = `triage-${result.taskRunId}`;
+      const byLine = result.items
+        .map(i => `[${i.classification}] ${i.subject} — ${i.from} (${i.actionTaken}, ${i.source})`)
+        .join('\n');
+      const actionItemsLine = result.actionItems.length
+        ? `\n\nAction items:\n${result.actionItems.map(a => `- ${a}`).join('\n')}`
+        : '';
+
+      setReceipts(r => [{
+        id: receiptId,
+        description: `Triaged ${result.items.length} unread message${result.items.length !== 1 ? 's' : ''}`,
+        category: 'inbox_triaged',
+        scope: 'mail.readwrite',
+        outcome: 'success' as const,
+        timestamp: new Date().toISOString(),
+        target: `${result.counts.urgent} urgent, ${result.counts.action_needed} action needed, ${result.counts.fyi} FYI, ${result.counts.low_priority} low priority`,
+        canUndo: true,
+        detail: `${byLine}${actionItemsLine}`,
+        onUndo: async () => {
+          await undoOutlookTriage(result.items.map(i => i.undo));
+          setReceipts(rs => rs.filter(rc => rc.id !== receiptId));
+        },
+      }, ...r]);
+    } catch (error) {
+      setTriageError(error instanceof Error ? error.message : 'Triage request failed');
+    } finally {
+      setTriageLoading(false);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', height: '100%', overflow: 'auto' }}>
       {/* Header */}
@@ -325,6 +372,46 @@ export default function Approvals() {
           </div>
           {summarizeError && (
             <div style={{ fontSize: '11px', color: '#E77A7A' }}>{summarizeError}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Real skill: outlook-triage-inbox */}
+      <div className="j-panel" style={{ height: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(120, 168, 220, 0.10)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Inbox size={14} style={{ color: '#8fa39c' }} />
+          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#fff' }}>
+            Real skill: outlook-triage-inbox (§12.3)
+          </h3>
+        </div>
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: '#8fa39c', lineHeight: 1.5 }}>
+            Classifies every unread message (rule-based, then judgment for anything ambiguous) and flags/categorizes/archives accordingly. No confirm gate — all reversible — but the resulting receipt offers real undo.
+          </p>
+          <div>
+            <button
+              onClick={handleTriage}
+              disabled={triageLoading}
+              style={{
+                height: '34px',
+                padding: '0 16px',
+                fontSize: '11px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: '#fff',
+                backgroundColor: '#F0A34C22',
+                border: '1px solid rgba(240, 163, 76, 0.45)',
+                borderRadius: '6px',
+                cursor: triageLoading ? 'wait' : 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {triageLoading ? 'Triaging…' : 'Triage inbox'}
+            </button>
+          </div>
+          {triageError && (
+            <div style={{ fontSize: '11px', color: '#E77A7A' }}>{triageError}</div>
           )}
         </div>
       </div>

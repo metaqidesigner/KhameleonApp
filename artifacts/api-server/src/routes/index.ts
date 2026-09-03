@@ -31,6 +31,7 @@ import weatherRouter from "./weather";
 import onboardingRouter from "./onboarding";
 import outlookSkillsRouter from "./outlookSkills";
 import outlookSummarizeRouter from "./outlookSummarize";
+import outlookTriageRouter from "./outlookTriage";
 
 const router: IRouter = Router();
 
@@ -66,5 +67,6 @@ router.use("/weather", weatherRouter);
 router.use("/onboarding", onboardingRouter);
 router.use("/skills/outlook-draft-email", outlookSkillsRouter);
 router.use("/skills/outlook-summarize-thread", outlookSummarizeRouter);
+router.use("/skills/outlook-triage-inbox", outlookTriageRouter);
 
 export default router;

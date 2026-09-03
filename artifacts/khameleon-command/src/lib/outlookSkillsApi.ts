@@ -69,3 +69,49 @@ export async function runOutlookSummarizeThread(messageId: string): Promise<Outl
   });
   return asJson<OutlookThreadSummary>(response, 'Summarize request');
 }
+
+export type TriageClassification = 'urgent' | 'action_needed' | 'fyi' | 'low_priority';
+
+export interface TriageUndoEntry {
+  currentId: string;
+  originalId: string;
+  wasArchived: boolean;
+  previousCategories: string[];
+  previousFlagStatus: string;
+}
+
+export interface TriageItem {
+  id: string;
+  subject: string;
+  from: string;
+  classification: TriageClassification;
+  source: 'rule' | 'judgment';
+  actionTaken: string;
+  undo: TriageUndoEntry;
+}
+
+export interface TriageResult {
+  taskRunId: string;
+  items: TriageItem[];
+  actionItems: string[];
+  counts: Record<TriageClassification, number>;
+}
+
+/**
+ * §12.3 — hybrid, no confirm gate: flagging/categorizing/archiving the
+ * user's own mail is local/cheap/reversible (§6.5.3). Real undo is offered
+ * on the resulting receipt instead (§6.5.2) — see undoOutlookTriage.
+ */
+export async function runOutlookTriageInbox(): Promise<TriageResult> {
+  const response = await fetch(`${BASE}/skills/outlook-triage-inbox`, { method: 'POST' });
+  return asJson<TriageResult>(response, 'Triage request');
+}
+
+export async function undoOutlookTriage(entries: TriageUndoEntry[]): Promise<{ ok: boolean; restored: number; failed: number }> {
+  const response = await fetch(`${BASE}/skills/outlook-triage-inbox/undo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entries }),
+  });
+  return asJson(response, 'Undo');
+}

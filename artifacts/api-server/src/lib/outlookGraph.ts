@@ -24,9 +24,13 @@ export interface GraphMessage {
   bodyPreview: string;
   body: { contentType: string; content: string };
   receivedDateTime: string;
+  categories?: string[];
+  flag?: { flagStatus: string };
+  parentFolderId?: string;
 }
 
 const MESSAGE_FIELDS = "id,conversationId,subject,from,toRecipients,bodyPreview,body,receivedDateTime";
+const TRIAGE_MESSAGE_FIELDS = "id,conversationId,subject,from,toRecipients,bodyPreview,receivedDateTime,categories,flag,parentFolderId";
 
 async function graphFetch(path: string, init: RequestInit = {}): Promise<globalThis.Response> {
   const token = await getFreshToken("microsoft");
@@ -59,6 +63,16 @@ export async function listConversationMessages(conversationId: string): Promise<
   const filter = encodeURIComponent(`conversationId eq '${conversationId.replace(/'/g, "''")}'`);
   const res = await graphFetch(`/me/messages?$filter=${filter}&$orderby=receivedDateTime asc&$select=${MESSAGE_FIELDS}`);
   await assertOk(res, "list conversation messages");
+  const json = (await res.json()) as { value: GraphMessage[] };
+  return json.value;
+}
+
+/** Unread messages in the inbox, newest first — the input to outlook-triage-inbox (§12.3). */
+export async function listUnreadInboxMessages(top = 50): Promise<GraphMessage[]> {
+  const res = await graphFetch(
+    `/me/mailFolders/inbox/messages?$filter=isRead eq false&$orderby=receivedDateTime desc&$top=${top}&$select=${TRIAGE_MESSAGE_FIELDS}`
+  );
+  await assertOk(res, "list unread inbox messages");
   const json = (await res.json()) as { value: GraphMessage[] };
   return json.value;
 }
@@ -98,6 +112,43 @@ export async function sendDraft(draftId: string): Promise<void> {
 export async function deleteDraft(draftId: string): Promise<void> {
   const res = await graphFetch(`/me/messages/${encodeURIComponent(draftId)}`, { method: "DELETE" });
   await assertOk(res, "delete draft");
+}
+
+/**
+ * Sets flag/categories on a message in place (Mail.ReadWrite) — used by
+ * outlook-triage-inbox (§12.3). Both fields are optional so undo can pass
+ * back only what it needs to restore.
+ */
+export async function updateMessageTriageState(
+  messageId: string,
+  patch: { flagStatus?: "flagged" | "notFlagged"; categories?: string[] }
+): Promise<void> {
+  const body: Record<string, unknown> = {};
+  if (patch.flagStatus) body.flag = { flagStatus: patch.flagStatus };
+  if (patch.categories) body.categories = patch.categories;
+  if (Object.keys(body).length === 0) return;
+
+  const res = await graphFetch(`/me/messages/${encodeURIComponent(messageId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  await assertOk(res, "update message triage state");
+}
+
+/**
+ * Moves a message to another folder (Mail.ReadWrite) — e.g. "archive" or
+ * "inbox" (Graph accepts these well-known folder names directly, no lookup
+ * needed). IMPORTANT: Graph's classic mail API assigns the moved message a
+ * NEW id in its destination folder — the returned message's `id` is what
+ * every later reference (including undo) must use, not the original id.
+ */
+export async function moveMessage(messageId: string, destinationFolderId: string): Promise<GraphMessage> {
+  const res = await graphFetch(`/me/messages/${encodeURIComponent(messageId)}/move`, {
+    method: "POST",
+    body: JSON.stringify({ destinationId: destinationFolderId }),
+  });
+  await assertOk(res, "move message");
+  return res.json() as Promise<GraphMessage>;
 }
 
 // ── Pure helpers (unit-testable without network — see outlookGraph.test.ts) ──
