@@ -46,9 +46,9 @@ function ConnectorTile({ connector }: { connector: JarvisConnector }) {
         <button
           className="j-btn-ghost"
           style={{ height: 22, padding: '0 8px', fontSize: 9, marginTop: 2, width: '100%' }}
-          onClick={() => setActiveTab('settings')}
+          onClick={() => setActiveTab('integrations')}
         >
-          CONNECT IN SETTINGS
+          VIEW IN INTEGRATIONS
         </button>
       )}
     </div>

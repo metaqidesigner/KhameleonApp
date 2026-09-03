@@ -7,7 +7,7 @@ const router = Router();
  * Provider map: connector id → which OAuth provider token covers it.
  * Multiple connectors can share one provider row (Gmail + GCal both use "google").
  */
-const PROVIDER_MAP: Record<string, string> = {
+export const PROVIDER_MAP: Record<string, string> = {
   gmail:     "google",
   gcal:      "google",
   gdrive:    "google",
@@ -25,9 +25,9 @@ const PROVIDER_MAP: Record<string, string> = {
  * Weather (Open-Meteo) is the first of these: added 2026-08-27 when
  * lifestyle utilities were brought into scope.
  */
-const NO_AUTH_CONNECTORS = new Set(["weather"]);
+export const NO_AUTH_CONNECTORS = new Set(["weather"]);
 
-const ALL_CONNECTORS: { id: string; name: string }[] = [
+export const ALL_CONNECTORS: { id: string; name: string }[] = [
   { id: "gmail",        name: "Gmail" },
   { id: "gcal",         name: "Google Calendar" },
   { id: "gdrive",       name: "Google Drive" },
@@ -51,27 +51,34 @@ const ALL_CONNECTORS: { id: string; name: string }[] = [
   { id: "granola",      name: "Granola" },
 ];
 
+/**
+ * Real connected/not-connected status per connector id, checked against
+ * live OAuth tokens (or NO_AUTH_CONNECTORS for ones that need none).
+ * Exported so routes/integrations.ts can join this against directory
+ * metadata without re-deriving connection status itself — one source
+ * of truth for "is this connected" (the oauth_tokens table), not two.
+ */
+export async function getConnectorStatusMap(): Promise<Record<string, boolean>> {
+  const providerIds = [...new Set(Object.values(PROVIDER_MAP))];
+  const statusMap: Record<string, boolean> = {};
+  await Promise.all(
+    providerIds.map(async (p) => {
+      statusMap[p] = await isConnected(p);
+    })
+  );
+  const result: Record<string, boolean> = {};
+  for (const c of ALL_CONNECTORS) {
+    if (NO_AUTH_CONNECTORS.has(c.id)) { result[c.id] = true; continue; }
+    const provider = PROVIDER_MAP[c.id];
+    result[c.id] = provider ? (statusMap[provider] ?? false) : false;
+  }
+  return result;
+}
+
 router.get("/", async (req, res) => {
   try {
-    // Batch-check which providers have live tokens (deduplicated)
-    const providerIds = [...new Set(Object.values(PROVIDER_MAP))];
-    const statusMap: Record<string, boolean> = {};
-    await Promise.all(
-      providerIds.map(async (p) => {
-        statusMap[p] = await isConnected(p);
-      })
-    );
-
-    const connectors = ALL_CONNECTORS.map((c) => {
-      if (NO_AUTH_CONNECTORS.has(c.id)) return { ...c, connected: true };
-      const provider = PROVIDER_MAP[c.id];
-      return {
-        ...c,
-        connected: provider ? (statusMap[provider] ?? false) : false,
-      };
-    });
-
-    res.json(connectors);
+    const statusMap = await getConnectorStatusMap();
+    res.json(ALL_CONNECTORS.map((c) => ({ ...c, connected: statusMap[c.id] ?? false })));
   } catch (err) {
     req.log.error({ err }, "Error fetching connectors");
     // Fall back to all-offline (except no-auth connectors, which never depend on token state)

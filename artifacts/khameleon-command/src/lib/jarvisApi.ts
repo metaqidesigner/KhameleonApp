@@ -35,13 +35,6 @@ export interface JarvisConnector {
   last_sync?: string;
 }
 
-export interface JarvisSkill {
-  id: string;
-  name: string;
-  description: string;
-  source: string;
-}
-
 export interface AskResponse {
   content: string;
   tool_results: unknown[];
@@ -161,10 +154,6 @@ export async function getConnectors(): Promise<JarvisConnector[]> {
   return safeFetch<JarvisConnector[]>(`${BASE}/connectors`, undefined, MOCK_CONNECTORS);
 }
 
-export async function getSkills(): Promise<JarvisSkill[]> {
-  return safeFetch<JarvisSkill[]>(`${BASE}/skills`, undefined, []);
-}
-
 export async function getCurrentMode(): Promise<{ name: string }> {
   return safeFetch<{ name: string }>(`${BASE}/modes/current`, undefined, { name: 'WORK' });
 }
@@ -230,25 +219,9 @@ export async function indexMemoryPath(path: string): Promise<{ ok: boolean; chun
   return res.json();
 }
 
-/**
- * Throws on failure rather than reporting a fake success — same reasoning
- * as indexMemoryPath above. This one was worse in practice: no backend
- * route for /skills/install exists yet at all, so the { ok: true }
- * fallback meant every single install attempt reported success
- * unconditionally, regardless of what "source" was typed in.
- */
-export async function installSkill(source: string): Promise<{ ok: boolean }> {
-  const res = await fetch(`${BASE}/skills/install`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({} as { error?: string }));
-    throw new Error(body.error ?? `Failed to install skill (HTTP ${res.status})`);
-  }
-  return res.json();
-}
+// Skill Sets moved to lib/skillSetsApi.ts (design-spec.md §15) — this
+// old getSkills()/installSkill() pair modeled a much simpler "install a
+// named skill by string" concept with no backend behind it at all.
 
 export async function runResearch(query: string, opts?: { max_iterations?: number; web_search?: boolean }): Promise<AskResponse> {
   return safeFetch(

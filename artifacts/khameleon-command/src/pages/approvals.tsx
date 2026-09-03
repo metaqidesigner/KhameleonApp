@@ -3,11 +3,12 @@
  * Implements design-spec.md §6.5 (Ambient Status and Confirmation Patterns)
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertCircle, Mail, Send, FileSearch, Inbox, RefreshCw } from 'lucide-react';
 import { ActionReceiptList, type ActionReceiptProps } from '@/components/ActionReceipt';
 import { ConfirmGate } from '@/components/ConfirmGate';
 import { createApproval } from '@/lib/approvalsApi';
+import { getActionReceipts } from '@/lib/actionReceiptsApi';
 import {
   runOutlookDraftEmail, sendOutlookDraft, rejectOutlookDraft,
   runOutlookSummarizeThread,
@@ -18,35 +19,25 @@ import {
 export default function Approvals() {
   const [showConfirmGate, setShowConfirmGate] = useState(false);
   const [approvalError, setApprovalError] = useState<string>();
-  const [receipts, setReceipts] = useState<ActionReceiptProps[]>([
-    {
-      id: 'action-1',
-      description: 'Email sent to alice@example.com',
-      category: 'email_sent',
-      scope: 'mail.send',
-      outcome: 'success' as const,
-      timestamp: new Date(Date.now() - 2 * 60000).toISOString(),
-      target: 'alice@example.com',
-      // Sending mail is the canonical "hard to reverse" example in §6.5.3 -
-      // an already-sent email cannot be undone, so this must never offer undo.
-      canUndo: false,
-      detail: `Subject: Project Update\n\nHi Alice,\n\nHere's the latest project status.\nLooking forward to your thoughts.\n\nBest`,
-    },
-    {
-      id: 'action-2',
-      description: 'Task created: Q4 planning sprint',
-      category: 'task_created',
-      scope: 'tasks.write',
-      outcome: 'success' as const,
-      timestamp: new Date(Date.now() - 5 * 60000).toISOString(),
-      target: 'Task #42',
-      canUndo: true,
-      detail: `Title: Q4 planning sprint\nAssignee: You\nDue: 2026-09-17`,
-      onUndo: async () => {
-        console.log('Undo: delete task #42');
-      },
-    },
-  ]);
+  // Real receipts (design-spec.md §6.5.2's durable record) now have a real
+  // backend (routes/actionReceipts.ts) — loaded here rather than the two
+  // permanently-fake illustrative rows this list used to start with, which
+  // would otherwise sit mixed into real history, unlabeled as fake, the
+  // exact pattern this session has spent so long finding and fixing.
+  const [receipts, setReceipts] = useState<ActionReceiptProps[]>([]);
+
+  useEffect(() => {
+    getActionReceipts().then(rows => setReceipts(rows.map(r => ({
+      id: String(r.id),
+      description: r.description,
+      category: r.category,
+      scope: r.scope,
+      outcome: r.outcome,
+      timestamp: r.createdAt,
+      target: r.target ?? undefined,
+      canUndo: r.canUndo && !r.undone,
+    }))));
+  }, []);
 
   const handleConfirmGateConfirm = async (editedContent?: string) => {
     setApprovalError(undefined);

@@ -11,7 +11,7 @@ export type TabId =
   | 'canvas'
   | 'agents' | 'research' | 'memory'
   | 'comms' | 'analytics' | 'security' | 'vault'
-  | 'skills' | 'approvals' | 'settings' | 'tasks' | 'projects';
+  | 'skills' | 'integrations' | 'approvals' | 'settings' | 'tasks' | 'projects';
 
 // 'thinking' — processing a request, before a response starts (violet).
 // 'error'    — a single coral flash on a non-connection failure, then

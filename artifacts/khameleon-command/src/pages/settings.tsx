@@ -3,6 +3,7 @@ import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, Ke
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { MIC_KEY } from '@/components/orb/VoiceController';
+import { ConnectIntegrationGate } from '@/components/ConnectIntegrationGate';
 import {
   getHealth, getSchedulerStatus, type SchedulerStatus,
   getApiKeyStatus, saveApiKey, clearApiKey, type ApiKeyProvider, type ApiKeyStatus,
@@ -71,6 +72,8 @@ interface ProviderDef {
   id: string;           // matches oauth_tokens.provider
   label: string;
   covers: string;       // human description of what it unlocks
+  dataScope: string;    // what it can read - shown at the connect gate (§16.3)
+  actionScope: string;  // what it can do - shown at the connect gate (§16.3)
   startPath: string;
   credentials: string;
 }
@@ -80,6 +83,8 @@ const PROVIDERS: ProviderDef[] = [
     id: 'google',
     label: 'Google',
     covers: 'Gmail + Google Calendar',
+    dataScope: 'Your Google account is verified, but nothing reads Gmail/Calendar/Drive/Contacts data yet.',
+    actionScope: 'Not yet built on top of the connection.',
     startPath: '/api/auth/oauth/google/start',
     credentials: 'GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET',
   },
@@ -87,6 +92,8 @@ const PROVIDERS: ProviderDef[] = [
     id: 'microsoft',
     label: 'Microsoft / Outlook',
     covers: 'Outlook Mail + Microsoft Calendar',
+    dataScope: 'Read and search your Outlook inbox and threads.',
+    actionScope: 'Draft, summarize, triage, and send email — sending requires your confirmation.',
     startPath: '/api/auth/oauth/microsoft/start',
     credentials: 'MICROSOFT_CLIENT_ID + MICROSOFT_CLIENT_SECRET',
   },
@@ -94,6 +101,8 @@ const PROVIDERS: ProviderDef[] = [
     id: 'spotify',
     label: 'Spotify',
     covers: 'Now playing + playback control',
+    dataScope: 'See what\'s currently playing.',
+    actionScope: 'Control playback: play, pause, skip, previous.',
     startPath: '/api/auth/oauth/spotify/start',
     credentials: 'SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET',
   },
@@ -103,6 +112,9 @@ function ConnectorsSection() {
   const [statuses, setStatuses]   = useState<Record<string, boolean>>({});
   const [loading, setLoading]     = useState<Record<string, boolean>>({});
   const [banner, setBanner]       = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  // §16.3: connecting is always a hard gate, no exceptions - this used to
+  // jump straight to the OAuth redirect below with nothing shown first.
+  const [gateFor, setGateFor] = useState<ProviderDef | null>(null);
 
   const fetchStatuses = useCallback(async () => {
     const results = await Promise.all(
@@ -132,7 +144,7 @@ function ConnectorsSection() {
   }, [fetchStatuses]);
 
   const connect = (p: ProviderDef) => {
-    window.location.href = p.startPath;
+    setGateFor(p);
   };
 
   const disconnect = async (p: ProviderDef) => {
@@ -262,6 +274,16 @@ function ConnectorsSection() {
           <strong style={{ color: 'var(--j-text)' }}>Spotify:</strong> Create an app at <span style={{ color: 'var(--j-cyan)' }}>developer.spotify.com/dashboard</span>, then add SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET as Replit Secrets. Weather needs no credentials — just a location, below.
         </div>
       </div>
+
+      {gateFor && (
+        <ConnectIntegrationGate
+          providerId={gateFor.id}
+          name={gateFor.label}
+          dataScope={gateFor.dataScope}
+          actionScope={gateFor.actionScope}
+          onCancel={() => setGateFor(null)}
+        />
+      )}
     </>
   );
 }

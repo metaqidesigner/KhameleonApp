@@ -10,6 +10,8 @@
 
 import { Router, type Request, type Response } from "express";
 import { saveToken, deleteToken, isConnected } from "../lib/oauthTokens.js";
+import { db } from "@workspace/db";
+import { actionReceiptsTable } from "@workspace/db";
 import crypto from "node:crypto";
 
 const router = Router();
@@ -214,6 +216,22 @@ router.get("/oauth/callback", async (req: Request, res: Response) => {
     else throw new Error(`Unknown provider: ${provider}`);
 
     req.log.info({ provider }, "OAuth token saved");
+
+    // design-spec.md §16.5: a connection change is logged as an action
+    // receipt, the same as any other local/reversible action.
+    try {
+      await db.insert(actionReceiptsTable).values({
+        description: `Connected ${provider}`,
+        category: "integration_connect",
+        scope: `oauth:${provider}`,
+        outcome: "success",
+        target: provider,
+        canUndo: true, // "undo" here means disconnect, not undoing anything already read/written
+      });
+    } catch (receiptErr) {
+      req.log.warn({ receiptErr, provider }, "Failed to write connect receipt (non-fatal)");
+    }
+
     res.redirect(`/?oauth_success=${provider}`);
   } catch (err) {
     req.log.error({ err, provider }, "OAuth exchange failed");
@@ -236,6 +254,22 @@ router.delete("/oauth/:provider", async (req: Request, res: Response) => {
   try {
     await deleteToken(req.params.provider);
     req.log.info({ provider: req.params.provider }, "OAuth token revoked");
+
+    // §16.5: disconnecting is local and reversible - logged as a receipt,
+    // with a note that already-completed external actions aren't undone.
+    try {
+      await db.insert(actionReceiptsTable).values({
+        description: `Disconnected ${req.params.provider} (any actions already taken while connected are not undone)`,
+        category: "integration_disconnect",
+        scope: `oauth:${req.params.provider}`,
+        outcome: "success",
+        target: String(req.params.provider),
+        canUndo: false,
+      });
+    } catch (receiptErr) {
+      req.log.warn({ receiptErr }, "Failed to write disconnect receipt (non-fatal)");
+    }
+
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Error revoking OAuth token");

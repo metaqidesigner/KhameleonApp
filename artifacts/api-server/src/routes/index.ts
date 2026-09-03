@@ -33,6 +33,10 @@ import outlookSkillsRouter from "./outlookSkills";
 import outlookSummarizeRouter from "./outlookSummarize";
 import outlookTriageRouter from "./outlookTriage";
 import outlookMessagesRouter from "./outlookMessages";
+import skillSetsRouter from "./skillSets";
+import workDomainsRouter from "./workDomains";
+import integrationsRouter from "./integrations";
+import actionReceiptsRouter from "./actionReceipts";
 
 const router: IRouter = Router();
 
@@ -70,5 +74,9 @@ router.use("/skills/outlook-draft-email", outlookSkillsRouter);
 router.use("/skills/outlook-summarize-thread", outlookSummarizeRouter);
 router.use("/skills/outlook-triage-inbox", outlookTriageRouter);
 router.use("/skills/outlook-messages", outlookMessagesRouter);
+router.use("/skill-sets", skillSetsRouter);
+router.use("/work-domains", workDomainsRouter);
+router.use("/integrations", integrationsRouter);
+router.use("/action-receipts", actionReceiptsRouter);
 
 export default router;

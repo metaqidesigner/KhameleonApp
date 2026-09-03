@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { initScheduler } from "./scheduler";
 import { migrateLegacyTaskValues } from "./migrate-legacy-values";
 import { ensureSettingsTable } from "./ensure-settings-table";
+import { seedSkillSetsData } from "./seed-skill-sets-data";
 
 const rawPort = process.env["PORT"];
 
@@ -33,7 +34,11 @@ async function bootstrap() {
   //    always reflects the saved digest time from the very first request.
   await initScheduler();
 
-  // 4. Start accepting HTTP requests only after all initialisation is complete.
+  // 4. Seed default Work Domains / Integrations directory metadata /
+  //    starter Skill Sets catalog (design-spec.md §15-17), idempotent.
+  await seedSkillSetsData();
+
+  // 5. Start accepting HTTP requests only after all initialisation is complete.
   await new Promise<void>((resolve, reject) => {
     app.listen(port, (err?: Error) => {
       if (err) {

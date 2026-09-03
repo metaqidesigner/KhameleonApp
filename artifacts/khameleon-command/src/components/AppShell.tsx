@@ -18,6 +18,7 @@ const Analytics  = lazy(() => import('@/pages/analytics'));
 const Security   = lazy(() => import('@/pages/security'));
 const Vault      = lazy(() => import('@/pages/vault'));
 const Skills     = lazy(() => import('@/pages/skills'));
+const Integrations = lazy(() => import('@/pages/integrations'));
 const Settings   = lazy(() => import('@/pages/settings'));
 const Tasks      = lazy(() => import('@/pages/tasks'));
 const Approvals  = lazy(() => import('@/pages/approvals'));
@@ -47,6 +48,7 @@ function PageRouter() {
       {activeTab === 'security'  && <Security />}
       {activeTab === 'vault'     && <Vault />}
       {activeTab === 'skills'    && <Skills />}
+      {activeTab === 'integrations' && <Integrations />}
       {activeTab === 'approvals' && <Approvals />}
       {activeTab === 'settings'  && <Settings />}
       {activeTab === 'tasks'     && <Tasks />}

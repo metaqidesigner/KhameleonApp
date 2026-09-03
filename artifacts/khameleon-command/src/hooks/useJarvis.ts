@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  getHealth, getTelemetry, getAgents, getConnectors, getSkills,
+  getHealth, getTelemetry, getAgents, getConnectors,
   getCurrentMode, askJarvis, searchMemory, indexMemoryPath,
-  installSkill, getAgentFeed,
-  type JarvisHealth, type JarvisConnector, type JarvisSkill,
+  getAgentFeed,
+  type JarvisHealth, type JarvisConnector,
   type JarvisTelemetry, type FeedItem,
 } from '@/lib/jarvisApi';
 
@@ -40,15 +40,6 @@ export function useJarvisConnectors() {
   return useQuery<JarvisConnector[]>({
     queryKey: ['jarvis', 'connectors'],
     queryFn: getConnectors,
-    staleTime: 60_000,
-    retry: false,
-  });
-}
-
-export function useJarvisSkills() {
-  return useQuery<JarvisSkill[]>({
-    queryKey: ['jarvis', 'skills'],
-    queryFn: getSkills,
     staleTime: 60_000,
     retry: false,
   });
@@ -98,10 +89,3 @@ export function useIndexMemory() {
   });
 }
 
-export function useInstallSkill() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (source: string) => installSkill(source),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['jarvis', 'skills'] }),
-  });
-}

@@ -17,3 +17,7 @@ export * from "./oauth_tokens";
 export * from "./agent_conversations";
 export * from "./task_runs";
 export * from "./settings";
+export * from "./work_domains";
+export * from "./skill_sets";
+export * from "./integration_directory";
+export * from "./action_receipts";
