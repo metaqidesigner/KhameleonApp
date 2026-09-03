@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { AlertCircle, Mail, Send, FileSearch, Inbox } from 'lucide-react';
+import { AlertCircle, Mail, Send, FileSearch, Inbox, RefreshCw } from 'lucide-react';
 import { ActionReceiptList, type ActionReceiptProps } from '@/components/ActionReceipt';
 import { ConfirmGate } from '@/components/ConfirmGate';
 import { createApproval } from '@/lib/approvalsApi';
@@ -12,7 +12,7 @@ import {
   runOutlookDraftEmail, sendOutlookDraft, rejectOutlookDraft,
   runOutlookSummarizeThread,
   runOutlookTriageInbox, undoOutlookTriage,
-  type OutlookDraft,
+  listOutlookMessages, type OutlookDraft, type OutlookMessagePreview,
 } from '@/lib/outlookSkillsApi';
 
 export default function Approvals() {
@@ -82,9 +82,8 @@ export default function Approvals() {
   // ── Real skill: outlook-draft-email (§12.1) ──────────────────────────────
   // Distinct from the mock demo above: this calls the actual Microsoft
   // Graph-backed pipeline (routes/outlookSkills.ts). Requires Outlook to be
-  // connected (Settings → Connectors) and a real message id from that
-  // mailbox — there's no inbox-browsing UI yet, so the id is typed in
-  // directly, consistent with this being a single-user prototype.
+  // connected (Settings → Connectors). A message id can come from the inbox
+  // browser below or be typed in directly (e.g. from Graph Explorer).
   const [outlookMessageId, setOutlookMessageId] = useState('');
   const [outlookLoading, setOutlookLoading] = useState(false);
   const [outlookRunError, setOutlookRunError] = useState<string>();
@@ -92,12 +91,14 @@ export default function Approvals() {
   const [outlookSending, setOutlookSending] = useState(false);
   const [outlookSendError, setOutlookSendError] = useState<string>();
 
-  const handleRunOutlook = async () => {
-    if (!outlookMessageId.trim()) return;
+  const handleRunOutlook = async (id?: string) => {
+    const messageId = (id ?? outlookMessageId).trim();
+    if (!messageId) return;
+    setOutlookMessageId(messageId);
     setOutlookLoading(true);
     setOutlookRunError(undefined);
     try {
-      const draft = await runOutlookDraftEmail(outlookMessageId.trim());
+      const draft = await runOutlookDraftEmail(messageId);
       setOutlookDraft(draft);
     } catch (error) {
       setOutlookRunError(error instanceof Error ? error.message : 'Draft request failed');
@@ -152,12 +153,14 @@ export default function Approvals() {
   const [summarizeLoading, setSummarizeLoading] = useState(false);
   const [summarizeError, setSummarizeError] = useState<string>();
 
-  const handleSummarize = async () => {
-    if (!summarizeMessageId.trim()) return;
+  const handleSummarize = async (id?: string) => {
+    const messageId = (id ?? summarizeMessageId).trim();
+    if (!messageId) return;
+    setSummarizeMessageId(messageId);
     setSummarizeLoading(true);
     setSummarizeError(undefined);
     try {
-      const result = await runOutlookSummarizeThread(summarizeMessageId.trim());
+      const result = await runOutlookSummarizeThread(messageId);
       setReceipts(r => [{
         id: `summarize-${result.taskRunId}`,
         description: `Thread summarized (${result.messageCount} message${result.messageCount !== 1 ? 's' : ''})`,
@@ -219,6 +222,27 @@ export default function Approvals() {
     }
   };
 
+  // ── Inbox browser ─────────────────────────────────────────────────────
+  // Lets a user pick a real message for outlook-draft-email/
+  // outlook-summarize-thread below instead of pasting a raw Graph message
+  // id found via an external tool. Loads on demand (not on page mount) so
+  // opening this page doesn't silently hit Graph every time.
+  const [messages, setMessages] = useState<OutlookMessagePreview[] | null>(null);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState<string>();
+
+  const loadMessages = async () => {
+    setMessagesLoading(true);
+    setMessagesError(undefined);
+    try {
+      setMessages(await listOutlookMessages());
+    } catch (error) {
+      setMessagesError(error instanceof Error ? error.message : 'Could not load inbox');
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', height: '100%', overflow: 'auto' }}>
       {/* Header */}
@@ -261,6 +285,83 @@ export default function Approvals() {
         </button>
       </div>
 
+      {/* Inbox browser — feeds a message id into the two panels below */}
+      <div className="j-panel" style={{ height: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(120, 168, 220, 0.10)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Inbox size={14} style={{ color: '#8fa39c' }} />
+          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#fff' }}>
+            Inbox browser
+          </h3>
+          <button
+            onClick={loadMessages}
+            disabled={messagesLoading}
+            title="Refresh"
+            style={{
+              marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px',
+              height: '26px', padding: '0 10px', fontSize: '10px', fontWeight: 600,
+              textTransform: 'uppercase', letterSpacing: '0.06em', color: '#8fa39c',
+              background: 'none', border: '1px solid rgba(120, 168, 220, 0.18)', borderRadius: '6px',
+              cursor: messagesLoading ? 'wait' : 'pointer',
+            }}
+          >
+            <RefreshCw size={11} style={messagesLoading ? { animation: 'jarvis-spin 1s linear infinite' } : undefined} />
+            {messages === null ? 'Browse inbox' : 'Refresh'}
+          </button>
+        </div>
+        <div style={{ padding: messages && messages.length > 0 ? '4px' : '12px 16px' }}>
+          {messagesError && <div style={{ padding: '8px 12px', fontSize: '11px', color: '#E77A7A' }}>{messagesError}</div>}
+          {messages === null && !messagesLoading && !messagesError && (
+            <p style={{ margin: 0, padding: '0 12px', fontSize: '11px', color: '#8fa39c', lineHeight: 1.5 }}>
+              Loads the 15 most recent messages from the connected Outlook inbox so you can pick one for the skills below, instead of pasting a raw Graph message id.
+            </p>
+          )}
+          {messages && messages.length === 0 && (
+            <div style={{ padding: '8px 12px', fontSize: '11px', color: '#8fa39c' }}>No messages found.</div>
+          )}
+          {messages && messages.map((m) => (
+            <div key={m.id} style={{
+              display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px',
+              borderBottom: '1px solid rgba(120, 168, 220, 0.06)',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#c4d4ec', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {m.subject}
+                </div>
+                <div style={{ fontSize: '10px', color: '#8fa39c', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {m.from} — {m.preview}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                <button
+                  onClick={() => handleSummarize(m.id)}
+                  disabled={summarizeLoading}
+                  style={{
+                    height: '26px', padding: '0 10px', fontSize: '10px', fontWeight: 600,
+                    textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6FE6BD',
+                    background: 'none', border: '1px solid rgba(111, 230, 189, 0.35)', borderRadius: '6px',
+                    cursor: summarizeLoading ? 'wait' : 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  Summarize
+                </button>
+                <button
+                  onClick={() => handleRunOutlook(m.id)}
+                  disabled={outlookLoading}
+                  style={{
+                    height: '26px', padding: '0 10px', fontSize: '10px', fontWeight: 600,
+                    textTransform: 'uppercase', letterSpacing: '0.04em', color: '#8C7CF0',
+                    background: 'none', border: '1px solid rgba(140, 124, 240, 0.35)', borderRadius: '6px',
+                    cursor: outlookLoading ? 'wait' : 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  Draft reply
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Real skill: outlook-draft-email */}
       <div className="j-panel" style={{ height: 'auto', flexShrink: 0 }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(120, 168, 220, 0.10)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -272,7 +373,7 @@ export default function Approvals() {
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <p style={{ margin: 0, fontSize: '11px', color: '#8fa39c', lineHeight: 1.5 }}>
             Runs the real pipeline against Microsoft Graph: fetch thread → summarize → compose → create draft.
-            Requires Outlook connected (Settings) and a real message id from that mailbox. Sending only happens if you confirm below.
+            Pick a message from the inbox browser above, or paste an id directly. Sending only happens if you confirm below.
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
             <input
@@ -293,7 +394,7 @@ export default function Approvals() {
               }}
             />
             <button
-              onClick={handleRunOutlook}
+              onClick={() => handleRunOutlook()}
               disabled={outlookLoading || !outlookMessageId.trim()}
               style={{
                 height: '34px',
@@ -329,7 +430,7 @@ export default function Approvals() {
         </div>
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <p style={{ margin: 0, fontSize: '11px', color: '#8fa39c', lineHeight: 1.5 }}>
-            Fetches a thread (Mail.Read) and summarizes it. No confirm gate — reading is local and reversible (§6.5.3) — the result lands directly as an action receipt below.
+            Fetches a thread (Mail.Read) and summarizes it. Pick a message from the inbox browser above, or paste an id directly. No confirm gate — reading is local and reversible (§6.5.3) — the result lands directly as an action receipt below.
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
             <input
@@ -350,7 +451,7 @@ export default function Approvals() {
               }}
             />
             <button
-              onClick={handleSummarize}
+              onClick={() => handleSummarize()}
               disabled={summarizeLoading || !summarizeMessageId.trim()}
               style={{
                 height: '34px',

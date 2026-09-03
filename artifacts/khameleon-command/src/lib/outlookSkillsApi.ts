@@ -115,3 +115,17 @@ export async function undoOutlookTriage(entries: TriageUndoEntry[]): Promise<{ o
   });
   return asJson(response, 'Undo');
 }
+
+export interface OutlookMessagePreview {
+  id: string;
+  subject: string;
+  from: string;
+  preview: string;
+  receivedDateTime: string;
+}
+
+/** Lets the user pick a real message instead of pasting a raw Graph id. */
+export async function listOutlookMessages(): Promise<OutlookMessagePreview[]> {
+  const response = await fetch(`${BASE}/skills/outlook-messages`);
+  return asJson<OutlookMessagePreview[]>(response, 'List messages');
+}

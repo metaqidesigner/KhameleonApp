@@ -32,6 +32,7 @@ import onboardingRouter from "./onboarding";
 import outlookSkillsRouter from "./outlookSkills";
 import outlookSummarizeRouter from "./outlookSummarize";
 import outlookTriageRouter from "./outlookTriage";
+import outlookMessagesRouter from "./outlookMessages";
 
 const router: IRouter = Router();
 
@@ -68,5 +69,6 @@ router.use("/onboarding", onboardingRouter);
 router.use("/skills/outlook-draft-email", outlookSkillsRouter);
 router.use("/skills/outlook-summarize-thread", outlookSummarizeRouter);
 router.use("/skills/outlook-triage-inbox", outlookTriageRouter);
+router.use("/skills/outlook-messages", outlookMessagesRouter);
 
 export default router;

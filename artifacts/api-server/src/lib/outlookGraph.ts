@@ -77,6 +77,20 @@ export async function listUnreadInboxMessages(top = 50): Promise<GraphMessage[]>
   return json.value;
 }
 
+/**
+ * The N most recent inbox messages regardless of read state — lets a user
+ * pick a real message id for outlook-draft-email/outlook-summarize-thread
+ * instead of having to find one via Graph Explorer or another tool first.
+ */
+export async function listRecentInboxMessages(top = 15): Promise<GraphMessage[]> {
+  const res = await graphFetch(
+    `/me/mailFolders/inbox/messages?$orderby=receivedDateTime desc&$top=${top}&$select=${TRIAGE_MESSAGE_FIELDS}`
+  );
+  await assertOk(res, "list recent inbox messages");
+  const json = (await res.json()) as { value: GraphMessage[] };
+  return json.value;
+}
+
 // ── Writes ────────────────────────────────────────────────────────────────────
 
 /** Creates a draft reply to `messageId` (Mail.ReadWrite) — never sends it. */
