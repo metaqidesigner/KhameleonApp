@@ -1,0 +1,311 @@
+# Khameleon — Decisions Log
+
+Running log of key decisions, separate from the full design spec, so nothing gets lost between sessions.
+
+## 2026-08-07 — Application type
+
+**Decision:** Khameleon will be built as a native desktop application (Electron or Tauri shell), not a web app or browser extension.
+
+**Why:**
+- Needs to auto-launch at login and be "the first thing you see" when the computer opens
+- Needs OS-level window management for the floating/draggable/minimize-maximize panels already specced
+- Needs to reach into desktop tools (Outlook client, local files, other apps) directly — a browser sandbox can't do this
+- Fits the "orchestration, not extraction" security pitch: logic runs locally, talking directly to services the user already trusts, nothing routed through a Khameleon-hosted backend beyond what's needed to route the command
+
+**Enterprise path:** Same shell distributed org-wide via MDM (Intune/Jamf), single installer, per-user onboarding questionnaire configures each instance on first launch, optional admin console for IT provisioning.
+
+## 2026-08-07 — Build sequencing
+
+**Decision:** Next step is a single-user working prototype — the app shell, floating window UI (matching existing mockups), basic orchestration layer, and a real connection to the user's own Outlook via Microsoft Graph API (OAuth). This proves the concept before tackling the harder org-wide pieces (multi-tenant security review, admin console, MDM packaging, the full multi-integration router).
+
+**UI approach confirmed:** UI is not being frozen upfront — it gets refined iteratively alongside the functional prototype rather than fully locked before build starts.
+
+## 2026-08-11 — Core architecture (router, agents, skills)
+
+**Decision:** Added section 11 to the design spec, defining the execution layer behind the UI. Four choices, informed by OpenJarvis's (Stanford Hazy Research/SAIL) open-source agent/skill architecture as the closest comparable pattern:
+
+- **Agent execution model — phased.** One orchestrator agent (tool-calling loop) handles all requests for the current prototype; the routing contract includes an `agent_type` field from day one so cheaper/more specialized agent types (`simple`, `traced`, `sandboxed`) can be added later without a rewrite.
+- **Skill format — hybrid.** Skills can be deterministic pipelines, model-followed instructions, or both. Pipeline steps map directly onto the task panel's trace column.
+- **Skill routing — model-driven catalog.** Installed skills' name + description sit in the router's context; the agent reads the catalog and picks. Flagged for future revisit: a fixed-skill-ID shortcut for scheduled/event triggers, since those already know their target skill at creation time.
+- **Skill sourcing — open import, gated by trust tier.** Skills can be imported from a public registry or any repo (OpenJarvis-style), but execution is gated by a trust tier (Verified / Org-approved / Unverified) so an unverified imported skill can only run sandboxed and can't touch a live connector without user confirmation — keeping this compatible with the "no extraction, no shadow copy" pitch in section 2.
+
+**Why phased/gated rather than fully committing up front:** the prototype scope (single Outlook connector) doesn't yet have enough request variety or imported skills to need the more advanced paths — but the interfaces are shaped now so adding them later doesn't require re-architecting the router.
+
+*Full detail: khameleon-design-spec.md, section 11.*
+
+## 2026-08-11 — Core architecture follow-ups resolved
+
+**Decision:** Closed the three open questions left in section 11.5.
+
+- **Catalog storage — hybrid.** Local files on the machine as the base (matching the single-user prototype scope), with an optional remote override layer for org admins to push/block skill IDs, built once the admin console exists.
+- **Agent build order — `simple` first, then `traced`.** Early usage is assumed to skew toward quick single-shot lookups.
+- **Scheduled/event trigger routing — deferred until after the org-wide router ships.** Every trigger type routes through the model-driven catalog for now; the fixed-skill-ID shortcut only pays for itself at org-scale re-routing cost.
+
+*Full detail: khameleon-design-spec.md, sections 11.5–11.6.*
+
+## 2026-08-11 — First skills spec'd: Outlook
+
+**Decision:** Added section 12, with concrete manifests for the three skills named in 11.2 — `outlook-summarize-thread` (pipeline-only, simplest, good first build target), `outlook-draft-email` (hybrid — deterministic fetch/summarize, instructional compose, ships as a draft only), and `outlook-triage-inbox` (hybrid — rule-based classification with instructional fallback for ambiguous mail, the clearest scheduled-trigger candidate). All three ship at **Verified** trust tier.
+
+**Key call:** `outlook-draft-email` never auto-sends. The pipeline stops at creating an Outlook draft; sending is a separate, explicitly user-confirmed action outside the traced pipeline, even though the `Mail.Send` scope is requested at OAuth time. Keeps the skill's automated surface area to draft-only, consistent with the orchestrate-don't-extract trust pitch in section 2.
+
+Real Microsoft Graph delegated scopes used: `Mail.Read`, `Mail.ReadWrite`, `Mail.Send`. Noted a Graph API change effective Dec 31, 2026 requiring `Mail-Advanced.ReadWrite` for editing sensitive properties on *delivered* mail — doesn't apply to these three skills since none of them edit delivered messages, but flagged for future skills that might.
+
+*Full detail: khameleon-design-spec.md, section 12.*
+
+## Backlog — review queue
+
+**Added 2026-09-03 — Ambient status + confirmation patterns review.**
+
+- **Backlog item:** build the new design-spec section "Ambient Status and Confirmation Patterns" and validate it against the orb states, window prominence rules, the persistence rule, and the `outlook-draft-email` confirm step. This should be reviewed as a candidate to move earlier, alongside the real-machine verification pass, because both touch the same orb/window status patterns and both affect whether users learn to trust the system instead of ignoring it.
+
+**Why this sits here:** it is a product-safety and UX-quality item, not a feature-completion item. It belongs after the CI and packaging work in the queue and before the remaining commercial-readiness items, because it directly affects trust, notification discipline, and confirm flow before the app reaches broader distribution.
+
+## 2026-09-03 — Ambient Status patterns built: ActionReceipt + ConfirmGate components
+
+**Decision:** Started implementing the "Ambient Status and Confirmation Patterns" section added to design-spec.md §6.5 earlier today. Built two foundational React components:
+
+1. **ActionReceipt** (`artifacts/khameleon-command/src/components/ActionReceipt.tsx`)
+   - Implements §6.5.2 (Action receipts)
+   - Durable, persistent record of every autonomous action (not a transient toast)
+   - Displays: action description, scope, category, timestamp, target, and outcome
+   - Includes undo/rollback option when available
+   - Expandable detail section to show full payload (full real content, not summarized)
+   - Integrates Signal Glass material for visual consistency
+
+2. **ConfirmGate** (`artifacts/khameleon-command/src/components/ConfirmGate.tsx`)
+   - Implements §6.5.3 and §6.5.4 (Confirm gates by reversibility, Intent preview)
+   - Modal-based confirmation flow for expensive/hard-to-reverse actions
+   - Shows: action category, recipient/target, permission scope, full real payload
+   - Supports in-place editing before approval (no approve-first-edit-after)
+   - Severity-based visual styling (critical/coral for email send, high/amber for public actions, medium/violet for data changes)
+   - Payload show/hide toggle for readability
+
+**Status: ready for integration** — both components are fully typed, styled per Signal Glass recipe, and ready to be wired into skill execution (Outlook draft → ConfirmGate for send, action history → ActionReceipt list). Not yet integrated into live flows because backend API setup (PostgreSQL requirement) is deferred.
+
+**Follow-up:** test these components in a demo page, then integrate into actual skill pipelines (starting with `outlook-draft-email` send confirm step per §12.1).
+
+## 2026-08-12 — Commercial readiness caveats (deferred)
+
+**Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
+
+- **Always-on wake word / background listening** — needs a persistent background process; not buildable inside a Cowork session. Fits the native-shell decision above, but needs its own build/test pass once the app shell exists.
+- **Commercial-grade plumbing** — auth, billing, secrets management for user-supplied API keys, multi-tenant data isolation, rate limiting. Buildable, but needs real testing before customers are charged.
+- **Security review** — required before launch, especially since the app handles third-party API keys and user data (ties into the trust-tier work in section 11 and the org-wide security review already scoped in the 2026-08-07 build-sequencing decision).
+- **AI provider terms review** — check Anthropic's and OpenAI's usage policies on rebranding/reselling access via their APIs before commercializing. Not legal advice — needs an actual read of current ToS.
+- **QA ownership** — as solo builder, Metqi is the QA team; every feature needs testing before it's customer-facing.
+- **Real database schema** (added 2026-08-12, VAULT) — storage is currently flat JSON files (`history.json`, `config.json`, `schedules.json`, `webapps.json`), fine for single-user but with no multi-tenancy or concurrent-write safety. Deliberately deferred until multi-user/org-wide work actually starts, per Metqi's call — tracked here so it isn't lost.
+
+## 2026-08-12 — Prototype verified working
+
+**Verified:** `khameleon-prototype/` builds clean (`tsc --noEmit`, zero errors) and runs end-to-end in mock mode — server boots, `/api/status`, `/api/catalog`, and a full `/api/command` → orchestrator → `outlook-summarize-thread` skill → history run all confirmed live. Router, orchestrator, trust-tier gating, config wizard endpoints, and MSAL-based Outlook OAuth (untested against a real Microsoft app registration, but code is structurally sound) all present and wired per design-spec.md §11–12.
+
+Electron shell (`electron/main.js`, `npm run electron:build`) is written but never installed/launched — README flags this as a known gap to close on a machine with GitHub access.
+
+## 2026-08-12 — Cron scheduler wired for scheduled triggers
+
+**Decision:** Built `src/scheduler.ts` (node-cron, already a listed dependency) and wired it into `server.ts` so scheduled commands run through the exact same orchestrator path as manual/voice ones — same routing, same trace events, same history entry, just tagged `trigger: "scheduled"`. This is the last of the four trigger types from design-spec.md §5 to actually fire.
+
+- Seeded one default: `outlook-triage-inbox` daily at 7am, matching §12.3's own "clearest candidate for a scheduled trigger" note.
+- Added `GET`/`PATCH /api/schedules` and a new "Scheduled" rail section (amber accent, per the "worth noticing" color rule in §3) to view/toggle it.
+- Added a `task-started` WebSocket broadcast so a scheduled run opens its own floating task panel client-side, the same way a typed command does — closing the gap where only manual commands could open a panel.
+- **Verified live**, not just compiled: patched the schedule to fire every minute in mock mode, confirmed the run actually fired unattended, landed in history with the correct trigger and a real triage result (1 urgent / 1 action needed / 1 FYI / 1 low priority against the mock inbox), then reset the cron back to its 7am default.
+- **Known gap:** no create/delete UI for schedules yet — only the one seeded default exists; adding a second means hand-editing `data/schedules.json` or calling the API directly. Acceptable for now since only one scheduling-candidate skill exists (§12.3).
+
+*Full detail: khameleon-prototype/README.md, "Section 5 scheduled trigger" row.*
+
+## 2026-08-12 — Web access raised, split into two, scope deferred
+
+**Raised:** Metqi wants users able to (a) have Khameleon's agent browse the web on their behalf — the "browser-using agents" case section 5's concurrency rule already name-dropped without ever specifying — **and** (b) sign into and work inside web apps they already use (Gmail, Slack, Notion, etc.) directly inside Khameleon.
+
+**Decision:** These are two different features with different risk profiles, not one. Wrote both up as design-spec.md §13, unresolved:
+
+- **§13.1 (user-facing web app windows)** — mostly UI work given the native-Electron decision already made; real caveat is that some identity providers block OAuth inside embedded webviews specifically, needs per-provider testing.
+- **§13.2 (agent web-browsing)** — materially higher risk: no bounded scope like Graph API permissions, real prompt-injection surface, needs the `sandboxed` agent type (§11.1) and a §12.1-style human-confirm-before-action gate. Recommended to scope this deliberately later, not fold into the current build pass.
+
+Not building either yet — flagging scope/priority with Metqi before starting.
+
+## 2026-08-12 — §13.2 agent web-browsing built and verified
+
+**Decision:** Built `web-task`, a new hybrid skill on a new `web` connector (`src/connectors/web.ts`, Playwright-based), at Verified trust tier since it's first-party, not imported. Implements the autonomy level chosen earlier today ("prepare actions, human confirms every one"): read-only lookups answer directly; anything needing a real action fills a form for real but only ever submits from an explicit human confirm — a new `POST /api/command/:taskId/confirm-web-action` endpoint, never called from within the skill's own pipeline. Exactly mirrors `outlook-draft-email`'s send-confirmation boundary (spec 12.1) rather than inventing a new pattern.
+
+- **Resilience:** falls back to fixture content automatically if a real headless browser can't launch (missing system deps, no Chromium installed, etc.) — same pattern as `isOutlookMock()`/`isClaudeMock()`. Surfaced as `webMock` in `/api/status` and a new "Web browsing" row in the rail.
+- **Prompt-injection note:** `web-task/SKILL.md` explicitly instructs the model to treat fetched page text as untrusted and never follow instructions found inside it — flagged in design-spec §13.2 as a real threat category a REST API response doesn't have.
+- **Verified live, not just compiled:** the read-only path ran against real mock fixtures and answered correctly. The stage → confirm path was verified by monkeypatching the Claude call to deterministically return a staged form-fill (real Anthropic calls aren't available in this sandbox) and driving the *real* HTTP server end-to-end: router picked `web-task` correctly, the skill staged the fill without submitting, `needs-input` surfaced with the right payload, confirming succeeded exactly once, and confirming a second time correctly 404'd — no double-submit possible.
+- **Known gap:** this sandbox has no root access, so Playwright's actual Chromium binary dependencies can't be installed here — real (non-mock) browsing needs `npx playwright install chromium` (+ `install-deps` on Linux) run on Metqi's own machine, same category of gap as the Electron shell's.
+
+## 2026-08-12 — §13.1 web-app windows built (Electron-only, unverified end-to-end)
+
+**Decision:** Built `electron/webapps.js` (persistent per-app `BrowserWindow` sessions via `session` partitions) + `electron/preload.js` (the `window.khameleon` bridge public/index.html needed but never had, since main.js's `BrowserWindow` had no `preload` set until now) + a "Your apps" rail section. Three placeholder apps seeded (Gmail, Slack, Notion) in `data/webapps.json` — no create/delete UI yet, same known-gap shape as `scheduler.ts`'s single seeded default.
+
+- **Verified:** file I/O and window-tracking logic (seed-defaults, focus-not-duplicate on repeat open, unknown-id handling) by stubbing the `electron` module — confirms the logic is correct.
+- **Not verified, can't be from here:** actual `BrowserWindow` launch, and whether Google/other providers still block OAuth sign-in inside it the way §13.1 originally flagged as a risk. Re-attempted installing Electron in this session specifically to check — it installed this time, but downloaded a macOS binary that can't run inside this Linux sandbox regardless (wrong platform, and no display either way). This is now confirmed a "run once for real on your Mac" item, not a sandbox-access problem that more retries would fix.
+
+*Full detail: khameleon-prototype/README.md, "§13.1 — Your apps (Electron only)".*
+
+## 2026-08-12 — Composio considered for §13.1, parked
+
+**Considered:** Composio (managed auth + standardized tool schemas for 1,000+ apps — Gmail, Slack, Notion, Salesforce, etc. — via MCP, with a documented Claude Cowork integration) as a faster path to adding connectors beyond Outlook, especially for §13.1's "sign into apps you already use."
+
+**Decision: not adopted as-is.** On self-serve plans, user OAuth tokens pass through and are stored in Composio's cloud — a direct conflict with §2's "no extraction, nothing new to trust with your data" and the 2026-08-07 native-app decision's "logic runs locally, nothing routed through a Khameleon-hosted backend." Self-hosting to avoid that is Enterprise-only (direct sales engagement) and the credential-storing runtime is closed-source even then, so it doesn't cleanly solve the local-first requirement either.
+
+**Where it could still fit:** lower-sensitivity, read-only cases (e.g. §13.2's agent-research case) where a stored token isn't a live personal-account credential, or as a fast-prototyping aid before commercial hardening. Parked, not ruled out — revisit if the local-first requirement is deliberately relaxed for specific connectors.
+
+**Reconsidered 2026-08-12, after §13.1/§13.2 shipped.** Same underlying conflict stands (self-serve tokens live in Composio's cloud; self-hosting is Enterprise-only, closed-source runtime) — nothing about that changed. What did change: two of the reasons Composio looked attractive are now partially covered by first-party work already built.
+
+- §13.1 (web-app windows) already gives the *person* direct access to Gmail/Slack/Notion/etc. inside Khameleon, with their own real session, no OAuth integration work needed at all — this was one of Composio's main selling points and it's now moot for that specific use case.
+- §13.2 (`web-task`) can already interact with a web app's own UI when needed, as a fallback path, without a dedicated API connector.
+
+**What Composio would still add that neither of those covers:** reliable, structured *API-level* actions in apps beyond Outlook — "create a Notion page," "post to Slack" via a real API call, not browser automation, which is faster and far less fragile than driving a UI. That case is undiminished. Decision: **stays parked.** If/when a second real API connector is needed (beyond Outlook), build it hand-rolled the same way Outlook was (matches the local-first story exactly), or evaluate a self-hostable alternative (Nango was flagged in the original research as worth a look) before reconsidering Composio's cloud-token model again.
+
+**Final decision, 2026-08-12 — Option C (hybrid) chosen.** Metqi's actual goal: users choose which apps they want connected *during signup*, so Khameleon is fully set up to work from immediately. Weighed four options (adopt Composio / keep hand-rolling one connector at a time / hybrid / research a self-hosted alternative like Nango first) — **hybrid wins**: signup offers a growing list of real, hand-rolled API connectors (Outlook today) for apps Khameleon acts on programmatically, plus §13.1's web-app windows — already built — for any other app by name/URL, instant, no integration work, fully local either way. Delivers the actual goal without the Composio cloud-token conflict and with the least new work, since §13.1 already exists. This resolves §13.1's open scope question (design-spec.md) — apps are chosen at signup, not ad hoc only.
+
+**Standing instruction from Metqi, 2026-08-12: flag any spec that requires user input at signup/onboarding, from now on, proactively.** See design-spec.md §14 for the running catalog this creates.
+
+## 2026-08-12 — §14 items 4-5 built: signup app picker + schedule preference
+
+**Decision:** Built both newly-required onboarding inputs identified in §14, closing the gap that prompted the Composio reconsideration in the first place.
+
+- **App connections:** new `src/webapps.ts` (catalog of 10 starter apps + selection read/write for `data/webapps.json`), new `GET /api/webapps/catalog`, `GET`/`POST /api/webapps`, and a new signup step 4 in the wizard. `electron/webapps.js` refactored to read from this instead of duplicating its own hardcoded seed — the old silent 3-app default (Gmail/Slack/Notion) is gone entirely; the file starts empty until someone actually picks.
+- **Schedule preference:** new signup step 5 — enable/disable + a time picker for `outlook-triage-inbox`'s schedule, converted to a cron expression and sent through the existing `PATCH /api/schedules/:id` (no new schedule endpoint needed).
+- **Verified live:** simulated both wizard steps' exact API calls against the real running server — app selection correctly replaces wholesale (not additive), an unrelated selection correctly overwrote the old one, and the schedule PATCH with a wizard-generated cron (`30 8 * * *` from a `08:30` time input) persisted and round-trips correctly back into a time value.
+- **Known gap:** this only auto-prompts on a fresh install (`onboardingComplete: false`). An install that already completed the old 3-step wizard (this dev instance included) won't be re-prompted automatically for the two new steps — reachable anytime via the gear icon, but not proactive for existing installs. Not fixed automatically since forcing re-onboarding on an existing config felt like the wrong default to pick unasked.
+
+## 2026-08-19 — Typography: Inter + Plus Jakarta Sans pairing chosen
+
+**Decision:** Replaced the system-font-only stack (design-spec.md §3) with a two-font pairing, after reviewing sample sets against office-appropriateness (Inter, Public Sans, IBM Plex Sans, Work Sans, Manrope, Source Sans 3, Archivo, DM Sans, Figtree, Plus Jakarta Sans, Lexend, Mulish) and a combined-pairing sample.
+
+- **Plus Jakarta Sans** — brand wordmark, greeting text, and panel headings. Anything read once per screen, set 14px or larger. Weights 600/700.
+- **Inter** — body copy, micro-labels, stat numbers/labels, status pills, buttons, timestamps/metadata. Anything scanned repeatedly or under 13px. Weights 400/600.
+
+**Why:** Plus Jakarta Sans's more distinctive letterforms read well at display sizes without becoming decorative; Inter's tall x-height keeps dense, small UI text legible. Rule of thumb locked in: display-sized/once-per-screen text → Jakarta, small/repeated-scan text → Inter.
+
+**Rolled out to:** `khameleon-home-implemented.html` (local mockup) and the live Replit app (`nexus-command`), replacing the prior single system-font stack everywhere text renders.
+
+*Full detail: khameleon-design-spec.md §3 Typography.*
+
+## 2026-08-19 — Glass material named "Signal Glass," exact parameters locked
+
+**Decision:** Named the frosted-glass panel material (design-spec.md §3 Materials & elevation) **Signal Glass** — translucent glass, lit from one consistent top-left source, with a colored ambient glow that always maps to what the panel represents (never decorative), tying directly back to the "color as signal" principle in §1.
+
+**Why now:** the live Replit app still showed subtle drift from the mockups' glass treatment even after the earlier styling pass — descriptive natural-language instructions ("frosted," "glowing rim") left room for Replit Agent to approximate. Locked in exact numeric CSS values in §3 (fill opacity, blur px, border opacity, box-shadow values, the highlight-streak gradient angle, the top-edge line gradient) so there's one unambiguous recipe every panel on the page must match, rather than a per-panel approximation.
+
+*Full detail: khameleon-design-spec.md §3, "Materials & elevation — Signal Glass."*
+
+## 2026-08-19 — Ambient scene glow locked, violet wash dropped
+
+**Decision:** The live app's background carried a violet radial bloom (bottom-center) alongside teal and amber ones. Metqi flagged it as not fitting and hurting text readability. Dropped the violet ambient bloom entirely; locked the canvas ("Void," design-spec.md §3) to exactly two: a teal bloom top-left (`rgba(111,230,189,0.16)` at 15% 10%) and an amber bloom top-right near the orb (`rgba(240,163,76,0.13)` at 88% 12%), over the same dark base gradient.
+
+**Why violet specifically:** it's the one hue in the accent ramp (§3) that already carries a strong specific meaning — thinking/processing state, and violet-category rim glows on Signal Glass panels. Using it as a passive, room-filling background wash diluted that meaning and, per Metqi's own note, didn't read well against panel text. Teal and amber ambient blooms stay because they're low-saturation enough at that opacity to function as pure light, not signal.
+
+*Full detail: khameleon-design-spec.md §3, "Base canvas (Void)."*
+
+## 2026-08-19 — Hexmark rendering bug found and fixed
+
+**Found:** the hexagon brand mark's CSS (`border` + `clip-path: polygon(...)`) does not actually draw a hexagon outline in a real browser — `clip-path` only clips the rectangular border to the polygon's silhouette, it doesn't stroke the newly-cut diagonal edges. For this specific hexagon's points, the result renders as two disconnected vertical brackets, not a hexagon. This CSS existed in the mockups (`khameleon-home-implemented.html`, `khameleon-home-canvas.html`) from the start and was only caught once Replit implemented it literally and a live screenshot showed the artifact — the mockups themselves were never opened in a real browser to catch it earlier (local `file://` preview isn't available in this environment).
+
+**Fix:** replaced the `border` + `clip-path` div with an inline SVG `<polygon>` using `stroke` + `fill="none"` — the correct technique for a hexagon outline, plus a `filter: drop-shadow(...)` for the glow (the CSS equivalent of the previous `box-shadow`). Applied to both mockup files and pushed to Replit as a follow-up precision fix.
+
+**Takeaway:** `border` + `clip-path: polygon()` should not be used again for outline/stroke shapes anywhere in Khameleon's UI — use an SVG `stroke` instead. `clip-path` is fine for solid/filled shapes (masking a filled or image background), just not for an outlined one.
+
+## 2026-08-19 — Right-click chat popup restyled to match home-implemented mockup
+
+**Decision:** The persistent floating orb (bottom-right, always visible, right-click opens chat) stays exactly as-is — rings, arcs, moon, nebula core, state colors, all untouched. What changes is the popup's content/look. Previously a dark terminal-style panel (agent chips, monospace "QUERY KHAMELEON..." input). Now matches `khameleon-home-implemented.html`'s main-panel at rest: a large orb, "Good evening"-style greeting + subtitle, the pill-shaped glass "Ask anything…" bar (mic affordance built into the bar per design-spec.md §4 Command bar, not a separate button), and the row of connected-system chips beneath it — all in Signal Glass material.
+
+**Functional note (mockup didn't show this):** `khameleon-home-implemented.html`'s ask-bar has no visible reply area — it's a static idle-state screenshot, not a working chat surface. Kept the existing behavior of the conversation transcript appearing above the ask-bar (replacing the greeting) once a message is sent, so responses are still visible — everything else about the popup's chat functionality (mic/voice, wake-word, agent selection, streaming) stays wired exactly as it was.
+
+## 2026-08-24 — App renamed: Nexus Command → Khameleon Command
+
+**Decision:** Full technical rename, not just a display-name change. `artifacts/nexus-command/` → `artifacts/khameleon-command/` (via `git mv`, history preserved), package `@workspace/nexus-command` → `@workspace/khameleon-command`, and `.replit-artifact/artifact.toml`'s `title`/`id`/`publicDir`/build-filter fields updated to match. `pnpm-lock.yaml` regenerated via `pnpm install` rather than hand-edited.
+
+**Also updated for consistency, since they self-reference the product by its old working name:**
+- `lib/api-spec/openapi.yaml`'s API description, and the matching header comment mechanically repeated across the generated `lib/api-zod`/`lib/api-client-react` client files.
+- `artifacts/api-server`'s seed data (`seed.ts`, `dashboard.ts`) — "Nexus Command" was used throughout as the name of the flagship demo project (the fictional user's own AI-platform project), not just an app label, so it followed the rename too.
+- `.agents/memory/agent-gateway.md` and `agents/tools/definitions.ts`'s example paths, so agent-facing docs keep pointing at the real path.
+
+**Left alone, deliberately:** the 2026-08-19 typography entry above (historical record of what was true then, not rewritten), and `artifacts/mockup-sandbox`'s "NEXUS COMMAND" mockup text (a separate design-exploration sandbox, not live product surface).
+
+## 2026-08-26 — `khameleon-prototype/` confirmed missing; 2026-08-12 verification claims unconfirmed for current code
+
+**Found, during a Cowork session reconciling this log against a parallel scope doc:** every 2026-08-12 entry above describing verified-live functionality (Outlook skills, the cron scheduler, `§13.2` agent web-browsing, `§13.1` web-app windows) points at code living in `khameleon-prototype/` — `server.ts`, `scheduler.ts`, `src/connectors/web.ts`, `electron/main.js`, `electron/webapps.js`, `data/*.json`. That directory does not exist anywhere in this repo. Searched the full filesystem and `git log --all` (every branch, full history) — no trace of it ever being committed here.
+
+**Why it's likely gone rather than misplaced:** the current backend (`artifacts/api-server`) runs on a structurally different stack — PostgreSQL + Drizzle ORM + an Orval-generated API client — versus the prototype's plain Express server with flat JSON file storage (`data/schedules.json`, `data/webapps.json`). These read as two different builds, not one evolving codebase. Most likely explanation: `khameleon-prototype/` was an earlier proof-of-concept, possibly built in a different session or a separate Replit project, superseded by the current `api-server`/`khameleon-command` line of work without this log being updated to reflect the handoff.
+
+**Practical implication:** treat every 2026-08-12 "verified live" claim above as **unconfirmed for the current codebase** — it was true of code that isn't here anymore, not a claim about what `artifacts/api-server` does today. Whether the current backend actually implements equivalent Outlook/scheduler/web-access functionality needs its own direct check against the code that's actually here, not an inference from this log.
+
+*Full reconciliation: khameleon-reconciliation.md.*
+
+## 2026-08-27 — Closed the "agent can't act on your apps" gap for the local shell; added a real research fetch tool
+
+**Problem found:** the api-server agent gateway (used by the khameleon-command dashboard) only had dev/repo-introspection tools — read/write files in the workspace, run builds, whitelisted shell, task CRUD. Nothing let it act inside the user's actual apps. Separately, `apps/khameleon-shell`'s `KhameleonCoordinator` *could* reach the real window/file/memory modules, but only as a single-shot router — one instruction in, exactly one capability call out, no ability to chain steps.
+
+**Why the fix went into `khameleon-shell`, not `api-server`:** window-agent needs `node-window-manager`'s native macOS/Windows bindings, and file-agent's app launcher shells out to `osascript`/`open -a` (macOS-only). Both only make sense running on the user's own Mac. `api-server` is built to run as a cloud/Postgres-backed service — wiring native desktop-control deps into it would be architecturally wrong and would likely break its build on non-macOS hosts. So the real fix is: give the *local* shell process a genuine multi-tool agent loop, not port desktop tools into the cloud API.
+
+**Built:**
+- `lib/integrations/src/tools.ts` + `localAgentRunner.ts` — three tools (`window_command`, `file_command`, `memory_command`) that reuse each module's already-tested `CommandRunner.run()` parser (no new parsing logic), wired into a genuine multi-turn Claude tool-use loop (`LocalAgentRunner`), so one instruction like "open a YouTube video enlarged, then move it aside" now executes as two real, sequenced actions.
+- `apps/khameleon-shell/src/main.ts` now runs `LocalAgentRunner` instead of the single-shot `KhameleonCoordinator` router; `control-panel.html` updated to match the new response shape.
+- `artifacts/api-server/src/agents/tools/webFetch.ts` — a real `fetch_url` tool (fetch + HTML-to-text, SSRF-guarded against localhost/private ranges/cloud metadata endpoints) added to the api-server agent's tool set, so it can genuinely read live web pages for research instead of only reading/writing its own DB rows. This one *is* safe cloud-side — no native deps, pure network fetch.
+
+**Verified:** `tsc` clean for `lib/integrations` and the new `webFetch.ts` (isolated scratch install, since this sandbox can't run the project's own `pnpm install` — see the 2026-08-26 entry above for why). `vitest run` — 15/15 passing (`tools.test.ts`, `localAgentRunner.test.ts` with a scripted fake Anthropic client covering multi-step tool calls/error handling/max-iteration fallback, plus the pre-existing `coordinator.test.ts` unaffected). `node --test` — 14/14 passing for `webFetch.test.ts` (URL-safety and HTML-to-text logic). Confirmed the SSRF guard actually blocks a real request to the cloud metadata address (`169.254.169.254`) before any network call is made. Could not verify a live end-to-end fetch to a public URL in this sandbox — outbound network here is allowlisted and blocked `example.com`/`api.github.com` at the proxy; the guarded/blocked path was verified, the happy path needs a check on a real network.
+
+**Left alone, deliberately, not silently built:**
+- `vault.ts` — still explicitly mock data only (its own TODO comment lists real encryption/HSM/audit trail as future work). That's DECISION item #16, still open — not something to fake-implement.
+- Full browser automation (Playwright) for `research.ts`/`§13.2` — `fetch_url` covers static/server-rendered pages; JS-rendered pages and anything needing real browser interaction (clicks, logins, scrolling) is a separate, bigger build, not attempted here.
+
+## 2026-08-27 — DECISION: Lifestyle utilities are in scope
+
+**Decision:** lifestyle utilities (Spotify control, weather, maps, stock tickers, etc.) are **in scope** for Khameleon, not excluded. Rationale given: users at work may reasonably want access to these alongside their work tools — Khameleon doesn't need to draw a hard line at "work automation only."
+
+This resolves backlog DECISION item #14. Note: `connectors.ts` already lists `spotify` and `weather` in `ALL_CONNECTORS` (unconnected — no OAuth/API wiring behind them yet), so this decision has a head start rather than starting from zero.
+
+## 2026-08-27 — Spotify + Weather wired in (first lifestyle utilities)
+
+**Built**, following the same OAuth pattern as Google/Microsoft:
+- Spotify: OAuth start/callback/refresh (`auth.ts`, `oauthTokens.ts`), and `routes/spotify.ts` — real `now-playing`, `play`, `pause`, `next`, `previous` against the Spotify Web API. Requires `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET` env vars (not yet set — connect flow will 503 until they are).
+- Weather: `routes/weather.ts` using Open-Meteo — no API key or OAuth needed at all, so it's marked `connected: true` unconditionally in `/api/connectors` (new `NO_AUTH_CONNECTORS` concept). Supports `?lat=&lon=` per request or a saved default location (`PUT /api/weather/default`).
+- `connectors.ts` updated: `spotify` now maps to a real provider token, `weather` is the first no-auth connector.
+
+**Verified:** `tsc --noEmit` against the real repo (after properly building `lib/db`/`lib/api-zod` first, which is what the project's own project-reference setup requires — raw `tsc --noEmit` without that step throws TS6305 on every file that imports `@workspace/db`, a pre-existing repo-wide condition unrelated to this change) — zero errors in `spotify.ts`, `weather.ts`, or any of today's other new/modified files. One real bug caught and fixed by this check: `spotify.ts` imported Express's `Response` type and shadowed the global fetch `Response`, breaking `.status`/`.ok` on the Spotify API response — fixed with an explicit `globalThis.Response` alias. Confirmed the remaining ~24 typecheck errors elsewhere in the repo (implicit-anys, a few "not all paths return", one `Cannot find name 'SetModeBody'` in `modes.ts`) all pre-date this session and are unrelated.
+
+Tests: this sandbox's copy of `node_modules` was installed on macOS (darwin-arm64) and can't run `esbuild`/`tsx --test` here (linux-arm64 mismatch) — same class of platform issue noted in the 2026-08-26 entry. Built isolated Linux-native scratch installs instead: 5/5 passing for `weather.test.ts` (coordinate validation, WMO code descriptions) and 14/14 for `webFetch.test.ts`. Neither Spotify's live API nor Open-Meteo's live API could be exercised end-to-end here — this sandbox's network is allowlisted and blocks arbitrary domains. Worth a real run on your Mac (`pnpm --filter @workspace/api-server test`) to confirm the live paths.
+
+**Also noted in passing:** `playwright` is listed as a root-level devDependency (`package.json`) but has zero actual usage anywhere in the codebase — no imports found. Likely a leftover from whatever built the missing `khameleon-prototype/`'s §13.2 web-browsing. Doesn't change anything already concluded, just confirms the intent was there even though the code isn't.
+
+## 2026-08-27 — All credential setup moved from env vars to a real in-app prompt
+
+**Request:** make sure every connection (OAuth authorizations, passwords, API keys) has a prompt for the user to enter it, so setup can happen in the app instead of requiring the server operator to configure environment variables.
+
+**Built:**
+- `lib/apiKeys.ts` — a settings-table-backed store (same pattern as scheduler config / weather default location) for model-provider API keys: Anthropic, OpenAI, Google (Gemini), OpenRouter, Minimax. Write-only from the frontend's perspective — status endpoints return booleans, never the key value.
+- `routes/onboarding.ts` — `GET /status`, `GET /api-keys`, `PUT /api-key`, `DELETE /api-key/:provider`, `GET /providers`.
+- `agents/gateway.ts` — `resolveKey`/`isAgentAvailable` now check, in order: per-agent override → user-saved key (new) → server env var (old behavior, kept as final fallback so nothing breaks for existing deployments). Both had to become `async`; updated their one external caller (`agentRoster.ts`'s `/:id/status` route).
+- Frontend (`settings.tsx`): added a real **API KEYS** section — password-masked input + Save/Clear per provider, wired to the routes above, replacing "set a Replit Secret and restart" with an actual in-app prompt. Added Spotify to the existing OAuth **Connectors** section (same Connect/Disconnect pattern as Google/Microsoft — already real, just needed the third provider added) and a **Weather** row for entering a default lat/lon (no OAuth needed there, just a location).
+
+**Deliberately not solved here:** the API keys are stored in plaintext in the same settings table as non-secret config (scheduler hour, weather location) — flagged clearly in the UI copy and code comments. Real encryption at rest is the same open item as `vault.ts`'s (DECISION #16). OAuth *app* credentials (`GOOGLE_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, etc.) are correctly left as server-level env vars, not user-entered — those belong to Khameleon-the-company's registered OAuth app, not to an individual user; what the user enters for those is nothing beyond clicking "Connect."
+
+**Verified:** `tsc --noEmit` clean on every new/modified file in both `api-server` and `khameleon-command` (after building `lib/db`/`lib/api-zod` first — see the 2026-08-27 Spotify/Weather entry above for why that step is required here). One real bug caught: `req.params.provider` in the new `DELETE /api-key/:provider` route typed as `string | string[]` under this project's Express 5 typings — same pre-existing pattern already present (unfixed) in `auth.ts`; fixed in the new file with an explicit `String()` coercion. 5/5 new tests passing (`apiKeys.test.ts`, input-validation paths only — the DB-backed save/read path needs a real Postgres connection, not available in this sandbox). Confirmed the remaining pre-existing typecheck errors in both packages are unrelated to this change (implicit-anys and stale project-reference builds that predate this session).
+
+## 2026-08-27 — Credentials encrypted at rest (AES-256-GCM)
+
+**Request:** encrypt the API keys just added.
+
+**Built:** `lib/crypto.ts` — AES-256-GCM via Node's built-in `crypto` (no new dependency). Master key is derived once via `scrypt` from an operator-set `KHAMELEON_ENCRYPTION_KEY` (Replit Secret, 16+ chars) and cached in memory; each value gets its own random IV + auth tag. Wired into both places credentials were sitting in plaintext:
+- `apiKeys.ts` — encrypts on `setApiKey`, decrypts on `getApiKey`.
+- `oauthTokens.ts` — encrypts `accessToken`/`refreshToken` on `saveToken`, decrypts on `getToken`. This wasn't explicitly asked for but was the same class of problem sitting right next to it (OAuth tokens grant real account access — arguably more sensitive than the API keys) — flagged and fixed rather than leaving it inconsistent.
+
+**Fails closed, deliberately:** if `KHAMELEON_ENCRYPTION_KEY` isn't set, `encrypt()` throws rather than silently storing plaintext — same pattern already established by `SCHEDULER_ADMIN_KEY` in `scheduler.ts`. `onboarding.ts`'s `/status` now reports `encryptionConfigured`, and the **API KEYS** settings section shows a clear red banner (not a silent failure) when it's false, explaining exactly what to set.
+
+**Backward compatible:** `decrypt()` recognizes its own `v1:...` format and returns anything else unchanged — so if a token was saved before this change, it keeps working and gets encrypted the next time it's written (e.g. on OAuth refresh), rather than breaking existing connections.
+
+**Verified:** 9/9 new tests (`crypto.test.ts`) — round-trip correctness, legacy-plaintext passthrough, tamper detection (flipped ciphertext byte correctly fails to decrypt), fails-closed with no key, random IV per call. `crypto.ts` has zero external dependencies so this suite runs directly in any Node environment, unlike this session's other new tests. `apiKeys.test.ts` re-verified passing with the encryption wired in. `tsc --noEmit` clean on every touched file in both `api-server` and `khameleon-command`.
+
+**Still not solved, on purpose:** the encryption key itself lives in a plain env var on this server — real secrets-manager integration (HashiCorp Vault / AWS Secrets Manager) is still future work per `vault.ts`'s existing TODO, and this doesn't change that. What changed is that the database itself no longer holds plaintext credentials.
+
+## 2026-08-27 — DECISION: Mobile device control is in scope
+
+**Decision:** remote control of a mobile device (Android/iOS) is **in scope** for Khameleon, not excluded.
+
+This resolves backlog DECISION item #15. Flagging honestly before any build work starts on it: this is a different category of effort than the desktop work done so far. Everything built this session runs on the same machine as the thing being controlled (Electron shell + native OS bindings, or a cloud API talking to a web API). Controlling a phone needs a presence on that phone — realistically a companion app (Android: Accessibility Service / MediaProjection for screen reads and input injection; iOS: far more restricted by Apple's sandboxing, likely limited to what Shortcuts/App Intents expose rather than true remote control) — plus a pairing/auth flow between that app and the Khameleon backend. Not something to wire in via a backend route the way Spotify/Weather were. No architecture for this exists yet anywhere in the design spec or codebase.
+
+---
+*Full functional/design spec: khameleon-design-spec.md · Competitor research: khameleon-competitor-research.md*
