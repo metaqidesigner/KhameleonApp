@@ -20,6 +20,7 @@ import {
   type WindowDropPlacement,
 } from '@/components/FloatingWindow';
 import { AssistantCard } from '@/components/AssistantCard';
+import { SignalGlassTile } from '@/components/SignalGlassTile';
 
 function fmtMs(n?: number)     { return n != null ? `${n.toFixed(0)}ms`  : '0ms'; }
 function fmtCost(n?: number)   { return n != null ? `$${n.toFixed(4)}`   : '$0.0000'; }
@@ -515,13 +516,7 @@ function KhameleonBody() {
   return (
     <div className="ac-concept-pills" style={{ maxWidth: 'none' }}>
       {PILLS.map(pill => (
-        <div key={pill.id} className={`ac-pill ac-pill-${pill.id}`}>
-          <div className="ac-pill-label">
-            <span className="ac-pill-dot" style={{ background: pill.dot }} />
-            <span style={{ color: pill.dot }}>{pill.label}</span>
-          </div>
-          <div className="ac-pill-sub">{pill.sub}</div>
-        </div>
+        <SignalGlassTile key={pill.id} {...pill} />
       ))}
     </div>
   );

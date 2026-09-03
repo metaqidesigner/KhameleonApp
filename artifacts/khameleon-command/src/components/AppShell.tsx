@@ -9,7 +9,6 @@ import { JarvisOrbPortal } from './orb/JarvisOrbPortal';
 import { VoiceController } from './orb/VoiceController';
 import { useJarvisStore } from '@/store/jarvisStore';
 
-const AssistantHome = lazy(() => import('@/pages/assistant-home'));
 const UnifiedCanvas = lazy(() => import('@/pages/canvas'));
 const Agents     = lazy(() => import('@/pages/agents'));
 const Research   = lazy(() => import('@/pages/research'));
@@ -21,6 +20,7 @@ const Vault      = lazy(() => import('@/pages/vault'));
 const Skills     = lazy(() => import('@/pages/skills'));
 const Settings   = lazy(() => import('@/pages/settings'));
 const Tasks      = lazy(() => import('@/pages/tasks'));
+const Approvals  = lazy(() => import('@/pages/approvals'));
 
 function Fallback() {
   return (
@@ -37,8 +37,7 @@ function PageRouter() {
   const activeTab = useJarvisStore(s => s.activeTab);
   return (
     <Suspense fallback={<Fallback />}>
-      {activeTab === 'assistant' && <AssistantHome />}
-      {activeTab === 'overview'  && <UnifiedCanvas />}
+      {activeTab === 'canvas'    && <UnifiedCanvas />}
       {activeTab === 'agents'    && <Agents />}
       {activeTab === 'research'  && <Research />}
       {activeTab === 'memory'    && <Memory />}
@@ -47,6 +46,7 @@ function PageRouter() {
       {activeTab === 'security'  && <Security />}
       {activeTab === 'vault'     && <Vault />}
       {activeTab === 'skills'    && <Skills />}
+      {activeTab === 'approvals' && <Approvals />}
       {activeTab === 'settings'  && <Settings />}
       {activeTab === 'tasks'     && <Tasks />}
     </Suspense>

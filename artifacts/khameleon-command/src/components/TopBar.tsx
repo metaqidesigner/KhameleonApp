@@ -50,46 +50,10 @@ function BrandMark() {
   );
 }
 
-// "Assistant / Workspace" text tabs — mirrors the icon rail's top two
-// destinations so the top nav reads the same way the mockup's does.
-function NavTabs() {
-  const activeTab    = useJarvisStore(s => s.activeTab);
-  const setActiveTab = useJarvisStore(s => s.setActiveTab);
-  const tabs: { id: 'assistant' | 'overview'; label: string }[] = [
-    { id: 'assistant', label: 'Assistant' },
-    { id: 'overview',  label: 'Workspace' },
-  ];
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 22, marginLeft: 18 }}>
-      {tabs.map(tab => {
-        const isActive = activeTab === tab.id;
-        return (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              fontFamily: 'var(--j-font-ui)',
-              fontSize: 13,
-              fontWeight: isActive ? 600 : 400,
-              color: isActive ? 'var(--j-text)' : 'var(--j-text-muted)',
-            }}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function TopBar() {
   return (
     <div className="j-topbar-slim">
-      {/* ── Left: brand + nav ─────────────────────────────── */}
+      {/* ── Left: brand only; the deprecated Assistant/Workspace split is removed. ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, flex: 1 }}>
         <BrandMark />
         <span style={{
@@ -102,7 +66,6 @@ export default function TopBar() {
         }}>
           Khameleon
         </span>
-        <NavTabs />
       </div>
 
       {/* ── Right: icon actions ───────────────────────────── */}

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { approvalsTable } from "@workspace/db";
+import { insertApprovalSchema } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -11,6 +12,22 @@ router.get("/", async (req, res) => {
     res.json(approvals.reverse());
   } catch (err) {
     req.log.error({ err }, "Error fetching approvals");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/", async (req, res) => {
+  const parsed = insertApprovalSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid approval request", details: parsed.error.flatten() });
+    return;
+  }
+
+  try {
+    const [approval] = await db.insert(approvalsTable).values(parsed.data).returning();
+    res.status(201).json(approval);
+  } catch (err) {
+    req.log.error({ err }, "Error creating approval request");
     res.status(500).json({ error: "Internal server error" });
   }
 });

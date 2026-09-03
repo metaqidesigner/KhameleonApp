@@ -3,7 +3,7 @@ import { Search, LayoutDashboard, Bot, FlaskConical, BrainCircuit, Shield, BarCh
 import { useJarvisStore, type TabId, type AgentType } from '@/store/jarvisStore';
 
 const MODULES: { id: TabId; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview',  label: 'OVERVIEW',  icon: <LayoutDashboard size={13}/> },
+  { id: 'canvas',    label: 'CANVAS',    icon: <LayoutDashboard size={13}/> },
   { id: 'agents',    label: 'AGENTS',    icon: <Bot size={13}/> },
   { id: 'research',  label: 'RESEARCH',  icon: <FlaskConical size={13}/> },
   { id: 'memory',    label: 'MEMORY',    icon: <BrainCircuit size={13}/> },
@@ -68,7 +68,7 @@ export default function CommandPalette() {
     }
     if (item.kind === 'module') { setActiveTab(item.id); }
     if (item.kind === 'agent')  { setSelectedAgent(item.id); setChatOpen(true); }
-    if (item.kind === 'action') { setActiveTab('overview'); }
+    if (item.kind === 'action') { setActiveTab('canvas'); }
     setCommandPaletteOpen(false);
   };
 

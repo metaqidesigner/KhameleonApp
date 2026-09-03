@@ -119,6 +119,7 @@ export function VoiceController() {
       queryRecRef.current = null;
       if (finalText.length > 1) {
         shouldRestartRef.current = true;
+        openOrbChat();
         setPendingVoiceQuery(finalText);
       } else {
         setOrbStatus('online');
@@ -138,6 +139,13 @@ export function VoiceController() {
     rec.start();
     queryRecRef.current = rec;
   }, [voiceSettings.lang, setPendingVoiceQuery, setOrbStatus, startWakeListener]);
+
+  // A direct Orb click starts voice even when the typed popup is closed.
+  useEffect(() => {
+    const startFromOrb = () => startQueryListener();
+    window.addEventListener('jarvis-orb-start-listening', startFromOrb);
+    return () => window.removeEventListener('jarvis-orb-start-listening', startFromOrb);
+  }, [startQueryListener]);
 
   // Restart wake listener after TTS finishes
   useEffect(() => {

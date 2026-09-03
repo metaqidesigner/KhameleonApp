@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useJarvisStore } from '@/store/jarvisStore';
+import { SignalGlassPanel } from './SignalGlassPanel';
 
 export type CanvasZone = 'left' | 'centre' | 'right';
 export type WindowDropPlacement = 'before' | 'after';
@@ -45,7 +46,10 @@ export function FloatingWindow({
   const stored = useJarvisStore(s =>
     windowId !== undefined ? s.canvasWindowsMinimized[windowId] : undefined,
   );
+  const model = useJarvisStore(s => windowId !== undefined ? s.canvasWindowModels[windowId] : undefined);
   const setCanvasWindowMinimized = useJarvisStore(s => s.setCanvasWindowMinimized);
+  const registerCanvasWindow = useJarvisStore(s => s.registerCanvasWindow);
+  const setCanvasWindowFocused = useJarvisStore(s => s.setCanvasWindowFocused);
 
   // Local fallback (no windowId) — keeps the component self-contained
   const [localMinimized, setLocalMinimized] = useState(defaultMinimized);
@@ -54,8 +58,34 @@ export function FloatingWindow({
   const dragDepth = useRef(0);
 
   const minimized = windowId !== undefined
-    ? (stored ?? defaultMinimized)
+    ? (model ? model.presentation === 'minimized' : stored ?? defaultMinimized)
     : localMinimized;
+  const isFocused = model?.focused ?? focused;
+
+  useEffect(() => {
+    if (!windowId || model) return;
+    registerCanvasWindow({
+      id: windowId,
+      title: label,
+      surface: 'react-canvas',
+      content: { kind: 'react-canvas', contentKey: windowId, live: true },
+      capabilities: {
+        canFocus: true,
+        canMinimize: true,
+        canMaximize: true,
+        canResize: true,
+        canObserve: true,
+        canManipulate: false,
+      },
+      presentation: defaultMinimized ? 'minimized' : 'normal',
+      focused,
+      zone: 'side',
+      bounds: { x: 0, y: 0, width: 0, height: 0 },
+      restoreBounds: null,
+      zIndex: 0,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [defaultMinimized, focused, label, model, registerCanvasWindow, windowId]);
 
   const setMinimized = (v: boolean) => {
     if (windowId !== undefined) {
@@ -63,6 +93,10 @@ export function FloatingWindow({
     } else {
       setLocalMinimized(v);
     }
+  };
+
+  const focusWindow = () => {
+    if (windowId) setCanvasWindowFocused(windowId, true);
   };
 
   const draggable = Boolean(windowId && onWindowDrop);
@@ -121,35 +155,38 @@ export function FloatingWindow({
   };
 
   return (
-    <div
-      className={`kc-window${windowId ? ` kc-window-${windowId}` : ''}${focused ? ' kc-window-focused' : ''}${minimized ? ' kc-window-min' : ''}${isDragging ? ' kc-window-dragging' : ''}${isDropTarget ? ' kc-window-drop-target' : ''}`}
-      style={grow && !minimized ? { flex: '1 1 0', minHeight: 0 } : undefined}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    >
-      <div
-        className={`kc-window-titlebar${draggable ? ' kc-window-drag-handle' : ''}`}
-        draggable={draggable}
-        title={draggable ? 'Drag to rearrange this window' : undefined}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
+    <SignalGlassPanel
+      className={`kc-window${windowId ? ` kc-window-${windowId}` : ''}${isFocused ? ' kc-window-focused' : ''}${minimized ? ' kc-window-min' : ''}${isDragging ? ' kc-window-dragging' : ''}${isDropTarget ? ' kc-window-drop-target' : ''}`}
+      panelStyle={grow && !minimized ? { flex: '1 1 0', minHeight: 0 } : undefined}
+      bodyClassName={`kc-window-body${minimized ? ' kc-window-body-minimized' : ''}`}
+      title={label}
+      icon={icon}
+      badge={badge}
+      action={<button
+        className="kc-window-minbtn"
+        title={minimized ? 'Expand' : 'Minimize'}
+        draggable={false}
+        onDragStart={event => event.preventDefault()}
+        onClick={() => setMinimized(!minimized)}
       >
-        {icon && <span className="kc-window-icon">{icon}</span>}
-        <span className="kc-window-label">{label}</span>
-        {badge && <span className="kc-window-badge">{badge}</span>}
-        <button
-          className="kc-window-minbtn"
-          title={minimized ? 'Expand' : 'Minimize'}
-          draggable={false}
-          onDragStart={event => event.preventDefault()}
-          onClick={() => setMinimized(!minimized)}
-        >
-          {minimized ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-        </button>
-      </div>
-      {!minimized && <div className="kc-window-body">{children}</div>}
-    </div>
+        {minimized ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+      </button>}
+      headerClassName={draggable ? 'kc-window-drag-handle' : ''}
+      panelProps={{
+        onMouseDown: focusWindow,
+        onDragEnter: handleDragEnter,
+        onDragLeave: handleDragLeave,
+        onDragOver: handleDragOver,
+        onDrop: handleDrop,
+      }}
+      headerProps={{
+        draggable,
+        title: draggable ? 'Drag to rearrange this window' : undefined,
+        onDragStart: handleDragStart,
+        onDragEnd: handleDragEnd,
+      }}
+    >
+      {children}
+    </SignalGlassPanel>
   );
 }

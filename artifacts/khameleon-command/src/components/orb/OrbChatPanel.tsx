@@ -273,7 +273,7 @@ export function OrbChatPanel({ style, onClose }: Props) {
   const {
     voiceInputAvailable, isListening, interim,
     pendingTranscript, cancelAutoSend,
-    analyserRef, toggleListening,
+    analyserRef, startListening, toggleListening,
   } = useVoice(handleTranscript);
 
   // Countdown progress bar animation

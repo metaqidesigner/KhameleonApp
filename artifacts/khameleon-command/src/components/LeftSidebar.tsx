@@ -1,13 +1,14 @@
 import React from 'react';
-import { MessageSquare, LayoutGrid, FileText, Link2, TrendingUp, Settings } from 'lucide-react';
+import { MessageSquare, LayoutGrid, FileText, Link2, TrendingUp, CheckSquare, Settings } from 'lucide-react';
 import { useJarvisStore, type TabId } from '@/store/jarvisStore';
 
 const NAV_ITEMS: { id: TabId; icon: React.ReactNode; title: string }[] = [
-  { id: 'assistant', icon: <MessageSquare size={17} />, title: 'Assistant' },
-  { id: 'overview',  icon: <LayoutGrid   size={17} />, title: 'Workspace'  },
-  { id: 'tasks',     icon: <FileText     size={17} />, title: 'Tasks'      },
-  { id: 'agents',    icon: <Link2        size={17} />, title: 'Agents'     },
-  { id: 'analytics', icon: <TrendingUp   size={17} />, title: 'Analytics'  },
+  { id: 'canvas',    icon: <LayoutGrid   size={17} />, title: 'Canvas'    },
+  { id: 'tasks',     icon: <FileText     size={17} />, title: 'Tasks'     },
+  { id: 'agents',    icon: <Link2        size={17} />, title: 'Agents'    },
+  { id: 'analytics', icon: <TrendingUp   size={17} />, title: 'Analytics' },
+  { id: 'comms',     icon: <MessageSquare size={17} />, title: 'Messages' },
+  { id: 'approvals', icon: <CheckSquare  size={17} />, title: 'Approvals' },
 ];
 
 export function LeftSidebar() {

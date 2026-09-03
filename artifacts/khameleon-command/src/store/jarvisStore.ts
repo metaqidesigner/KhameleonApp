@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { SharedWindowModel } from '../../../../khameleon-window-agent/src/types';
 
 export type AgentType =
   | 'simple' | 'orchestrator' | 'deep_research'
@@ -7,10 +8,10 @@ export type AgentType =
   | 'channel_agent' | 'proactive_agent' | 'operative';
 
 export type TabId =
-  | 'assistant'
-  | 'overview' | 'agents' | 'research' | 'memory'
+  | 'canvas'
+  | 'agents' | 'research' | 'memory'
   | 'comms' | 'analytics' | 'security' | 'vault'
-  | 'skills' | 'settings' | 'tasks';
+  | 'skills' | 'approvals' | 'settings' | 'tasks';
 
 // 'thinking' — processing a request, before a response starts (violet).
 // 'error'    — a single coral flash on a non-connection failure, then
@@ -84,6 +85,8 @@ interface JarvisStore {
   canvasWindowsMinimized: Record<string, boolean>;
   /** Persisted column and order for each named canvas window */
   canvasWindowsPositions: Record<string, CanvasWindowPosition>;
+  /** Canonical shared window records used by React and native hosts. */
+  canvasWindowModels: Record<string, SharedWindowModel>;
   chatMessages: ChatMessage[];
   isStreaming: boolean;
   selectedAgent: AgentType;
@@ -125,6 +128,9 @@ interface JarvisStore {
   setCornerBrackets: (v: boolean) => void;
   setTickerSpeed: (v: number) => void;
   setCanvasWindowMinimized: (id: string, v: boolean) => void;
+  registerCanvasWindow: (model: SharedWindowModel) => void;
+  updateCanvasWindow: (id: string, patch: Partial<SharedWindowModel>) => void;
+  setCanvasWindowFocused: (id: string, focused: boolean) => void;
   resetCanvasLayout: () => void;
   setCanvasWindowPositions: (positions: Record<string, CanvasWindowPosition>) => void;
 
@@ -150,9 +156,10 @@ interface JarvisStore {
 export const useJarvisStore = create<JarvisStore>()(
   persist(
     (set) => ({
-      activeTab: 'assistant',
+      activeTab: 'canvas',
       canvasWindowsMinimized: {},
       canvasWindowsPositions: {},
+      canvasWindowModels: {},
       chatOpen: false,
       chatMessages: [],
       isStreaming: false,
@@ -209,12 +216,57 @@ export const useJarvisStore = create<JarvisStore>()(
       setTickerSpeed:        (v)      => set({ tickerSpeed: v }),
       setCanvasWindowMinimized: (id, v) => set(s => ({
         canvasWindowsMinimized: { ...s.canvasWindowsMinimized, [id]: v },
+        canvasWindowModels: s.canvasWindowModels[id]
+          ? {
+              ...s.canvasWindowModels,
+              [id]: {
+                ...s.canvasWindowModels[id],
+                presentation: v ? 'minimized' : 'normal',
+                restoreBounds: v
+                  ? s.canvasWindowModels[id].bounds
+                  : s.canvasWindowModels[id].restoreBounds,
+                updatedAt: new Date().toISOString(),
+              },
+            }
+          : s.canvasWindowModels,
+      })),
+      registerCanvasWindow: (model) => set(s => ({
+        canvasWindowModels: {
+          ...s.canvasWindowModels,
+          [model.id]: s.canvasWindowModels[model.id] ?? model,
+        },
+      })),
+      updateCanvasWindow: (id, patch) => set(s => ({
+        canvasWindowModels: s.canvasWindowModels[id]
+          ? { ...s.canvasWindowModels, [id]: { ...s.canvasWindowModels[id], ...patch, updatedAt: new Date().toISOString() } }
+          : s.canvasWindowModels,
+      })),
+      setCanvasWindowFocused: (id, focused) => set(s => ({
+        canvasWindowModels: s.canvasWindowModels[id]
+          ? { ...s.canvasWindowModels, [id]: { ...s.canvasWindowModels[id], focused, updatedAt: new Date().toISOString() } }
+          : s.canvasWindowModels,
       })),
       resetCanvasLayout: () => set({
         canvasWindowsMinimized: {},
         canvasWindowsPositions: {},
+        canvasWindowModels: {},
       }),
-      setCanvasWindowPositions: (positions) => set({ canvasWindowsPositions: positions }),
+      setCanvasWindowPositions: (positions) => set(s => {
+        const zoneMap: Record<CanvasWindowZone, SharedWindowModel['zone']> = {
+          left: 'side', centre: 'center', right: 'right-rail',
+        };
+        const canvasWindowModels = { ...s.canvasWindowModels };
+        Object.entries(positions).forEach(([id, position]) => {
+          const model = canvasWindowModels[id];
+          if (model) canvasWindowModels[id] = {
+            ...model,
+            zone: zoneMap[position.zone],
+            zIndex: position.order,
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        return { canvasWindowsPositions: positions, canvasWindowModels };
+      }),
 
       addActiveTask:    (id) => set(s => ({ activeTaskIds: [...new Set([...s.activeTaskIds, id])] })),
       removeActiveTask: (id) => set(s => ({ activeTaskIds: s.activeTaskIds.filter(x => x !== id) })),
@@ -240,6 +292,7 @@ export const useJarvisStore = create<JarvisStore>()(
         activeTab: s.activeTab,
         canvasWindowsMinimized: s.canvasWindowsMinimized,
         canvasWindowsPositions: s.canvasWindowsPositions,
+        canvasWindowModels: s.canvasWindowModels,
         panelLayouts: s.panelLayouts,
         scanLinesEnabled: s.scanLinesEnabled,
         cornerBracketsEnabled: s.cornerBracketsEnabled,

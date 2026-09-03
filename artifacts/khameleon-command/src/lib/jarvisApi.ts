@@ -360,6 +360,70 @@ export async function getSchedulerStatus(): Promise<SchedulerStatus> {
 // To change the digest time, set DIGEST_HOUR and DIGEST_MINUTE as Replit Secrets
 // and restart the server. This keeps the control plane out of the browser bundle.
 
+// ── Onboarding: model-provider API keys ─────────────────────
+// Unlike OAuth connectors (Google/Microsoft/Spotify — user clicks Connect),
+// these providers need the user to actually type a key in. Added 2026-08-27
+// so setup doesn't require the server operator to configure env vars.
+export type ApiKeyProvider = 'anthropic' | 'openai' | 'google' | 'openrouter' | 'minimax';
+export type ApiKeyStatus = Record<string, boolean>;
+
+export async function getApiKeyStatus(): Promise<ApiKeyStatus> {
+  return safeFetch<ApiKeyStatus>(`${BASE}/onboarding/api-keys`, undefined, {});
+}
+
+export interface OnboardingStatus {
+  apiKeys: ApiKeyStatus;
+  oauth: Record<string, boolean>;
+  encryptionConfigured: boolean;
+}
+
+export async function getOnboardingStatus(): Promise<OnboardingStatus> {
+  return safeFetch<OnboardingStatus>(`${BASE}/onboarding/status`, undefined, {
+    apiKeys: {}, oauth: {}, encryptionConfigured: false,
+  });
+}
+
+export async function saveApiKey(provider: ApiKeyProvider, apiKey: string): Promise<void> {
+  const res = await fetch(`${BASE}/onboarding/api-key`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider, apiKey }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(body.error ?? `Failed to save ${provider} API key`);
+  }
+}
+
+export async function clearApiKey(provider: ApiKeyProvider): Promise<void> {
+  const res = await fetch(`${BASE}/onboarding/api-key/${provider}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`Failed to clear ${provider} API key`);
+}
+
+// ── Weather default location ─────────────────────────────────
+export interface WeatherDefaultLocation {
+  lat: number | null;
+  lon: number | null;
+  label: string | null;
+}
+
+export async function getWeatherDefault(): Promise<WeatherDefaultLocation> {
+  return safeFetch<WeatherDefaultLocation>(`${BASE}/weather/default`, undefined, { lat: null, lon: null, label: null });
+}
+
+export async function saveWeatherDefault(lat: number, lon: number, label?: string): Promise<WeatherDefaultLocation> {
+  const res = await fetch(`${BASE}/weather/default`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lat, lon, label }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(body.error ?? 'Failed to save default weather location');
+  }
+  return res.json();
+}
+
 // ── WebSocket streaming ────────────────────────────────────
 export interface StreamDonePayload {
   model: string | null;
