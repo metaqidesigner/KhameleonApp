@@ -1,8 +1,25 @@
 import React, { useState, useRef } from 'react';
 import { marked } from 'marked';
-import { Play, Archive, Copy, ChevronDown, ChevronRight, FlaskConical } from 'lucide-react';
+import { Play, Copy, ChevronDown, ChevronRight, FlaskConical } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { runResearch } from '@/lib/jarvisApi';
+
+interface ResearchToolResult {
+  name: string;
+  input: Record<string, unknown>;
+  result: string;
+  durationMs: number;
+  error?: string;
+}
+
+interface ResearchResult {
+  content: string;
+  model?: string | null;
+  latencyMs?: number;
+  tokens?: number;
+  cost?: number;
+  toolResults: ResearchToolResult[];
+}
 
 export default function Research() {
   const [query, setQuery]       = useState('');
@@ -11,7 +28,7 @@ export default function Research() {
   const [saveMemory, setSaveMemory] = useState(false);
   const [optOpen, setOptOpen]   = useState(false);
   const [running, setRunning]   = useState(false);
-  const [result, setResult]     = useState<{ content:string; model?:string|null; latencyMs?:number; tokens?:number; cost?:number } | null>(null);
+  const [result, setResult]     = useState<ResearchResult | null>(null);
   const [traceOpen, setTraceOpen] = useState(false);
   const [copied, setCopied]     = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -22,7 +39,10 @@ export default function Research() {
     setResult(null);
     try {
       const res = await runResearch(query, { max_iterations: maxIter, web_search: webSearch });
-      setResult({ content: res.content, model: res.model, latencyMs: res.latency_ms, tokens: res.tokens, cost: res.cost_usd });
+      setResult({
+        content: res.content, model: res.model, latencyMs: res.latency_ms, tokens: res.tokens, cost: res.cost_usd,
+        toolResults: (res.tool_results ?? []) as ResearchToolResult[],
+      });
     } finally {
       setRunning(false);
     }
@@ -112,17 +132,25 @@ export default function Research() {
         )}
         {result && (
           <div style={{ display:'flex', flexDirection:'column', gap:10, height:'100%' }}>
-            {/* Trace log */}
+            {/* Trace log — real tool calls made during this run, not a fixed decorative script */}
             <div>
               <button onClick={() => setTraceOpen(v=>!v)} style={{ display:'flex', alignItems:'center', gap:6, width:'100%', padding:'5px 10px', background:'linear-gradient(90deg, rgba(107,0,0,0.4), transparent)', border:'none', borderBottom:'1px solid rgba(192,21,42,0.3)', cursor:'pointer' }}>
                 {traceOpen ? <ChevronDown size={11} color="var(--j-red)"/> : <ChevronRight size={11} color="var(--j-red)"/>}
-                <span style={{ fontFamily:'var(--j-font-ui)', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.18em', color:'var(--j-text-muted)' }}>TRACE LOG</span>
+                <span style={{ fontFamily:'var(--j-font-ui)', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.18em', color:'var(--j-text-muted)' }}>
+                  TRACE LOG {result.toolResults.length > 0 && `(${result.toolResults.length})`}
+                </span>
               </button>
               {traceOpen && (
                 <div style={{ padding:'6px 0', fontFamily:'var(--j-font-mono)', fontSize:10, color:'var(--j-text-muted)', animation:'jarvis-fadein 0.15s ease both' }}>
-                  → web_search : 5 results retrieved<br/>
-                  → summarize  : 3400 tokens processed<br/>
-                  → synthesize : report generated
+                  {result.toolResults.length === 0 ? (
+                    <span>No tool calls — answered from the model's own knowledge.</span>
+                  ) : (
+                    result.toolResults.map((t, i) => (
+                      <div key={i} style={{ color: t.error ? 'var(--j-red)' : 'var(--j-text-muted)' }}>
+                        → {t.name}({Object.values(t.input).map(String).join(', ')}) : {t.error ?? `${t.result.length} chars`} · {t.durationMs}ms
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
             </div>
@@ -137,9 +165,6 @@ export default function Research() {
               <div style={{ fontFamily:'var(--j-font-mono)', fontSize:10, color:'var(--j-text-muted)', borderTop:'1px solid rgba(0,212,255,0.1)', paddingTop:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                 <span>{result.model} · {result.latencyMs}ms · {result.tokens} tok · ${(result.cost??0).toFixed(4)}</span>
                 <div style={{ display:'flex', gap:8 }}>
-                  <button className="j-btn-ghost" style={{ height:26, fontSize:10, padding:'0 10px' }} onClick={() => {}}>
-                    <Archive size={11}/> ARCHIVE
-                  </button>
                   <button className="j-btn-ghost" style={{ height:26, fontSize:10, padding:'0 10px' }} onClick={copy}>
                     <Copy size={11}/> {copied ? 'COPIED!' : 'COPY'}
                   </button>

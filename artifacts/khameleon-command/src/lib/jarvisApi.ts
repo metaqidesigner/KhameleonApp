@@ -189,23 +189,45 @@ export async function askJarvis(prompt: string, agent?: string): Promise<AskResp
   );
 }
 
-export async function searchMemory(q: string) {
-  return safeFetch<{ content: string; source: string; score: number; chunk_id?: string; ts?: string }[]>(
-    `${BASE}/memory/search?q=${encodeURIComponent(q)}`,
-    undefined,
-    [
-      { content: `Demo result for "${q}"`, source: '/demo/sample.txt', score: 0.91, chunk_id: 'c001', ts: new Date().toISOString() },
-      { content: 'Another knowledge base fragment.', source: '/demo/notes.md', score: 0.74, chunk_id: 'c002', ts: new Date().toISOString() },
-    ],
-  );
+export interface MemoryItem {
+  id: number;
+  category: string;
+  key: string;
+  value: string;
+  isProtected: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
+export async function getMemoryItems(): Promise<MemoryItem[]> {
+  return safeFetch<MemoryItem[]>(`${BASE}/memory`, undefined, []);
+}
+
+export interface MemorySearchResult {
+  content: string;
+  source: string;
+  score: number;
+  chunk_id?: string;
+  ts?: string;
+}
+
+/** Falls back to an empty result set on failure, never fabricated matches — a real search returning nothing looks the same as a backend that's unreachable, which is the honest behavior. */
+export async function searchMemory(q: string): Promise<MemorySearchResult[]> {
+  return safeFetch<MemorySearchResult[]>(`${BASE}/memory/search?q=${encodeURIComponent(q)}`, undefined, []);
+}
+
+/** Throws on failure rather than reporting a fake success — indexing is a mutation with a real, checkable outcome, not a value that's safe to paper over. */
 export async function indexMemoryPath(path: string): Promise<{ ok: boolean; chunks?: number }> {
-  return safeFetch(
-    `${BASE}/memory/index`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) },
-    { ok: true, chunks: 42 },
-  );
+  const res = await fetch(`${BASE}/memory/index`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(body.error ?? `Failed to index path (HTTP ${res.status})`);
+  }
+  return res.json();
 }
 
 export async function installSkill(source: string): Promise<{ ok: boolean }> {

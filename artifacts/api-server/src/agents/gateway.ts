@@ -18,7 +18,7 @@ const COST_TABLE: Record<string, number> = {
 };
 const ENERGY_PER_1K = 0.001;
 
-function costForTokens(model: string, tokens: number): number {
+export function costForTokens(model: string, tokens: number): number {
   return (tokens / 1000) * (COST_TABLE[model] ?? 0.002);
 }
 function energyForTokens(tokens: number): number {

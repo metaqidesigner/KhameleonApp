@@ -3,6 +3,7 @@ import { Play, BrainCircuit, Search, MessageSquare, RefreshCw, ChevronDown, Chev
 import JPanel from '@/components/JPanel';
 import { useMemorySearch, useIndexMemory } from '@/hooks/useJarvis';
 import { getAgentConversations, type AgentConversationRow } from '@/lib/agentsApi';
+import { getMemoryItems, type MemoryItem } from '@/lib/jarvisApi';
 
 // ── Agent History section ─────────────────────────────────────
 
@@ -162,16 +163,30 @@ function AgentHistory() {
 
 export default function Memory() {
   const [path, setPath]       = useState('');
-  const [indexed, setIndexed] = useState<{ ok: boolean; chunks?: number } | null>(null);
+  const [indexed, setIndexed] = useState<{ ok: boolean; chunks?: number; error?: string } | null>(null);
   const [searchQ, setSearchQ] = useState('');
+  const [items, setItems]     = useState<MemoryItem[]>([]);
   const { mutateAsync: indexPath, isPending: indexing } = useIndexMemory();
   const { data: results, isFetching: searching } = useMemorySearch(searchQ);
 
+  const refreshItems = useCallback(() => { getMemoryItems().then(setItems); }, []);
+  useEffect(() => { refreshItems(); }, [refreshItems]);
+
   const doIndex = async () => {
     if (!path.trim()) return;
-    const r = await indexPath(path.trim());
-    setIndexed(r);
+    try {
+      const r = await indexPath(path.trim());
+      setIndexed(r);
+      refreshItems();
+    } catch (err) {
+      setIndexed({ ok: false, error: err instanceof Error ? err.message : 'Index failed' });
+    }
   };
+
+  const totalBytes = items.reduce((sum, i) => sum + i.value.length, 0);
+  const lastIndexed = items
+    .filter(i => i.category === 'indexed')
+    .reduce<string | null>((latest, i) => (!latest || i.updatedAt > latest ? i.updatedAt : latest), null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, height: '100%', padding: 8 }}>
@@ -184,7 +199,7 @@ export default function Memory() {
               <input
                 className="j-input"
                 style={{ flex: 1 }}
-                placeholder="/path/to/documents  or  ~/notes"
+                placeholder="Workspace-relative file path, e.g. artifacts/api-server/README.md"
                 value={path}
                 onChange={e => setPath(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && doIndex()}
@@ -203,11 +218,14 @@ export default function Memory() {
             </div>
             {indexed && (
               <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: indexed.ok ? 'var(--j-green)' : 'var(--j-red)', animation: 'jarvis-fadein 0.2s ease both' }}>
-                {indexed.ok ? `● INDEXED SUCCESSFULLY — ${indexed.chunks ?? '?'} CHUNKS STORED` : '✕ INDEX FAILED'}
+                {indexed.ok ? `● INDEXED SUCCESSFULLY — ${indexed.chunks ?? '?'} CHUNKS STORED` : `✕ INDEX FAILED — ${indexed.error ?? 'unknown error'}`}
               </div>
             )}
             <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: 'var(--j-text-muted)', display: 'flex', gap: 16 }}>
-              <span>0 CHUNKS</span><span>0 SOURCES</span><span>0.00 MB</span><span>NEVER INDEXED</span>
+              <span>{items.length} CHUNKS</span>
+              <span>{new Set(items.map(i => i.category)).size} SOURCES</span>
+              <span>{(totalBytes / 1_000_000).toFixed(2)} MB</span>
+              <span>{lastIndexed ? new Date(lastIndexed).toLocaleString() : 'NEVER INDEXED'}</span>
             </div>
           </div>
         </JPanel>
