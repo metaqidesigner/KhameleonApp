@@ -424,3 +424,101 @@ Standing instruction from Metqi, 2026-08-12: every spec that implies something t
 
 **Not applicable to individual signup:**
 7. Trust-tier admin approvals (§11.4) — org/admin-level, only relevant once the org-wide phase (decisions log 2026-08-07) exists.
+
+## 15. Skill Sets
+
+**Extends:** Ambient Status and Confirmation Patterns (confirm-gate tiering, action receipts), workspace model.
+
+### 15.1 Definition
+
+A Skill Set is a bundle of instructions, reference material, and optionally tools/scripts that teaches an agent how to handle a specific class of task (e.g. "Aviation Compliance Review," "Investor Update Drafting"). Skill Sets are workspace-scoped, not global — installing one in a workspace makes it available to agents operating in that workspace only.
+
+### 15.2 Discovery
+
+Two paths, not one:
+
+- Catalog browsing: a searchable directory (curated + org-shared) the user can browse and install from directly.
+- Contextual surfacing: when a task in progress matches a not-yet-installed Skill Set closely, the system may surface it inline as a suggestion the user can accept or dismiss with one action. Never auto-installs. A dismissed suggestion does not repeat for the same task thread.
+
+### 15.3 Installation — routes through existing confirm-gate tiering
+
+- Instructions-only Skill Set (no new tool/data access requested): treated as local, cheap, reversible. Skips the hard gate. Installs immediately, logged as an action receipt with a quiet undo (uninstall).
+- Skill Set that bundles a new Integration or a write-capable tool: treated as affecting scope beyond the user's existing grants. Requires a hard confirm gate — show exactly which new tool/data access is being requested, not just the Skill Set's name or description, before install completes.
+
+### 15.4 Removal / update
+
+Uninstalling a Skill Set is always local and reversible: no gate, logged as a receipt. If a Skill Set update changes its requested scope (adds a new tool or Integration dependency), the update itself re-triggers a hard gate on the delta only — not a full re-approval of the whole Skill Set.
+
+### 15.5 Authorship & sourcing
+
+**Extends:** Skill Sets (installation, confirm-gate tiering).
+
+Skill Sets may be:
+
+- Authored from scratch by the user (freeform instructions/reference material, optionally scripts).
+- Imported from an external source: a GitHub repository, a public URL, or a third-party marketplace.
+
+External-source import is always a hard confirm gate, regardless of what the imported package's own manifest claims to request. Rationale: content from an untrusted external source can't be verified against its stated scope the way internally-authored or catalog-reviewed content can, so it's treated as elevated-risk independent of the reversibility test that governs other install types. The gate must show:
+
+- the source (repo/URL, author if available, last-updated date)
+- the full content being imported — instructions, scripts, requested tool/data access — never a summary
+- an explicit warning if the package requests write access, credentials, or unrestricted tool/script execution
+
+Imported Skill Sets are versioned. An update from the source requires a new hard gate before it takes effect — never a silent pull.
+
+## 16. Integrations
+
+**Extends:** Ambient Status and Confirmation Patterns (confirm-gate tiering, action receipts, intent preview), orb states (for connection status).
+
+### 16.1 Definition
+
+An Integration is a connection to an external service (email, calendar, CRM, docs, etc.) that exposes that service's actions as tools agents can call. Distinct from a Skill Set: an Integration is a capability grant, a Skill Set is a behavior pattern. A Skill Set may request an Integration as a dependency, but Integrations can also be connected standalone.
+
+### 16.2 Directory & discovery
+
+A browsable, searchable directory of available Integrations. Each listing states plainly, before connection: what data it can read, what actions it can take, and whether those actions are reversible.
+
+### 16.3 Connection flow — always a hard gate
+
+Connecting an Integration always affects something beyond the user's local workspace and is not cheaply reversible (revoking access after data has been read/written doesn't undo the read/write). Per the reversibility rule, this is always a hard confirm gate, with no exceptions by task type:
+
+- Full scope shown before authorization: exact data types and actions being granted, not a generic "this app wants access" summary.
+- OAuth or equivalent handoff for credential exchange; Khameleon never collects or stores the credential directly.
+
+### 16.4 Tool exposure to agents
+
+Once connected, an agent's calls to an Integration default to read-only. Any write action against a connected Integration routes through the same confirm-gate tiering as any other autonomous action:
+
+- Expensive / hard-to-reverse / affects someone other than the user (e.g. sending an email, posting to a shared calendar) → hard gate, full real payload and recipient shown, editable in place (per intent preview rule).
+- Local / cheap / easily undone (e.g. drafting without sending, reading) → no gate, logged as an action receipt.
+
+### 16.5 Status & disconnection
+
+Each connected Integration shows an ambient badge state (connected / degraded / needs re-auth) consistent with the three-tier status model — no separate notification system for Integration health. Disconnecting is local and reversible: no gate, logged as a receipt, with a note that any already-completed external actions are not undone by disconnection.
+
+### 16.6 Authorship & sourcing
+
+**Extends:** Integrations (connection flow, hard gate).
+
+Integrations may be:
+
+- Selected from a first-party directory (as previously defined).
+- Defined by the user pointing Khameleon at an external service definition — an OpenAPI spec, an MCP server URL, a GitHub-hosted connector manifest, etc.
+
+Integrations already always trigger a hard gate at connection. For externally-sourced Integrations, that gate additionally shows: where the definition came from, who published it (if known), and — same as Skill Sets — the full real scope requested, not a paraphrase.
+
+## 17. Work Domains
+
+**Extends:** Skill Sets, Integrations (organizing layer for both).
+
+### 17.1 Definition
+
+A Work Domain is a user-defined label for organizing their own Skill Sets and Integrations around the actual shape of their job. There is no fixed taxonomy. Khameleon ships a set of illustrative examples only (e.g. Business as Usual, People, Governance, Change, Administration, Strategic) as a starting template — users may rename, merge, split, delete, or invent domains freely. Naming convention and structure is entirely up to the user.
+
+### 17.2 Tagging
+
+A Skill Set or Integration may carry zero, one, or multiple Work Domain tags. Tags drive discovery (filtering, contextual surfacing) and carry no fixed permission meaning on their own.
+
+### 17.3 UI surface
+
+Domains render as a user-editable grouping/filter layer, not a mode switch. The agent stays one continuous entity regardless of which domain a Skill Set came from — domains organize the user's library, they don't fork the agent into separate personas (unlike a multi-bot model).

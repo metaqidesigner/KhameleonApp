@@ -85,6 +85,22 @@ Real Microsoft Graph delegated scopes used: `Mail.Read`, `Mail.ReadWrite`, `Mail
 
 **Follow-up:** test these components in a demo page, then integrate into actual skill pipelines (starting with `outlook-draft-email` send confirm step per §12.1).
 
+## 2026-09-03 — Design spec extended: Skill Sets, Integrations, Work Domains (§15–17); backlog updated
+
+**Decision:** Added three new design-spec sections — §15 Skill Sets, §16 Integrations, §17 Work Domains — plus an Authorship & Sourcing subsection under each of §15 and §16 covering external import (GitHub repo/public URL/marketplace for Skill Sets; OpenAPI spec/MCP server URL/GitHub-hosted manifest for Integrations). All three extend the Ambient Status and Confirmation Patterns section (§6.5) — confirm-gate tiering, action receipts, intent preview — routing install/connect/import flows through that existing reversibility-based gating rather than introducing a new confirmation model. Work Domains is a pure user-defined organizing/tagging layer over the other two, not a permission construct.
+
+Nothing in the existing spec (orb states, window prominence, the persistence rule, the `outlook-draft-email` confirm step, or §6.5 itself) was altered — these are additions only.
+
+**Backlog added**, positioned after the Ambient Status and Confirmation Patterns work above:
+- Build Skill Sets install flow (catalog + contextual surfacing + confirm-gate routing)
+- Build Integrations directory + connection flow (hard gate, scope display)
+- Build Work Domains tagging/filtering layer
+- Build external sourcing/import for Skill Sets and Integrations (GitHub/URL/manifest import, elevated-risk hard gate, versioning)
+
+**Flagged for prioritization review:** this is a larger scope addition than the items immediately around it, and all four items depend on the confirm-gate/action-receipt system (§6.5) already being built before any of them can actually route through it — none of the four can start ahead of that dependency.
+
+*Full detail: khameleon-design-spec.md §15–17.*
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
