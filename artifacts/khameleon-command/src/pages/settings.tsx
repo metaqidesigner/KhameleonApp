@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin, Music, Play, Pause, SkipForward, SkipBack } from 'lucide-react';
+import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin, Music, Play, Pause, SkipForward, SkipBack, Mic } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
+import { MIC_KEY } from '@/components/orb/VoiceController';
 import {
   getHealth, getSchedulerStatus, type SchedulerStatus,
   getApiKeyStatus, saveApiKey, clearApiKey, type ApiKeyProvider, type ApiKeyStatus,
@@ -10,8 +11,8 @@ import {
   getOnboardingStatus,
 } from '@/lib/jarvisApi';
 
-type Section = 'GENERAL' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'CONNECTORS' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED';
-const SECTIONS: Section[] = ['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'CONNECTORS', 'MEMORY', 'TELEMETRY', 'ADVANCED'];
+type Section = 'GENERAL' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED';
+const SECTIONS: Section[] = ['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MEMORY', 'TELEMETRY', 'ADVANCED'];
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -706,6 +707,65 @@ function AppearanceSection() {
   );
 }
 
+/**
+ * Wake word / mic permission were completely inert for every user by
+ * default: VoiceController's MicPermissionModal was fully built (real
+ * onGranted/onSkipped wiring) but nothing ever called setShowModal(true)
+ * to show it, and wakeWordActive had no toggle anywhere in the UI. Fixed
+ * on the VoiceController side (a never-asked browser now sees the modal
+ * on boot) and here: a real place to check status, re-open the prompt
+ * after a skip/denial, and turn wake word on/off once granted.
+ */
+function VoiceSection() {
+  const wakeWordActive           = useJarvisStore(s => s.wakeWordActive);
+  const setWakeWordActive        = useJarvisStore(s => s.setWakeWordActive);
+  const wakeWordBlocked          = useJarvisStore(s => s.wakeWordBlocked);
+  const setMicPermissionModalOpen = useJarvisStore(s => s.setMicPermissionModalOpen);
+  const [micStatus, setMicStatus] = useState<'granted' | 'denied' | 'unknown'>('unknown');
+
+  useEffect(() => {
+    const stored = localStorage.getItem(MIC_KEY);
+    setMicStatus(stored === 'true' ? 'granted' : stored === 'denied' ? 'denied' : 'unknown');
+  }, []);
+
+  const inputAvailable = typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  if (!inputAvailable) {
+    return <NotYetWired>Voice input needs Chrome or Edge — not supported in this browser</NotYetWired>;
+  }
+
+  return (
+    <>
+      <Row>
+        <Label>Microphone access</Label>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,4,8,0.6)', border: '1px solid rgba(0,212,255,0.15)' }}>
+          <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 11, color: micStatus === 'granted' ? 'var(--j-green)' : micStatus === 'denied' ? 'var(--j-red)' : 'var(--j-text-muted)' }}>
+            {micStatus === 'granted' ? '● GRANTED' : micStatus === 'denied' ? '✕ DENIED / SKIPPED' : '○ NOT YET ASKED'}
+          </span>
+          {micStatus !== 'granted' && (
+            <button className="j-btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 10 }} onClick={() => setMicPermissionModalOpen(true)}>
+              {micStatus === 'denied' ? 'RE-REQUEST ACCESS' : 'GRANT ACCESS'}
+            </button>
+          )}
+        </div>
+      </Row>
+      <Row>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Label>Wake word ("Hello Khameleon")</Label>
+          <div style={{ opacity: micStatus === 'granted' ? 1 : 0.4, pointerEvents: micStatus === 'granted' ? 'auto' : 'none' }}>
+            <Toggle value={wakeWordActive} onChange={setWakeWordActive} />
+          </div>
+        </div>
+        {micStatus !== 'granted' && (
+          <NotYetWired>Grant microphone access above to enable wake word listening</NotYetWired>
+        )}
+      </Row>
+      <NotYetWired>Voice speed, pitch, and output voice aren't configurable yet</NotYetWired>
+    </>
+  );
+}
+
 function pad2(n: number) { return String(n).padStart(2, '0'); }
 
 function formatNextRun(iso: string | null, now = Date.now()): string {
@@ -863,7 +923,8 @@ export default function Settings() {
             >
               {s === 'CONNECTORS' && <><Plug size={12} style={{ marginRight: 8 }} />{s}</>}
               {s === 'API KEYS' && <><KeyRound size={12} style={{ marginRight: 8 }} />{s}</>}
-              {s !== 'CONNECTORS' && s !== 'API KEYS' && s}
+              {s === 'VOICE' && <><Mic size={12} style={{ marginRight: 8 }} />{s}</>}
+              {s !== 'CONNECTORS' && s !== 'API KEYS' && s !== 'VOICE' && s}
             </button>
           ))}
         </div>
@@ -876,8 +937,9 @@ export default function Settings() {
           {active === 'ENGINE'     && <EngineSection />}
           {active === 'API KEYS'   && <ApiKeysSection />}
           {active === 'APPEARANCE' && <AppearanceSection />}
+          {active === 'VOICE'      && <VoiceSection />}
           {active === 'CONNECTORS' && <ConnectorsSection />}
-          {!['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'CONNECTORS'].includes(active) && <GenericSection section={active} />}
+          {!['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS'].includes(active) && <GenericSection section={active} />}
         </div>
       </JPanel>
     </div>

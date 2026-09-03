@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { MicPermissionModal } from './MicPermissionModal';
 
-const MIC_KEY = 'jarvis_mic_granted';
+// Exported so Settings' Voice section can read the same key for display
+// (granted/denied/not-yet-asked) without duplicating the string literal.
+export const MIC_KEY = 'jarvis_mic_granted';
 const WAKE_PHRASES = ['hello khameleon', 'hey khameleon', 'ok khameleon', 'khameleon'];
 
 type WakeStatus = 'idle' | 'waiting' | 'listening' | 'blocked';
@@ -21,8 +23,12 @@ export function VoiceController() {
   const setPendingVoiceQuery = useJarvisStore(s => s.setPendingVoiceQuery);
   const voiceSettings       = useJarvisStore(s => s.voiceSettings);
   const orbStatus           = useJarvisStore(s => s.orbStatus);
+  // Lives in the store (not local state) so Settings' Voice section can
+  // reopen this after a user skips it the first time - see the store
+  // comment on micPermissionModalOpen for why.
+  const showModal           = useJarvisStore(s => s.micPermissionModalOpen);
+  const setShowModal        = useJarvisStore(s => s.setMicPermissionModalOpen);
 
-  const [showModal, setShowModal] = useState(false);
   const [wakeStatus, setWakeStatus] = useState<WakeStatus>('idle');
 
   const wakeRecRef      = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
@@ -160,17 +166,24 @@ export function VoiceController() {
     return undefined;
   }, [orbStatus, wakeWordActive, wakeWordBlocked, startWakeListener]);
 
-  // Boot sequence on mount
+  // Boot sequence on mount. Previously: an unset MIC_KEY (i.e. this browser
+  // has never been asked) silently fell into the same "blocked" branch as
+  // an explicit denial, and nothing anywhere ever called setShowModal(true)
+  // - MicPermissionModal was fully built (real onGranted/onSkipped wiring)
+  // but permanently unreachable, so voice/wake-word was inert by default
+  // for every user with no way to discover or enable it. Now a never-asked
+  // browser actually sees the modal; an explicit prior denial stays quiet.
   useEffect(() => {
     if (!inputAvailable) return;
 
     const stored = localStorage.getItem(MIC_KEY);
     if (stored === 'true') {
       startWakeListener();
-    } else {
-      // Default to blocked — user enables voice from Settings › Voice
+    } else if (stored === 'denied') {
       setWakeWordBlocked(true);
       setWakeStatus('blocked');
+    } else {
+      setShowModal(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
