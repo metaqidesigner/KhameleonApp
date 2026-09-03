@@ -116,6 +116,26 @@ Nothing in the existing spec (orb states, window prominence, the persistence rul
 
 **Still not what §12.1 describes, and this doesn't change that:** this demo wires ConfirmGate/ActionReceipt to a mocked "Send Email" scenario and the real (generic) `/api/approvals` endpoint — it is not integrated into an actual `outlook-draft-email` skill's send step, because that skill has no code anywhere in this repo (confirmed 2026-08-26: the whole Outlook prototype lived in the missing `khameleon-prototype/`). The pattern is proven and ready; wiring it into a real send step is blocked on that skill actually being built, not on anything in `ActionReceipt`/`ConfirmGate` themselves.
 
+## 2026-09-03 — outlook-draft-email built for real (§12.1); resolves the blocker above
+
+**Built the actual skill**, closing the gap the entry above left open. Distinct from the generic `task-executor.ts` (which plans its own freeform steps per command) — a pipeline skill's steps are fixed per §11.2, so this has its own dedicated orchestration:
+
+- `lib/outlookGraph.ts` — typed Microsoft Graph mail client (get message, list conversation thread, create/update/send/delete a draft). Uses the Microsoft OAuth token already wired up on 2026-08-27 alongside Spotify/Weather — Outlook's scopes (`Mail.ReadWrite`, `Mail.Send`) were already requested at connect time in `auth.ts`, just never used until now.
+- `agents/skills/outlookDraftEmail.ts` — the fixed 4-step pipeline (fetch thread → summarize → compose → create draft) from §12.1, persisted through the same `taskRunsTable`/`taskEvents` mechanism the generic executor uses, so it shows up in the Tasks trace column like any other run. Ends in a new `awaiting_confirmation` status rather than `completed` — step 5 (send) is deliberately not part of this pipeline.
+- `routes/outlookSkills.ts` — run/send/reject endpoints. `/send` is the only place `Mail.Send` is ever called, gated on an `approvals` table row created by the run step (the same table the mock demo uses — one durable-record system, not two). A failed send leaves the approval pending and retryable rather than silently marking it resolved.
+- `pages/approvals.tsx` gets a second, real section alongside the existing mock demo, wired to a genuine ConfirmGate/ActionReceipt round trip against these endpoints.
+
+**Three real bugs found by actually testing, not just typechecking** — same discipline as the entry above:
+1. `threadToPlainText` used `??` where it needed `||`: an empty-string (not missing) message body silently failed to fall back to `bodyPreview`. Caught by the new test suite, fixed.
+2. ConfirmGate has no separate subject field, so the payload display concatenates a `Subject: X` header onto the body. If a user edited the draft before confirming, that literal header line would have been written into the real email body sent via Graph. Added `stripSubjectPrefix()` to strip it back off before any edited content reaches Graph.
+3. The existing mock demo's "Email sent" receipt offered `canUndo: true` — directly contradicts §6.5.3's own example of an irreversible action (an already-sent email can't be unsent). Fixed to `canUndo: false`.
+
+**Verified:** `tsc --noEmit` clean on every new/modified file in both packages (the same 24 pre-existing unrelated errors elsewhere, unchanged count). 44/44 backend DB-free tests (11 new), 38/38 frontend tests. Drove the running app via Playwright: the new section renders correctly and produces a graceful inline error on the expected failure path (no live network or Postgres in this sandbox).
+
+**Not verified here, on purpose — same limitation as Spotify/Weather before it:** a live end-to-end Graph call. `MICROSOFT_CLIENT_ID`/`SECRET` aren't set and this sandbox's network is allowlisted, so the real fetch/summarize/compose/draft/send path against an actual mailbox needs a run on a real deployment to confirm.
+
+*Full detail: khameleon-design-spec.md §12.1; code in `artifacts/api-server/src/{lib/outlookGraph.ts,agents/skills/outlookDraftEmail.ts,routes/outlookSkills.ts}` and `artifacts/khameleon-command/src/{lib/outlookSkillsApi.ts,pages/approvals.tsx}`.*
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
