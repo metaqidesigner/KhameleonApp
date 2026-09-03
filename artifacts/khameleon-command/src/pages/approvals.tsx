@@ -4,11 +4,11 @@
  */
 
 import React, { useState } from 'react';
-import { AlertCircle, Mail, Send } from 'lucide-react';
+import { AlertCircle, Mail, Send, FileSearch } from 'lucide-react';
 import { ActionReceiptList, type ActionReceiptProps } from '@/components/ActionReceipt';
 import { ConfirmGate } from '@/components/ConfirmGate';
 import { createApproval } from '@/lib/approvalsApi';
-import { runOutlookDraftEmail, sendOutlookDraft, rejectOutlookDraft, type OutlookDraft } from '@/lib/outlookSkillsApi';
+import { runOutlookDraftEmail, sendOutlookDraft, rejectOutlookDraft, runOutlookSummarizeThread, type OutlookDraft } from '@/lib/outlookSkillsApi';
 
 export default function Approvals() {
   const [showConfirmGate, setShowConfirmGate] = useState(false);
@@ -139,6 +139,39 @@ export default function Approvals() {
     setOutlookSendError(undefined);
   };
 
+  // ── Real skill: outlook-summarize-thread (§12.2) ─────────────────────────
+  // No ConfirmGate here, unlike outlook-draft-email above: reading and
+  // summarizing is local/cheap/reversible (§6.5.3), so it's a quiet action
+  // receipt, not a hard gate.
+  const [summarizeMessageId, setSummarizeMessageId] = useState('');
+  const [summarizeLoading, setSummarizeLoading] = useState(false);
+  const [summarizeError, setSummarizeError] = useState<string>();
+
+  const handleSummarize = async () => {
+    if (!summarizeMessageId.trim()) return;
+    setSummarizeLoading(true);
+    setSummarizeError(undefined);
+    try {
+      const result = await runOutlookSummarizeThread(summarizeMessageId.trim());
+      setReceipts(r => [{
+        id: `summarize-${result.taskRunId}`,
+        description: `Thread summarized (${result.messageCount} message${result.messageCount !== 1 ? 's' : ''})`,
+        category: 'thread_summarized',
+        scope: 'mail.read',
+        outcome: 'success' as const,
+        timestamp: new Date().toISOString(),
+        target: result.participants.join(', ') || undefined,
+        canUndo: false,
+        detail: result.summary,
+      }, ...r]);
+      setSummarizeMessageId('');
+    } catch (error) {
+      setSummarizeError(error instanceof Error ? error.message : 'Summarize request failed');
+    } finally {
+      setSummarizeLoading(false);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', height: '100%', overflow: 'auto' }}>
       {/* Header */}
@@ -235,6 +268,63 @@ export default function Approvals() {
           </div>
           {outlookRunError && (
             <div style={{ fontSize: '11px', color: '#E77A7A' }}>{outlookRunError}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Real skill: outlook-summarize-thread */}
+      <div className="j-panel" style={{ height: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(120, 168, 220, 0.10)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <FileSearch size={14} style={{ color: '#8fa39c' }} />
+          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#fff' }}>
+            Real skill: outlook-summarize-thread (§12.2)
+          </h3>
+        </div>
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: '#8fa39c', lineHeight: 1.5 }}>
+            Fetches a thread (Mail.Read) and summarizes it. No confirm gate — reading is local and reversible (§6.5.3) — the result lands directly as an action receipt below.
+          </p>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              value={summarizeMessageId}
+              onChange={(e) => setSummarizeMessageId(e.target.value)}
+              placeholder="Outlook message id"
+              disabled={summarizeLoading}
+              style={{
+                flex: 1,
+                height: '34px',
+                padding: '0 10px',
+                fontSize: '11px',
+                fontFamily: 'var(--j-font-mono)',
+                color: '#c4d4ec',
+                backgroundColor: 'rgba(8, 14, 32, 0.4)',
+                border: '1px solid rgba(120, 168, 220, 0.18)',
+                borderRadius: '6px',
+              }}
+            />
+            <button
+              onClick={handleSummarize}
+              disabled={summarizeLoading || !summarizeMessageId.trim()}
+              style={{
+                height: '34px',
+                padding: '0 16px',
+                fontSize: '11px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: '#fff',
+                backgroundColor: '#6FE6BD22',
+                border: '1px solid rgba(111, 230, 189, 0.45)',
+                borderRadius: '6px',
+                cursor: summarizeLoading ? 'wait' : 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {summarizeLoading ? 'Summarizing…' : 'Summarize'}
+            </button>
+          </div>
+          {summarizeError && (
+            <div style={{ fontSize: '11px', color: '#E77A7A' }}>{summarizeError}</div>
           )}
         </div>
       </div>

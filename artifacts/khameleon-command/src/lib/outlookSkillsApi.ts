@@ -49,3 +49,23 @@ export async function rejectOutlookDraft(approvalId: number): Promise<{ ok: true
   });
   return asJson(response, 'Reject');
 }
+
+export interface OutlookThreadSummary {
+  taskRunId: string;
+  summary: string;
+  participants: string[];
+  messageCount: number;
+}
+
+/**
+ * §12.2 — pipeline-only, no confirm gate: reading and summarizing a thread
+ * is local/cheap/reversible (§6.5.3), so this runs to completion in one call.
+ */
+export async function runOutlookSummarizeThread(messageId: string): Promise<OutlookThreadSummary> {
+  const response = await fetch(`${BASE}/skills/outlook-summarize-thread`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messageId }),
+  });
+  return asJson<OutlookThreadSummary>(response, 'Summarize request');
+}
