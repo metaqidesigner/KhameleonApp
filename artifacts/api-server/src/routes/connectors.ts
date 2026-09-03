@@ -17,7 +17,15 @@ const PROVIDER_MAP: Record<string, string> = {
   notion:    "notion",
   dropbox:   "dropbox",
   outlook:   "microsoft",
+  spotify:   "spotify",
 };
+
+/**
+ * Connectors that need no OAuth/API key at all — they just work.
+ * Weather (Open-Meteo) is the first of these: added 2026-08-27 when
+ * lifestyle utilities were brought into scope.
+ */
+const NO_AUTH_CONNECTORS = new Set(["weather"]);
 
 const ALL_CONNECTORS: { id: string; name: string }[] = [
   { id: "gmail",        name: "Gmail" },
@@ -55,6 +63,7 @@ router.get("/", async (req, res) => {
     );
 
     const connectors = ALL_CONNECTORS.map((c) => {
+      if (NO_AUTH_CONNECTORS.has(c.id)) return { ...c, connected: true };
       const provider = PROVIDER_MAP[c.id];
       return {
         ...c,
@@ -65,8 +74,8 @@ router.get("/", async (req, res) => {
     res.json(connectors);
   } catch (err) {
     req.log.error({ err }, "Error fetching connectors");
-    // Fall back to all-offline rather than 500
-    res.json(ALL_CONNECTORS.map((c) => ({ ...c, connected: false })));
+    // Fall back to all-offline (except no-auth connectors, which never depend on token state)
+    res.json(ALL_CONNECTORS.map((c) => ({ ...c, connected: NO_AUTH_CONNECTORS.has(c.id) })));
   }
 });
 

@@ -141,6 +141,53 @@ async function exchangeMicrosoftCode(req: Request, code: string): Promise<void> 
   });
 }
 
+// ── Spotify ───────────────────────────────────────────────────────────────────
+
+const SPOTIFY_SCOPES = [
+  "user-read-playback-state",
+  "user-modify-playback-state",
+  "user-read-currently-playing",
+].join(" ");
+
+router.get("/oauth/spotify/start", (req: Request, res: Response) => {
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  if (!clientId) {
+    res.status(503).json({ error: "SPOTIFY_CLIENT_ID not configured" });
+    return;
+  }
+  const url = new URL("https://accounts.spotify.com/authorize");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", getRedirectUri(req));
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", SPOTIFY_SCOPES);
+  url.searchParams.set("state", makeState("spotify"));
+  res.redirect(url.toString());
+});
+
+async function exchangeSpotifyCode(req: Request, code: string): Promise<void> {
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id:     process.env.SPOTIFY_CLIENT_ID!,
+      client_secret: process.env.SPOTIFY_CLIENT_SECRET!,
+      redirect_uri:  getRedirectUri(req),
+      grant_type:    "authorization_code",
+    }),
+  });
+  if (!res.ok) throw new Error(`Spotify exchange failed: ${res.status} ${await res.text()}`);
+  const json = await res.json() as {
+    access_token: string; refresh_token?: string; expires_in: number; scope: string;
+  };
+  await saveToken("spotify", {
+    accessToken:   json.access_token,
+    refreshToken:  json.refresh_token ?? null,
+    expiresInSecs: json.expires_in,
+    scope:         json.scope,
+  });
+}
+
 // ── Generic callback (all providers redirect here) ────────────────────────────
 
 router.get("/oauth/callback", async (req: Request, res: Response) => {
@@ -163,6 +210,7 @@ router.get("/oauth/callback", async (req: Request, res: Response) => {
   try {
     if (provider === "google")    await exchangeGoogleCode(req, code);
     else if (provider === "microsoft") await exchangeMicrosoftCode(req, code);
+    else if (provider === "spotify")   await exchangeSpotifyCode(req, code);
     else throw new Error(`Unknown provider: ${provider}`);
 
     req.log.info({ provider }, "OAuth token saved");
