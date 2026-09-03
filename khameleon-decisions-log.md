@@ -150,6 +150,29 @@ Nothing in the existing spec (orb states, window prominence, the persistence rul
 
 **Remaining:** `outlook-triage-inbox` (§12.3), the third and most complex of the three (hybrid rule-based + instructional classification, multi-item batch actions) — not started.
 
+## 2026-09-03 — outlook-triage-inbox built (§12.3) — all three §12 skills now real
+
+**Built the third and last named Outlook skill**, closing out §12 entirely. Hybrid: fixed deterministic steps plus instructional judgment for whatever the rules can't confidently classify, then real mailbox mutations (flag/categorize/archive) — the most complex of the three, as flagged in the entry above.
+
+**No ConfirmGate:** flagging/categorizing/archiving the user's own mail is local, cheap, and affects nobody but the user — per §6.5.3 it never needs a hard gate. What it needs instead — and gets — is **real undo** per §6.5.2, since unlike outlook-summarize-thread this skill actually mutates mailbox state.
+
+- `lib/outlookGraph.ts` gained `listUnreadInboxMessages`, `updateMessageTriageState` (flag/categories), and `moveMessage` (archive/restore). Documented up front: Graph's classic mail API assigns a message a **new id every time it moves folders** — every downstream reference, undo included, has to track the current id, not the original one.
+- `agents/skills/outlookTriageInbox.ts` — the fixed 5-step pipeline (fetch unread → rule-classify → judgment-classify the rest → apply actions → extract action items). `classifyByRule` is a pure, tested function (urgent/fyi/action_needed by subject/sender pattern, null when it needs judgment); `ACTION_BY_CLASSIFICATION` maps each classification to a real action. Judgment classification and action-item extraction each batch every remaining message into one Anthropic call, not one call per message.
+- `routes/outlookTriage.ts` — run + undo endpoints; undo is best-effort per item (one failure doesn't block restoring the rest).
+- A fourth section on the Approvals page: one receipt per run (not one per message), with real `onUndo` wired to the undo endpoint.
+
+**Two real bugs caught by the test suite before touching a real mailbox:**
+1. `undoTriageItem` restored categories/flag using the *pre-undo* message id even when the message had just been moved back from Archive to Inbox — which assigns yet another new id. Fixed to use the id the restore-move actually returns.
+2. `ACTION_PATTERN` was missing a case-insensitive flag, so "Please review ..." (capitalized, as real subject lines are) silently failed to classify as `action_needed`.
+
+**Verified:** `tsc --noEmit` clean in both packages (same 24 pre-existing unrelated errors). 54/54 backend DB-free tests (7 new, covering the classification rule and action mapping — the part of this skill most worth testing, since it's a judgment call), 38/38 frontend tests. Drove the running app via Playwright — all three real-skill sections render together correctly, graceful inline error on the expected no-backend failure path.
+
+**Not verified here, on purpose:** a live end-to-end run against a real mailbox. The move-reassigns-id behavior in particular is documented from Graph's own API reference, not observed firsthand in this session — worth double-checking against a real mailbox before relying on it.
+
+**§12 is now fully built** — all three named Outlook skills (`outlook-draft-email`, `outlook-summarize-thread`, `outlook-triage-inbox`) exist as real code against Microsoft Graph, not just spec. What's still open: live verification against a real connected mailbox (needs `MICROSOFT_CLIENT_ID`/`SECRET` and a real deployment), and the scheduled-trigger path noted in §12.3's own trigger note (still deferred per 11.3/11.6, unrelated to this session's work).
+
+*Full detail: khameleon-design-spec.md §12.3; code in `artifacts/api-server/src/{lib/outlookGraph.ts,agents/skills/outlookTriageInbox.ts,routes/outlookTriage.ts}`.*
+
 *Full detail: khameleon-design-spec.md §12.2; code in `artifacts/api-server/src/{agents/skills/outlookSummarizeThread.ts,routes/outlookSummarize.ts}`.*
 
 ## 2026-08-12 — Commercial readiness caveats (deferred)
