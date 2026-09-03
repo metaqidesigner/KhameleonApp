@@ -13,6 +13,7 @@ export default function MultiAgent() {
   const [results, setResults] = useState<AgentResponse[]>([]);
   const [verdict, setVerdict] = useState<AgentResponse | null>(null);
   const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState<string>();
 
   useEffect(() => { getRoster().then(setRoster).catch(() => {}); }, []);
 
@@ -21,10 +22,13 @@ export default function MultiAgent() {
     setRunning(true);
     setResults([]);
     setVerdict(null);
+    setRunError(undefined);
     try {
       const res = await askAll([{ role: 'user', content: prompt }], selectedIds, mode);
       setResults(res.results);
       if (res.verdict) setVerdict(res.verdict);
+    } catch (error) {
+      setRunError(error instanceof Error ? error.message : 'Multi-agent request failed');
     } finally {
       setRunning(false);
     }
@@ -84,6 +88,10 @@ export default function MultiAgent() {
           );
         })}
       </div>
+
+      {runError && !running && (
+        <div style={{ fontSize: '11px', color: '#E77A7A' }}>{runError}</div>
+      )}
 
       {/* results */}
       <div style={{ flex: 1, overflowY: 'auto' }} className="scrollbar-jarvis">

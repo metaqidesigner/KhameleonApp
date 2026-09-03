@@ -9,6 +9,7 @@ export default function Compare() {
   const [prompt, setPrompt] = useState('');
   const [results, setResults] = useState<CompareResult[]>([]);
   const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState<string>();
 
   useEffect(() => { getRoster().then(setRoster).catch(() => {}); }, []);
 
@@ -16,9 +17,12 @@ export default function Compare() {
     if (!prompt.trim() || running || !selectedIds.length) return;
     setRunning(true);
     setResults([]);
+    setRunError(undefined);
     try {
       const res = await compareAgents(prompt, selectedIds);
       setResults(res.comparison);
+    } catch (error) {
+      setRunError(error instanceof Error ? error.message : 'Comparison request failed');
     } finally {
       setRunning(false);
     }
@@ -59,6 +63,10 @@ export default function Compare() {
           );
         })}
       </div>
+
+      {runError && !running && (
+        <div style={{ fontSize: '11px', color: '#E77A7A' }}>{runError}</div>
+      )}
 
       {/* comparison table */}
       {results.length > 0 && !running && (

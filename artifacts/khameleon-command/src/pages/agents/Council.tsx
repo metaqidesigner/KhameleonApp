@@ -16,12 +16,14 @@ export default function Council() {
   const [prompt, setPrompt] = useState('');
   const [rounds, setRounds] = useState<Round[]>([]);
   const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState<string>();
 
   useEffect(() => { getRoster().then(setRoster).catch(() => {}); }, []);
 
   async function runCouncil() {
     if (!prompt.trim() || running || !selectedIds.length) return;
     setRunning(true);
+    setRunError(undefined);
     const p = prompt.trim();
     setPrompt('');
 
@@ -33,6 +35,12 @@ export default function Council() {
         responses: res.results,
         synthesis: res.verdict,
       }]);
+    } catch (error) {
+      // Don't push a round with no responses - that looked identical to
+      // every agent legitimately having nothing to say. Restore the
+      // prompt so a failed request doesn't lose what the user typed.
+      setRunError(error instanceof Error ? error.message : 'Council request failed');
+      setPrompt(p);
     } finally {
       setRunning(false);
     }
@@ -111,6 +119,10 @@ export default function Council() {
           </>
         )}
       </div>
+
+      {runError && !running && (
+        <div style={{ fontSize: '11px', color: '#E77A7A' }}>{runError}</div>
+      )}
 
       {/* input */}
       <div style={{ display: 'flex', gap: 6 }}>

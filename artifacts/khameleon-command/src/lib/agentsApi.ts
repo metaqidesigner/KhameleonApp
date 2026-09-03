@@ -174,14 +174,19 @@ export async function getAgentConversations(params?: {
   return safeFetch<AgentConversationRow[]>(`${BASE}/agent-conversations?${qs}`, undefined, []);
 }
 
+/**
+ * Ask a single agent (non-streaming). Throws on failure rather than
+ * falling back to a fake "AGENT OFFLINE — Configure API key in Settings."
+ * response - that message named one specific cause (a missing key) for
+ * what could just as easily be a network error, a timeout, or a real
+ * bug in the ask handler, and there was no way for the caller to tell
+ * a genuine offline agent from the backend being briefly unreachable.
+ */
 export async function askAgent(id: string, messages: ChatMessage[]): Promise<AgentResponse> {
   return safeFetch<AgentResponse>(`${BASE}/agents/${id}/ask`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, stream: false }),
-  }, {
-    agentId: id, content: 'AGENT OFFLINE — Configure API key in Settings.',
-    model: 'offline', latencyMs: 0, tokens: 0, costUsd: 0, energyWh: 0,
   });
 }
 
@@ -247,14 +252,28 @@ export function streamAgentChat(
   return () => { closed = true; ctrl.abort(); };
 }
 
+/**
+ * Run a prompt across multiple agents for side-by-side comparison.
+ * Throws on failure rather than falling back to { prompt, comparison: [] } -
+ * Compare.tsx used that fallback to mean "nothing happened yet", so a
+ * genuine backend failure looked identical to never having run anything:
+ * the "COMPARE RESPONSES SIDE BY SIDE" empty state came right back with
+ * no indication the request had actually failed.
+ */
 export async function compareAgents(prompt: string, agentIds: string[]): Promise<{ prompt: string; comparison: CompareResult[] }> {
   return safeFetch<{ prompt: string; comparison: CompareResult[] }>(
     `${BASE}/agents/compare`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, agent_ids: agentIds }) },
-    { prompt, comparison: [] },
   );
 }
 
+/**
+ * Broadcast a prompt to multiple agents (parallel or judged "vote" mode).
+ * Throws on failure - same reasoning as compareAgents above. Council.tsx
+ * in particular would otherwise append a new round with an empty
+ * responses array and no synthesis, silently indistinguishable from a
+ * round where every agent just had nothing to say.
+ */
 export async function askAll(
   messages: ChatMessage[],
   agentIds?: string[],
@@ -263,7 +282,6 @@ export async function askAll(
   return safeFetch(
     `${BASE}/agents/ask-all`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, agent_ids: agentIds, mode }) },
-    { results: [], mode },
   );
 }
 

@@ -17,6 +17,7 @@ interface Message {
   tokens?: number;
   costUsd?: number;
   toolEvent?: ToolEvent;
+  isError?: boolean;
 }
 
 // ── Tool event bubble ─────────────────────────────────────────
@@ -160,8 +161,21 @@ export default function AgentChat() {
         if (done.sessionId) sessionIdRef.current = done.sessionId;
         setStreaming(false);
       },
-      // onError
-      (_err) => setStreaming(false),
+      // onError — streamAgentChat swallowed this into a silent
+      // setStreaming(false) before: the assistant bubble pushed at the
+      // start of send() would stay empty forever with no indication
+      // anything had gone wrong. Fill it with the real error instead.
+      (err) => {
+        setMessages(prev => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last && last.role === 'assistant') {
+            next[next.length - 1] = { ...last, content: `Failed to get a response: ${err}`, isError: true };
+          }
+          return next;
+        });
+        setStreaming(false);
+      },
       // onToolEvent — insert a tool_event bubble *before* the streaming assistant message
       (event) => setMessages(prev => {
         // Insert tool event bubble just before the last (streaming) assistant message
@@ -251,10 +265,10 @@ export default function AgentChat() {
             <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 3, animation: 'jarvis-fadein 0.2s ease both' }}>
               <div style={{
                 maxWidth: '82%', padding: '8px 12px',
-                background: msg.role === 'user' ? 'rgba(192,21,42,0.10)' : 'rgba(0,212,255,0.05)',
-                border: `1px solid ${msg.role === 'user' ? 'rgba(192,21,42,0.28)' : 'rgba(0,212,255,0.14)'}`,
+                background: msg.isError ? 'rgba(192,21,42,0.06)' : msg.role === 'user' ? 'rgba(192,21,42,0.10)' : 'rgba(0,212,255,0.05)',
+                border: `1px solid ${msg.isError ? 'rgba(192,21,42,0.25)' : msg.role === 'user' ? 'rgba(192,21,42,0.28)' : 'rgba(0,212,255,0.14)'}`,
                 fontFamily: msg.role === 'user' ? 'var(--j-font-ui)' : 'var(--j-font-mono)',
-                fontSize: 12, color: 'var(--j-text)', lineHeight: 1.65,
+                fontSize: 12, color: msg.isError ? 'var(--j-red)' : 'var(--j-text)', lineHeight: 1.65,
                 whiteSpace: 'pre-wrap', wordBreak: 'break-word',
               }}>
                 {msg.content}
