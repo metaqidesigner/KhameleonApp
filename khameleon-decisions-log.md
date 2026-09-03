@@ -243,7 +243,21 @@ Added real `POST /index` (reads a file via the same path-traversal-guarded `read
 
 **This closes the item flagged as still-open in the entry above.** The theming fix is broader than Projects — it's the root cause for every shadcn `ui/` component in the codebase, so anything else built on those (nothing currently uses them besides Projects, as far as this session found) benefits automatically going forward.
 
-*Full detail: khameleon-design-spec.md §12.2; code in `artifacts/api-server/src/{agents/skills/outlookSummarizeThread.ts,routes/outlookSummarize.ts}`.*
+## 2026-09-03 — Real inbox browser for the Outlook skills
+
+**Moved from auditing back to building.** Using the three Outlook skills required a raw Microsoft Graph message id, with no in-app way to get one — `replit.md`'s own verification runbook documents fetching one via Graph Explorer as a workaround. That's real friction on everything shipped today, closed directly:
+
+- `lib/outlookGraph.ts` gained `listRecentInboxMessages` — the 15 most recent messages regardless of read state (distinct from `listUnreadInboxMessages`, filtered to unread only, which `outlook-triage-inbox` uses).
+- `routes/outlookMessages.ts` — `GET /api/skills/outlook-messages`, a small shared read-only endpoint (not a skill itself) backing the browser.
+- An "Inbox browser" panel on the Approvals page, loaded on demand (a button, not on page mount, so opening Approvals doesn't silently hit Graph every time). Each row shows subject/sender/preview with inline Summarize and Draft Reply buttons. `handleRunOutlook`/`handleSummarize` now take an optional explicit message id, so a row click and the existing manual-paste input both flow through the same code — clicking a row also fills the input, so what's about to run stays visible.
+
+**Verified:** `tsc --noEmit` clean in both packages (same 24 pre-existing errors), 43/43 frontend tests. Drove the running app via Playwright with a mocked message list: clicking Summarize on a specific row sent exactly that message's real id to the real endpoint (captured and asserted, not just eyeballed) and a new receipt appeared (2 → 3 actions).
+
+**Test-tooling note, not an app bug:** Playwright's `locator(selector, {hasText})` matched multiple unrelated sibling panels when first tried; a direct `page.evaluate()` DOM dump confirmed the actual markup was correctly structured, no nesting bug. Indexing into the panel list directly resolved it — worth knowing if this pattern comes up again.
+
+**Not verified here, on purpose:** a live Graph call against a real mailbox's actual messages.
+
+*(Housekeeping: the entry two above accidentally carried a stray, misplaced "Full detail: §12.2" footer left over from an earlier edit — removed; it didn't belong to any entry.)*
 
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
