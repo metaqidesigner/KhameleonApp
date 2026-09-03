@@ -48,20 +48,31 @@ async function safeFetch<T>(url: string, opts?: RequestInit, fallback?: T): Prom
   }
 }
 
-/** Submit a command → creates and starts a task run. Returns the taskRunId. */
+/**
+ * Submit a command → creates and starts a task run. Returns the taskRunId.
+ * Throws on failure rather than falling back to { taskRunId: '' } - this
+ * used safeFetch's fallback pattern, meant for read endpoints where "no
+ * data" and "backend unreachable" can honestly look the same. Submitting
+ * a command is a mutation with a real outcome: ChatPanel.tsx's own catch
+ * block was already written to show "Failed to submit command: ..." on a
+ * thrown error, but could never reach it - a failed submit silently
+ * returned an empty taskRunId instead, and the caller then told the user
+ * "Command submitted." even though nothing had happened.
+ */
 export async function submitCommand(
   text: string,
   options?: { triggerType?: TriggerType; triggerSource?: string },
 ): Promise<{ taskRunId: string }> {
-  return safeFetch<{ taskRunId: string }>(
-    `${BASE}/command`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, ...options }),
-    },
-    { taskRunId: '' },
-  );
+  const res = await fetch(`${BASE}/command`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, ...options }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(body.error ?? `Failed to submit command (HTTP ${res.status})`);
+  }
+  return res.json();
 }
 
 /** Fetch a list of task runs with optional filters. */

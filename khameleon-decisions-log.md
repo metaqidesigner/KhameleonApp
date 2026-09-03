@@ -286,6 +286,16 @@ Added real `POST /index` (reads a file via the same path-traversal-guarded `read
 
 **Verified:** `tsc --noEmit` clean, 43/43 frontend tests. Drove the running app via Playwright with a mocked task-runs list: an `awaiting_confirmation` run renders in the active section with the amber icon/badge/glow, all four real trace steps shown done, and the real drafted content visible in Live Preview — while a genuinely completed run in the same list correctly stays in collapsed history.
 
+## 2026-09-03 — `submitCommand` now throws on failure — closed a "Command submitted." false positive in the app's central command path
+
+**Found while sweeping the orb chat / command bar** (the last piece of the bounded audit before returning to the multi-agent pages). `submitCommand` (`lib/taskRunApi.ts`) is the one function both `ChatPanel.tsx` and the Tasks page's Commands tab call to issue any command. It was built on `safeFetch`'s read-endpoint fallback pattern — on any backend failure it returned `{ taskRunId: '' }` instead of throwing. That's the wrong convention for a mutation with a real, user-visible outcome, and it wasn't just theoretical: `ChatPanel.tsx` already had a correct `catch` block written, ready to show "Failed to submit command: ...", but it could never be reached. A failed submit silently returned an empty `taskRunId`, and the caller's own ternary then told the user **"Command submitted."** even though nothing had happened — a false positive in the single most central interaction surface in the app, the same bug class found repeatedly across Research, Memory, Security, and Projects earlier in this audit.
+
+**Fixed** `submitCommand` to do a real `fetch` + `res.ok` check and throw a descriptive `Error`, matching the house rule established across this whole session: reads degrade to empty/absent data, mutations throw.
+
+**One consequence, caught before it shipped:** `tasks.tsx`'s `handleCommand` (the Commands tab's own caller) had `try { ... } finally { ... }` with no `catch` at all, and its own caller doesn't await or catch either — making the newly-thrown error an unhandled promise rejection there instead of a shown one. Added a `catch` plus a small local `commandError` state, rendered inline below the command bar in the same style already used elsewhere in this codebase (`approvals.tsx`'s error divs).
+
+**Verified:** `tsc --noEmit` clean on the frontend; backend's pre-existing 24 errors unchanged (none in touched files). 43/43 frontend tests; 60/60 DB-free backend tests (the only failures locally are 5 tests in `migrate-legacy-values.test.ts`/`tasks-delete.test.ts` that need a live Postgres connection, not a dummy `DATABASE_URL` — unrelated to this change). Drove the running app via Playwright with `/api/command` mocked to always fail: `ChatPanel` now renders "Failed to submit command: Simulated backend failure for verification" instead of "Command submitted.", and the Tasks page's Commands tab renders the same real error inline with no unhandled rejection and no console error.
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.

@@ -1502,6 +1502,7 @@ function CommandsPanel() {
   const [activeRuns,  setActiveRuns]  = useState<TaskRun[]>([]);
   const [historyRuns, setHistoryRuns] = useState<TaskRun[]>([]);
   const [submitting,  setSubmitting]  = useState(false);
+  const [commandError, setCommandError] = useState<string>();
   const [searchQ,     setSearchQ]     = useState('');
   const [statusFilter,   setStatusFilter]   = useState<TaskRunStatus | 'all'>('all');
   const [triggerFilter,  setTriggerFilter]  = useState<TriggerType | 'all'>('all');
@@ -1527,6 +1528,7 @@ function CommandsPanel() {
 
   const handleCommand = async (text: string) => {
     setSubmitting(true);
+    setCommandError(undefined);
     try {
       const { taskRunId } = await submitCommand(text, { triggerType: 'manual' });
       if (taskRunId) {
@@ -1538,6 +1540,11 @@ function CommandsPanel() {
         };
         setActiveRuns(prev => [optimistic, ...prev]);
       }
+    } catch (error) {
+      // submitCommand throws on failure (see lib/taskRunApi.ts) rather than
+      // silently returning an empty taskRunId - show the real error instead
+      // of leaving the command bar looking like nothing happened.
+      setCommandError(error instanceof Error ? error.message : 'Failed to submit command');
     } finally { setSubmitting(false); }
   };
 
@@ -1552,6 +1559,9 @@ function CommandsPanel() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 8 }}>
       {/* Command bar */}
       <CommandBar onSubmit={handleCommand} loading={submitting} />
+      {commandError && (
+        <div style={{ fontSize: '11px', color: '#E77A7A' }}>{commandError}</div>
+      )}
 
       {/* Active runs */}
       {activeRuns.length > 0 && (
