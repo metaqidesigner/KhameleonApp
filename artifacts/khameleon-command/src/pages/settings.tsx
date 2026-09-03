@@ -27,6 +27,25 @@ function Label({ children }: { children: React.ReactNode }) {
 function Row({ children }: { children: React.ReactNode }) {
   return <div style={{ marginBottom: 16 }}>{children}</div>;
 }
+/**
+ * A handful of fields on this page (workspace name/language, the local-
+ * engine picker, font size, memory/telemetry/advanced tuning) had no
+ * onChange or save path at all - `defaultValue`/`defaultChecked` inputs
+ * that accepted keystrokes into a void, styled identically to the real,
+ * store- or backend-backed controls right next to them. Marks a field
+ * honestly as not yet wired to anything, instead of letting it look like
+ * every other working control on the page.
+ */
+function NotYetWired({ children }: { children?: React.ReactNode }) {
+  return (
+    <div style={{
+      fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)',
+      marginTop: 4, display: 'flex', alignItems: 'center', gap: 4,
+    }}>
+      <span>○</span> {children ?? 'Not yet configurable — no effect'}
+    </div>
+  );
+}
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
     <button onClick={() => onChange(!value)} style={{
@@ -597,26 +616,38 @@ function ApiKeysSection() {
 
 // ── Other sections ────────────────────────────────────────────────────────────
 
-function EngineSection({ health }: { health: string }) {
+/**
+ * This used to show ENGINE/MODEL/BASE URL fields for a single swappable
+ * local-inference backend (ollama/vllm/sglang/llama.cpp/...) - but nothing
+ * on the server reads them. `getHealth()`'s engine/model come back
+ * hardcoded ("replit-ai") regardless of what's typed here, so "TEST
+ * CONNECTION" always reported the same result no matter what the user
+ * had just entered above it - actively implying the form was being
+ * tested, when it never was. The app's real model configuration lives
+ * in two other places: Agents > Settings (per-agent provider/model) and
+ * Settings > API Keys (provider credentials) - this section now points
+ * there and keeps only the one thing that was genuinely real: a live
+ * health check against the server's primary gateway.
+ */
+function EngineSection() {
   const [result, setResult] = useState<string | null>(null);
   const test = async () => {
     const h = await getHealth();
-    setResult(h.status === 'offline' ? '✕ OFFLINE — Check engine configuration' : `● CONNECTED — ${h.engine} · ${h.model}`);
+    setResult(h.status === 'offline' ? '✕ OFFLINE — Check server configuration' : `● ONLINE — ${h.engine} · ${h.model}`);
   };
   return (
     <>
-      <Row>
-        <Label>ENGINE</Label>
-        <select className="j-input" defaultValue="ollama">
-          {['ollama', 'vllm', 'sglang', 'llama.cpp', 'openai', 'anthropic'].map(e => (
-            <option key={e} value={e} style={{ background: '#020c14' }}>{e.toUpperCase()}</option>
-          ))}
-        </select>
-      </Row>
-      <Row><Label>MODEL</Label><input className="j-input" defaultValue="llama3.2" /></Row>
-      <Row><Label>BASE URL</Label><input className="j-input" defaultValue="http://localhost:11434" /></Row>
+      <div style={{
+        marginBottom: 16, padding: '10px 12px', fontFamily: 'var(--j-font-ui)', fontSize: 11,
+        color: 'var(--j-text-muted)', lineHeight: 1.6,
+        background: 'rgba(0,212,255,0.03)', border: '1px solid rgba(0,212,255,0.1)',
+      }}>
+        Model configuration lives in <strong>Agents → Settings</strong> (per-agent provider and
+        model) and <strong>API Keys</strong> (provider credentials) — there's no separate
+        single-engine picker.
+      </div>
       <button className="j-btn-primary" style={{ height: 36, padding: '0 16px', fontSize: 11 }} onClick={test}>
-        ▶ TEST CONNECTION
+        ▶ CHECK SERVER STATUS
       </button>
       {result && (
         <div style={{
@@ -644,11 +675,15 @@ function AppearanceSection() {
         <Label>FONT SIZE</Label>
         <div style={{ display: 'flex', gap: 8 }}>
           {[12, 13, 14].map(s => (
-            <label key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'var(--j-text-muted)' }}>
-              <input type="radio" name="fontsize" defaultChecked={s === 13} style={{ accentColor: 'var(--j-cyan)' }} /> {s}px
+            <label key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'var(--j-text-faint)' }}>
+              <input type="radio" name="fontsize" defaultChecked={s === 13} disabled style={{ accentColor: 'var(--j-cyan)' }} /> {s}px
             </label>
           ))}
         </div>
+        {/* Font sizes are hardcoded px throughout index.css rather than driven
+            by one root variable - making this real means a real refactor, not
+            a quick wire-up, so it's disabled rather than pretending to work. */}
+        <NotYetWired>Fixed at 13px — not yet adjustable</NotYetWired>
       </Row>
       <Row>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -704,11 +739,13 @@ export function GeneralSection() {
     <>
       <Row>
         <Label>WORKSPACE NAME</Label>
-        <input className="j-input" defaultValue="My Khameleon" />
+        <input className="j-input" defaultValue="My Khameleon" disabled />
+        <NotYetWired>Single-workspace only — nothing to name yet</NotYetWired>
       </Row>
       <Row>
         <Label>LANGUAGE</Label>
-        <input className="j-input" defaultValue="en" />
+        <input className="j-input" defaultValue="en" disabled />
+        <NotYetWired>English only — no localization built yet</NotYetWired>
       </Row>
 
       {/* ── Morning Digest ── */}
@@ -763,6 +800,14 @@ export function GeneralSection() {
   );
 }
 
+/**
+ * These three tabs used to show real-looking input fields (MAX CHUNKS,
+ * CHUNK SIZE, RETENTION DAYS, API TIMEOUT, ...) with no onChange and no
+ * save path at all - nothing on the server reads any of these values,
+ * there's no config surface for memory chunking, telemetry retention, or
+ * runtime tuning yet. Shown as read-only info instead of editable-looking
+ * inputs, so a value someone types in doesn't silently vanish.
+ */
 function GenericSection({ section }: { section: Section }) {
   const fields: Record<string, string[][]> = {
     MEMORY:    [['MAX CHUNKS', '10000'], ['CHUNK SIZE', '512'], ['OVERLAP', '50']],
@@ -771,8 +816,12 @@ function GenericSection({ section }: { section: Section }) {
   };
   return (
     <>
+      <NotYetWired>These are the server's built-in defaults — not yet configurable from here</NotYetWired>
       {(fields[section] ?? []).map(([label, def]) => (
-        <Row key={label}><Label>{label}</Label><input className="j-input" defaultValue={def} /></Row>
+        <Row key={label}>
+          <Label>{label}</Label>
+          <div className="j-input" style={{ color: 'var(--j-text-faint)', cursor: 'default' }}>{def}</div>
+        </Row>
       ))}
     </>
   );
@@ -824,7 +873,7 @@ export default function Settings() {
       <JPanel title={`SETTINGS — ${active}`} icon={<SettingsIcon size={13} />}>
         <div style={{ maxWidth: 520 }}>
           {active === 'GENERAL'    && <GeneralSection />}
-          {active === 'ENGINE'     && <EngineSection health="" />}
+          {active === 'ENGINE'     && <EngineSection />}
           {active === 'API KEYS'   && <ApiKeysSection />}
           {active === 'APPEARANCE' && <AppearanceSection />}
           {active === 'CONNECTORS' && <ConnectorsSection />}

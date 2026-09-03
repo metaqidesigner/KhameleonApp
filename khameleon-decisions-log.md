@@ -324,6 +324,21 @@ Added real `POST /index` (reads a file via the same path-traversal-guarded `read
 
 **Verified:** `tsc --noEmit` clean, 43/43 frontend tests. Drove the running app via Playwright with mocked `/api/connectors` and `/api/telemetry`: Communications shows real CONNECTED/NOT CONNECTED state per connector with a working "CONNECT IN SETTINGS" button, Channels shows "NOT AVAILABLE" tiles with no fake button; Analytics' query-volume line, latency-distribution bars (now correctly colored per bucket), and P95 column all matched the mocked query records by hand-calculation, and the agent table's figures matched the mocked `by_agent` stats exactly.
 
+## 2026-09-04 — Settings: the last decorative fields on the page made honest
+
+**Continued into another area** — the rest of the Settings page (Connectors and API Keys were already real from earlier work; General/Engine/Appearance/Memory/Telemetry/Advanced hadn't been checked). First checked `canvas.tsx` (the CANVAS home tab) and `AssistantCard.tsx` end-to-end — both genuinely solid: real daily-tasks/scheduler-status/health/telemetry data throughout, `AgentActivityBody`'s feed is real conversation history pushed by real chat sends, and `AssistantCard`'s error handling already correctly distinguishes offline vs. agent-error and shows real messages. No fix needed there.
+
+Settings had the same decorative-field problem found in Communications/Analytics, in miniature, spread across four sections:
+
+- **GeneralSection:** WORKSPACE NAME and LANGUAGE — `defaultValue` inputs with no onChange, no multi-workspace or localization concept anywhere in the app to feed into. (Morning Digest status in the same section is genuinely real.)
+- **EngineSection:** worse than decorative — the ENGINE/MODEL/BASE URL fields implied a swappable local-inference backend (ollama/vllm/sglang/...), but `getHealth()`'s engine/model come back hardcoded server-side ("replit-ai") regardless of what's typed, so "TEST CONNECTION" always reported the identical result no matter what had just been entered — actively implying the form was being tested when it never was.
+- **AppearanceSection:** the FONT SIZE radios had no wiring at all, sitting directly beside SCAN LINES/PANEL CORNERS/TICKER SPEED, which are genuinely real (zustand-store-backed, from earlier session work) — same styling, opposite reality.
+- **GenericSection** (MEMORY/TELEMETRY/ADVANCED tabs): every field on all three was decorative — no memory-chunking, telemetry-retention, or runtime-tuning config surface exists on the server at all.
+
+**Fixed** by making each one honest rather than guessing at backends that don't exist (same call as Vault/Channels): disabled the General fields with a one-line reason each; removed Engine's fake per-field form entirely and replaced it with a note pointing to where model config actually lives (Agents > Settings, Settings > API Keys), keeping only the genuinely-real health check, relabeled so it no longer implies it tests a form that no longer exists; disabled the Appearance font-size radios with a note (font sizes are hardcoded px scattered through `index.css`, not one root variable — making this real is a refactor, not a quick fix); replaced the three Generic tabs' editable-looking inputs with read-only display of the server's actual defaults. Added a small shared `NotYetWired` note component so a real control and a decorative one never look identical on this page again.
+
+**Verified:** `tsc --noEmit` clean, 43/43 frontend tests. Drove the running app via Playwright through General/Engine/Appearance/Memory: General and Appearance show real fields (Morning Digest, Scan Lines, etc.) next to clearly-marked disabled ones; Engine shows the real "ONLINE — replit-ai · claude-sonnet-4-6" result with the fake form gone; Memory shows its defaults as read-only text with the honest header note.
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
