@@ -259,6 +259,18 @@ Added real `POST /index` (reads a file via the same path-traversal-guarded `read
 
 *(Housekeeping: the entry two above accidentally carried a stray, misplaced "Full detail: §12.2" footer left over from an earlier edit — removed; it didn't belong to any entry.)*
 
+## 2026-09-03 — outlook-triage-inbox's action items now become real Tasks
+
+**Closing a real gap in the skill built earlier today.** Step 5 already extracted plain-language action items from urgent/action_needed messages, but they only ever ended up as text inside one receipt's detail blob — useful information that vanished once the receipt scrolled out of view, with no way to act on it later from the real Tasks page.
+
+**Built:** each extracted action item now creates a real `tasksTable` row (category `communication`, source `agent` — the same taxonomy `taskOps.ts`'s own `create_task` tool already uses; priority derived from urgent vs. action_needed; `threadId` linking back to the real Outlook conversation). `TriageActionItem` now carries `{ text, taskId, sourceMessageId }` instead of a bare string, so the frontend can show which items became real tasks. A failed individual insert doesn't sink the whole run — the mailbox classification/actions already succeeded and are real regardless of whether one task-creation call failed.
+
+**Made undo consistent with this:** undoing a triage run now also deletes the Task rows it created (`/undo` takes an optional `taskIds` array) — otherwise "undo" would leave real, unexplained tasks behind after the mailbox state they came from was reverted.
+
+**Verified:** `tsc --noEmit` clean in both packages (same 24 pre-existing errors), 60/60 backend tests, 43/43 frontend tests. Drove the running app via Playwright with a mocked result carrying one action item with a real task id: the receipt description correctly reads "Triaged 2 unread messages, created 1 task," and clicking Undo sent the real task id to the undo endpoint alongside the mailbox-state entries (captured and asserted, not just eyeballed).
+
+**Not verified here, on purpose:** a live triage run against a real mailbox and real Postgres — same limitation as every Outlook integration this session.
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
