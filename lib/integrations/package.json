@@ -1,0 +1,23 @@
+{
+  "name": "@khameleon/integrations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.2",
+    "khameleon-file-agent": "workspace:*",
+    "khameleon-memory": "workspace:*",
+    "khameleon-window-agent": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.0"
+  }
+}

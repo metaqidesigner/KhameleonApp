@@ -12,7 +12,7 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.Tool[] = [
         path: {
           type: "string",
           description:
-            "Workspace-relative path to the file, e.g. 'artifacts/nexus-command/src/pages/inbox.tsx'.",
+            "Workspace-relative path to the file, e.g. 'artifacts/khameleon-command/src/pages/inbox.tsx'.",
         },
       },
       required: ["path"],
@@ -53,13 +53,13 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.Tool[] = [
   {
     name: "run_build",
     description:
-      "Run `pnpm build` for a specific workspace package and return stdout/stderr. Package name is the short name after @workspace/, e.g. 'nexus-command' or 'api-server'.",
+      "Run `pnpm build` for a specific workspace package and return stdout/stderr. Package name is the short name after @workspace/, e.g. 'khameleon-command' or 'api-server'.",
     input_schema: {
       type: "object",
       properties: {
         package: {
           type: "string",
-          description: "Package short name, e.g. 'nexus-command', 'api-server', 'db'.",
+          description: "Package short name, e.g. 'khameleon-command', 'api-server', 'db'.",
         },
       },
       required: ["package"],
@@ -123,6 +123,22 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.Tool[] = [
         },
       },
       required: [],
+    },
+  },
+  // ── Research tools ──────────────────────────────────────────────────────
+  {
+    name: "fetch_url",
+    description:
+      "Fetch a web page or API endpoint (http/https only) and return its readable text content. Use this for real research — reading articles, documentation, or reference pages — rather than relying on prior knowledge. Cannot execute JavaScript, so fully client-rendered pages may return little content. Refuses private/internal addresses.",
+    input_schema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "Full http:// or https:// URL to fetch.",
+        },
+      },
+      required: ["url"],
     },
   },
   // ── Task management tools ──────────────────────────────────────────────────

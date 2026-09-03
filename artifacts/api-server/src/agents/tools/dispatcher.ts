@@ -8,6 +8,7 @@ import {
   gitStatus, gitLog, checkWorkflow, readLogs,
 } from "./shell.js";
 import { createTask, listTasks, updateTask } from "./taskOps.js";
+import { fetchUrl } from "./webFetch.js";
 
 export type ToolInput = Record<string, unknown>;
 
@@ -62,6 +63,12 @@ export async function dispatchTool(name: string, input: ToolInput): Promise<stri
       const lines  = optionalNumber(input, "lines") ?? 100;
       const filter = optionalString(input, "filter");
       return readLogs(lines, filter);
+    }
+
+    // ── Research tools ────────────────────────────────────────────────────
+    case "fetch_url": {
+      const url = requireString(input, "url");
+      return fetchUrl(url);
     }
 
     // ── Task management tools ──────────────────────────────────────────────

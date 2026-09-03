@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Khameleon</title>
+  <style>
+    :root { color-scheme: dark; font: 14px -apple-system, BlinkMacSystemFont, sans-serif; }
+    body { margin: 0; padding: 20px; background: #080c1a; color: #e7ecef; }
+    form { display: flex; gap: 8px; }
+    input { flex: 1; padding: 10px 12px; border: 1px solid rgba(111,230,189,.35); border-radius: 8px; background: rgba(255,255,255,.06); color: inherit; }
+    button { padding: 0 14px; border: 1px solid rgba(111,230,189,.45); border-radius: 8px; background: rgba(111,230,189,.14); color: #6fe6bd; cursor: pointer; }
+    pre { min-height: 60px; white-space: pre-wrap; color: #9aa6a2; }
+  </style>
+</head>
+<body>
+  <form id="command-form"><input id="command" autofocus placeholder="Ask Khameleon to act in your apps" /><button>Run</button></form>
+  <pre id="result" aria-live="polite"></pre>
+  <script>
+    const form = document.getElementById('command-form');
+    const input = document.getElementById('command');
+    const result = document.getElementById('result');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      result.textContent = 'Working…';
+      try {
+        const response = await window.khameleon.runCommand(input.value);
+        result.textContent = response.reply || '(done — no reply text)';
+        input.value = '';
+      } catch (error) {
+        result.textContent = error instanceof Error ? error.message : String(error);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "khameleon-window-agent",
+  "version": "0.1.0",
+  "description": "Khameleon's window-management layer: teleport (move/resize) any desktop window and spawn/close animated floating widgets.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "npm run build && electron ."
+  },
+  "dependencies": {
+    "node-window-manager": "^2.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "electron": "^31.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^1.6.0"
+  },
+  "license": "UNLICENSED"
+}
