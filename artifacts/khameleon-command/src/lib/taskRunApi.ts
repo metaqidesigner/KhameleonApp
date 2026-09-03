@@ -1,7 +1,14 @@
 const BASE = import.meta.env.VITE_API_URL || '/api';
 
 export type TriggerType   = 'manual' | 'scheduled' | 'event';
-export type TaskRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+/**
+ * 'awaiting_confirmation' — a real status the backend sets (e.g.
+ * outlook-draft-email once its draft is ready, per §12.1's step 5 not
+ * being part of the pipeline it runs). Deliberately distinct from
+ * 'completed': the task isn't done, it's paused on the user per §6 —
+ * "needs input" is the highest-prominence state in the window model.
+ */
+export type TaskRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'awaiting_confirmation';
 
 export interface TaskStep {
   index: number;

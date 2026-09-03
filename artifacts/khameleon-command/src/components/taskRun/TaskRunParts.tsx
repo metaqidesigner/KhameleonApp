@@ -15,6 +15,10 @@ export function StatusBadge({ status }: { status: TaskRunStatus }) {
     completed: { color: 'var(--j-green)',  label: 'DONE' },
     failed:    { color: 'var(--j-coral)',  label: 'FAILED' },
     cancelled: { color: 'var(--j-text-muted)', label: 'CANCELLED' },
+    // Amber = "attention, not error" (design-spec.md §3's accent ramp) - a
+    // draft is ready and waiting on the user, the highest-prominence state
+    // in the window model (§6), not a neutral in-between state.
+    awaiting_confirmation: { color: 'var(--j-amber)', label: 'NEEDS CONFIRM' },
   };
   const { color, label } = cfg[status] ?? cfg.queued;
   return (

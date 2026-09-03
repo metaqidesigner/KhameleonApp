@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Send, Mic, MicOff, RefreshCw, ChevronDown, ChevronRight,
-  X, RotateCcw, CheckCircle2, AlertTriangle, Loader2,
+  X, RotateCcw, CheckCircle2, AlertTriangle, AlertCircle, Loader2,
   Terminal, FileText, Clock, Zap, Filter, Search,
   Calendar, Mail, Play, Plus, Tag, Repeat, CheckSquare,
   Square, Trash2, SunMedium, Coffee, Users, MessageSquare,
@@ -1114,7 +1114,15 @@ function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
       const e = event as Record<string, unknown>;
       setRun((r) => {
         if (e.type === 'init')    return { ...r, ...(e.task as Partial<TaskRun>) };
-        if (e.type === 'status')  return { ...r, status: e.status as TaskRunStatus };
+        if (e.type === 'status') {
+          // awaiting_confirmation isn't "actively processing" either - the
+          // pipeline stopped, it's just paused on the user (e.g.
+          // outlook-draft-email once its draft is ready) - so it drops out
+          // of the active-tasks indicator the same way done/failed/
+          // cancelled do below.
+          if (e.status === 'awaiting_confirmation') removeActiveTask(r.id);
+          return { ...r, status: e.status as TaskRunStatus };
+        }
         if (e.type === 'steps')   return { ...r, steps: e.steps as TaskStep[] };
         if (e.type === 'step') { const s = e.step as TaskStep; return { ...r, steps: r.steps.map((x) => (x.index === s.index ? s : x)) }; }
         if (e.type === 'preview') return { ...r, previewContent: e.preview as string };
@@ -1141,8 +1149,15 @@ function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
   };
 
   const isActive = run.status === 'running' || run.status === 'queued';
-  const borderColor = run.status === 'completed' ? 'rgba(56,207,138,0.18)' : run.status === 'failed' ? 'rgba(226,90,110,0.22)' : run.status === 'running' ? 'rgba(0,196,184,0.22)' : 'rgba(120,168,220,0.11)';
-  const glowColor   = run.status === 'completed' ? 'rgba(56,207,138,0.08)' : run.status === 'failed' ? 'rgba(226,90,110,0.06)' : run.status === 'running' ? 'rgba(0,196,184,0.07)' : 'transparent';
+  // awaiting_confirmation gets its own amber treatment, distinct from the
+  // neutral default - it's a "needs input" state (design-spec.md §6's
+  // highest-prominence case), not a passive in-between one.
+  const borderColor = run.status === 'completed' ? 'rgba(56,207,138,0.18)' : run.status === 'failed' ? 'rgba(226,90,110,0.22)' : run.status === 'running' ? 'rgba(0,196,184,0.22)' : run.status === 'awaiting_confirmation' ? 'rgba(240,163,76,0.3)' : 'rgba(120,168,220,0.11)';
+  const glowColor   = run.status === 'completed' ? 'rgba(56,207,138,0.08)' : run.status === 'failed' ? 'rgba(226,90,110,0.06)' : run.status === 'running' ? 'rgba(0,196,184,0.07)' : run.status === 'awaiting_confirmation' ? 'rgba(240,163,76,0.1)' : 'transparent';
+  // Distinct from isActive (which also gates the cancel button below) -
+  // there's nothing to cancel once a run is paused on the user, but it
+  // should still draw the eye the same way an actively-running one does.
+  const needsAttention = isActive || run.status === 'awaiting_confirmation';
 
   return (
     <div style={{
@@ -1150,13 +1165,14 @@ function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
       border: `1px solid ${borderColor}`, borderRadius: 14,
       boxShadow: `inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 24px rgba(0,0,0,0.4), 0 0 32px ${glowColor}`,
       overflow: 'hidden', animation: 'jarvis-fadein 0.25s ease both',
-      ...(isActive && { animation: 'task-pulse 3s ease-in-out infinite' }),
+      ...(needsAttention && { animation: 'task-pulse 3s ease-in-out infinite' }),
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: expanded ? `1px solid rgba(120,168,220,0.07)` : 'none' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, overflow: 'hidden' }}>
           {run.status === 'running'   ? <Loader2 size={12} style={{ color: 'var(--j-teal)', animation: 'jarvis-spin 1s linear infinite', flexShrink: 0 }} />
           : run.status === 'completed'? <CheckCircle2 size={12} style={{ color: 'var(--j-green)', flexShrink: 0 }} />
           : run.status === 'failed'   ? <AlertTriangle size={12} style={{ color: 'var(--j-coral)', flexShrink: 0 }} />
+          : run.status === 'awaiting_confirmation' ? <AlertCircle size={12} style={{ color: 'var(--j-amber)', flexShrink: 0 }} />
           : <Clock size={12} style={{ color: 'var(--j-text-muted)', flexShrink: 0 }} />}
           <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, fontWeight: 600, color: 'var(--j-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {run.commandText.length > 60 ? run.commandText.slice(0, 58) + '…' : run.commandText}
@@ -1166,7 +1182,7 @@ function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
           <TriggerBadge type={run.triggerType} />
           <StatusBadge status={run.status} />
           <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{relativeTime(run.createdAt)}</span>
-          {run.status === 'completed' && (
+          {(run.status === 'completed' || run.status === 'awaiting_confirmation') && (
             <button onClick={() => setExpanded(e => !e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-text-faint)', padding: '0 2px', display: 'flex', alignItems: 'center' }}>
               {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             </button>
@@ -1186,8 +1202,8 @@ function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
           </button>
         </div>
       </div>
-      {!expanded && run.status === 'completed' && run.resultSummary && (
-        <div style={{ padding: '7px 12px', fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', lineHeight: 1.4 }}>{run.resultSummary}</div>
+      {!expanded && (run.status === 'completed' || run.status === 'awaiting_confirmation') && run.resultSummary && (
+        <div style={{ padding: '7px 12px', fontFamily: 'var(--j-font-ui)', fontSize: 11, color: run.status === 'awaiting_confirmation' ? 'var(--j-amber)' : 'var(--j-text-muted)', lineHeight: 1.4 }}>{run.resultSummary}</div>
       )}
       {!expanded && run.status === 'failed' && (
         <div style={{ padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1497,8 +1513,14 @@ function CommandsPanel() {
     if (triggerFilter !== 'all') params.triggerType  = triggerFilter;
     if (searchQ.length > 1)      params.q            = searchQ;
     const runs = await getTaskRuns(params);
-    setActiveRuns(runs.filter(r => r.status === 'running' || r.status === 'queued'));
-    setHistoryRuns(runs.filter(r => r.status !== 'running' && r.status !== 'queued'));
+    // awaiting_confirmation counts as "active" here too, not history - it's
+    // not running anymore, but it needs the user's attention (design-spec.md
+    // §6's highest-prominence case), which is exactly what this section
+    // (full TaskRunCard treatment) is for. Left in history it'd be buried,
+    // collapsed, indistinguishable at a glance from an old completed run.
+    const isActiveOrNeedsInput = (r: TaskRun) => r.status === 'running' || r.status === 'queued' || r.status === 'awaiting_confirmation';
+    setActiveRuns(runs.filter(isActiveOrNeedsInput));
+    setHistoryRuns(runs.filter(r => !isActiveOrNeedsInput(r)));
   }, [searchQ, statusFilter, triggerFilter]);
 
   useEffect(() => { loadHistory(); const id = setInterval(loadHistory, 8000); return () => clearInterval(id); }, [loadHistory]);

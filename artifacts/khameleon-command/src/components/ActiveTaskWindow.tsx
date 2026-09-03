@@ -72,7 +72,16 @@ export function ActiveTaskWindow() {
       setRun(r => {
         if (!r || r.id !== id) return r;
         if (e.type === 'init')    return { ...r, ...(e.task as Partial<TaskRun>) };
-        if (e.type === 'status')  return { ...r, status: e.status as TaskRunStatus };
+        if (e.type === 'status') {
+          // Paused on the user (e.g. outlook-draft-email's draft is ready),
+          // not actively processing - drops out of the active-tasks
+          // indicator the same way done/failed/cancelled do below. Stays
+          // pinned in this center zone though (unlike those three) - it's
+          // a "needs input" state, the highest-prominence case in the
+          // window model (design-spec.md §6), not one to clear away.
+          if (e.status === 'awaiting_confirmation') removeActiveTask(id);
+          return { ...r, status: e.status as TaskRunStatus };
+        }
         if (e.type === 'steps')   return { ...r, steps: e.steps as TaskStep[] };
         if (e.type === 'step') { const s = e.step as TaskStep; return { ...r, steps: r.steps.map(x => x.index === s.index ? s : x) }; }
         if (e.type === 'preview') return { ...r, previewContent: e.preview as string };
