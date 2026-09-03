@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "n=$(git -C /Users/newtonlew/Desktop/KhameleonApp status --porcelain 2>/dev/null | wc -l | tr -d ' '); if [ \"${n:-0}\" -gt 0 ] 2>/dev/null; then jq -n --arg n \"$n\" '{systemMessage: (\"⚠️ \" + $n + \" uncommitted file(s) in KhameleonApp — commit and push before ending the session.\")}'; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
