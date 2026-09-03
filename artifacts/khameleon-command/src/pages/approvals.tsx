@@ -132,8 +132,12 @@ export default function Approvals() {
         </div>
       </div>
 
-      {/* Pattern explanation */}
-      <div className="j-panel">
+      {/* Pattern explanation — height: 'auto' overrides .j-panel's height: 100%
+          (index.css), which otherwise inflates this panel's flex-basis to the
+          full container height and starves the Action History panel above it
+          of space in the flex-column layout. This panel is a compact static
+          block and should size to its own content, not fill the column. */}
+      <div className="j-panel" style={{ height: 'auto', flexShrink: 0 }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(120, 168, 220, 0.10)' }}>
           <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertCircle size={14} style={{ color: '#F0A34C' }} />
