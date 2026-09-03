@@ -21,6 +21,7 @@ const Skills     = lazy(() => import('@/pages/skills'));
 const Settings   = lazy(() => import('@/pages/settings'));
 const Tasks      = lazy(() => import('@/pages/tasks'));
 const Approvals  = lazy(() => import('@/pages/approvals'));
+const Projects   = lazy(() => import('@/pages/projects'));
 
 function Fallback() {
   return (
@@ -49,6 +50,7 @@ function PageRouter() {
       {activeTab === 'approvals' && <Approvals />}
       {activeTab === 'settings'  && <Settings />}
       {activeTab === 'tasks'     && <Tasks />}
+      {activeTab === 'projects'  && <Projects />}
     </Suspense>
   );
 }

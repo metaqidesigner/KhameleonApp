@@ -42,12 +42,65 @@
   --font-sans: var(--j-font-ui);
   --font-mono: var(--j-font-mono);
 
-  /* Tailwind compat */
-  --background: 228 55% 7%;
-  --foreground: 216 52% 82%;
-  --primary: 176 100% 38%;
-  --border-color: rgba(120, 168, 220, 0.11);
+  /* Tailwind/shadcn compat — bridges the shadcn ui/ components (Card, Button,
+     Dialog, Select, Progress, etc.) onto the same j-* palette everything
+     else uses, so both design systems render as one visual language rather
+     than two. This was previously a 4-variable stub (--background,
+     --foreground, --primary, --border-color — note even that last name is
+     wrong, shadcn/Tailwind v4 expects --border) with no @theme block at
+     all, so Tailwind v4 never actually generated bg-primary/text-destructive/
+     bg-secondary/etc. as real utilities - only literal-palette classes like
+     border-white/10 worked. Found via pages/projects's Card-based UI
+     rendering with no visible borders/backgrounds/colors during the
+     2026-09-03 backend-route audit. Values are all var(--j-*) references,
+     not new colors, so the existing .light theme override further down
+     this file applies to these automatically. */
+  --background: var(--j-bg);
+  --foreground: var(--j-text);
+  --card: var(--j-surface);
+  --card-foreground: var(--j-text);
+  --popover: var(--j-surface);
+  --popover-foreground: var(--j-text);
+  --primary: var(--j-teal);
+  --primary-foreground: var(--j-bg);
+  --secondary: var(--j-surface-alt);
+  --secondary-foreground: var(--j-text);
+  --muted: var(--j-surface-alt);
+  --muted-foreground: var(--j-text-muted);
+  --accent: var(--j-violet);
+  --accent-foreground: var(--j-bg);
+  --destructive: var(--j-coral);
+  --destructive-foreground: var(--j-bg);
+  --border: var(--j-border);
+  --input: var(--j-border);
+  --ring: var(--j-teal);
   --radius: 0.875rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 /* ── Reset ─────────────────────────────────────────────── */

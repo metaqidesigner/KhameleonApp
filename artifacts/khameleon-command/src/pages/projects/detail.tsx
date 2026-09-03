@@ -57,21 +57,21 @@ export default function ProjectDetail() {
                     transition={{ delay: i * 0.05 }}
                     className="flex items-start gap-3 p-3 rounded-lg border border-white/5 bg-secondary/20 hover:bg-secondary/40 transition-colors"
                   >
-                    {task.status === 'Completed' ? (
+                    {task.status === 'done' ? (
                       <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
-                    ) : task.status === 'In Progress' ? (
+                    ) : task.status === 'in_progress' ? (
                       <Clock className="w-5 h-5 text-accent shrink-0 mt-0.5" />
                     ) : (
                       <Circle className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
                     )}
-                    
+
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
-                        <span className={cn("font-medium", task.status === 'Completed' ? "line-through text-muted-foreground" : "text-foreground")}>{task.title}</span>
+                        <span className={cn("font-medium", task.status === 'done' ? "line-through text-muted-foreground" : "text-foreground")}>{task.title}</span>
                         <span className={cn(
                           "text-[10px] font-mono px-2 py-0.5 rounded border uppercase",
-                          task.priority === 'High' ? "bg-destructive/10 border-destructive/20 text-destructive" :
-                          task.priority === 'Medium' ? "bg-accent/10 border-accent/20 text-accent" :
+                          task.priority === 'urgent' || task.priority === 'high' ? "bg-destructive/10 border-destructive/20 text-destructive" :
+                          task.priority === 'medium' ? "bg-accent/10 border-accent/20 text-accent" :
                           "bg-secondary border-white/10 text-muted-foreground"
                         )}>
                           {task.priority}

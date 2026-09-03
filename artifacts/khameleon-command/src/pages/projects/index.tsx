@@ -1,39 +1,33 @@
+import { Switch, Route } from 'wouter';
+import ProjectsList from './ProjectsList';
+import ProjectDetail from './detail';
+
+/**
+ * pages/projects (this whole feature) uses wouter's real URL routing
+ * internally - unlike the rest of the app, which switches pages on
+ * Zustand `activeTab` state, not the URL. AppShell mounts exactly this
+ * one component for `activeTab === 'projects'`; everything inside it
+ * (the list <-> a specific project's detail view) is real client-side
+ * routing on /projects and /projects/:id, confined to this feature so it
+ * doesn't require retrofitting the rest of the app's navigation model.
+ *
+ * This file, ProjectsList.tsx (the list + create-project view), and
+ * detail.tsx (a single project) were previously unreachable from the
+ * running app entirely: 'projects' wasn't a valid TabId, AppShell never
+ * imported anything under pages/projects, and no nav surface (sidebar or
+ * command palette) linked to it. Found and fixed as part of the
+ * 2026-09-03 backend-route audit, alongside real bugs in both the
+ * projects list/detail data (routes/projects.ts's completed-task count
+ * was wrong three different ways) and detail.tsx's status/priority
+ * comparisons (checking for "Completed"/"High" when the real values are
+ * lowercase "done"/"high").
+ */
 export default function Projects() {
   return (
-    <div className="j-page">
-      <div className="j-page-header">
-        <div>
-          <h1 className="j-brand">Projects</h1>
-          <p>Task boards and project tracking powered by Jarvis</p>
-        </div>
-        <button className="j-btn j-btn-primary">+ New Project</button>
-      </div>
-      <div className="j-page-content" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="j-card">
-          <div className="j-card-header">What Jarvis does here</div>
-          <p style={{ fontSize: 13, color: '#8b949e', margin: 0, lineHeight: 1.6 }}>
-            Jarvis connects to your project management tools to surface blockers,
-            summarise progress, generate status updates, and proactively flag deadlines.
-            Connect a source to populate your boards.
-          </p>
-        </div>
-        <div className="j-card">
-          <div className="j-card-header">Required connectors</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {['GitHub Issues', 'Linear', 'Notion', 'Jira', 'TickTick'].map(c => (
-              <div key={c} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #30363d' }}>
-                <span style={{ fontSize: 13 }}>{c}</span>
-                <button className="j-btn" style={{ height: 26, fontSize: 11 }}>Connect</button>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="j-grid-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="j-skeleton" style={{ height: 100 }} />
-          ))}
-        </div>
-      </div>
-    </div>
+    <Switch>
+      <Route path="/projects/:id" component={ProjectDetail} />
+      <Route path="/projects" component={ProjectsList} />
+      <Route><ProjectsList /></Route>
+    </Switch>
   );
 }

@@ -1,24 +1,36 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, tasksTable } from "@workspace/db";
-import { eq, count } from "drizzle-orm";
+import { and, eq, count } from "drizzle-orm";
 import { CreateProjectBody, UpdateProjectBody } from "@workspace/api-zod";
 
 const router = Router();
+
+/**
+ * Real task counts for a project. Factored out because this was previously
+ * wrong in three different ways across three handlers: the list endpoint's
+ * "completed" count ran the exact same query as "total" (no status filter
+ * at all, so completedTaskCount === taskCount for every project); the
+ * detail endpoint filtered on the string "completed", but tasksTable's
+ * actual status values are todo | in_progress | done | blocked (see
+ * lib/db/src/schema/tasks.ts) - "completed" never matches anything; and
+ * PATCH hardcoded completedTaskCount: 0 unconditionally. Found during the
+ * 2026-09-03 backend-route audit.
+ */
+async function getTaskCounts(projectId: number): Promise<{ taskCount: number; completedTaskCount: number }> {
+  const [total] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.projectId, projectId));
+  const [completed] = await db
+    .select({ count: count() })
+    .from(tasksTable)
+    .where(and(eq(tasksTable.projectId, projectId), eq(tasksTable.status, "done")));
+  return { taskCount: total?.count ?? 0, completedTaskCount: completed?.count ?? 0 };
+}
 
 router.get("/", async (req, res) => {
   try {
     const projects = await db.select().from(projectsTable).orderBy(projectsTable.createdAt);
     const result = await Promise.all(
-      projects.map(async (p) => {
-        const [totalResult] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.projectId, p.id));
-        const [completedResult] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.projectId, p.id));
-        return {
-          ...p,
-          taskCount: totalResult?.count ?? 0,
-          completedTaskCount: completedResult?.count ?? 0,
-        };
-      })
+      projects.map(async (p) => ({ ...p, ...(await getTaskCounts(p.id)) }))
     );
     res.json(result);
   } catch (err) {
@@ -46,15 +58,7 @@ router.get("/:id", async (req, res) => {
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
     if (!project) return res.status(404).json({ error: "Project not found" });
 
-    const [totalResult] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.projectId, id));
-    const tasks = await db.select().from(tasksTable).where(eq(tasksTable.projectId, id));
-    const completedCount = tasks.filter((t) => t.status === "completed").length;
-
-    res.json({
-      ...project,
-      taskCount: totalResult?.count ?? 0,
-      completedTaskCount: completedCount,
-    });
+    res.json({ ...project, ...(await getTaskCounts(id)) });
   } catch (err) {
     req.log.error({ err }, "Error fetching project");
     res.status(500).json({ error: "Internal server error" });
@@ -74,8 +78,7 @@ router.patch("/:id", async (req, res) => {
       .returning();
     if (!updated) return res.status(404).json({ error: "Project not found" });
 
-    const [totalResult] = await db.select({ count: count() }).from(tasksTable).where(eq(tasksTable.projectId, id));
-    res.json({ ...updated, taskCount: totalResult?.count ?? 0, completedTaskCount: 0 });
+    res.json({ ...updated, ...(await getTaskCounts(id)) });
   } catch (err) {
     req.log.error({ err }, "Error updating project");
     res.status(500).json({ error: "Internal server error" });
