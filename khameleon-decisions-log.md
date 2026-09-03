@@ -187,6 +187,20 @@ Nothing in the existing spec (orb states, window prominence, the persistence rul
 
 **Not verified here, on purpose:** a live Spotify session and a live weather reading, same network/credentials limitation as every OAuth integration this session.
 
+## 2026-09-03 — Found and fixed: CommandPalette was permanently unopenable; Security page showed fabricated status
+
+**Audited every backend route against frontend usage** to check for more instances of today's recurring pattern (a real, tested backend nothing in the UI ever calls). Two real findings, one worse than the class of bug this was looking for.
+
+**1. The command palette could never be opened, at all, by anyone.** `TopBar.tsx`'s Search button had no `onClick`. Grepped the whole frontend for `setCommandPaletteOpen`: only `setCommandPaletteOpen(false)` (closing it) appears anywhere — the palette component, its Escape handler, its module and agent-mode lists were all fully built and entirely dead. Consequence: **Research, Memory, and Security — three routed, working pages — were unreachable by any user action**, since none of the three sit in the left sidebar rail and the palette was their only listed entry point. Fixed with one line: wire the button to `setCommandPaletteOpen(true)`.
+
+**2. Once Security became reachable, its own content was worse than unreachable — it was actively wrong.** The "Credential Vault Status" table was a `useState` initialized once to hardcoded values, setter not even destructured, so it could never reflect reality regardless of what was actually configured. Wired it to the real `getApiKeyStatus`/`clearApiKey` API — the same one Settings' own API Keys section already uses — against the five real providers instead of a fabricated `KHAMELEON_ENGINE` entry.
+
+**3. Checked the same page's "Guardrails" list against the actual codebase rather than assuming.** Of the five listed (Injection Scanner, Rate Limiter, File Policy, SSRF Protection, Audit Log), only two are real: SSRF Protection (`agents/tools/webFetch.ts`'s private-address/cloud-metadata guard) and Audit Log (this page's own right-hand panel, backed by real agent history). The other three have no implementation anywhere. All five showed the identical pulsing-green "ACTIVE" badge. Building real Injection Scanner/Rate Limiter/File Policy implementations is well outside this session's scope — but leaving a security page claiming active protection that doesn't exist isn't a reasonable middle ground either. Changed the display to be honest: the two real guardrails show ACTIVE, the other three show "NOT IMPLEMENTED," and the panel's header badge reads "2/5 active" instead of a blanket "ACTIVE."
+
+**Verified:** `tsc --noEmit` clean, 43/43 frontend tests. Drove the running app via Playwright: Search button now opens the palette, Security is reachable and renders real (mocked) credential data correctly — SET/NOT SET per provider, REVOKE only offered when set, clicking it fires the real DELETE for the correct provider — and the guardrails list shows the honest 2/5 split.
+
+**Worth flagging as its own item, not folded into "done":** this was found by an audit, not a systematic test — there may be other places in the app with the same silently-fabricated-status pattern that this pass didn't reach. Worth a dedicated pass if that's a priority, rather than assuming this was exhaustive.
+
 *Full detail: khameleon-design-spec.md §12.2; code in `artifacts/api-server/src/{agents/skills/outlookSummarizeThread.ts,routes/outlookSummarize.ts}`.*
 
 ## 2026-08-12 — Commercial readiness caveats (deferred)
