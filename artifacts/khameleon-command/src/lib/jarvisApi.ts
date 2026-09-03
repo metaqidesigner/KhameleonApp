@@ -230,12 +230,24 @@ export async function indexMemoryPath(path: string): Promise<{ ok: boolean; chun
   return res.json();
 }
 
+/**
+ * Throws on failure rather than reporting a fake success — same reasoning
+ * as indexMemoryPath above. This one was worse in practice: no backend
+ * route for /skills/install exists yet at all, so the { ok: true }
+ * fallback meant every single install attempt reported success
+ * unconditionally, regardless of what "source" was typed in.
+ */
 export async function installSkill(source: string): Promise<{ ok: boolean }> {
-  return safeFetch(
-    `${BASE}/skills/install`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source }) },
-    { ok: true },
-  );
+  const res = await fetch(`${BASE}/skills/install`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(body.error ?? `Failed to install skill (HTTP ${res.status})`);
+  }
+  return res.json();
 }
 
 export async function runResearch(query: string, opts?: { max_iterations?: number; web_search?: boolean }): Promise<AskResponse> {

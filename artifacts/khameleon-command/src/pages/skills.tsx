@@ -12,9 +12,13 @@ export default function Skills() {
   const doInstall = async () => {
     if (!source.trim()) return;
     setStatus(null);
-    const r = await install(source.trim());
-    setStatus(r.ok ? '● SKILL INSTALLED SUCCESSFULLY' : '✕ INSTALL FAILED');
-    if (r.ok) setSource('');
+    try {
+      await install(source.trim());
+      setStatus('● SKILL INSTALLED SUCCESSFULLY');
+      setSource('');
+    } catch (error) {
+      setStatus(`✕ ${error instanceof Error ? error.message : 'INSTALL FAILED'}`);
+    }
   };
 
   return (
@@ -52,7 +56,12 @@ export default function Skills() {
           ) : (
             <table className="j-table">
               <thead className="j-table-header">
-                <tr><th>NAME</th><th>SOURCE</th><th>STATUS</th><th>INSTALLED</th><th>ACTIONS</th></tr>
+                {/* No ACTIONS column - there's no removeSkill API or backend
+                    route yet to back a REMOVE button (see installSkill's
+                    comment in jarvisApi.ts: /skills/install doesn't exist
+                    on the server either). A button with no handler and
+                    nothing to call is worse than no button. */}
+                <tr><th>NAME</th><th>SOURCE</th><th>STATUS</th><th>INSTALLED</th></tr>
               </thead>
               <tbody>
                 {skills.map(s => (
@@ -61,9 +70,6 @@ export default function Skills() {
                     <td className="j-mono" style={{ fontSize:10, color:'var(--j-cyan)' }}>{s.source}</td>
                     <td><span className="j-badge j-badge-green" style={{ fontSize:8 }}>ACTIVE</span></td>
                     <td className="j-mono" style={{ fontSize:10, color:'var(--j-text-muted)' }}>—</td>
-                    <td>
-                      <button className="j-btn-ghost" style={{ height:22, padding:'0 8px', fontSize:9, borderColor:'rgba(192,21,42,0.4)', color:'var(--j-red)' }}>REMOVE</button>
-                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
+  AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from 'recharts';
 import { BarChart2 } from 'lucide-react';
@@ -23,29 +23,65 @@ const TT = ({ active, payload }: { active?:boolean; payload?:{name?:string; valu
   );
 };
 
+/** Nearest-rank 95th percentile over a set of latencies. Returns undefined
+ * when there's nothing to compute from (rather than faking a number). */
+function p95(latencies: number[]): number | undefined {
+  if (!latencies.length) return undefined;
+  const sorted = [...latencies].sort((a, b) => a - b);
+  const idx = Math.min(sorted.length - 1, Math.ceil(0.95 * sorted.length) - 1);
+  return sorted[idx];
+}
+
 export default function Analytics() {
   const { data: telemetry = MOCK_TELEMETRY } = useJarvisTelemetry();
 
-  // Build 14-day area chart data
-  const areaData = Array.from({ length:14 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (13 - i));
-    const label = d.toLocaleDateString('en-US',{ month:'short', day:'numeric' });
-    return { label, queries: Math.floor(Math.random() * 30), cost: +(Math.random() * 0.05).toFixed(4) };
-  });
+  // Build the 14-day query-volume / cost chart from telemetry.queries (real,
+  // timestamped query records already being fetched below) instead of
+  // Math.random() - the chart previously re-rolled fake numbers on every
+  // single render, changing every time regardless of any real activity.
+  const areaData = (() => {
+    const days = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (13 - i));
+      return d;
+    });
+    const buckets = days.map(d => ({
+      label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      dayStart: d.getTime(),
+      queries: 0,
+      cost: 0,
+    }));
+    for (const q of telemetry.queries) {
+      const bucket = buckets.find((b, i) => q.ts >= b.dayStart && (i === buckets.length - 1 || q.ts < buckets[i + 1].dayStart));
+      if (bucket) { bucket.queries += 1; bucket.cost += q.cost_usd; }
+    }
+    return buckets.map(({ label, queries, cost }) => ({ label, queries, cost: +cost.toFixed(4) }));
+  })();
 
-  // Latency buckets
-  const latData = [
-    { label:'<100ms',   count: 42, color:'#3fb950' },
-    { label:'100-300ms',count: 28, color:'#00d4ff' },
-    { label:'300ms-1s', count: 18, color:'#c9a84c' },
-    { label:'>1s',      count:  8, color:'#c0152a' },
-  ];
+  // Latency buckets, counted from real query records rather than hardcoded.
+  const latData = (() => {
+    const bounds: { label: string; color: string; max: number }[] = [
+      { label: '<100ms',    color: '#3fb950', max: 100 },
+      { label: '100-300ms', color: '#00d4ff', max: 300 },
+      { label: '300ms-1s',  color: '#c9a84c', max: 1000 },
+      { label: '>1s',       color: '#c0152a', max: Infinity },
+    ];
+    const counts = bounds.map(b => ({ ...b, count: 0 }));
+    for (const q of telemetry.queries) {
+      const b = counts.find(c => q.latency_ms < c.max);
+      if (b) b.count += 1;
+    }
+    return counts;
+  })();
 
   const agents = Object.entries(telemetry.by_agent);
-  const tableRows = agents.length > 0 ? agents : [
-    ['simple', { queries:12, avg_latency:180, avg_tokens:320, avg_cost:0, total_cost:0, p95_latency:280 }],
-    ['orchestrator', { queries:5, avg_latency:420, avg_tokens:1200, avg_cost:0.001, total_cost:0.005, p95_latency:800 }],
-  ] as [string, { queries:number; avg_latency:number; avg_tokens:number; avg_cost:number; total_cost:number; p95_latency?:number }][];
+  // Per-agent p95 computed from the same real query records - the backend
+  // doesn't track p95 per agent, and this used to fill that gap with
+  // avg_latency * 1.8, an unlabeled guess presented as a real percentile.
+  const p95ByAgent: Record<string, number | undefined> = {};
+  for (const [agentId] of agents) {
+    p95ByAgent[agentId] = p95(telemetry.queries.filter(q => q.agent === agentId).map(q => q.latency_ms));
+  }
+  const tableRows = agents as [string, { queries:number; avg_latency:number; avg_tokens:number; avg_cost:number; total_cost:number }][];
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:6, height:'100%', padding:8 }}>
@@ -78,7 +114,7 @@ export default function Analytics() {
               <Tooltip content={<TT />} />
               <Bar dataKey="count" radius={[2,2,0,0]}>
                 {latData.map(d => (
-                  <rect key={d.label} fill={d.color} />
+                  <Cell key={d.label} fill={d.color} />
                 ))}
               </Bar>
             </BarChart>
@@ -97,14 +133,16 @@ export default function Analytics() {
                 </tr>
               </thead>
               <tbody>
-                {tableRows.map(([agent, s]) => {
-                  const st = s as { queries:number; avg_latency:number; avg_tokens:number; avg_cost:number; total_cost:number; p95_latency?:number };
+                {tableRows.length === 0 ? (
+                  <tr><td colSpan={7} className="j-empty" style={{ padding: '20px 0' }}>NO QUERIES YET</td></tr>
+                ) : tableRows.map(([agent, st]) => {
+                  const p = p95ByAgent[agent];
                   return (
                     <tr key={agent}>
                       <td style={{ fontFamily:'var(--j-font-ui)', fontSize:11 }}>{String(agent).replace('_',' ').toUpperCase()}</td>
                       <td className="j-mono">{st.queries}</td>
                       <td className="j-mono">{st.avg_latency.toFixed(0)}ms</td>
-                      <td className="j-mono">{(st.p95_latency ?? st.avg_latency * 1.8).toFixed(0)}ms</td>
+                      <td className="j-mono">{p != null ? `${p.toFixed(0)}ms` : '—'}</td>
                       <td className="j-mono">{st.avg_tokens.toFixed(0)}</td>
                       <td className="j-mono">${st.avg_cost.toFixed(5)}</td>
                       <td className="j-mono">${st.total_cost.toFixed(4)}</td>
