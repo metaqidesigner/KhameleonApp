@@ -1,25 +1,56 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Shield, Lock } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
+import { getApiKeyStatus, clearApiKey, type ApiKeyProvider, type ApiKeyStatus } from '@/lib/jarvisApi';
 
-const GUARDRAILS = [
-  'Injection Scanner',
-  'Rate Limiter',
-  'File Policy',
-  'SSRF Protection',
-  'Audit Log',
+/**
+ * Real guardrails only get an ACTIVE badge. `Injection Scanner`, `Rate
+ * Limiter`, and `File Policy` have no implementation anywhere in the
+ * codebase (checked directly, not assumed) - this page used to show all
+ * five as unconditionally ACTIVE regardless, which is a security status
+ * page fabricating security status. SSRF Protection is real
+ * (agents/tools/webFetch.ts's private-address/cloud-metadata guard) and
+ * Audit Log is real (the panel on the right, backed by real agent
+ * history) - those two, and only those two, get the real badge.
+ */
+const GUARDRAILS: { label: string; implemented: boolean }[] = [
+  { label: 'Injection Scanner', implemented: false },
+  { label: 'Rate Limiter', implemented: false },
+  { label: 'File Policy', implemented: false },
+  { label: 'SSRF Protection', implemented: true },
+  { label: 'Audit Log', implemented: true },
 ];
 
-const KEYS = [
-  { id: 'ANTHROPIC_API_KEY', label: 'ANTHROPIC_API_KEY' },
-  { id: 'OPENAI_API_KEY',    label: 'OPENAI_API_KEY' },
-  { id: 'KHAMELEON_ENGINE',  label: 'KHAMELEON_ENGINE' },
+interface KeyDef { id: ApiKeyProvider; label: string }
+const KEYS: KeyDef[] = [
+  { id: 'anthropic', label: 'ANTHROPIC_API_KEY' },
+  { id: 'openai', label: 'OPENAI_API_KEY' },
+  { id: 'google', label: 'GOOGLE_API_KEY' },
+  { id: 'openrouter', label: 'OPENROUTER_API_KEY' },
+  { id: 'minimax', label: 'MINIMAX_API_KEY' },
 ];
 
 export default function Security() {
   const agentHistory = useJarvisStore(s => s.agentHistory);
-  const [keySet] = useState<Record<string, boolean>>({ ANTHROPIC_API_KEY: false, OPENAI_API_KEY: false, KHAMELEON_ENGINE: true });
+  const [keySet, setKeySet] = useState<ApiKeyStatus>({});
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+
+  const refresh = useCallback(() => {
+    getApiKeyStatus().then(setKeySet);
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const revoke = async (id: ApiKeyProvider) => {
+    setBusy(b => ({ ...b, [id]: true }));
+    try {
+      await clearApiKey(id);
+      refresh();
+    } finally {
+      setBusy(b => ({ ...b, [id]: false }));
+    }
+  };
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'40% 60%', gap:6, height:'100%', padding:8 }}>
@@ -41,7 +72,14 @@ export default function Security() {
                   </td>
                   <td>
                     {keySet[k.id] && (
-                      <button className="j-btn-ghost" style={{ height:22, padding:'0 8px', fontSize:9 }}>REVOKE</button>
+                      <button
+                        className="j-btn-ghost"
+                        style={{ height:22, padding:'0 8px', fontSize:9, opacity: busy[k.id] ? 0.5 : 1 }}
+                        disabled={busy[k.id]}
+                        onClick={() => revoke(k.id)}
+                      >
+                        {busy[k.id] ? '…' : 'REVOKE'}
+                      </button>
                     )}
                   </td>
                 </tr>
@@ -50,14 +88,25 @@ export default function Security() {
           </table>
         </JPanel>
 
-        <JPanel title="GUARDRAILS" icon={<Shield size={13}/>} headerVariant="amber" badge="ACTIVE">
+        <JPanel
+          title="GUARDRAILS"
+          icon={<Shield size={13}/>}
+          headerVariant="amber"
+          badge={`${GUARDRAILS.filter(g => g.implemented).length}/${GUARDRAILS.length} ACTIVE`}
+        >
           <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
             {GUARDRAILS.map(g => (
-              <div key={g} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid rgba(0,212,255,0.06)' }}>
-                <span style={{ fontFamily:'var(--j-font-ui)', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--j-text)' }}>{g}</span>
+              <div key={g.label} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid rgba(0,212,255,0.06)' }}>
+                <span style={{ fontFamily:'var(--j-font-ui)', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--j-text)' }}>{g.label}</span>
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--j-green)', animation:'jarvis-pulse 2s ease-in-out infinite' }}/>
-                  <span className="j-mono" style={{ fontSize:10, color:'var(--j-green)' }}>ACTIVE</span>
+                  <div style={{
+                    width:6, height:6, borderRadius:'50%',
+                    background: g.implemented ? 'var(--j-green)' : 'var(--j-text-faint)',
+                    animation: g.implemented ? 'jarvis-pulse 2s ease-in-out infinite' : 'none',
+                  }}/>
+                  <span className="j-mono" style={{ fontSize:10, color: g.implemented ? 'var(--j-green)' : 'var(--j-text-faint)' }}>
+                    {g.implemented ? 'ACTIVE' : 'NOT IMPLEMENTED'}
+                  </span>
                 </div>
               </div>
             ))}

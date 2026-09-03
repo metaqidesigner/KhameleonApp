@@ -51,6 +51,7 @@ function BrandMark() {
 }
 
 export default function TopBar() {
+  const setCommandPaletteOpen = useJarvisStore(s => s.setCommandPaletteOpen);
   return (
     <div className="j-topbar-slim">
       {/* ── Left: brand only; the deprecated Assistant/Workspace split is removed. ── */}
@@ -70,7 +71,7 @@ export default function TopBar() {
 
       {/* ── Right: icon actions ───────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <button className="j-topbar-icon-btn" title="Search">
+        <button className="j-topbar-icon-btn" title="Search" onClick={() => setCommandPaletteOpen(true)}>
           <Search size={14} />
         </button>
         <button className="j-topbar-icon-btn" title="Notifications" style={{ position: 'relative' }}>
