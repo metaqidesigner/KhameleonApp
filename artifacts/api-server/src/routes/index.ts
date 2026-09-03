@@ -29,6 +29,7 @@ import schedulerRouter from "./scheduler";
 import spotifyRouter from "./spotify";
 import weatherRouter from "./weather";
 import onboardingRouter from "./onboarding";
+import outlookSkillsRouter from "./outlookSkills";
 
 const router: IRouter = Router();
 
@@ -62,5 +63,6 @@ router.use("/scheduler", schedulerRouter);
 router.use("/spotify", spotifyRouter);
 router.use("/weather", weatherRouter);
 router.use("/onboarding", onboardingRouter);
+router.use("/skills/outlook-draft-email", outlookSkillsRouter);
 
 export default router;

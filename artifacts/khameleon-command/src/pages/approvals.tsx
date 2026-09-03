@@ -4,10 +4,11 @@
  */
 
 import React, { useState } from 'react';
-import { AlertCircle, Mail } from 'lucide-react';
+import { AlertCircle, Mail, Send } from 'lucide-react';
 import { ActionReceiptList, type ActionReceiptProps } from '@/components/ActionReceipt';
 import { ConfirmGate } from '@/components/ConfirmGate';
 import { createApproval } from '@/lib/approvalsApi';
+import { runOutlookDraftEmail, sendOutlookDraft, rejectOutlookDraft, type OutlookDraft } from '@/lib/outlookSkillsApi';
 
 export default function Approvals() {
   const [showConfirmGate, setShowConfirmGate] = useState(false);
@@ -21,11 +22,10 @@ export default function Approvals() {
       outcome: 'success' as const,
       timestamp: new Date(Date.now() - 2 * 60000).toISOString(),
       target: 'alice@example.com',
-      canUndo: true,
+      // Sending mail is the canonical "hard to reverse" example in §6.5.3 -
+      // an already-sent email cannot be undone, so this must never offer undo.
+      canUndo: false,
       detail: `Subject: Project Update\n\nHi Alice,\n\nHere's the latest project status.\nLooking forward to your thoughts.\n\nBest`,
-      onUndo: async () => {
-        setReceipts(r => r.filter(rc => rc.id !== 'action-1'));
-      },
     },
     {
       id: 'action-2',
@@ -74,6 +74,71 @@ export default function Approvals() {
     setShowConfirmGate(false);
   };
 
+  // ── Real skill: outlook-draft-email (§12.1) ──────────────────────────────
+  // Distinct from the mock demo above: this calls the actual Microsoft
+  // Graph-backed pipeline (routes/outlookSkills.ts). Requires Outlook to be
+  // connected (Settings → Connectors) and a real message id from that
+  // mailbox — there's no inbox-browsing UI yet, so the id is typed in
+  // directly, consistent with this being a single-user prototype.
+  const [outlookMessageId, setOutlookMessageId] = useState('');
+  const [outlookLoading, setOutlookLoading] = useState(false);
+  const [outlookRunError, setOutlookRunError] = useState<string>();
+  const [outlookDraft, setOutlookDraft] = useState<OutlookDraft | null>(null);
+  const [outlookSending, setOutlookSending] = useState(false);
+  const [outlookSendError, setOutlookSendError] = useState<string>();
+
+  const handleRunOutlook = async () => {
+    if (!outlookMessageId.trim()) return;
+    setOutlookLoading(true);
+    setOutlookRunError(undefined);
+    try {
+      const draft = await runOutlookDraftEmail(outlookMessageId.trim());
+      setOutlookDraft(draft);
+    } catch (error) {
+      setOutlookRunError(error instanceof Error ? error.message : 'Draft request failed');
+    } finally {
+      setOutlookLoading(false);
+    }
+  };
+
+  const handleOutlookConfirm = async (editedContent?: string) => {
+    if (!outlookDraft) return;
+    setOutlookSending(true);
+    setOutlookSendError(undefined);
+    try {
+      const { sentAt } = await sendOutlookDraft(outlookDraft.approvalId, editedContent);
+      setReceipts(r => [{
+        id: `outlook-${outlookDraft.approvalId}`,
+        description: `Email sent to ${outlookDraft.to}`,
+        category: 'email_sent',
+        scope: 'mail.send',
+        outcome: 'success' as const,
+        timestamp: sentAt,
+        target: outlookDraft.to,
+        // Real send, real irreversibility — no undo offered (§6.5.3).
+        canUndo: false,
+        detail: `Subject: ${outlookDraft.subject}\n\n${editedContent ?? outlookDraft.body}`,
+      }, ...r]);
+      setOutlookDraft(null);
+      setOutlookMessageId('');
+    } catch (error) {
+      setOutlookSendError(error instanceof Error ? error.message : 'Send failed');
+      throw error; // keeps ConfirmGate open so the user can retry
+    } finally {
+      setOutlookSending(false);
+    }
+  };
+
+  const handleOutlookCancel = () => {
+    if (outlookDraft) {
+      // Best-effort - closing the gate should discard the pending draft
+      // rather than leave an orphaned unsent draft in the user's mailbox.
+      rejectOutlookDraft(outlookDraft.approvalId).catch(() => {});
+    }
+    setOutlookDraft(null);
+    setOutlookSendError(undefined);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', height: '100%', overflow: 'auto' }}>
       {/* Header */}
@@ -114,6 +179,64 @@ export default function Approvals() {
         >
           Demo: Approve Email (no message is sent)
         </button>
+      </div>
+
+      {/* Real skill: outlook-draft-email */}
+      <div className="j-panel" style={{ height: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(120, 168, 220, 0.10)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Send size={14} style={{ color: '#8fa39c' }} />
+          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#fff' }}>
+            Real skill: outlook-draft-email (§12.1)
+          </h3>
+        </div>
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: '#8fa39c', lineHeight: 1.5 }}>
+            Runs the real pipeline against Microsoft Graph: fetch thread → summarize → compose → create draft.
+            Requires Outlook connected (Settings) and a real message id from that mailbox. Sending only happens if you confirm below.
+          </p>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              value={outlookMessageId}
+              onChange={(e) => setOutlookMessageId(e.target.value)}
+              placeholder="Outlook message id"
+              disabled={outlookLoading}
+              style={{
+                flex: 1,
+                height: '34px',
+                padding: '0 10px',
+                fontSize: '11px',
+                fontFamily: 'var(--j-font-mono)',
+                color: '#c4d4ec',
+                backgroundColor: 'rgba(8, 14, 32, 0.4)',
+                border: '1px solid rgba(120, 168, 220, 0.18)',
+                borderRadius: '6px',
+              }}
+            />
+            <button
+              onClick={handleRunOutlook}
+              disabled={outlookLoading || !outlookMessageId.trim()}
+              style={{
+                height: '34px',
+                padding: '0 16px',
+                fontSize: '11px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: '#fff',
+                backgroundColor: '#8C7CF022',
+                border: '1px solid rgba(140, 124, 240, 0.45)',
+                borderRadius: '6px',
+                cursor: outlookLoading ? 'wait' : 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {outlookLoading ? 'Drafting…' : 'Draft reply'}
+            </button>
+          </div>
+          {outlookRunError && (
+            <div style={{ fontSize: '11px', color: '#E77A7A' }}>{outlookRunError}</div>
+          )}
+        </div>
       </div>
 
       {/* Action history */}
@@ -157,7 +280,7 @@ export default function Approvals() {
         </div>
       </div>
 
-      {/* ConfirmGate modal */}
+      {/* ConfirmGate modal — mock demo */}
       {showConfirmGate && (
         <ConfirmGate
           title="Send Email"
@@ -173,6 +296,25 @@ export default function Approvals() {
           editableContent={`Subject: Follow-up\n\nHi Bob,\n\nJust following up on our earlier conversation about the Q4 timeline. I wanted to share my thoughts on the proposed schedule.\n\nLooking forward to hearing back from you.\n\nBest regards`}
           onConfirm={handleConfirmGateConfirm}
           onCancel={() => setShowConfirmGate(false)}
+        />
+      )}
+
+      {/* ConfirmGate modal — real outlook-draft-email skill */}
+      {outlookDraft && (
+        <ConfirmGate
+          title="Send Email"
+          category="email_send"
+          target={outlookDraft.to}
+          scope="mail.send"
+          severity="critical"
+          confirmLabel="Confirm & Send"
+          confirming={outlookSending}
+          error={outlookSendError}
+          payload={`Subject: ${outlookDraft.subject}\n\n${outlookDraft.body}`}
+          allowEdit={true}
+          editableContent={`Subject: ${outlookDraft.subject}\n\n${outlookDraft.body}`}
+          onConfirm={handleOutlookConfirm}
+          onCancel={handleOutlookCancel}
         />
       )}
     </div>
