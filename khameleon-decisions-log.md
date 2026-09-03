@@ -173,6 +173,20 @@ Nothing in the existing spec (orb states, window prominence, the persistence rul
 
 *Full detail: khameleon-design-spec.md §12.3; code in `artifacts/api-server/src/{lib/outlookGraph.ts,agents/skills/outlookTriageInbox.ts,routes/outlookTriage.ts}`.*
 
+## 2026-09-03 — Spotify now-playing and live weather wired into the UI (same gap as the Outlook skills, different feature)
+
+**Checked whether the other 2026-08-27 lifestyle-utility work had the same problem the Outlook skills did — it did.** `routes/spotify.ts` and `routes/weather.ts` were built and tested that day, but nothing in the frontend ever called them. The Spotify connector row's own description text already promised "Now playing + playback control" — entirely unfulfilled in the UI until now.
+
+**Where this landed, and why not elsewhere:** `pages/canvas.tsx` (the home screen) runs a real floating-window system — auto-arrange, dock, focus logic — not a safe place to bolt on a new widget type without touching that machinery for a small, unrelated feature. `pages/communications.tsx` lists Spotify/Weather among its connector tiles but is explicitly mock data (a hash-based fake-status function, no real backend calls anywhere on that page) — not a sensible foundation to build real functionality on. Settings already fetches real connector state and is where these get configured in the first place, so it's the natural, low-risk home — showing live data next to the controls that configure it also doubles as proof the connection actually works.
+
+**Built:**
+- `lib/jarvisApi.ts` — `getWeatherCurrent`, `getSpotifyNowPlaying`, and `spotifyPlay`/`Pause`/`Next`/`Previous`. The two reads use the file's existing `safeFetch` fallback pattern: silent graceful degradation to "no data" (a missing widget, not an error banner), consistent with how the rest of this file already treats optional live state.
+- `pages/settings.tsx` — `SpotifyNowPlayingRow` (polls every 8s while connected; track/artist/album art/progress, real play/pause/skip/previous) under the Spotify connector row, shown only when connected. `WeatherLocationRow` now also shows current temperature/conditions once a default location exists.
+
+**Verified:** `tsc --noEmit` clean, 43/43 frontend tests (5 new, for the progress-time formatter). Drove the running app via Playwright twice: once with no backend (both widgets degrade to nothing, no errors, existing layout untouched) and once with routes mocked to realistic payloads — confirmed actual widget rendering (track title, artist, formatted progress, live temperature) and that all four playback buttons fire their correct endpoint.
+
+**Not verified here, on purpose:** a live Spotify session and a live weather reading, same network/credentials limitation as every OAuth integration this session.
+
 *Full detail: khameleon-design-spec.md §12.2; code in `artifacts/api-server/src/{agents/skills/outlookSummarizeThread.ts,routes/outlookSummarize.ts}`.*
 
 ## 2026-08-12 — Commercial readiness caveats (deferred)
