@@ -218,7 +218,7 @@ export function getOrbChatPanelPosition(
   return safeCandidate ?? candidates[0];
 }
 
-function clampToViewport(
+export function clampToViewport(
   x: number,
   y: number,
   viewportWidth: number,
@@ -275,4 +275,46 @@ export function clampOrbPosition(
     const candidateDistance = (candidate.x - bounded.x) ** 2 + (candidate.y - bounded.y) ** 2;
     return candidateDistance < nearestDistance ? candidate : nearest;
   });
+}
+
+/**
+ * Picks a resting spot for the orb itself once the chat popup has claimed
+ * its own fixed rect near the orb's default corner. The popup's position is
+ * not recomputed as the orb moves (see JarvisOrb's panelPos state) — this
+ * is the inverse of getOrbChatPanelPosition: the panel stays put and the
+ * orb is the one that moves out of its way, landing just outside whichever
+ * edge of the panel keeps it closest to its original corner.
+ */
+export function getOrbAutoAvoidPosition(
+  panelRect: LayoutRect,
+  viewportWidth: number,
+  viewportHeight: number,
+  size = ORB_SIZE,
+  protectedRects: readonly LayoutRect[] = [],
+): { x: number; y: number } {
+  const candidates = [
+    // Directly above the panel, right-aligned to its right edge — keeps the
+    // orb in the same general corner, just lifted clear of the popup.
+    { x: panelRect.left + panelRect.width - size, y: panelRect.top - size - ORB_CHAT_PANEL_GAP },
+    // To the left of the panel, bottom-aligned.
+    { x: panelRect.left - size - ORB_CHAT_PANEL_GAP, y: panelRect.top + panelRect.height - size },
+    // Directly below the panel, right-aligned — covers a panel that opened
+    // above an orb near the top of the viewport.
+    { x: panelRect.left + panelRect.width - size, y: panelRect.top + panelRect.height + ORB_CHAT_PANEL_GAP },
+    // Top-right corner of the viewport as a last resort.
+    { x: viewportWidth - size - ORB_RIGHT_OFFSET, y: ORB_CHAT_PANEL_VIEWPORT_INSET },
+  ].map(candidate => clampToViewport(
+    candidate.x,
+    candidate.y,
+    viewportWidth,
+    viewportHeight,
+    size,
+  ));
+
+  const allProtected = [panelRect, ...protectedRects];
+  const safeCandidate = candidates.find(candidate =>
+    allProtected.every(rect => !rectsOverlap(getOrbVisualRect(candidate.x, candidate.y, size), rect)),
+  );
+
+  return safeCandidate ?? candidates[0];
 }

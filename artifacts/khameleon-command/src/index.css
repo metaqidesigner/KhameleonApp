@@ -90,71 +90,22 @@ html, body, #root {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 32% 30% at 15% 10%, rgba(111,230,189,0.16) 0%, transparent 100%),
-    radial-gradient(ellipse 34% 32% at 88% 12%, rgba(240,163,76,0.13) 0%, transparent 100%),
+    radial-gradient(circle at 15% 10%, rgba(111,230,189,0.16) 0%, rgba(111,230,189,0) 32%),
+    radial-gradient(circle at 88% 12%, rgba(240,163,76,0.13) 0%, rgba(240,163,76,0) 34%),
     linear-gradient(180deg, #06080a 0%, #030405 60%, #000000 100%);
 }
 
-/* ── Panel — true glassmorphism ─────────────────────────── */
+/* ── Panel — layout only; the Signal Glass recipe (fill/blur/border/
+   shadow/highlight/top-edge) is the single definition further down this
+   file, under "SIGNAL GLASS — shared material recipe for every panel/card".
+   Keeping the glass values out of this block avoids two conflicting
+   recipes for the same selector living in one file. ─────────────────── */
 .j-panel {
   position: relative;
-  /* Translucent — background blooms bleed through the blur */
-  background: rgba(8, 12, 28, 0.28);
-  backdrop-filter: blur(40px) saturate(1.7) brightness(1.06);
-  -webkit-backdrop-filter: blur(40px) saturate(1.7) brightness(1.06);
-  /* Anisotropic border — bright top catches the "light source" */
-  border-top:    1px solid rgba(255, 255, 255, 0.38);
-  border-left:   1px solid rgba(255, 255, 255, 0.16);
-  border-right:  1px solid rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 14px;
-  box-shadow:
-    /* Inner top-edge highlight — bright glass rim */
-    inset 0 1px 0 rgba(255, 255, 255, 0.32),
-    /* Inner left-edge ambient */
-    inset 1px 0 0 rgba(255, 255, 255, 0.10),
-    /* Drop shadow for depth */
-    0 8px 40px rgba(0, 0, 0, 0.50),
-    0 2px 8px rgba(0, 0, 0, 0.30);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   height: 100%;
-}
-
-/* Glass sheen — diagonal light-source streak across top-left */
-.j-panel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.22) 0%,
-    rgba(255, 255, 255, 0.06) 36%,
-    transparent 58%
-  );
-  pointer-events: none;
-  z-index: 0;
-}
-/* Hard bright highlight line across the top inner edge of each panel */
-.j-panel::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 8%;
-  right: 8%;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.55) 25%,
-    rgba(255, 255, 255, 0.70) 50%,
-    rgba(255, 255, 255, 0.55) 75%,
-    transparent 100%
-  );
-  pointer-events: none;
-  z-index: 2;
 }
 
 /* All direct children sit above the sheen */
@@ -1117,14 +1068,15 @@ html.light body {
 .ac-greeting-title {
   font-family: var(--j-font-head);
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--j-text);
   margin-bottom: 4px;
   letter-spacing: 0.01em;
+  text-shadow: 0 0 18px rgba(111,230,189,0.25);
 }
 .ac-greeting-sub {
   font-family: var(--j-font-ui);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--j-text-muted);
   line-height: 1.45;
 }
@@ -1181,11 +1133,12 @@ html.light body {
 .ac-input-wrap {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 11px;
-  padding: 0 5px 0 13px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 0 5px 0 16px;
   gap: 4px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 0 20px rgba(111,230,189,0.08);
   transition: border-color 0.15s;
 }
 .ac-input-wrap:focus-within {
@@ -1205,16 +1158,17 @@ html.light body {
   color: rgba(196, 212, 236, 0.28);
 }
 .ac-send-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--j-teal);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(111,230,189,0.2);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #061210;
+  color: var(--j-teal);
+  box-shadow: 0 0 12px rgba(111,230,189,0.5);
   flex-shrink: 0;
   transition: opacity 0.15s, transform 0.1s;
 }
@@ -1231,27 +1185,29 @@ html.light body {
   flex-wrap: wrap;
 }
 .ac-connected-label {
-  font-family: var(--j-font-mono);
-  font-size: 7.5px;
-  letter-spacing: 0.14em;
-  color: rgba(196, 212, 236, 0.22);
+  font-family: var(--j-font-ui);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--j-text-muted);
   flex-shrink: 0;
   margin-right: 2px;
 }
 .ac-agent-pill {
-  width: 27px;
-  height: 27px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.11);
-  background: rgba(255, 255, 255, 0.03);
+  width: 30px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1.25px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--j-font-mono);
-  font-size: 7.5px;
+  font-size: 10px;
   font-weight: 700;
-  color: rgba(196, 212, 236, 0.45);
+  color: var(--j-text-muted);
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
   transition: border-color 0.15s, color 0.15s, background 0.15s;
   letter-spacing: 0.04em;
 }
@@ -1259,6 +1215,19 @@ html.light body {
   border-color: rgba(111, 230, 189, 0.4);
   color: var(--j-teal);
   background: rgba(111, 230, 189, 0.06);
+}
+.ac-tool-add {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px dashed rgba(255,255,255,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--j-text-muted);
+  font-family: var(--j-font-ui);
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1558,7 +1527,10 @@ html.light body {
 .j-metric-box,
 .j-section-pill,
 .ac-pill,
-.ac-focus-card {
+.ac-focus-card,
+.kh-mini,
+.kh-focus-panel,
+.kh-film-card {
   --signal-rim-glow: 0 0 24px rgba(111,230,189,0.16);
   background: rgba(255,255,255,0.055);
   backdrop-filter: blur(16px);
@@ -1566,8 +1538,9 @@ html.light body {
   border: 1px solid rgba(255,255,255,0.16);
   border-radius: 16px;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.16),
     0 30px 55px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    0 0 0 1px rgba(255,255,255,0.03),
     var(--signal-rim-glow);
 }
 
@@ -1581,8 +1554,9 @@ html.light body {
   border: 1.5px solid rgba(255,255,255,0.22);
   border-radius: 16px;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.16),
     0 40px 74px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    0 0 0 1px rgba(255,255,255,0.03),
     var(--signal-rim-glow);
 }
 
@@ -1613,6 +1587,17 @@ html.light body {
 .j-section-pill-end_of_day {
   --signal-rim-glow: 0 0 24px rgba(111,230,189,0.16);
 }
+.kh-mini-context {
+  --signal-rim-glow: 0 0 24px rgba(240,163,76,0.16);
+}
+.kh-mini-status {
+  --signal-rim-glow: 0 0 24px rgba(140,124,240,0.16);
+}
+/* .kh-focus-panel carries the mockup's own specific (dimmer) rim value
+   rather than a flat category glow. */
+.kh-focus-panel {
+  --signal-rim-glow: 0 0 26px rgba(140,124,240,0.1);
+}
 
 /* One consistent directional highlight across every panel. */
 .j-panel::before,
@@ -1623,7 +1608,10 @@ html.light body {
 .ac-pill::before,
 .ac-focus-card::before,
 .kc-window::before,
-.ac-card::before {
+.ac-card::before,
+.kh-mini::before,
+.kh-focus-panel::before,
+.kh-film-card::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -1642,7 +1630,10 @@ html.light body {
 .ac-pill::after,
 .ac-focus-card::after,
 .kc-window::after,
-.ac-card::after {
+.ac-card::after,
+.kh-mini::after,
+.kh-focus-panel::after,
+.kh-film-card::after {
   content: '';
   position: absolute;
   top: 0;
@@ -1663,7 +1654,10 @@ html.light body {
 .ac-pill > *,
 .ac-focus-card > *,
 .kc-window > *,
-.ac-card > * {
+.ac-card > *,
+.kh-mini > *,
+.kh-focus-panel > *,
+.kh-film-card > * {
   position: relative;
   z-index: 1;
 }
@@ -1676,12 +1670,16 @@ html.light body {
 .light .j-metric-box,
 .light .j-section-pill,
 .light .ac-pill,
-.light .ac-focus-card {
+.light .ac-focus-card,
+.light .kh-mini,
+.light .kh-focus-panel,
+.light .kh-film-card {
   background: rgba(255,255,255,0.055);
   border: 1px solid rgba(255,255,255,0.16);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.16),
     0 30px 55px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    0 0 0 1px rgba(255,255,255,0.03),
     var(--signal-rim-glow);
 }
 
@@ -1690,7 +1688,189 @@ html.light body {
   background: rgba(255,255,255,0.055);
   border: 1.5px solid rgba(255,255,255,0.22);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.16),
     0 40px 74px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    0 0 0 1px rgba(255,255,255,0.03),
     var(--signal-rim-glow);
+}
+
+/* ════════════════════════════════════════════════════════════
+   ASSISTANT HOME — dedicated hero view, ported from
+   khameleon-home-implemented.html's .layout / .main-panel /
+   .focus-panel / .filmstrip. Icon-rail and top nav are already
+   provided by the app shell (LeftSidebar / TopBar) — this page is
+   just the content that sits to their right.
+   ════════════════════════════════════════════════════════════ */
+.kh-home {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  padding: 28px 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  /* Scoped to this page only — the shared --j-text* tokens elsewhere in the
+     app (e.g. the Workspace canvas) intentionally stay untouched. These
+     correct the base palette to design-spec.md §3's locked values
+     (text-primary #E7ECEF / text-muted #55635E) for everything rendered
+     inside this page, including reused shared components. */
+  --j-text: #E7ECEF;
+  --j-text-muted: #55635E;
+}
+/* Circuit-grid + flare ambient texture, ported from khameleon-home-implemented.html's
+   .circuit / .flare — layered behind the page content, not a bounded "scene" card
+   (the app's Void background is already full-bleed behind the persistent chrome). */
+.kh-home::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(111,230,189,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(111,230,189,0.05) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(circle at 50% 30%, black 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(circle at 50% 30%, black 0%, transparent 75%);
+}
+.kh-flare {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(6px);
+  z-index: 0;
+}
+.kh-flare-teal { top: -20px; left: 8%; background: radial-gradient(circle, rgba(111,230,189,0.28) 0%, rgba(111,230,189,0) 70%); }
+.kh-flare-amber { top: 0; right: 4%; background: radial-gradient(circle, rgba(240,163,76,0.22) 0%, rgba(240,163,76,0) 70%); }
+.kh-layout, .kh-filmstrip { position: relative; z-index: 1; }
+.kh-layout {
+  display: grid;
+  grid-template-columns: 190px 1fr 280px;
+  gap: 22px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .kh-layout { grid-template-columns: 1fr; }
+}
+/* Pin the two flanking columns to their grid tracks so the center zone
+   (ActiveTaskWindow) can be absent from the DOM entirely — without an
+   explicit column, CSS Grid's auto-placement would slide the focus panel
+   into the center track whenever no task window is rendered. Only applies
+   once the 3-column layout is actually active. */
+@media (min-width: 1101px) {
+  .kh-mini-col { grid-column: 1; }
+  .kh-focus-panel { grid-column: 3; }
+}
+
+/* ── Mini col: Command / Context / Status ───────────────────── */
+.kh-mini-col { display: flex; flex-direction: column; gap: 16px; }
+.kh-mini { padding: 12px 14px; }
+.kh-mini-label {
+  font-family: var(--j-font-ui); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--j-text-muted);
+  margin-bottom: 4px; display: flex; align-items: center; gap: 6px;
+}
+.kh-mini-dot { width: 8px; height: 8px; border-radius: 2px; box-shadow: 0 0 6px currentColor; }
+.kh-mini-body { font-family: var(--j-font-ui); font-size: 11px; color: var(--j-text-muted); }
+
+/* ── Center zone: live-view of the task Khameleon is actively working on
+   (design-spec.md §6). Rendered by ActiveTaskWindow, which mounts nothing
+   at all here when idle — see assistant-home.tsx. Reuses .j-panel's Signal
+   Glass recipe (via JPanel) rather than its own background/border. ── */
+.kh-task-window {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.kh-task-window-body {
+  display: grid;
+  grid-template-columns: minmax(150px, 200px) 1fr;
+  gap: 18px;
+}
+@media (max-width: 720px) {
+  .kh-task-window-body { grid-template-columns: 1fr; }
+}
+.kh-task-window-col-label {
+  display: flex; align-items: center; gap: 5px;
+  font-family: var(--j-font-mono); font-size: 9px; letter-spacing: 0.1em;
+  color: var(--j-text-faint); margin-bottom: 6px;
+}
+.kh-task-window-trace { min-width: 0; }
+.kh-task-window-live { min-width: 0; }
+.kh-task-window-preview {
+  font-family: var(--j-font-ui); font-size: 11px; color: var(--j-text);
+  line-height: 1.65; white-space: pre-wrap; word-break: break-word;
+  max-height: 260px; overflow-y: auto;
+  padding: 8px 10px;
+  background: rgba(0,196,184,0.03);
+  border: 1px solid rgba(0,196,184,0.09);
+  border-radius: 8px;
+}
+.kh-task-window-footer {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ── Focus panel ──────────────────────────────────────────────  */
+.kh-focus-panel { padding: 16px 16px 18px; }
+.kh-focus-title {
+  font-family: var(--j-font-ui); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--j-text-muted); margin-bottom: 12px;
+}
+.kh-focus-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.kh-focus-task-title { font-family: var(--j-font-ui); font-size: 13px; font-weight: 600; color: #fff; }
+.kh-focus-task-sub { font-family: var(--j-font-ui); font-size: 11px; color: var(--j-teal); margin-top: 2px; }
+.kh-focus-list { display: flex; flex-direction: column; gap: 9px; }
+.kh-focus-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--j-font-ui); font-size: 12px;
+}
+.kh-focus-row .name { display: flex; align-items: center; gap: 8px; color: var(--j-text-muted); }
+.kh-focus-row .name.done { color: var(--j-text); }
+.kh-fdot {
+  width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.25);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 9px;
+}
+.kh-fdot.done {
+  background: rgba(111,230,189,0.22); border-color: var(--j-teal); color: var(--j-teal);
+  box-shadow: 0 0 6px rgba(111,230,189,0.5);
+}
+.kh-fstatus { font-family: var(--j-font-ui); font-size: 10px; color: var(--j-text-muted); }
+.kh-fstatus.done { color: var(--j-teal); }
+
+/* ── Filmstrip ────────────────────────────────────────────────  */
+.kh-filmstrip { display: flex; gap: 14px; flex-wrap: wrap; }
+.kh-film-card { flex: 1; min-width: 160px; border-radius: 12px; overflow: hidden; }
+.kh-film-swatch {
+  height: 76px; position: relative; background: #05070a;
+  display: flex; align-items: center; justify-content: center;
+}
+.kh-film-swatch svg { width: 100%; height: 100%; }
+.kh-film-swatch::after {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.12), rgba(255,255,255,0) 55%);
+  pointer-events: none;
+}
+.kh-film-info {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; font-family: var(--j-font-ui); font-size: 11px;
+}
+.kh-film-name {
+  color: var(--j-text); display: flex; align-items: center; gap: 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kh-film-time { color: var(--j-text-muted); text-align: right; font-size: 10px; flex-shrink: 0; margin-left: 8px; }
+.kh-film-check {
+  width: 12px; height: 12px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 8px;
+}
+.kh-film-check.done { background: rgba(111,230,189,0.28); color: var(--j-teal); box-shadow: 0 0 6px rgba(111,230,189,0.5); }
+.kh-film-empty {
+  width: 100%; padding: 24px; text-align: center;
+  font-family: var(--j-font-ui); font-size: 12px; color: var(--j-text-faint);
+  border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px;
 }

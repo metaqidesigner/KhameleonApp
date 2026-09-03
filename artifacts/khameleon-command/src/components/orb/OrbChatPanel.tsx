@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Mic, Send, Volume2, X } from 'lucide-react';
+import { Mic, MicOff, Send, Volume2, X } from 'lucide-react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import {
   streamAgentChat,
@@ -67,6 +67,7 @@ export function OrbChatPanel({ style, onClose }: Props) {
   const setOrbActiveAgentId = useJarvisStore(s => s.setOrbActiveAgentId);
   const orbStatus           = useJarvisStore(s => s.orbStatus);
   const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
+  const voiceEnabled        = useJarvisStore(s => s.voiceEnabled);
   const voiceSettings       = useJarvisStore(s => s.voiceSettings);
   const pushAgentEvent      = useJarvisStore(s => s.pushAgentEvent);
   const pendingVoiceQuery   = useJarvisStore(s => s.pendingVoiceQuery);
@@ -191,7 +192,7 @@ export function OrbChatPanel({ style, onClose }: Props) {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setStreaming(true);
-    setOrbStatus('speaking');
+    setOrbStatus('thinking');
     streamBufRef.current = '';
 
     const history: ChatMessage[] = [
@@ -237,9 +238,14 @@ export function OrbChatPanel({ style, onClose }: Props) {
       },
       (err) => {
         setStreaming(false);
-        setOrbStatus('online');
         const isOffline = err.includes('unreachable') || err.includes('fetch') || err.includes('network');
-        if (isOffline) setOrbStatus('offline');
+        if (isOffline) {
+          setOrbStatus('offline');
+        } else {
+          // Coral flash, then settle back to idle — spec §4: "single pulse, not sustained".
+          setOrbStatus('error');
+          setTimeout(() => setOrbStatus('online'), 900);
+        }
         setMessages(prev => prev.map(m =>
           m.id === assistantId
             ? { ...m, role: 'error' as const, content: isOffline
@@ -310,13 +316,14 @@ export function OrbChatPanel({ style, onClose }: Props) {
       {/* Orb Visual Area */}
       <div className="orb-chat-visual-area">
         <div style={{ position: 'relative', width: 90, height: 90, transform: 'scale(1.15)' }}>
-          <div className={`jarvis-orb-container ${orbStatus}`}>
-            <div className={`orb-glow ${orbStatus}`} />
+          <div className={`jarvis-orb-container ${voiceEnabled ? orbStatus : 'muted'}`}>
+            <div className={`orb-glow ${voiceEnabled ? orbStatus : 'muted'}`} />
             <div className="orb-arc orb-arc-1" />
             <div className="orb-arc orb-arc-2" />
             <div className="orb-ring orb-ring-outer"><div className="orb-moon" /></div>
             <div className="orb-ring orb-ring-inner"><div className="orb-beacon" /></div>
             <div className="orb-core" ref={coreRef} />
+            {!voiceEnabled && <MicOff size={16} className="orb-muted-icon" />}
           </div>
         </div>
       </div>

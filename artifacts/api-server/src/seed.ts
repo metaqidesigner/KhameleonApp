@@ -19,7 +19,7 @@ import {
 } from "@workspace/db";
 
 async function seed() {
-  console.log("Seeding Nexus Command database...");
+  console.log("Seeding Khameleon Command database...");
 
   // Operating Modes
   await db.insert(operatingModesTable).values([
@@ -250,7 +250,7 @@ async function seed() {
 
   const [project5] = await db.insert(projectsTable).values([
     {
-      name: "Nexus Command",
+      name: "Khameleon Command",
       description: "AI-powered personal command centre — the central operating system for professional and personal digital life.",
       owner: "Alex Morgan",
       status: "active",
@@ -305,7 +305,7 @@ async function seed() {
       actionItems: ["Confirm compliance timeline", "Sign off on audit documentation"],
     },
     {
-      title: "Deep Focus: Nexus Command Architecture",
+      title: "Deep Focus: Khameleon Command Architecture",
       description: "Dedicated 2-hour block for architecture review and critical design decisions.",
       startTime: "2026-06-12T07:00:00Z",
       endTime: "2026-06-12T09:00:00Z",
@@ -313,7 +313,7 @@ async function seed() {
       attendees: ["Alex Morgan"],
       location: "Personal",
       aiPrep: "Review agent routing algorithm, security model, and knowledge graph schema.",
-      relatedProject: "Nexus Command",
+      relatedProject: "Khameleon Command",
       actionItems: ["Finalise agent routing logic", "Define knowledge graph entities"],
     },
     {
@@ -326,7 +326,7 @@ async function seed() {
       location: "HQ Boardroom",
       aiPrep: "Q2 revenue up 34%. AITradingMarket and Chameleon are key discussion items. Property Governance ahead of schedule.",
       relatedProject: "",
-      actionItems: ["Present Q2 financials", "Demo Nexus Command prototype", "Approve Q3 budget"],
+      actionItems: ["Present Q2 financials", "Demo Khameleon Command prototype", "Approve Q3 budget"],
     },
     {
       title: "Investor Call — Series B Update",
@@ -336,7 +336,7 @@ async function seed() {
       type: "call",
       attendees: ["Alex Morgan", "Lead Investor", "Co-investor"],
       location: "Teams Call",
-      aiPrep: "Prepare KPI dashboard. Highlight AITradingMarket traction and Nexus Command product vision.",
+      aiPrep: "Prepare KPI dashboard. Highlight AITradingMarket traction and Khameleon Command product vision.",
       relatedProject: "AITradingMarket",
       actionItems: ["Prepare deck", "Update KPI metrics", "Send pre-read"],
     },
@@ -386,12 +386,12 @@ async function seed() {
       source: "Slack",
       sourceIcon: "Hash",
       sender: "Dev Team",
-      subject: "Nexus Command — API performance test results",
+      subject: "Khameleon Command — API performance test results",
       summary: "Load testing complete. API handling 2,400 req/s with p99 latency under 120ms. All endpoints passing health checks.",
       priority: "medium",
       classification: "reminder",
       aiRecommendation: "Results exceed targets. Share with stakeholders in next status update.",
-      relatedProject: "Nexus Command",
+      relatedProject: "Khameleon Command",
       priorityScore: 60,
       isRead: false,
     },
@@ -682,7 +682,7 @@ async function seed() {
       tags: ["Competitive", "AI", "Market", "Strategy"],
       sources: 41,
       credibilityScore: 88,
-      aiSummary: "Nexus Command differentiated through multi-agent orchestration and security architecture. Key gap in market: enterprise-grade personal AI with true data isolation.",
+      aiSummary: "Khameleon Command differentiated through multi-agent orchestration and security architecture. Key gap in market: enterprise-grade personal AI with true data isolation.",
     },
     {
       title: "Agent-Based Economic Modelling Literature Review",
@@ -712,7 +712,7 @@ async function seed() {
       tags: ["Architecture", "Multi-Agent", "AI", "Technical"],
       sources: 34,
       credibilityScore: 91,
-      aiSummary: "AutoGen and CrewAI patterns provide solid foundation but lack enterprise security isolation. Nexus Command's approach of isolated agent contexts with shared semantic memory appears novel.",
+      aiSummary: "AutoGen and CrewAI patterns provide solid foundation but lack enterprise security isolation. Khameleon Command's approach of isolated agent contexts with shared semantic memory appears novel.",
     },
   ]);
 
@@ -721,7 +721,7 @@ async function seed() {
     { category: "Preferences", key: "Writing Style", value: "Direct, concise, no corporate jargon. Use plain English. Bullet points for complex information.", isProtected: true },
     { category: "Preferences", key: "Meeting Preferences", value: "Prefer mornings for deep work. No meetings before 9am or after 5pm unless critical. Maximum 45 minutes per meeting.", isProtected: true },
     { category: "Preferences", key: "Communication Style", value: "Always acknowledge urgency before responding. Lead with conclusions, then reasoning.", isProtected: false },
-    { category: "Business Goals", key: "2026 Primary Goal", value: "Launch Nexus Command to 1,000 enterprise users and achieve $5M ARR by Q4 2026.", isProtected: true },
+    { category: "Business Goals", key: "2026 Primary Goal", value: "Launch Khameleon Command to 1,000 enterprise users and achieve $5M ARR by Q4 2026.", isProtected: true },
     { category: "Business Goals", key: "Investment Objective", value: "Close Series B at $20M by August 2026. Focus on AITradingMarket traction for lead narrative.", isProtected: true },
     { category: "Contacts", key: "Lead Investor", value: "Preferred contact channel: WhatsApp for urgent items, email for formal communication. Responds within 2 hours.", isProtected: false },
     { category: "Contacts", key: "Key Clients", value: "Pinnacle Capital (trading), PropertyGroup APAC (governance), ANU Economic Research. Quarterly check-ins required.", isProtected: false },

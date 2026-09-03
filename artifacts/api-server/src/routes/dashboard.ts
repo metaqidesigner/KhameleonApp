@@ -123,7 +123,7 @@ router.get("/analytics", async (_req, res) => {
       { name: "Chameleon", progress: 45, status: "at-risk" },
       { name: "Property Gov.", progress: 88, status: "on-track" },
       { name: "Economic Sim.", progress: 31, status: "delayed" },
-      { name: "Nexus Command", progress: 65, status: "on-track" },
+      { name: "Khameleon Command", progress: 65, status: "on-track" },
     ],
   });
 });

@@ -1,5 +1,6 @@
 import './orb.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { MicOff } from 'lucide-react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { OrbChatPanel } from './OrbChatPanel';
 import { OutputWaveform } from './VoiceWaveform';
@@ -7,10 +8,12 @@ import {
   clampOrbPosition,
   getDefaultOrbPosition,
   getDashboardProtectedRects,
+  getOrbAutoAvoidPosition,
   getOrbChatPanelPosition,
   getOrbChatPanelSize,
   ORB_SIZE,
   ORB_SIZE_MIN,
+  type LayoutRect,
 } from '@/lib/orbLayout';
 
 function getDefaultPos(): { x: number; y: number } {
@@ -38,11 +41,13 @@ export function JarvisOrb() {
   const setOrbActiveAgentId = useJarvisStore(s => s.setOrbActiveAgentId);
   const toggleVoice         = useJarvisStore(s => s.toggleVoice);
   const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
+  const voiceEnabled        = useJarvisStore(s => s.voiceEnabled);
 
   const pos     = orbPosition ?? getDefaultPos();
   const orbSize = orbMinimized ? ORB_SIZE_MIN : ORB_SIZE;
 
-  const wrapperRef   = useRef<HTMLDivElement>(null);
+  const wrapperRef      = useRef<HTMLDivElement>(null);
+  const panelWrapperRef = useRef<HTMLDivElement>(null);
   const coreRef      = useRef<HTMLDivElement>(null);
   const dragRef      = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const didDragRef   = useRef(false);
@@ -51,31 +56,37 @@ export function JarvisOrb() {
   const ampRafRef    = useRef<number>(0);
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [viewport, setViewport] = useState(() => ({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  }));
+  const [dragging, setDragging] = useState(false);
 
-  const panelSize = getOrbChatPanelSize(viewport.width, viewport.height);
-  const panelPos = getOrbChatPanelPosition(
-    pos.x,
-    pos.y,
-    orbSize,
-    viewport.width,
-    viewport.height,
-    getDashboardProtectedRects(viewport.height),
-    panelSize.width,
-    panelSize.height,
-  );
+  // The popup's rect is fixed to wherever the orb was when it opened — it
+  // does not follow the orb around afterward (the orb is what moves; see
+  // the auto-avoid effect below and getOrbAutoAvoidPosition's own comment).
+  const [panelPos, setPanelPos] = useState<{ left: number; top: number } | null>(null);
 
+  // ── Popup open/close: anchor the panel, move the orb clear of it,
+  //    and animate the orb back to its resting corner on close ──────
   useEffect(() => {
-    const updateViewport = () => {
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
-    };
+    if (orbChatOpen) {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const size = getOrbChatPanelSize(vw, vh);
+      const protectedRects = getDashboardProtectedRects(vh);
+      const anchoredPos = getOrbChatPanelPosition(
+        pos.x, pos.y, orbSize, vw, vh, protectedRects, size.width, size.height,
+      );
+      setPanelPos(anchoredPos);
 
-    window.addEventListener('resize', updateViewport);
-    return () => window.removeEventListener('resize', updateViewport);
-  }, []);
+      const panelRect: LayoutRect = { left: anchoredPos.left, top: anchoredPos.top, width: size.width, height: size.height };
+      setOrbPosition(getOrbAutoAvoidPosition(panelRect, vw, vh, orbSize, protectedRects));
+    } else {
+      setPanelPos(null);
+      setOrbPosition(getDefaultPos());
+    }
+    // Only the open/close transition itself should trigger this — not
+    // every subsequent orb move (dragging, etc.), or the panel would chase
+    // the orb around instead of staying put.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orbChatOpen]);
 
   // A saved position can outlive a viewport resize. Normalize it before the
   // next interaction so the orb never starts on top of the focus card.
@@ -153,12 +164,28 @@ export function JarvisOrb() {
     return () => window.removeEventListener('pointerdown', close, true);
   }, [contextMenu]);
 
+  // ── Close chat popup on outside click ─────────────────────────
+  // The orb itself is excluded — it already has its own right-click/
+  // double-click handling for opening and closing the popup.
+  useEffect(() => {
+    if (!orbChatOpen) return;
+    const closeOnOutsideClick = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (wrapperRef.current?.contains(target)) return;
+      if (panelWrapperRef.current?.contains(target)) return;
+      setOrbChatOpen(false);
+    };
+    window.addEventListener('pointerdown', closeOnOutsideClick, true);
+    return () => window.removeEventListener('pointerdown', closeOnOutsideClick, true);
+  }, [orbChatOpen, setOrbChatOpen]);
+
   // ── Drag ──────────────────────────────────────────────────────
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
     didDragRef.current = false;
+    setDragging(true);
   }, [pos]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
@@ -182,6 +209,7 @@ export function JarvisOrb() {
   const onPointerUp = useCallback(() => {
     dragRef.current = null;
     didDragRef.current = false;
+    setDragging(false);
   }, []);
 
   // ── Click — left click: cancel speech / restore only ─────────
@@ -219,7 +247,7 @@ export function JarvisOrb() {
     <>
       <div
         ref={wrapperRef}
-        className="jarvis-orb-wrapper"
+        className={`jarvis-orb-wrapper${dragging ? '' : ' orb-animated'}`}
         style={{ left: pos.x, top: pos.y, cursor: didDragRef.current ? 'grabbing' : 'grab' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -228,9 +256,9 @@ export function JarvisOrb() {
         onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
       >
-        <div className={`jarvis-orb-container ${orbStatus}${orbMinimized ? ' minimized' : ''}`}>
+        <div className={`jarvis-orb-container ${voiceEnabled ? orbStatus : 'muted'}${orbMinimized ? ' minimized' : ''}`}>
           {/* Ambient bloom behind everything */}
-          <div className={`orb-glow ${orbStatus}`} />
+          <div className={`orb-glow ${voiceEnabled ? orbStatus : 'muted'}`} />
 
           {/* Layer 1 — outer decorative partial arcs (slow, counter-rotating) */}
           <div className="orb-arc orb-arc-1" />
@@ -248,17 +276,22 @@ export function JarvisOrb() {
 
           {/* Layer 3 — core sphere with nebula texture */}
           <div className="orb-core" ref={coreRef} />
+          {!voiceEnabled && !orbMinimized && <MicOff size={16} className="orb-muted-icon" />}
         </div>
 
         <OutputWaveform visible={orbStatus === 'speaking'} />
       </div>
 
-      {/* Chat panel — functionality completely unchanged */}
-      {orbChatOpen && !orbMinimized && (
-        <OrbChatPanel
-          style={{ left: panelPos.left, top: panelPos.top }}
-          onClose={() => setOrbChatOpen(false)}
-        />
+      {/* Chat panel — functionality completely unchanged. Position is fixed
+          for as long as it's open (see the open/close effect above) — it
+          does not follow the orb around; the orb moves clear of it instead. */}
+      {orbChatOpen && !orbMinimized && panelPos && (
+        <div ref={panelWrapperRef}>
+          <OrbChatPanel
+            style={{ left: panelPos.left, top: panelPos.top }}
+            onClose={() => setOrbChatOpen(false)}
+          />
+        </div>
       )}
 
       {/* Context menu (still wired, accessible via code) */}

@@ -1,8 +1,8 @@
 kind = "web"
 previewPath = "/"
-title = "Nexus Command"
+title = "Khameleon Command"
 version = "1.0.0"
-id = "artifacts/nexus-command"
+id = "artifacts/khameleon-command"
 router = "path"
 
 [[integratedSkills]]
@@ -15,11 +15,11 @@ paths = [ "/" ]
 localPort = 20596
 
 [services.development]
-run = "pnpm --filter @workspace/nexus-command run dev"
+run = "pnpm --filter @workspace/khameleon-command run dev"
 
 [services.production]
-build = [ "pnpm", "--filter", "@workspace/nexus-command", "run", "build" ]
-publicDir = "artifacts/nexus-command/dist/public"
+build = [ "pnpm", "--filter", "@workspace/khameleon-command", "run", "build" ]
+publicDir = "artifacts/khameleon-command/dist/public"
 serve = "static"
 
 [[services.production.rewrites]]

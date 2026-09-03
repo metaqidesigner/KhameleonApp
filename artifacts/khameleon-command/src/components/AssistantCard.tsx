@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Send } from 'lucide-react';
+import { Send, MicOff } from 'lucide-react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import {
   streamAgentChat,
@@ -55,6 +55,7 @@ export function AssistantCard() {
   const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
   const orbActiveAgentId    = useJarvisStore(s => s.orbActiveAgentId);
   const setOrbActiveAgentId = useJarvisStore(s => s.setOrbActiveAgentId);
+  const voiceEnabled        = useJarvisStore(s => s.voiceEnabled);
   const voiceSettings       = useJarvisStore(s => s.voiceSettings);
   const pushAgentEvent      = useJarvisStore(s => s.pushAgentEvent);
 
@@ -143,7 +144,7 @@ export function AssistantCard() {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setStreaming(true);
-    setOrbStatus('speaking');
+    setOrbStatus('thinking');
     streamBufRef.current = '';
 
     const history: ChatMessage[] = [
@@ -175,9 +176,14 @@ export function AssistantCard() {
       },
       (err) => {
         setStreaming(false);
-        setOrbStatus('online');
         const offline = err.includes('unreachable') || err.includes('fetch') || err.includes('network');
-        if (offline) setOrbStatus('offline');
+        if (offline) {
+          setOrbStatus('offline');
+        } else {
+          // Coral flash, then settle back to idle — spec §4: "single pulse, not sustained".
+          setOrbStatus('error');
+          setTimeout(() => setOrbStatus('online'), 900);
+        }
         setMessages(prev => prev.map(m =>
           m.id === assistantId
             ? { ...m, role: 'error' as const, content: offline ? 'CONNECTION LOST' : `AGENT ERROR — ${err}` }
@@ -189,89 +195,94 @@ export function AssistantCard() {
 
   const hasMessages = messages.length > 0;
 
+  const orbEl = (
+    <div style={{ position: 'relative', width: 90, height: 90 }}>
+      <div className={`jarvis-orb-container ${voiceEnabled ? orbStatus : 'muted'}`}>
+        <div className={`orb-glow ${voiceEnabled ? orbStatus : 'muted'}`} />
+        <div className="orb-arc orb-arc-1" />
+        <div className="orb-arc orb-arc-2" />
+        <div className="orb-ring orb-ring-outer"><div className="orb-moon" /></div>
+        <div className="orb-ring orb-ring-inner"><div className="orb-beacon" /></div>
+        <div className="orb-core" ref={coreRef} />
+        {!voiceEnabled && <MicOff size={16} className="orb-muted-icon" />}
+      </div>
+    </div>
+  );
+
+  const askBarEl = (
+    <div className="ac-input-wrap">
+      <input
+        ref={inputRef}
+        className="ac-input"
+        placeholder="Ask anything..."
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handleSend(input); }}
+        disabled={streaming}
+      />
+      <button
+        className="ac-send-btn"
+        disabled={streaming || !input.trim()}
+        onClick={() => handleSend(input)}
+        title="Send"
+      >
+        <Send size={13} strokeWidth={2.2} />
+      </button>
+    </div>
+  );
+
+  const agentsRowEl = (
+    <div className="ac-agents-row">
+      <span className="ac-connected-label">Connected</span>
+      {roster.slice(0, 5).map(agent => (
+        <button
+          key={agent.id}
+          className={`ac-agent-pill${agent.id === orbActiveAgentId ? ' active' : ''}`}
+          title={agent.name}
+          onClick={() => setOrbActiveAgentId(agent.id)}
+          style={{
+            borderColor: agent.id === orbActiveAgentId
+              ? (AGENT_COLORS[agent.id] ?? 'var(--j-teal)')
+              : undefined,
+            color: agent.id === orbActiveAgentId
+              ? (AGENT_COLORS[agent.id] ?? 'var(--j-teal)')
+              : undefined,
+          }}
+        >
+          {agent.initials}
+        </button>
+      ))}
+      <span className="ac-tool-add" title="Add a connection">+</span>
+    </div>
+  );
+
+  const messagesEl = (
+    <div className="ac-messages">
+      {messages.map(msg => (
+        <div key={msg.id} className={
+          msg.role === 'user' ? 'ac-msg-user' :
+          msg.role === 'error' ? 'ac-msg-error' : 'ac-msg-assistant'
+        }>
+          {msg.role === 'assistant' && !msg.content && streaming
+            ? <span style={{ opacity: 0.45, fontFamily: 'var(--j-font-mono)', fontSize: 10 }}>PROCESSING…</span>
+            : msg.content}
+        </div>
+      ))}
+      <div ref={messagesEndRef} />
+    </div>
+  );
+
   return (
     <div className="ac-card">
-      {/* ── Orb visual ───────────────────────────────────────── */}
-      <div className="ac-orb-area">
-        <div style={{ position: 'relative', width: 90, height: 90 }}>
-          <div className={`jarvis-orb-container ${orbStatus}`}>
-            <div className={`orb-glow ${orbStatus}`} />
-            <div className="orb-arc orb-arc-1" />
-            <div className="orb-arc orb-arc-2" />
-            <div className="orb-ring orb-ring-outer"><div className="orb-moon" /></div>
-            <div className="orb-ring orb-ring-inner"><div className="orb-beacon" /></div>
-            <div className="orb-core" ref={coreRef} />
-          </div>
-        </div>
-      </div>
-
-      {/* ── Greeting OR messages ─────────────────────────────── */}
+      <div className="ac-orb-area">{orbEl}</div>
       {!hasMessages ? (
         <div className="ac-greeting">
           <div className="ac-greeting-title">{greeting.title}</div>
           <div className="ac-greeting-sub">{greeting.sub}</div>
         </div>
-      ) : (
-        <div className="ac-messages">
-          {messages.map(msg => (
-            <div key={msg.id} className={
-              msg.role === 'user' ? 'ac-msg-user' :
-              msg.role === 'error' ? 'ac-msg-error' : 'ac-msg-assistant'
-            }>
-              {msg.role === 'assistant' && !msg.content && streaming
-                ? <span style={{ opacity: 0.45, fontFamily: 'var(--j-font-mono)', fontSize: 10 }}>PROCESSING…</span>
-                : msg.content}
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-      )}
-
-      {/* ── Input ────────────────────────────────────────────── */}
-      <div className="ac-input-row">
-        <div className="ac-input-wrap">
-          <input
-            ref={inputRef}
-            className="ac-input"
-            placeholder="Ask anything..."
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSend(input); }}
-            disabled={streaming}
-          />
-          <button
-            className="ac-send-btn"
-            disabled={streaming || !input.trim()}
-            onClick={() => handleSend(input)}
-            title="Send"
-          >
-            <Send size={13} strokeWidth={2.2} />
-          </button>
-        </div>
-      </div>
-
-      {/* ── Connected agents ─────────────────────────────────── */}
-      <div className="ac-agents-row">
-        <span className="ac-connected-label">CONNECTED</span>
-        {roster.slice(0, 5).map(agent => (
-          <button
-            key={agent.id}
-            className={`ac-agent-pill${agent.id === orbActiveAgentId ? ' active' : ''}`}
-            title={agent.name}
-            onClick={() => setOrbActiveAgentId(agent.id)}
-            style={{
-              borderColor: agent.id === orbActiveAgentId
-                ? (AGENT_COLORS[agent.id] ?? 'var(--j-teal)')
-                : undefined,
-              color: agent.id === orbActiveAgentId
-                ? (AGENT_COLORS[agent.id] ?? 'var(--j-teal)')
-                : undefined,
-            }}
-          >
-            {agent.initials}
-          </button>
-        ))}
-      </div>
+      ) : messagesEl}
+      <div className="ac-input-row">{askBarEl}</div>
+      {agentsRowEl}
     </div>
   );
 }

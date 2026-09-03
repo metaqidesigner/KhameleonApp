@@ -25,6 +25,6 @@ description: Multi-provider agent gateway in api-server; Replit AI integrations 
 **How to apply:** When adding new providers, follow the openai SDK pattern in gateway.ts — add to PROVIDER_URLS and envMap, then add default config in defaults.ts.
 
 ## Frontend
-- `artifacts/nexus-command/src/lib/agentsApi.ts` — typed API client with offline fallbacks
-- `artifacts/nexus-command/src/pages/agents.tsx` — sub-nav shell with 6 sub-tabs
+- `artifacts/khameleon-command/src/lib/agentsApi.ts` — typed API client with offline fallbacks
+- `artifacts/khameleon-command/src/pages/agents.tsx` — sub-nav shell with 6 sub-tabs
 - Sub-pages: Roster, AgentChat, MultiAgent, Compare, Council, AgentSettings

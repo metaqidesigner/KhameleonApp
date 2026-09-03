@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Bell, MoreHorizontal, User, Sun, Moon } from 'lucide-react';
+import { useJarvisStore } from '@/store/jarvisStore';
 
 // Theme toggle — kept from previous version
 function ThemeToggle() {
@@ -49,6 +50,42 @@ function BrandMark() {
   );
 }
 
+// "Assistant / Workspace" text tabs — mirrors the icon rail's top two
+// destinations so the top nav reads the same way the mockup's does.
+function NavTabs() {
+  const activeTab    = useJarvisStore(s => s.activeTab);
+  const setActiveTab = useJarvisStore(s => s.setActiveTab);
+  const tabs: { id: 'assistant' | 'overview'; label: string }[] = [
+    { id: 'assistant', label: 'Assistant' },
+    { id: 'overview',  label: 'Workspace' },
+  ];
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 22, marginLeft: 18 }}>
+      {tabs.map(tab => {
+        const isActive = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              fontFamily: 'var(--j-font-ui)',
+              fontSize: 13,
+              fontWeight: isActive ? 600 : 400,
+              color: isActive ? 'var(--j-text)' : 'var(--j-text-muted)',
+            }}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TopBar() {
   return (
     <div className="j-topbar-slim">
@@ -58,14 +95,14 @@ export default function TopBar() {
         <span style={{
           fontFamily: 'var(--j-font-head)',
           fontSize: 13,
-          fontWeight: 700,
+          fontWeight: 600,
           color: 'rgba(255,255,255,0.88)',
-          letterSpacing: '0.14em',
-          marginRight: 20,
+          letterSpacing: '0.02em',
           flexShrink: 0,
         }}>
           Khameleon
         </span>
+        <NavTabs />
       </div>
 
       {/* ── Right: icon actions ───────────────────────────── */}

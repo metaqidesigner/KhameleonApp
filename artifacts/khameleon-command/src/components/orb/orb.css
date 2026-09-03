@@ -37,6 +37,25 @@
   0%, 100% { opacity: 1;   transform: scale(1);    }
   50%       { opacity: 0.6; transform: scale(0.75); }
 }
+/* error — single coral flash, not sustained (spec §4) */
+@keyframes orb-error-flash {
+  0%   { opacity: 0.3; }
+  30%  { opacity: 1;   }
+  100% { opacity: 0.3; }
+}
+/* thinking — the core mark itself rotates continuously, not just hue-shifts (spec §4) */
+@keyframes orb-core-think-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg);   }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+/* error — ring briefly stutters (spec §4) instead of its normal smooth spin */
+@keyframes orb-ring-stutter {
+  0%, 100% { transform: rotate(0deg); }
+  20%      { transform: rotate(14deg); }
+  40%      { transform: rotate(-10deg); }
+  60%      { transform: rotate(6deg); }
+  80%      { transform: rotate(-4deg); }
+}
 /* waveform bars */
 @keyframes orb-waveform {
   0%, 100% { transform: scaleY(0.3); }
@@ -60,6 +79,13 @@
   touch-action: none;
 }
 .jarvis-orb-wrapper:active { cursor: grabbing !important; }
+/* Standard easing (design-spec.md §3 Motion) for the orb's automatic moves
+   (auto-avoiding the chat popup, returning to its default corner). Applied
+   whenever the orb isn't actively being dragged by hand, so a manual drag
+   still tracks the pointer 1:1 with no lag — see JarvisOrb's `dragging` state. */
+.jarvis-orb-wrapper.orb-animated {
+  transition: left 0.4s cubic-bezier(0.22, 1, 0.36, 1), top 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
 
 .jarvis-orb-container {
   position: relative;
@@ -94,6 +120,19 @@
 .orb-glow.offline {
   background: radial-gradient(circle, rgba(100,100,100,0.12) 0%, transparent 68%);
   animation-duration: 4s;
+}
+.orb-glow.thinking {
+  background: radial-gradient(circle, rgba(140,124,240,0.28) 0%, transparent 68%);
+  animation-duration: 1.8s;
+}
+.orb-glow.error {
+  background: radial-gradient(circle, rgba(231,122,122,0.4) 0%, transparent 68%);
+  animation: orb-error-flash 0.9s ease-out 1;
+}
+.orb-glow.muted {
+  background: radial-gradient(circle, rgba(120,120,120,0.10) 0%, transparent 68%);
+  animation-duration: 5s;
+  opacity: 0.3;
 }
 
 /* ── Outer decorative arcs ─────────────────────────────────── */
@@ -161,6 +200,36 @@
 .offline .orb-arc-2 {
   border-color: transparent rgba(100,100,110,0.12) rgba(100,100,110,0.12) rgba(100,100,110,0.12);
   animation-duration: 50s;
+}
+
+/* thinking — arcs lock violet */
+.thinking .orb-arc-1 {
+  border-color: rgba(140,124,240,0.50) rgba(140,124,240,0.50) transparent rgba(140,124,240,0.50);
+  animation-duration: 14s;
+}
+.thinking .orb-arc-2 {
+  border-color: transparent rgba(140,124,240,0.38) rgba(140,124,240,0.38) rgba(140,124,240,0.38);
+  animation-duration: 24s;
+}
+
+/* error — arcs flash coral, brief stutter instead of a smooth spin */
+.error .orb-arc-1 {
+  border-color: rgba(231,122,122,0.55) rgba(231,122,122,0.55) transparent rgba(231,122,122,0.55);
+  animation: orb-ring-stutter 0.9s ease-out 1;
+}
+.error .orb-arc-2 {
+  border-color: transparent rgba(231,122,122,0.4) rgba(231,122,122,0.4) rgba(231,122,122,0.4);
+  animation: orb-ring-stutter 0.9s ease-out 1;
+}
+
+/* muted — arcs dim, distinct from offline's gray so the two states read differently */
+.muted .orb-arc-1 {
+  border-color: rgba(150,150,150,0.14) rgba(150,150,150,0.14) transparent rgba(150,150,150,0.14);
+  animation-duration: 36s;
+}
+.muted .orb-arc-2 {
+  border-color: transparent rgba(150,150,150,0.10) rgba(150,150,150,0.10) rgba(150,150,150,0.10);
+  animation-duration: 60s;
 }
 
 /* minimized — hide outer arcs */
@@ -235,6 +304,41 @@
   animation-duration: 9s;
 }
 
+/* thinking — violet, ring segments animate inward like a closing aperture (spec §4) */
+.thinking .orb-ring-outer {
+  border-color: rgba(140,124,240,0.34);
+  animation-duration: 4s;
+}
+.thinking .orb-ring-inner {
+  border-color: rgba(140,124,240,0.9) rgba(140,124,240,0.9) transparent transparent;
+  box-shadow: 0 0 10px rgba(140,124,240,0.5);
+  animation: orb-ring-ccw 2.2s linear infinite, orb-breathe 2.2s ease-in-out infinite;
+}
+
+/* error — coral, brief stutter (spec §4: "ring briefly stutters, returns to idle") */
+.error .orb-ring-outer {
+  border-color: rgba(231,122,122,0.32);
+  animation: orb-ring-stutter 0.9s ease-out 1;
+}
+.error .orb-ring-inner {
+  border-color: rgba(231,122,122,0.9) rgba(231,122,122,0.9) transparent transparent;
+  box-shadow: 0 0 10px rgba(231,122,122,0.5);
+  animation: orb-ring-stutter 0.9s ease-out 1;
+}
+
+/* muted — dims to ~30% opacity (spec §4) */
+.muted .orb-ring-outer {
+  border-color: rgba(111,230,189,0.20);
+  opacity: 0.3;
+  animation-duration: 10s;
+}
+.muted .orb-ring-inner {
+  border-color: rgba(111,230,189,0.75) rgba(111,230,189,0.75) transparent transparent;
+  box-shadow: none;
+  opacity: 0.3;
+  animation-duration: 6s;
+}
+
 /* minimized — show only inner ring at reduced size */
 .minimized .orb-ring-outer { display: none; }
 .minimized .orb-ring-inner {
@@ -276,6 +380,20 @@
   background: rgba(160,160,170,0.5);
   box-shadow: 0 0 4px rgba(120,120,130,0.4);
 }
+.thinking .orb-moon {
+  background: rgba(200,190,255,0.95);
+  box-shadow:
+    0 0 7px 3px rgba(140,124,240,1),
+    0 0 16px rgba(140,124,240,0.6);
+}
+.error .orb-moon {
+  background: rgba(255,190,190,0.95);
+  box-shadow:
+    0 0 7px 3px rgba(231,122,122,1),
+    0 0 16px rgba(231,122,122,0.6);
+  animation: orb-beacon-pulse 0.45s ease-in-out 2;
+}
+.muted .orb-moon { opacity: 0.3; }
 .minimized .orb-moon { display: none; }
 
 /* ── Beacon (child of inner ring) ──────────────────────────── */
@@ -311,6 +429,21 @@
   background: rgba(130,130,140,0.4);
   box-shadow: 0 0 3px rgba(100,100,110,0.3);
 }
+.thinking .orb-beacon {
+  background: rgba(140,124,240,0.95);
+  box-shadow:
+    0 0 6px 2px rgba(140,124,240,1),
+    0 0 14px rgba(140,124,240,0.6);
+  animation-duration: 0.9s;
+}
+.error .orb-beacon {
+  background: rgba(231,122,122,0.95);
+  box-shadow:
+    0 0 6px 2px rgba(231,122,122,1),
+    0 0 14px rgba(231,122,122,0.6);
+  animation: orb-beacon-pulse 0.45s ease-in-out 2;
+}
+.muted .orb-beacon { opacity: 0.3; }
 
 /* ── Core sphere ───────────────────────────────────────────── */
 /* translate(-50%,-50%) keeps it centered; JS overrides transform
@@ -326,7 +459,7 @@
   overflow: hidden;
 
   /* Nebula texture — desaturated + high contrast so cloud detail reads clearly */
-  background-image: url('/nexus-command/nebula-core.png');
+  background-image: url('/khameleon-command/nebula-core.png');
   background-size: cover;
   background-position: center;
   filter: saturate(0) contrast(1.85) brightness(1.3);
@@ -410,6 +543,53 @@
 }
 .offline .orb-core::before {
   opacity: 0; /* no tint */
+}
+
+/* Thinking — violet lock-in; the core mark itself rotates continuously
+   rather than just hue-shifting, per spec §4's "not just a color swap". */
+.thinking .orb-core {
+  filter: saturate(0.6) contrast(1.5) brightness(1.0);
+  box-shadow:
+    0 0 20px rgba(140,124,240,0.55),
+    0 0 40px rgba(140,124,240,0.20),
+    0 0 0 1px rgba(140,124,240,0.18);
+  animation: orb-core-think-spin 6s linear infinite;
+}
+.thinking .orb-core::before {
+  background: #8C7CF0;
+  opacity: 0.62;
+}
+
+/* Error — coral flash, single pulse, not sustained; settles back to idle. */
+.error .orb-core {
+  filter: saturate(0.7) contrast(1.5) brightness(1.05);
+  box-shadow:
+    0 0 24px rgba(231,122,122,0.6),
+    0 0 44px rgba(231,122,122,0.24),
+    0 0 0 1px rgba(231,122,122,0.22);
+}
+.error .orb-core::before {
+  background: #E77A7A;
+  opacity: 0.7;
+  animation: orb-error-flash 0.9s ease-out 1;
+}
+
+/* Muted — ring dims to ~30% opacity; core carries a mic-off glyph (spec §4). */
+.muted .orb-core {
+  filter: saturate(0) contrast(1.1) brightness(0.5);
+  opacity: 0.3;
+}
+.muted .orb-core::before {
+  opacity: 0;
+}
+.orb-muted-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(196,212,236,0.7);
+  z-index: 3;
+  pointer-events: none;
 }
 
 /* ── Minimized core ────────────────────────────────────────── */
@@ -545,11 +725,11 @@
 }
 .orb-chat-greeting-title {
   font-family: var(--j-font-head);
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   color: #fff;
-  letter-spacing: 0.05em;
   margin-bottom: 6px;
+  text-shadow: 0 0 18px rgba(111,230,189,0.25);
 }
 .orb-chat-greeting-sub {
   font-family: var(--j-font-ui);
@@ -847,7 +1027,7 @@
 
 /* ── Reduced motion ────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .orb-arc, .orb-ring, .orb-glow, .orb-beacon, .orb-moon {
+  .orb-arc, .orb-ring, .orb-glow, .orb-beacon, .orb-moon, .orb-core, .orb-core::before {
     animation-duration: 20s !important;
   }
 }

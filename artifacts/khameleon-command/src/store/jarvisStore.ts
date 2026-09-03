@@ -12,7 +12,12 @@ export type TabId =
   | 'comms' | 'analytics' | 'security' | 'vault'
   | 'skills' | 'settings' | 'tasks';
 
-export type OrbStatus = 'online' | 'speaking' | 'listening' | 'offline';
+// 'thinking' — processing a request, before a response starts (violet).
+// 'error'    — a single coral flash on a non-connection failure, then
+//              reverts to 'online' (spec §4: "single pulse, not sustained").
+// 'muted'    — visual override applied at render time when voice output
+//              is disabled, regardless of the underlying status.
+export type OrbStatus = 'online' | 'speaking' | 'listening' | 'thinking' | 'error' | 'offline' | 'muted';
 
 export interface ChatMessage {
   id: string;
@@ -145,7 +150,7 @@ interface JarvisStore {
 export const useJarvisStore = create<JarvisStore>()(
   persist(
     (set) => ({
-      activeTab: 'overview',
+      activeTab: 'assistant',
       canvasWindowsMinimized: {},
       canvasWindowsPositions: {},
       chatOpen: false,

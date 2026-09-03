@@ -9,6 +9,7 @@ import { JarvisOrbPortal } from './orb/JarvisOrbPortal';
 import { VoiceController } from './orb/VoiceController';
 import { useJarvisStore } from '@/store/jarvisStore';
 
+const AssistantHome = lazy(() => import('@/pages/assistant-home'));
 const UnifiedCanvas = lazy(() => import('@/pages/canvas'));
 const Agents     = lazy(() => import('@/pages/agents'));
 const Research   = lazy(() => import('@/pages/research'));
@@ -36,7 +37,8 @@ function PageRouter() {
   const activeTab = useJarvisStore(s => s.activeTab);
   return (
     <Suspense fallback={<Fallback />}>
-      {(activeTab === 'assistant' || activeTab === 'overview') && <UnifiedCanvas />}
+      {activeTab === 'assistant' && <AssistantHome />}
+      {activeTab === 'overview'  && <UnifiedCanvas />}
       {activeTab === 'agents'    && <Agents />}
       {activeTab === 'research'  && <Research />}
       {activeTab === 'memory'    && <Memory />}
