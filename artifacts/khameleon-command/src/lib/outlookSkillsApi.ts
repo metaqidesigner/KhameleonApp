@@ -90,10 +90,17 @@ export interface TriageItem {
   undo: TriageUndoEntry;
 }
 
+/** An extracted action item, plus the real Task row created for it (if creation succeeded). */
+export interface TriageActionItem {
+  text: string;
+  taskId: number | null;
+  sourceMessageId: string;
+}
+
 export interface TriageResult {
   taskRunId: string;
   items: TriageItem[];
-  actionItems: string[];
+  actionItems: TriageActionItem[];
   counts: Record<TriageClassification, number>;
 }
 
@@ -107,11 +114,15 @@ export async function runOutlookTriageInbox(): Promise<TriageResult> {
   return asJson<TriageResult>(response, 'Triage request');
 }
 
-export async function undoOutlookTriage(entries: TriageUndoEntry[]): Promise<{ ok: boolean; restored: number; failed: number }> {
+/** taskIds: also deletes the Task rows the run created, so undo doesn't leave orphaned tasks behind. */
+export async function undoOutlookTriage(
+  entries: TriageUndoEntry[],
+  taskIds: number[] = []
+): Promise<{ ok: boolean; restored: number; failed: number; tasksDeleted: number }> {
   const response = await fetch(`${BASE}/skills/outlook-triage-inbox/undo`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ entries }),
+    body: JSON.stringify({ entries, taskIds }),
   });
   return asJson(response, 'Undo');
 }

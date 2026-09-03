@@ -11,6 +11,8 @@
  */
 
 import { Router, type Request, type Response } from "express";
+import { db, tasksTable } from "@workspace/db";
+import { inArray } from "drizzle-orm";
 import { isConnected } from "../lib/oauthTokens.js";
 import { runOutlookTriageInbox, undoTriageItem, type TriageUndoEntry } from "../agents/skills/outlookTriageInbox.js";
 
@@ -33,7 +35,7 @@ router.post("/", async (req: Request, res: Response) => {
 
 router.post("/undo", async (req: Request, res: Response) => {
   try {
-    const { entries } = req.body as { entries?: TriageUndoEntry[] };
+    const { entries, taskIds } = req.body as { entries?: TriageUndoEntry[]; taskIds?: number[] };
     if (!Array.isArray(entries) || entries.length === 0) {
       res.status(400).json({ error: "entries (non-empty array) is required" });
       return;
@@ -47,7 +49,25 @@ router.post("/undo", async (req: Request, res: Response) => {
       req.log.warn({ failures: failures.map((f) => String(f.reason)) }, "Some triage undo entries failed");
     }
 
-    res.json({ ok: failures.length === 0, restored: entries.length - failures.length, failed: failures.length });
+    // Undoing a triage run also removes the Tasks it created from that run's
+    // action items - otherwise "undo" leaves real, unexplained tasks behind
+    // even though the mailbox state they were derived from was reverted.
+    let tasksDeleted = 0;
+    if (Array.isArray(taskIds) && taskIds.length > 0) {
+      try {
+        const deleted = await db.delete(tasksTable).where(inArray(tasksTable.id, taskIds)).returning({ id: tasksTable.id });
+        tasksDeleted = deleted.length;
+      } catch (err) {
+        req.log.warn({ err, taskIds }, "Failed to delete tasks created by an undone triage run");
+      }
+    }
+
+    res.json({
+      ok: failures.length === 0,
+      restored: entries.length - failures.length,
+      failed: failures.length,
+      tasksDeleted,
+    });
   } catch (err) {
     req.log.error({ err }, "outlook-triage-inbox undo failed");
     res.status(500).json({ error: "Internal server error" });

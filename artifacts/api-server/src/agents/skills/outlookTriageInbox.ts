@@ -13,7 +13,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
-import { taskRunsTable, type TaskStep } from "@workspace/db";
+import { taskRunsTable, tasksTable, type TaskStep } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { emitTaskEvent } from "../taskEvents.js";
 import { logger } from "../../lib/logger.js";
@@ -110,10 +110,17 @@ export interface TriageItem {
   undo: TriageUndoEntry;
 }
 
+/** An extracted action item, plus the real Task row created for it (if creation succeeded). */
+export interface TriageActionItem {
+  text: string;
+  taskId: number | null;
+  sourceMessageId: string;
+}
+
 export interface TriageResult {
   taskRunId: string;
   items: TriageItem[];
-  actionItems: string[];
+  actionItems: TriageActionItem[];
   counts: Record<TriageClassification, number>;
 }
 
@@ -262,10 +269,14 @@ export async function runOutlookTriageInbox(): Promise<TriageResult> {
       completedAt: new Date().toISOString(),
     });
 
-    // Step 5 — pipeline: extract action items into a plain-language list
+    // Step 5 — pipeline: extract action items, and turn each into a real Task
+    // (tasksTable) instead of a plain-language line that only ever lived
+    // inside this one receipt's detail text. category 'communication' and
+    // source 'agent' match the taxonomy taskOps.ts's own create_task tool
+    // already uses; threadId links back to the real Outlook conversation.
     await setStep(taskRunId, steps, 4, { status: "running", startedAt: new Date().toISOString() });
     const needsAction = classified.filter((c) => c.classification === "urgent" || c.classification === "action_needed");
-    let actionItems: string[] = [];
+    const actionItems: TriageActionItem[] = [];
     if (needsAction.length > 0) {
       const client = getClient();
       const listing = needsAction
@@ -279,24 +290,55 @@ export async function runOutlookTriageInbox(): Promise<TriageResult> {
           messages: [{ role: "user", content: listing }],
         })
       );
-      const parsed = parseJsonArray(response);
-      actionItems = parsed.filter((s): s is string => typeof s === "string");
+      const parsed = parseJsonArray(response).filter((s): s is string => typeof s === "string");
+
+      // Zipped by index against the same-order prompt above - Math.min guards
+      // against the model returning a different count than requested despite
+      // the instruction, rather than reading past either array's end.
+      const pairCount = Math.min(parsed.length, needsAction.length);
+      for (let i = 0; i < pairCount; i++) {
+        const text = parsed[i];
+        const source = needsAction[i];
+        let taskId: number | null = null;
+        try {
+          const [task] = await db
+            .insert(tasksTable)
+            .values({
+              title: text,
+              description: `From triage of "${source.message.subject}" (${source.message.from?.emailAddress?.address ?? "unknown sender"})`,
+              category: "communication",
+              priority: source.classification === "urgent" ? "urgent" : "medium",
+              source: "agent",
+              threadId: source.message.conversationId,
+            })
+            .returning({ id: tasksTable.id });
+          taskId = task?.id ?? null;
+        } catch (err) {
+          // A failed task insert shouldn't fail the whole triage run - the
+          // classification/mailbox actions above already succeeded and are
+          // real; this just means one action item has no linked Task.
+          logger.warn({ err, subject: source.message.subject }, "Failed to create task for triage action item");
+        }
+        actionItems.push({ text, taskId, sourceMessageId: source.message.id });
+      }
     }
+    const tasksCreated = actionItems.filter((a) => a.taskId !== null).length;
     await setStep(taskRunId, steps, 4, {
       status: "done",
-      output: `Extracted ${actionItems.length} action item(s)`,
+      output: `Extracted ${actionItems.length} action item(s), created ${tasksCreated} task(s)`,
       completedAt: new Date().toISOString(),
     });
 
     const counts: Record<TriageClassification, number> = { urgent: 0, action_needed: 0, fyi: 0, low_priority: 0 };
     for (const item of items) counts[item.classification]++;
 
+    const previewText = actionItems.map((a) => a.text).join("\n");
     const summary = `Triaged ${items.length} unread: ${counts.urgent} urgent, ${counts.action_needed} action needed, ${counts.fyi} FYI, ${counts.low_priority} low priority`;
     await db
       .update(taskRunsTable)
-      .set({ status: "completed", resultSummary: summary, previewContent: actionItems.join("\n"), completedAt: new Date(), updatedAt: new Date() })
+      .set({ status: "completed", resultSummary: summary, previewContent: previewText, completedAt: new Date(), updatedAt: new Date() })
       .where(eq(taskRunsTable.id, taskRunId));
-    emitTaskEvent(taskRunId, { type: "done", summary, preview: actionItems.join("\n") });
+    emitTaskEvent(taskRunId, { type: "done", summary, preview: previewText });
 
     return { taskRunId, items, actionItems, counts };
   } catch (err) {

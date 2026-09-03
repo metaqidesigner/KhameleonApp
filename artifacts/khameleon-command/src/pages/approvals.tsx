@@ -196,13 +196,15 @@ export default function Approvals() {
       const byLine = result.items
         .map(i => `[${i.classification}] ${i.subject} — ${i.from} (${i.actionTaken}, ${i.source})`)
         .join('\n');
+      const tasksCreated = result.actionItems.filter(a => a.taskId !== null).length;
       const actionItemsLine = result.actionItems.length
-        ? `\n\nAction items:\n${result.actionItems.map(a => `- ${a}`).join('\n')}`
+        ? `\n\nAction items (${tasksCreated}/${result.actionItems.length} saved as real tasks):\n${result.actionItems.map(a => `- ${a.text}${a.taskId ? ` [task #${a.taskId}]` : ' [not saved]'}`).join('\n')}`
         : '';
+      const taskIds = result.actionItems.map(a => a.taskId).filter((id): id is number => id !== null);
 
       setReceipts(r => [{
         id: receiptId,
-        description: `Triaged ${result.items.length} unread message${result.items.length !== 1 ? 's' : ''}`,
+        description: `Triaged ${result.items.length} unread message${result.items.length !== 1 ? 's' : ''}${tasksCreated ? `, created ${tasksCreated} task${tasksCreated !== 1 ? 's' : ''}` : ''}`,
         category: 'inbox_triaged',
         scope: 'mail.readwrite',
         outcome: 'success' as const,
@@ -211,7 +213,7 @@ export default function Approvals() {
         canUndo: true,
         detail: `${byLine}${actionItemsLine}`,
         onUndo: async () => {
-          await undoOutlookTriage(result.items.map(i => i.undo));
+          await undoOutlookTriage(result.items.map(i => i.undo), taskIds);
           setReceipts(rs => rs.filter(rc => rc.id !== receiptId));
         },
       }, ...r]);
