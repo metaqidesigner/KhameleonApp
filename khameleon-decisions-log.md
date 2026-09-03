@@ -271,6 +271,21 @@ Added real `POST /index` (reads a file via the same path-traversal-guarded `read
 
 **Not verified here, on purpose:** a live triage run against a real mailbox and real Postgres — same limitation as every Outlook integration this session.
 
+## 2026-09-03 — 'awaiting_confirmation' task runs now get a real visual treatment
+
+**Closing a gap flagged and left as cosmetic when outlook-draft-email was built.** `TaskRunStatus` was a closed 5-value union that never included `awaiting_confirmation` — the real status the backend sets once a draft is ready and waiting on the user. Concretely, the frontend was silently mishandling a real value it had never been told about:
+
+- `StatusBadge`'s lookup fell through to the `queued` entry (violet "QUEUED") for a task that had finished every real step and was just waiting on confirmation — actively misleading, not just unstyled.
+- `TaskRunCard`'s icon/border/glow fell through to the generic neutral default, even though design-spec.md §6 calls "needs input" the single highest-prominence state in the window model.
+- `CommandsPanel` bucketed it into "history" (mixed with completed/failed/cancelled, rendered as a collapsed `HistoryRow`) instead of the active section's fuller `TaskRunCard` treatment.
+- Neither `tasks.tsx` nor `ActiveTaskWindow.tsx`'s SSE handlers called `removeActiveTask` on this transition, even though done/error/cancelled all do — would have left it in the active-tasks indicator indefinitely.
+
+**Fixed all four:** added the status to the type with a proper amber "NEEDS CONFIRM" badge (fixes `ActiveTaskWindow.tsx` for free, since it shares the component); gave the card its own amber icon/border/glow/pulse and extended the collapse-toggle/collapsed-summary treatment (previously `completed`-only) to cover it; recategorized it into the active bucket instead of history; added the `removeActiveTask` call to both streaming handlers.
+
+**Caught mid-edit, not after:** the first version of the `removeActiveTask` fix placed the new check *after* the existing generic `'status'` handler, which already returns unconditionally for any status event — making the new check unreachable. Found by rereading the code before verifying, not by a test catching it live.
+
+**Verified:** `tsc --noEmit` clean, 43/43 frontend tests. Drove the running app via Playwright with a mocked task-runs list: an `awaiting_confirmation` run renders in the active section with the amber icon/badge/glow, all four real trace steps shown done, and the real drafted content visible in Live Preview — while a genuinely completed run in the same list correctly stays in collapsed history.
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
