@@ -7,6 +7,7 @@ import { db } from "@workspace/db";
 import { oauthTokensTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger.js";
+import { encrypt, decrypt } from "./crypto.js";
 
 export interface TokenRecord {
   provider: string;
@@ -26,10 +27,14 @@ export async function getToken(provider: string): Promise<TokenRecord | null> {
     .from(oauthTokensTable)
     .where(eq(oauthTokensTable.provider, provider))
     .limit(1);
-  return row
-    ? { provider: row.provider, accessToken: row.accessToken,
-        refreshToken: row.refreshToken ?? null, expiresAt: row.expiresAt ?? null, scope: row.scope }
-    : null;
+  if (!row) return null;
+  return {
+    provider: row.provider,
+    accessToken: decrypt(row.accessToken),
+    refreshToken: row.refreshToken ? decrypt(row.refreshToken) : null,
+    expiresAt: row.expiresAt ?? null,
+    scope: row.scope,
+  };
 }
 
 export function isExpired(token: TokenRecord): boolean {
@@ -44,14 +49,17 @@ export async function saveToken(
   data: { accessToken: string; refreshToken?: string | null; expiresInSecs?: number | null; scope?: string }
 ): Promise<void> {
   const expiresAt = data.expiresInSecs ? new Date(Date.now() + data.expiresInSecs * 1000) : null;
+  const encryptedAccessToken = encrypt(data.accessToken);
+  const encryptedRefreshToken = data.refreshToken ? encrypt(data.refreshToken) : data.refreshToken; // preserves null/undefined as-is
+
   await db
     .insert(oauthTokensTable)
-    .values({ provider, accessToken: data.accessToken, refreshToken: data.refreshToken ?? null, expiresAt, scope: data.scope ?? "" })
+    .values({ provider, accessToken: encryptedAccessToken, refreshToken: encryptedRefreshToken ?? null, expiresAt, scope: data.scope ?? "" })
     .onConflictDoUpdate({
       target: oauthTokensTable.provider,
       set: {
-        accessToken: data.accessToken,
-        ...(data.refreshToken !== undefined && { refreshToken: data.refreshToken }),
+        accessToken: encryptedAccessToken,
+        ...(data.refreshToken !== undefined && { refreshToken: encryptedRefreshToken }),
         expiresAt,
         ...(data.scope !== undefined && { scope: data.scope }),
         updatedAt: new Date(),
@@ -117,9 +125,35 @@ async function refreshMicrosoft(token: TokenRecord): Promise<TokenRecord> {
   return (await getToken("microsoft"))!;
 }
 
+async function refreshSpotify(token: TokenRecord): Promise<TokenRecord> {
+  if (!token.refreshToken) throw new Error("No refresh token for Spotify");
+  const clientId     = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("SPOTIFY_CLIENT_ID/SECRET not set");
+
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId, client_secret: clientSecret,
+      refresh_token: token.refreshToken, grant_type: "refresh_token",
+    }),
+  });
+  if (!res.ok) throw new Error(`Spotify refresh failed: ${res.status} ${await res.text()}`);
+  const json = await res.json() as { access_token: string; refresh_token?: string; expires_in: number; scope?: string };
+  await saveToken("spotify", {
+    accessToken: json.access_token,
+    // Spotify doesn't always rotate the refresh token; keep the old one if a new one isn't issued
+    refreshToken: json.refresh_token ?? token.refreshToken,
+    expiresInSecs: json.expires_in, scope: json.scope ?? token.scope,
+  });
+  return (await getToken("spotify"))!;
+}
+
 const REFRESHERS: Record<string, (t: TokenRecord) => Promise<TokenRecord>> = {
   google:    refreshGoogle,
   microsoft: refreshMicrosoft,
+  spotify:   refreshSpotify,
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────

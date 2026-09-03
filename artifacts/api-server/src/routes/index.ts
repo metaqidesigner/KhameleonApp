@@ -26,6 +26,9 @@ import agentConversationsRouter from "./agent-conversations";
 import commandRouter from "./command";
 import taskRunsRouter from "./task-runs";
 import schedulerRouter from "./scheduler";
+import spotifyRouter from "./spotify";
+import weatherRouter from "./weather";
+import onboardingRouter from "./onboarding";
 
 const router: IRouter = Router();
 
@@ -56,5 +59,8 @@ router.use("/agent-conversations", agentConversationsRouter);
 router.use("/command", commandRouter);
 router.use("/task-runs", taskRunsRouter);
 router.use("/scheduler", schedulerRouter);
+router.use("/spotify", spotifyRouter);
+router.use("/weather", weatherRouter);
+router.use("/onboarding", onboardingRouter);
 
 export default router;

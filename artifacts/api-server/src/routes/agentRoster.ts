@@ -61,7 +61,7 @@ router.get("/:id/status", async (req, res) => {
   if (!agent) { res.status(404).json({ error: "Agent not found" }); return; }
   res.json({
     agentId:  agent.id,
-    status:   isAgentAvailable(agent) ? "online" : "standby",
+    status:   (await isAgentAvailable(agent)) ? "online" : "standby",
     model:    agent.model,
     provider: agent.provider,
     useTools: agent.useTools ?? false,

@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import type { AgentConfig, AgentResponse, ChatMessage, Provider, ToolCallRecord, ToolEvent } from "./types.js";
 import { TOOL_DEFINITIONS } from "./tools/definitions.js";
 import { dispatchTool } from "./tools/dispatcher.js";
+import { getApiKey } from "../lib/apiKeys.js";
 
 // ── Cost tables (USD per 1k tokens) ──────────────────────────
 const COST_TABLE: Record<string, number> = {
@@ -32,8 +33,20 @@ const PROVIDER_URLS: Partial<Record<Provider, string>> = {
   minimax:    "https://api.minimax.chat/v1",
 };
 
-function resolveKey(agent: AgentConfig): string | undefined {
+/**
+ * Resolves an API key in priority order:
+ *   1. An explicit per-agent override (agent.apiKey, set via the roster UI)
+ *   2. A key the user entered during setup (stored via /api/onboarding/api-key)
+ *   3. A server-level environment variable (deployment-wide fallback)
+ * Async because (2) is a DB read — added 2026-08-27 so users don't have to
+ * rely on the server operator setting environment variables for them.
+ */
+async function resolveKey(agent: AgentConfig): Promise<string | undefined> {
   if (agent.apiKey) return agent.apiKey;
+
+  const stored = await getApiKey(agent.provider).catch(() => null);
+  if (stored) return stored;
+
   const envMap: Record<string, string | undefined> = {
     openai:     process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY,
     anthropic:  process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY,
@@ -159,7 +172,7 @@ async function askAnthropic(
   onToken?: (t: string) => void,
   onToolEvent?: (e: ToolEvent) => void,
 ): Promise<AgentResponse> {
-  const apiKey  = resolveKey(agent);
+  const apiKey  = await resolveKey(agent);
   const baseURL = resolveBaseUrl(agent);
   if (!apiKey) throw new Error("Anthropic API key not configured");
 
@@ -233,7 +246,7 @@ async function askOpenAI(
   messages: ChatMessage[],
   onToken?: (t: string) => void,
 ): Promise<AgentResponse> {
-  const apiKey  = resolveKey(agent);
+  const apiKey  = await resolveKey(agent);
   const baseURL = resolveBaseUrl(agent);
   if (!apiKey) throw new Error(`API key not configured for provider ${agent.provider}`);
 
@@ -297,7 +310,7 @@ export async function askAgent(
   }
 }
 
-export function isAgentAvailable(agent: AgentConfig): boolean {
+export async function isAgentAvailable(agent: AgentConfig): Promise<boolean> {
   if (!agent.enabled) return false;
-  return !!resolveKey(agent);
+  return !!(await resolveKey(agent));
 }

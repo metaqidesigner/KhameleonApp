@@ -1,11 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock } from 'lucide-react';
+import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
-import { getHealth, getSchedulerStatus, type SchedulerStatus } from '@/lib/jarvisApi';
+import {
+  getHealth, getSchedulerStatus, type SchedulerStatus,
+  getApiKeyStatus, saveApiKey, clearApiKey, type ApiKeyProvider, type ApiKeyStatus,
+  getWeatherDefault, saveWeatherDefault,
+  getOnboardingStatus,
+} from '@/lib/jarvisApi';
 
-type Section = 'GENERAL' | 'ENGINE' | 'APPEARANCE' | 'CONNECTORS' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED';
-const SECTIONS: Section[] = ['GENERAL', 'ENGINE', 'APPEARANCE', 'CONNECTORS', 'MEMORY', 'TELEMETRY', 'ADVANCED'];
+type Section = 'GENERAL' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'CONNECTORS' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED';
+const SECTIONS: Section[] = ['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'CONNECTORS', 'MEMORY', 'TELEMETRY', 'ADVANCED'];
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -63,6 +68,13 @@ const PROVIDERS: ProviderDef[] = [
     covers: 'Outlook Mail + Microsoft Calendar',
     startPath: '/api/auth/oauth/microsoft/start',
     credentials: 'MICROSOFT_CLIENT_ID + MICROSOFT_CLIENT_SECRET',
+  },
+  {
+    id: 'spotify',
+    label: 'Spotify',
+    covers: 'Now playing + playback control',
+    startPath: '/api/auth/oauth/spotify/start',
+    credentials: 'SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET',
   },
 ];
 
@@ -133,7 +145,8 @@ function ConnectorsSection() {
 
       <p style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', marginBottom: 20, lineHeight: 1.6 }}>
         Connect external accounts to pull real email and calendar data into Khameleon.
-        Credentials must be added as Replit Secrets before connecting.
+        Credentials must be added as Replit Secrets before connecting. Access and refresh
+        tokens are encrypted at rest once connected (see API KEYS for the encryption key setup).
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -213,15 +226,250 @@ function ConnectorsSection() {
         })}
       </div>
 
+      <WeatherLocationRow />
+
       <div style={{ marginTop: 24, padding: '12px 14px', background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.2)' }}>
         <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, fontWeight: 700, color: '#c9a84c', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           ⚠ Credential Setup Required
         </div>
         <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', lineHeight: 1.7 }}>
           <strong style={{ color: 'var(--j-text)' }}>Google:</strong> Create an OAuth Client ID at <span style={{ color: 'var(--j-cyan)' }}>console.cloud.google.com</span> → APIs &amp; Services → Credentials, then add GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET as Replit Secrets.<br />
-          <strong style={{ color: 'var(--j-text)' }}>Microsoft:</strong> Register an app at <span style={{ color: 'var(--j-cyan)' }}>portal.azure.com</span> → Azure Active Directory → App registrations, then add MICROSOFT_CLIENT_ID + MICROSOFT_CLIENT_SECRET as Replit Secrets.
+          <strong style={{ color: 'var(--j-text)' }}>Microsoft:</strong> Register an app at <span style={{ color: 'var(--j-cyan)' }}>portal.azure.com</span> → Azure Active Directory → App registrations, then add MICROSOFT_CLIENT_ID + MICROSOFT_CLIENT_SECRET as Replit Secrets.<br />
+          <strong style={{ color: 'var(--j-text)' }}>Spotify:</strong> Create an app at <span style={{ color: 'var(--j-cyan)' }}>developer.spotify.com/dashboard</span>, then add SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET as Replit Secrets. Weather needs no credentials — just a location, below.
         </div>
       </div>
+    </>
+  );
+}
+
+// ── Weather default location ────────────────────────────────────────────────
+// Weather has no OAuth "connect" step (Open-Meteo needs no API key) — the only
+// thing to set up is where. Lives in the Connectors section since it's the
+// same "app I want Khameleon to reach into" mental model as the OAuth rows above.
+
+function WeatherLocationRow() {
+  const [lat, setLat]     = useState('');
+  const [lon, setLon]     = useState('');
+  const [label, setLabel] = useState('');
+  const [saved, setSaved] = useState<{ lat: number; lon: number; label: string | null } | null>(null);
+  const [busy, setBusy]   = useState(false);
+  const [msg, setMsg]     = useState<string | null>(null);
+
+  useEffect(() => {
+    getWeatherDefault().then((loc) => {
+      if (loc.lat != null && loc.lon != null) {
+        setSaved({ lat: loc.lat, lon: loc.lon, label: loc.label });
+        setLat(String(loc.lat));
+        setLon(String(loc.lon));
+        setLabel(loc.label ?? '');
+      }
+    });
+  }, []);
+
+  const save = async () => {
+    const latNum = Number(lat);
+    const lonNum = Number(lon);
+    if (!Number.isFinite(latNum) || latNum < -90 || latNum > 90 || !Number.isFinite(lonNum) || lonNum < -180 || lonNum > 180) {
+      setMsg('Enter a valid latitude (-90..90) and longitude (-180..180).');
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      const result = await saveWeatherDefault(latNum, lonNum, label || undefined);
+      setSaved({ lat: result.lat ?? latNum, lon: result.lon ?? lonNum, label: result.label ?? null });
+      setMsg('Saved.');
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'Failed to save location');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{
+      marginTop: 12, padding: '14px 16px',
+      background: saved ? 'rgba(0,212,255,0.04)' : 'rgba(0,4,8,0.6)',
+      border: `1px solid ${saved ? 'rgba(0,212,255,0.25)' : 'rgba(0,212,255,0.1)'}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <MapPin size={12} color="var(--j-cyan)" />
+        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 13, fontWeight: 700, color: 'var(--j-text)', letterSpacing: '0.05em' }}>
+          Weather — Default Location
+        </span>
+        {saved && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--j-font-ui)', fontSize: 10, color: 'var(--j-green)', marginLeft: 'auto' }}>
+            <CheckCircle size={12} /> SET
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <input className="j-input" placeholder="Latitude" value={lat} onChange={(e) => setLat(e.target.value)} style={{ flex: 1 }} />
+        <input className="j-input" placeholder="Longitude" value={lon} onChange={(e) => setLon(e.target.value)} style={{ flex: 1 }} />
+        <input className="j-input" placeholder="Label (optional, e.g. Home)" value={label} onChange={(e) => setLabel(e.target.value)} style={{ flex: 1.4 }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          onClick={save}
+          disabled={busy || !lat || !lon}
+          className="j-btn-primary"
+          style={{ height: 32, padding: '0 14px', fontSize: 11, opacity: busy || !lat || !lon ? 0.5 : 1 }}
+        >
+          {busy ? <Loader size={11} /> : 'SAVE LOCATION'}
+        </button>
+        {msg && <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 11, color: msg === 'Saved.' ? 'var(--j-green)' : '#f87171' }}>{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── API Keys ─────────────────────────────────────────────────────────────────
+// Model-provider credentials the user types in directly, as opposed to the
+// OAuth "Connect" buttons above. Saving here makes Khameleon's agents usable
+// without the server operator having to set environment variables.
+
+interface ApiKeyProviderDef {
+  id: ApiKeyProvider;
+  label: string;
+  placeholder: string;
+  helpUrl: string;
+}
+
+const API_KEY_PROVIDER_DEFS: ApiKeyProviderDef[] = [
+  { id: 'anthropic',  label: 'Anthropic (Claude)', placeholder: 'sk-ant-...',    helpUrl: 'console.anthropic.com/settings/keys' },
+  { id: 'openai',     label: 'OpenAI (GPT)',       placeholder: 'sk-...',        helpUrl: 'platform.openai.com/api-keys' },
+  { id: 'google',     label: 'Google (Gemini)',    placeholder: 'AIza...',       helpUrl: 'aistudio.google.com/apikey' },
+  { id: 'openrouter', label: 'OpenRouter',         placeholder: 'sk-or-...',     helpUrl: 'openrouter.ai/keys' },
+  { id: 'minimax',    label: 'Minimax',            placeholder: 'API key',       helpUrl: 'platform.minimax.chat' },
+];
+
+function ApiKeyRow({ def, isSet, onSaved, onCleared }: {
+  def: ApiKeyProviderDef;
+  isSet: boolean;
+  onSaved: () => void;
+  onCleared: () => void;
+}) {
+  const [value, setValue] = useState('');
+  const [busy, setBusy]   = useState(false);
+  const [msg, setMsg]     = useState<string | null>(null);
+
+  const save = async () => {
+    if (!value.trim()) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await saveApiKey(def.id, value.trim());
+      setValue('');
+      setMsg('Saved.');
+      onSaved();
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'Failed to save key');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clear = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await clearApiKey(def.id);
+      onCleared();
+    } catch {
+      setMsg('Failed to clear key');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{
+      padding: '14px 16px', marginBottom: 10,
+      background: isSet ? 'rgba(0,212,255,0.04)' : 'rgba(0,4,8,0.6)',
+      border: `1px solid ${isSet ? 'rgba(0,212,255,0.25)' : 'rgba(0,212,255,0.1)'}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 13, fontWeight: 700, color: 'var(--j-text)', letterSpacing: '0.05em' }}>
+          {def.label}
+        </span>
+        {isSet ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--j-font-ui)', fontSize: 10, color: 'var(--j-green)' }}>
+            <CheckCircle size={12} /> KEY SET
+          </span>
+        ) : (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--j-font-ui)', fontSize: 10, color: 'var(--j-text-faint)' }}>
+            <XCircle size={12} /> NOT SET
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          type="password"
+          className="j-input"
+          placeholder={isSet ? 'Enter a new key to replace it' : def.placeholder}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          style={{ flex: 1 }}
+        />
+        <button onClick={save} disabled={busy || !value.trim()} className="j-btn-primary"
+          style={{ height: 32, padding: '0 14px', fontSize: 11, opacity: busy || !value.trim() ? 0.5 : 1 }}>
+          {busy ? <Loader size={11} /> : 'SAVE'}
+        </button>
+        {isSet && (
+          <button onClick={clear} disabled={busy} style={{
+            height: 32, padding: '0 14px', fontSize: 10, fontFamily: 'var(--j-font-ui)',
+            fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+            background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.35)',
+            color: '#f87171', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.5 : 1,
+          }}>
+            CLEAR
+          </button>
+        )}
+      </div>
+      <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)' }}>
+        Get a key at {def.helpUrl}
+      </div>
+      {msg && (
+        <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 11, color: msg === 'Saved.' ? 'var(--j-green)' : '#f87171' }}>
+          {msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ApiKeysSection() {
+  const [statuses, setStatuses] = useState<ApiKeyStatus>({});
+  const [encryptionConfigured, setEncryptionConfigured] = useState<boolean | null>(null);
+
+  const refresh = useCallback(() => {
+    getApiKeyStatus().then(setStatuses);
+    getOnboardingStatus().then((s) => setEncryptionConfigured(s.encryptionConfigured));
+  }, []);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  return (
+    <>
+      <p style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
+        Enter your own API key for any model provider you want Khameleon's agents to use.
+        Keys are encrypted at rest (AES-256-GCM) before they're stored. At least one is
+        required for agents to respond.
+      </p>
+
+      {encryptionConfigured === false && (
+        <div style={{
+          marginBottom: 16, padding: '12px 14px',
+          background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.3)',
+          fontFamily: 'var(--j-font-ui)', fontSize: 11, color: '#f87171', lineHeight: 1.7,
+        }}>
+          <strong>Encryption key not configured.</strong> Set <span style={{ fontFamily: 'var(--j-font-mono)' }}>KHAMELEON_ENCRYPTION_KEY</span> (16+ characters) as a Replit Secret and restart the server —
+          saving a key below will fail until then. This is deliberate: Khameleon refuses to store credentials as plaintext rather than doing so silently.
+        </div>
+      )}
+
+      {API_KEY_PROVIDER_DEFS.map((def) => (
+        <ApiKeyRow key={def.id} def={def} isSet={!!statuses[def.id]} onSaved={refresh} onCleared={refresh} />
+      ))}
     </>
   );
 }
@@ -443,9 +691,9 @@ export default function Settings() {
                 transition: 'color 0.15s, background 0.15s',
               }}
             >
-              {s === 'CONNECTORS'
-                ? <><Plug size={12} style={{ marginRight: 8 }} />{s}</>
-                : s}
+              {s === 'CONNECTORS' && <><Plug size={12} style={{ marginRight: 8 }} />{s}</>}
+              {s === 'API KEYS' && <><KeyRound size={12} style={{ marginRight: 8 }} />{s}</>}
+              {s !== 'CONNECTORS' && s !== 'API KEYS' && s}
             </button>
           ))}
         </div>
@@ -456,9 +704,10 @@ export default function Settings() {
         <div style={{ maxWidth: 520 }}>
           {active === 'GENERAL'    && <GeneralSection />}
           {active === 'ENGINE'     && <EngineSection health="" />}
+          {active === 'API KEYS'   && <ApiKeysSection />}
           {active === 'APPEARANCE' && <AppearanceSection />}
           {active === 'CONNECTORS' && <ConnectorsSection />}
-          {!['GENERAL', 'ENGINE', 'APPEARANCE', 'CONNECTORS'].includes(active) && <GenericSection section={active} />}
+          {!['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'CONNECTORS'].includes(active) && <GenericSection section={active} />}
         </div>
       </JPanel>
     </div>
