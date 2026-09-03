@@ -136,6 +136,22 @@ Nothing in the existing spec (orb states, window prominence, the persistence rul
 
 *Full detail: khameleon-design-spec.md §12.1; code in `artifacts/api-server/src/{lib/outlookGraph.ts,agents/skills/outlookDraftEmail.ts,routes/outlookSkills.ts}` and `artifacts/khameleon-command/src/{lib/outlookSkillsApi.ts,pages/approvals.tsx}`.*
 
+## 2026-09-03 — outlook-summarize-thread built (§12.2), second of the three named skills
+
+**Built the second Outlook skill**, reusing the Graph client and thread-fetch logic from outlook-draft-email above. §12.2 calls this one out explicitly as "the simplest of the three... a good first candidate," and unlike outlook-draft-email it needed no new pipeline pattern:
+
+- `agents/skills/outlookSummarizeThread.ts` — the fixed 2-step pipeline (fetch thread → summarize into plain language). Ends at `completed` directly, not `awaiting_confirmation` — there's no step 5 equivalent here.
+- `routes/outlookSummarize.ts` — a single POST endpoint. No `/send` or `/reject`: per §6.5.3, reading and summarizing is local/cheap/reversible, so it never needs a hard gate.
+- A third section on the Approvals page landing directly as an ActionReceipt (`mail.read` scope, no undo offered — there's nothing to undo).
+
+**Verified:** `tsc --noEmit` clean in both packages (same 24 pre-existing unrelated errors). 47/47 backend DB-free tests (3 new), 38/38 frontend tests. Drove the running app via Playwright — renders correctly alongside outlook-draft-email's section, graceful inline error on the expected no-backend failure path.
+
+**Not verified here, on purpose — same limitation as everything Graph-backed so far:** a live end-to-end call against a real mailbox.
+
+**Remaining:** `outlook-triage-inbox` (§12.3), the third and most complex of the three (hybrid rule-based + instructional classification, multi-item batch actions) — not started.
+
+*Full detail: khameleon-design-spec.md §12.2; code in `artifacts/api-server/src/{agents/skills/outlookSummarizeThread.ts,routes/outlookSummarize.ts}`.*
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
