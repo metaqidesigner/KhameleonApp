@@ -101,6 +101,21 @@ Nothing in the existing spec (orb states, window prominence, the persistence rul
 
 *Full detail: khameleon-design-spec.md §15–17.*
 
+## 2026-09-03 — ActionReceipt/ConfirmGate demo page verified working; one layout bug found and fixed
+
+**Follow-up to the "Ambient Status patterns built" entry above.** That entry said the two components were "ready for integration" but "not yet integrated into live flows." Turned out a demo integration already existed in the working tree (`pages/approvals.tsx`, `lib/approvalsApi.ts`, and the api-server `approvals.ts` route) — built but never actually run or committed. This entry is that verification.
+
+**Verified by actually running the app**, not just typechecking:
+- `tsc --noEmit` clean across `khameleon-command` (after building `lib/db`/`lib/api-zod`/`lib/api-client-react` first, per the established pre-existing project-reference requirement).
+- Launched the Vite dev server standalone and drove it with Playwright: navigated to the Approvals sidebar tab, opened the ConfirmGate modal, and clicked through to the (expected, no backend in this sandbox) 404 error path.
+- `vitest run` — 38/38 passing, unaffected by the fix below.
+
+**Bug found by running it that typecheck could not catch:** the Action History panel — the one actually holding `ActionReceiptList`, the real point of this demo — was rendering at **2px tall**, effectively invisible. Root cause: `.j-panel` (`index.css`) hardcodes `height: 100%`. The sibling "Patterns Implemented" panel shares that class with no flex override, so its flex-basis inflated to the full container height in the flex-column layout, and the Action History panel (`flex: 1`, basis 0) absorbed nearly all of the resulting shrink deficit. Fixed by giving the Patterns panel `height: 'auto'` + `flexShrink: 0` so it sizes to its own content instead of competing for the full column height. Re-verified via Playwright: Action History now renders at 517px with both mock receipts fully visible.
+
+**ConfirmGate confirmed matching §6.5.3/§6.5.4 exactly** in the running app: severity-colored border (coral for `email_send`), warning banner, Recipient and Permission Scope fields, full real payload (not summarized), "Edit before sending," and — on the expected fetch failure — the component's own inline error banner rendering correctly beneath the payload rather than crashing.
+
+**Still not what §12.1 describes, and this doesn't change that:** this demo wires ConfirmGate/ActionReceipt to a mocked "Send Email" scenario and the real (generic) `/api/approvals` endpoint — it is not integrated into an actual `outlook-draft-email` skill's send step, because that skill has no code anywhere in this repo (confirmed 2026-08-26: the whole Outlook prototype lived in the missing `khameleon-prototype/`). The pattern is proven and ready; wiring it into a real send step is blocked on that skill actually being built, not on anything in `ActionReceipt`/`ConfirmGate` themselves.
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
