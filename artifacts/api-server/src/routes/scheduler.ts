@@ -5,17 +5,16 @@ import { getSchedulerStatus, updateSchedulerConfig } from '../scheduler.js';
 const router = Router();
 
 /**
- * The scheduler admin key is read from environment at startup.
- * If not set, the mutation endpoint is disabled (503).
- * Set SCHEDULER_ADMIN_KEY as a Replit Secret to enable remote configuration.
+ * The scheduler admin key is read from environment at startup. Unset by
+ * default in a single-user deployment - PUT /config is then open to the
+ * app's one user, same trust level as every other personal-preference
+ * endpoint. Set SCHEDULER_ADMIN_KEY as a Replit Secret only if this
+ * server is ever hosted for more than one person.
  */
 const ADMIN_KEY = process.env.SCHEDULER_ADMIN_KEY ?? '';
 
-if (!ADMIN_KEY) {
-  logger.warn(
-    'Scheduler: SCHEDULER_ADMIN_KEY env var is not set — ' +
-    'PUT /api/scheduler/config will be disabled until it is configured.',
-  );
+if (ADMIN_KEY) {
+  logger.info('Scheduler: SCHEDULER_ADMIN_KEY is set — PUT /api/scheduler/config now requires it.');
 }
 
 /**
@@ -31,22 +30,31 @@ function safeCompare(a: string, b: string): boolean {
 }
 
 /**
- * Middleware: require Authorization: Bearer <SCHEDULER_ADMIN_KEY>.
+ * Pure decision function behind requireAdminKey, split out so it's
+ * unit-testable without needing two separate module imports for the
+ * "key set" / "key unset" cases (ADMIN_KEY is captured once at import
+ * time from process.env).
  */
-function requireAdminKey(req: Request, res: Response, next: () => void): void {
-  if (!ADMIN_KEY) {
-    res.status(503).json({
-      error:
-        'Scheduler configuration is disabled: set the SCHEDULER_ADMIN_KEY ' +
-        'Replit Secret (and VITE_SCHEDULER_ADMIN_KEY for the frontend) to enable it.',
-    });
-    return;
-  }
-
-  const authHeader = req.headers.authorization ?? '';
+export function isSchedulerRequestAuthorized(configuredKey: string, authHeader: string): boolean {
+  if (!configuredKey) return true;
   const [scheme, token = ''] = authHeader.split(' ');
+  return scheme === 'Bearer' && safeCompare(token, configuredKey);
+}
 
-  if (scheme !== 'Bearer' || !safeCompare(token, ADMIN_KEY)) {
+/**
+ * Middleware: require Authorization: Bearer <SCHEDULER_ADMIN_KEY> - but only
+ * when an operator has actually configured one. This was originally
+ * "disabled until configured", which in a single-user app meant the
+ * user's own digest-time preference required setting a special admin
+ * secret as BOTH a server and frontend env var before it was even
+ * reachable - worse than having no time picker at all. Every other
+ * personal-preference endpoint in this app (weather location, voice
+ * settings, appearance) is open to the app's one user by default; this
+ * now matches that, while still gating access the moment an operator
+ * deliberately sets SCHEDULER_ADMIN_KEY (future hosted/org use).
+ */
+export function requireAdminKey(req: Request, res: Response, next: () => void): void {
+  if (!isSchedulerRequestAuthorized(ADMIN_KEY, req.headers.authorization ?? '')) {
     res.status(401).json({ error: 'Unauthorized: valid Bearer token required' });
     return;
   }

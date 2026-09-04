@@ -118,6 +118,10 @@ interface JarvisStore {
   // state so Settings' Voice section, a completely different part of the
   // tree, can reopen it after a user skips the first-run prompt.
   micPermissionModalOpen: boolean;
+  // Same shape as micPermissionModalOpen - controls OnboardingWizard
+  // (mounted once in AppShell, checked at boot against the server-tracked
+  // completion flag), reopenable from Settings' "Redo setup" button.
+  onboardingWizardOpen: boolean;
 
   setActiveTab: (t: TabId) => void;
   setChatOpen: (v: boolean) => void;
@@ -157,6 +161,7 @@ interface JarvisStore {
   setPendingVoiceQuery: (q: string | null) => void;
   setVoiceSettings: (s: Partial<VoiceSettings>) => void;
   setMicPermissionModalOpen: (v: boolean) => void;
+  setOnboardingWizardOpen: (v: boolean) => void;
 }
 
 export const useJarvisStore = create<JarvisStore>()(
@@ -190,6 +195,7 @@ export const useJarvisStore = create<JarvisStore>()(
       wakeWordBlocked: false,
       pendingVoiceQuery: null,
       micPermissionModalOpen: false,
+      onboardingWizardOpen: false,
       voiceSettings: {
         voice: '',
         rate: 1.05,
@@ -293,6 +299,7 @@ export const useJarvisStore = create<JarvisStore>()(
       setPendingVoiceQuery:  (q)      => set({ pendingVoiceQuery: q }),
       setVoiceSettings:      (patch)  => set(s => ({ voiceSettings: { ...s.voiceSettings, ...patch } })),
       setMicPermissionModalOpen: (v)  => set({ micPermissionModalOpen: v }),
+      setOnboardingWizardOpen:   (v)  => set({ onboardingWizardOpen: v }),
     }),
     {
       name: 'jarvis-ui',

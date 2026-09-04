@@ -8,6 +8,7 @@ import {
   type AgentConfig,
   type ChatMessage,
 } from '@/lib/agentsApi';
+import { getOnboardingStatus } from '@/lib/jarvisApi';
 import type { VoiceSettings } from '@/store/jarvisStore';
 // reuse orb visual styles (JarvisOrb.tsx imports this too, but we need it standalone on the assistant page)
 import './orb/orb.css';
@@ -33,11 +34,16 @@ function getVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
-function getGreeting(): { title: string; sub: string } {
+// design-spec.md §14 item 1: "Display name... - personalization now."
+// `name` is real when set (via Settings > General or the onboarding
+// wizard) and omitted entirely otherwise - never a placeholder like
+// "there" or "friend" standing in for a name nobody gave.
+function getGreeting(name: string | null): { title: string; sub: string } {
   const h = new Date().getHours();
-  const title =
-    h >= 5  && h < 12 ? 'Good morning.'   :
-    h >= 12 && h < 18 ? 'Good afternoon.' : 'Good evening.';
+  const timeGreeting =
+    h >= 5  && h < 12 ? 'Good morning'   :
+    h >= 12 && h < 18 ? 'Good afternoon' : 'Good evening';
+  const title = name ? `${timeGreeting}, ${name}.` : `${timeGreeting}.`;
   return { title, sub: 'How can I help you blend in today?' };
 }
 
@@ -63,6 +69,7 @@ export function AssistantCard() {
   const [messages, setMessages] = useState<AcMsg[]>([]);
   const [input, setInput]       = useState('');
   const [streaming, setStreaming] = useState(false);
+  const [displayName, setDisplayName] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLInputElement>(null);
@@ -72,7 +79,11 @@ export function AssistantCard() {
   const coreRef        = useRef<HTMLDivElement>(null);
   const ampRafRef      = useRef<number>(0);
 
-  const greeting = getGreeting();
+  const greeting = getGreeting(displayName);
+
+  useEffect(() => {
+    getOnboardingStatus().then(s => setDisplayName(s.profile.displayName));
+  }, []);
 
   useEffect(() => {
     getRoster().then(setRoster).catch(() => {});

@@ -4,12 +4,14 @@ import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { MIC_KEY } from '@/components/orb/VoiceController';
 import { ConnectIntegrationGate } from '@/components/ConnectIntegrationGate';
+import { ApiKeyRow } from '@/components/ApiKeyRow';
+import { API_KEY_PROVIDER_DEFS, PROVIDERS, type ProviderDef } from '@/lib/apiKeyProviders';
 import {
-  getHealth, getSchedulerStatus, type SchedulerStatus,
-  getApiKeyStatus, saveApiKey, clearApiKey, type ApiKeyProvider, type ApiKeyStatus,
+  getHealth, getSchedulerStatus, saveSchedulerConfig, type SchedulerStatus,
+  getApiKeyStatus, type ApiKeyStatus,
   getWeatherDefault, saveWeatherDefault, getWeatherCurrent, type WeatherCurrent,
   getSpotifyNowPlaying, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, type SpotifyNowPlaying,
-  getOnboardingStatus,
+  getOnboardingStatus, saveProfile, type Profile,
 } from '@/lib/jarvisApi';
 
 type Section = 'GENERAL' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED';
@@ -68,45 +70,9 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 
 // ── Connectors ────────────────────────────────────────────────────────────────
 
-interface ProviderDef {
-  id: string;           // matches oauth_tokens.provider
-  label: string;
-  covers: string;       // human description of what it unlocks
-  dataScope: string;    // what it can read - shown at the connect gate (§16.3)
-  actionScope: string;  // what it can do - shown at the connect gate (§16.3)
-  startPath: string;
-  credentials: string;
-}
-
-const PROVIDERS: ProviderDef[] = [
-  {
-    id: 'google',
-    label: 'Google',
-    covers: 'Gmail + Google Calendar',
-    dataScope: 'Your Google account is verified, but nothing reads Gmail/Calendar/Drive/Contacts data yet.',
-    actionScope: 'Not yet built on top of the connection.',
-    startPath: '/api/auth/oauth/google/start',
-    credentials: 'GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET',
-  },
-  {
-    id: 'microsoft',
-    label: 'Microsoft / Outlook',
-    covers: 'Outlook Mail + Microsoft Calendar',
-    dataScope: 'Read and search your Outlook inbox and threads.',
-    actionScope: 'Draft, summarize, triage, and send email — sending requires your confirmation.',
-    startPath: '/api/auth/oauth/microsoft/start',
-    credentials: 'MICROSOFT_CLIENT_ID + MICROSOFT_CLIENT_SECRET',
-  },
-  {
-    id: 'spotify',
-    label: 'Spotify',
-    covers: 'Now playing + playback control',
-    dataScope: 'See what\'s currently playing.',
-    actionScope: 'Control playback: play, pause, skip, previous.',
-    startPath: '/api/auth/oauth/spotify/start',
-    credentials: 'SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET',
-  },
-];
+// ProviderDef / PROVIDERS moved to lib/apiKeyProviders.ts so
+// OnboardingWizard (mounted eagerly at the app root) can reuse them
+// without pulling this lazy-loaded page's bundle into the main chunk.
 
 function ConnectorsSection() {
   const [statuses, setStatuses]   = useState<Record<string, boolean>>({});
@@ -491,115 +457,10 @@ function WeatherLocationRow() {
 // OAuth "Connect" buttons above. Saving here makes Khameleon's agents usable
 // without the server operator having to set environment variables.
 
-interface ApiKeyProviderDef {
-  id: ApiKeyProvider;
-  label: string;
-  placeholder: string;
-  helpUrl: string;
-}
-
-const API_KEY_PROVIDER_DEFS: ApiKeyProviderDef[] = [
-  { id: 'anthropic',  label: 'Anthropic (Claude)', placeholder: 'sk-ant-...',    helpUrl: 'console.anthropic.com/settings/keys' },
-  { id: 'openai',     label: 'OpenAI (GPT)',       placeholder: 'sk-...',        helpUrl: 'platform.openai.com/api-keys' },
-  { id: 'google',     label: 'Google (Gemini)',    placeholder: 'AIza...',       helpUrl: 'aistudio.google.com/apikey' },
-  { id: 'openrouter', label: 'OpenRouter',         placeholder: 'sk-or-...',     helpUrl: 'openrouter.ai/keys' },
-  { id: 'minimax',    label: 'Minimax',            placeholder: 'API key',       helpUrl: 'platform.minimax.chat' },
-];
-
-function ApiKeyRow({ def, isSet, onSaved, onCleared }: {
-  def: ApiKeyProviderDef;
-  isSet: boolean;
-  onSaved: () => void;
-  onCleared: () => void;
-}) {
-  const [value, setValue] = useState('');
-  const [busy, setBusy]   = useState(false);
-  const [msg, setMsg]     = useState<string | null>(null);
-
-  const save = async () => {
-    if (!value.trim()) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      await saveApiKey(def.id, value.trim());
-      setValue('');
-      setMsg('Saved.');
-      onSaved();
-    } catch (err) {
-      setMsg(err instanceof Error ? err.message : 'Failed to save key');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const clear = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await clearApiKey(def.id);
-      onCleared();
-    } catch {
-      setMsg('Failed to clear key');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div style={{
-      padding: '14px 16px', marginBottom: 10,
-      background: isSet ? 'rgba(0,212,255,0.04)' : 'rgba(0,4,8,0.6)',
-      border: `1px solid ${isSet ? 'rgba(0,212,255,0.25)' : 'rgba(0,212,255,0.1)'}`,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 13, fontWeight: 700, color: 'var(--j-text)', letterSpacing: '0.05em' }}>
-          {def.label}
-        </span>
-        {isSet ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--j-font-ui)', fontSize: 10, color: 'var(--j-green)' }}>
-            <CheckCircle size={12} /> KEY SET
-          </span>
-        ) : (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--j-font-ui)', fontSize: 10, color: 'var(--j-text-faint)' }}>
-            <XCircle size={12} /> NOT SET
-          </span>
-        )}
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input
-          type="password"
-          className="j-input"
-          placeholder={isSet ? 'Enter a new key to replace it' : def.placeholder}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          style={{ flex: 1 }}
-        />
-        <button onClick={save} disabled={busy || !value.trim()} className="j-btn-primary"
-          style={{ height: 32, padding: '0 14px', fontSize: 11, opacity: busy || !value.trim() ? 0.5 : 1 }}>
-          {busy ? <Loader size={11} /> : 'SAVE'}
-        </button>
-        {isSet && (
-          <button onClick={clear} disabled={busy} style={{
-            height: 32, padding: '0 14px', fontSize: 10, fontFamily: 'var(--j-font-ui)',
-            fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
-            background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.35)',
-            color: '#f87171', cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.5 : 1,
-          }}>
-            CLEAR
-          </button>
-        )}
-      </div>
-      <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)' }}>
-        Get a key at {def.helpUrl}
-      </div>
-      {msg && (
-        <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 11, color: msg === 'Saved.' ? 'var(--j-green)' : '#f87171' }}>
-          {msg}
-        </div>
-      )}
-    </div>
-  );
-}
+// ApiKeyProviderDef / API_KEY_PROVIDER_DEFS moved to lib/apiKeyProviders.ts,
+// ApiKeyRow moved to components/ApiKeyRow.tsx - both now imported below -
+// so OnboardingWizard (mounted eagerly at the app root) can reuse them
+// without pulling this lazy-loaded page's bundle into the main chunk.
 
 function ApiKeysSection() {
   const [statuses, setStatuses] = useState<ApiKeyStatus>({});
@@ -803,9 +664,17 @@ function formatNextRun(iso: string | null, now = Date.now()): string {
 export function GeneralSection() {
   const [sched, setSched] = useState<SchedulerStatus | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [profile, setProfile] = useState<Profile>({ displayName: null, role: null });
+  const [nameInput, setNameInput] = useState('');
+  const [roleInput, setRoleInput] = useState('');
+  const [profileMsg, setProfileMsg] = useState<string>();
+  const [digestHour, setDigestHour] = useState(7);
+  const [digestMinute, setDigestMinute] = useState(0);
+  const [digestMsg, setDigestMsg] = useState<string>();
+  const setOnboardingWizardOpen = useJarvisStore(s => s.setOnboardingWizardOpen);
 
   useEffect(() => {
-    const fetch = () => { getSchedulerStatus().then(setSched); };
+    const fetch = () => { getSchedulerStatus().then(s => { setSched(s); setDigestHour(s.digestHour); setDigestMinute(s.digestMinute); }); };
     fetch();
     const interval = setInterval(fetch, 5 * 60 * 1000);
     window.addEventListener('focus', fetch);
@@ -813,12 +682,57 @@ export function GeneralSection() {
   }, []);
 
   useEffect(() => {
+    getOnboardingStatus().then(s => { setProfile(s.profile); setNameInput(s.profile.displayName ?? ''); setRoleInput(s.profile.role ?? ''); });
+  }, []);
+
+  useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
+  const saveProfileFields = async () => {
+    setProfileMsg(undefined);
+    try {
+      const updated = await saveProfile({ displayName: nameInput.trim(), role: roleInput.trim() });
+      setProfile(updated);
+      setProfileMsg('Saved.');
+    } catch (err) {
+      setProfileMsg(err instanceof Error ? err.message : 'Failed to save');
+    }
+  };
+
+  const saveDigestTime = async () => {
+    setDigestMsg(undefined);
+    try {
+      const updated = await saveSchedulerConfig({ digestHour, digestMinute });
+      setSched(updated);
+      setDigestMsg('Saved.');
+    } catch (err) {
+      setDigestMsg(err instanceof Error ? err.message : 'Failed to save');
+    }
+  };
+
   return (
     <>
+      <Row>
+        <Label>YOUR NAME</Label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input className="j-input" style={{ flex: 1 }} placeholder="What should Khameleon call you?" value={nameInput} onChange={e => setNameInput(e.target.value)} />
+          <input className="j-input" style={{ flex: 1 }} placeholder="Role or field (optional)" value={roleInput} onChange={e => setRoleInput(e.target.value)} />
+          <button className="j-btn-ghost" style={{ height: 34, padding: '0 12px', fontSize: 10 }} onClick={saveProfileFields}>SAVE</button>
+        </div>
+        {profileMsg && (
+          <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: profileMsg === 'Saved.' ? 'var(--j-green)' : 'var(--j-red)', marginTop: 4 }}>{profileMsg}</div>
+        )}
+        {!profileMsg && profile.displayName && (
+          <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)', marginTop: 4 }}>
+            Used in the assistant's greeting ("Good morning, {profile.displayName}.")
+          </div>
+        )}
+        <button className="j-btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 9, marginTop: 8 }} onClick={() => setOnboardingWizardOpen(true)}>
+          REDO FIRST-RUN SETUP
+        </button>
+      </Row>
       <Row>
         <Label>WORKSPACE NAME</Label>
         <input className="j-input" defaultValue="My Khameleon" disabled />
@@ -865,17 +779,24 @@ export function GeneralSection() {
           </div>
         )}
 
-        {/* Configuration instructions */}
-        <div style={{
-          marginTop: 14, padding: '10px 12px',
-          background: 'rgba(120,168,220,0.04)', border: '1px solid rgba(120,168,220,0.15)',
-          fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', lineHeight: 1.7,
-        }}>
-          <strong style={{ color: 'var(--j-text)' }}>To change the digest time</strong>, set these Replit Secrets and restart the server:<br />
-          <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: 'rgba(120,168,220,0.7)' }}>
-            DIGEST_HOUR — hour to run (0–23, default 7)<br />
-            DIGEST_MINUTE — minute to run (0–59, default 0)
-          </span>
+        {/* Real control - PUT /api/scheduler/config used to be closed by
+            default behind a SCHEDULER_ADMIN_KEY nobody sets in a
+            single-user app (see routes/scheduler.ts), so this was
+            read-only with "set these env vars and restart the server"
+            underneath it. That's now the initial-boot default only;
+            this picker is the real way to change it. */}
+        <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select className="j-input" style={{ width: 80 }} value={digestHour} onChange={e => setDigestHour(Number(e.target.value))}>
+            {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{pad2(h)}</option>)}
+          </select>
+          <span style={{ color: 'var(--j-text-muted)' }}>:</span>
+          <select className="j-input" style={{ width: 80 }} value={digestMinute} onChange={e => setDigestMinute(Number(e.target.value))}>
+            {[0, 15, 30, 45].map(m => <option key={m} value={m}>{pad2(m)}</option>)}
+          </select>
+          <button className="j-btn-ghost" style={{ height: 32, padding: '0 12px', fontSize: 10 }} onClick={saveDigestTime}>SAVE TIME</button>
+          {digestMsg && (
+            <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: digestMsg === 'Saved.' ? 'var(--j-green)' : 'var(--j-red)' }}>{digestMsg}</span>
+          )}
         </div>
       </div>
     </>

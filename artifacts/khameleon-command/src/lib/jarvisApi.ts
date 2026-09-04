@@ -363,9 +363,28 @@ export async function getSchedulerStatus(): Promise<SchedulerStatus> {
   );
 }
 
-// Scheduler config is intentionally read-only from the browser.
-// To change the digest time, set DIGEST_HOUR and DIGEST_MINUTE as Replit Secrets
-// and restart the server. This keeps the control plane out of the browser bundle.
+/**
+ * Save digest schedule preferences. Used to be impossible from the
+ * browser at all - PUT /api/scheduler/config was gated behind a
+ * SCHEDULER_ADMIN_KEY that had no default, so the endpoint just 503'd
+ * until an operator set env vars on both the server and this bundle.
+ * That's now open by default in this single-user app (see the comment
+ * on requireAdminKey in routes/scheduler.ts) - no auth header needed
+ * here unless SCHEDULER_ADMIN_KEY has been deliberately configured for
+ * a hosted/org deployment, which this single-user client doesn't do.
+ */
+export async function saveSchedulerConfig(patch: Partial<Pick<SchedulerStatus, 'enabled' | 'digestHour' | 'digestMinute'>>): Promise<SchedulerStatus> {
+  const res = await fetch(`${BASE}/scheduler/config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(body.error ?? `Failed to save digest schedule (HTTP ${res.status})`);
+  }
+  return res.json();
+}
 
 // ── Onboarding: model-provider API keys ─────────────────────
 // Unlike OAuth connectors (Google/Microsoft/Spotify — user clicks Connect),
@@ -378,16 +397,51 @@ export async function getApiKeyStatus(): Promise<ApiKeyStatus> {
   return safeFetch<ApiKeyStatus>(`${BASE}/onboarding/api-keys`, undefined, {});
 }
 
+export interface Profile {
+  displayName: string | null;
+  role: string | null;
+}
+
 export interface OnboardingStatus {
   apiKeys: ApiKeyStatus;
   oauth: Record<string, boolean>;
   encryptionConfigured: boolean;
+  profile: Profile;
+  onboardingComplete: boolean;
 }
 
 export async function getOnboardingStatus(): Promise<OnboardingStatus> {
   return safeFetch<OnboardingStatus>(`${BASE}/onboarding/status`, undefined, {
     apiKeys: {}, oauth: {}, encryptionConfigured: false,
+    profile: { displayName: null, role: null },
+    // Fails toward "already set up" rather than "needs onboarding" - a
+    // backend hiccup shouldn't pop the first-run wizard in front of an
+    // existing user who's long past needing it.
+    onboardingComplete: true,
   });
+}
+
+/** Mutation - throws on failure, matching every other save in this app. */
+export async function saveProfile(patch: Partial<Profile>): Promise<Profile> {
+  const res = await fetch(`${BASE}/onboarding/profile`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(body.error ?? 'Failed to save profile');
+  }
+  return res.json();
+}
+
+/** Marks first-run setup finished (or explicitly skipped) - server-tracked, not per-browser. */
+export async function completeOnboarding(): Promise<void> {
+  const res = await fetch(`${BASE}/onboarding/complete`, { method: 'POST' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(body.error ?? 'Failed to complete onboarding');
+  }
 }
 
 export async function saveApiKey(provider: ApiKeyProvider, apiKey: string): Promise<void> {

@@ -7,6 +7,7 @@ import ChatPanel from './ChatPanel';
 import { LeftSidebar } from './LeftSidebar';
 import { JarvisOrbPortal } from './orb/JarvisOrbPortal';
 import { VoiceController } from './orb/VoiceController';
+import { OnboardingWizard } from './OnboardingWizard';
 import { useJarvisStore } from '@/store/jarvisStore';
 
 const UnifiedCanvas = lazy(() => import('@/pages/canvas'));
@@ -79,6 +80,7 @@ export function AppShell() {
       <JarvisOrbPortal />
 
       <VoiceController />
+      <OnboardingWizard />
     </>
   );
 }

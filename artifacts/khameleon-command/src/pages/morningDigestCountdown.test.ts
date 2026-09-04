@@ -12,8 +12,17 @@ vi.mock('@/lib/jarvisApi', () => ({
   deleteTask: vi.fn(),
   getHealth: vi.fn(),
   getSchedulerStatus: vi.fn(),
+  saveSchedulerConfig: vi.fn(),
   getTasks: vi.fn(),
   updateTask: vi.fn(),
+  // GeneralSection (§14 onboarding work) now also loads/saves a display
+  // name/role - mocked here so this test's real target (the countdown
+  // refresh behavior) isn't broken by an unrelated new dependency.
+  getOnboardingStatus: vi.fn().mockResolvedValue({
+    apiKeys: {}, oauth: {}, encryptionConfigured: true,
+    profile: { displayName: null, role: null }, onboardingComplete: true,
+  }),
+  saveProfile: vi.fn(),
 }));
 
 vi.mock('@/lib/taskRunApi', () => ({
