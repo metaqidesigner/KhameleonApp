@@ -407,6 +407,14 @@ Two concrete, current gaps surfaced while confirming this: **(1)** no display-na
 
 **Verified:** `tsc --noEmit` clean in both packages (24 pre-existing backend errors unchanged, zero in new files). 5/5 new classifier unit tests (prompt shape; SIMPLE/COMPLEX/garbage parsing, including a case proving the parser doesn't substring-match "SIMPLEX" as simple); 79 backend tests total, same 5 pre-existing DB-dependent failures, unrelated. 43/43 frontend tests. Drove the running app via Playwright with mocked task runs: a `simple`-typed run shows a real SIMPLE badge next to its trigger/status badges, an `orchestrator`-typed run shows none.
 
+## 2026-09-04 — §13.1 (web-app windows): a documented blocker, not a build
+
+**Phase 2 of the four-phase continuation of the spec build** (§11 done above; this is §13.1). Unlike the other three phases, this one produced no code — the investigation itself is the finding.
+
+§13.1 ("user-facing web app windows" — the person signs into Gmail/Slack/Notion/etc. and works inside them without leaving Khameleon) is specified entirely in terms of Electron's `BrowserView`/`BrowserWindow` rendering real Chromium, with `session.fromPartition` for persistent per-site sign-in. Checked: **there is zero Electron presence anywhere in this repo** — no `electron/` directory, no Electron dependency in `artifacts/khameleon-command/package.json`. The current app is a plain Vite browser SPA. In a browser, embedding another origin's live authenticated session means an `<iframe>` — and the exact apps §13.1 names (Gmail, Slack, Notion, Salesforce) all send `X-Frame-Options`/CSP `frame-ancestors` headers that block being framed at all, specifically as anti-clickjacking/phishing protection. An iframe-based version wouldn't degrade to "less polished" — it would show a blank or browser-blocked frame for every one of the feature's own named use cases.
+
+**Decision: not building this.** §13.1 isn't a "not yet built" gap closable inside a web-app pass — it's blocked on a prerequisite architectural decision (ship an Electron desktop build alongside or instead of the web app) that hasn't been made anywhere in this session or the decisions log before it. Recommending it stay explicitly deferred until that decision is made, rather than shipping something that can't work for its stated purpose. This is a different kind of gap than everything else flagged this session (those were real backends waiting on frontends, or genuinely unbuilt features) — this one is blocked on a choice about the shape of the product itself, which is Metqi's call, not a coding task.
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
