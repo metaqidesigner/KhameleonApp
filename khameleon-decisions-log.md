@@ -439,6 +439,32 @@ Two concrete, current gaps surfaced while confirming this: **(1)** no display-na
 
 **This closes the four-phase continuation.** Every section of `khameleon-design-spec.md` (§1–17) has now either been built, verified already real, or explicitly and honestly documented as blocked/deferred with a stated reason — nothing left silently unaddressed.
 
+## 2026-09-04 — Correction: §13.1's "zero Electron presence" claim was wrong; `apps/khameleon-shell` already exists
+
+The 2026-09-04 §13.1 entry above stated "there is zero Electron presence anywhere in this repo," checked only against `artifacts/khameleon-command/package.json`. That was too narrow — this session's own 2026-08-27 entry ("Closed the 'agent can't act on your apps' gap for the local shell") already describes `apps/khameleon-shell`, a real Electron app (`electron@31.0.0` in its `devDependencies`, `pnpm-workspace.yaml` lists `apps/*`) with a working `main.ts`/`preload.ts`/`control-panel.html`. Found again by accident this session, via `pnpm`'s ignored-build-scripts gate naming `electron`, `extract-file-icon`, and `node-window-manager` while pushing the DB schema — a good example of why "grep one package.json" isn't the same as "checked the repo."
+
+**§13.1's conclusion still holds, for a narrower and more accurate reason.** Read `main.ts`: the existing shell hosts exactly one `BrowserWindow` (a 520×220 always-on-top control panel loading its own local `control-panel.html`) wired to `LocalAgentRunner` for window/file/memory tool calls — it has no `BrowserView`, no `session.fromPartition`, nothing that embeds another site's authenticated session. §13.1 needs that specific multi-partition web-app-embedding machinery, which genuinely doesn't exist yet anywhere in this repo. So the recommendation to defer §13.1 is unchanged — but the framing changes from "needs an Electron shell to exist at all" to "already has a working Electron main process and IPC bridge to extend with `BrowserView` windows," which is meaningfully less work than starting from zero whenever that architectural call gets made.
+
+## 2026-09-04 — First real Postgres verification of the session
+
+Every DB-touching feature built this session — going back to the very first schema addition — carried the same caveat: verified against DB-free unit tests and a dummy `DATABASE_URL` only, never a live Postgres. `migrate-legacy-values.test.ts` and `tasks-delete.test.ts` failed with `ECONNREFUSED` in every run for the same reason. This was the highest-value remaining unverified surface in the app, per Metqi's own pick from the "what's next" options presented after auditing every remaining stub page (Automations, Marketplace, and a separate orphaned `communicationsTable`/`routes/communications.ts` were all found to be fabricated/decorative demo scaffolding in that audit — not real gaps, not built on top of).
+
+**Set up for real, locally:** installed PostgreSQL 16 via Homebrew (`brew install postgresql@16`, `brew services start`), created `khameleon_dev`, and ran `drizzle-kit push` for the first time this session against a real database — all 25 tables from `lib/db/src/schema` created successfully with zero manual intervention.
+
+**Verified against it, live, not mocked:**
+- Full backend suite (68 tests across every `*.test.ts` file plus `scheduler.test.ts`) — 68/68 pass, including the 5 tests that had failed with `ECONNREFUSED` in every prior run this session.
+- Real mutation round-trips via `curl` directly against the running `api-server`: `POST /api/tasks` → row confirmed via `psql` independent of the app layer → `PATCH` → `GET /api/tasks/daily` reflects it → `PATCH` against a nonexistent id correctly 404s rather than silently succeeding (the house "mutations throw on failure" rule, now checked against a real DB instead of inferred from code reading).
+- The AES-256-GCM credential encryption path (`lib/crypto.ts`, built 2026-08-27, never before checked against a live Postgres): saved a test API key via `PUT /api/onboarding/api-key`, confirmed via `psql` that the stored `settings` row is genuine ciphertext (`v1:iv:tag:...` format) with the plaintext nowhere in the database, then confirmed `getApiKey()` decrypts it back to the exact original value.
+- `GET /api/dashboard/summary` (flagged in the same-day stub audit as "real but orphaned — nothing calls it") is in fact genuinely DB-backed: `activeProjects` went from 0 to 1 immediately after a real `POST /api/projects`, live.
+- The new §8 `GET /tasks/completion-trend` endpoint, built and previously verified only against a mocked route, bucketed a real completed task into today's date correctly against live data.
+- A full browser pass via Playwright against the real backend with **no mocked routes at all**: fresh-DB state correctly triggered the real onboarding wizard (no profile row, no API key configured) rather than skipping to the main app; after dismissing it, created a task through the actual Tasks UI form and confirmed the row via direct `psql` query — a genuine browser-to-Postgres round trip.
+
+**No bugs found in this pass** — every mutation, read, and encryption round-trip behaved exactly as the code reading predicted across the whole session. `DELETE /api/projects/1` returning 404 was investigated and is correct: there's simply no `DELETE` route on `routes/projects.ts` (only GET/POST/PATCH), so that's Express's router, not a business-logic bug.
+
+**Left running for continued local use:** the Postgres service (`brew services start postgresql@16`, persists across reboots), plus this pass's `api-server` (port 4001) and `khameleon-command` (port 5173, `VITE_API_URL=http://localhost:4001/api`) processes. No `.env` file exists anywhere in the repo — every env var (`DATABASE_URL`, `KHAMELEON_ENCRYPTION_KEY`, provider API keys) is read directly from `process.env` with no `dotenv` loader, so they must be exported per-shell-session until/unless that's set up as a real convenience.
+
+**Not verified here, on purpose:** anything requiring a real `ANTHROPIC_API_KEY` (agent execution, chat, research, skill runs) — this pass covered Postgres only, per Metqi's own scoping. That remains the next real-credential gap, distinct from this one.
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
