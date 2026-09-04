@@ -7,6 +7,7 @@ export * from "./communications";
 export * from "./automations";
 export * from "./security";
 export * from "./vault";
+export * from "./vault_access_log";
 export * from "./research";
 export * from "./memory";
 export * from "./approvals";

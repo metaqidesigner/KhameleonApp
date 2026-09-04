@@ -9,7 +9,6 @@ import {
   automationsTable,
   securityEventsTable,
   securityLayersTable,
-  vaultItemsTable,
   researchItemsTable,
   memoryItemsTable,
   approvalsTable,
@@ -649,18 +648,9 @@ async function seed() {
     { type: "Data Export", severity: "medium", description: "Large data export (2.3GB) initiated by automated report generator. Approved and logged.", timestamp: "2026-06-08T09:15:00Z", resolved: true },
   ]);
 
-  // Vault Items (MOCK DATA ONLY)
-  await db.insert(vaultItemsTable).values([
-    { name: "Microsoft 365 — API Key", category: "API Key", permissionLevel: "read-write", lastAccessed: "2026-06-11T07:30:00Z", owner: "Alex Morgan", description: "Microsoft Graph API key for calendar and email integration.", status: "active" },
-    { name: "Google Workspace — Service Account", category: "Credential", permissionLevel: "read", lastAccessed: "2026-06-10T18:00:00Z", owner: "Alex Morgan", description: "Google Workspace service account for document access.", status: "active" },
-    { name: "Xero — OAuth Token", category: "Token", permissionLevel: "read-write", lastAccessed: "2026-06-11T06:00:00Z", owner: "Finance Agent", description: "Xero accounting API access token for financial data.", status: "active" },
-    { name: "GitHub — Personal Access Token", category: "Token", permissionLevel: "read-write", lastAccessed: "2026-06-10T14:00:00Z", owner: "Coding Agent", description: "GitHub PAT for repository access and code review automation.", status: "active" },
-    { name: "Slack — Bot Token", category: "Token", permissionLevel: "read-write", lastAccessed: "2026-06-11T08:00:00Z", owner: "Automation Agent", description: "Slack bot token for message sending and channel monitoring.", status: "active" },
-    { name: "OpenAI — API Key", category: "API Key", permissionLevel: "read-write", lastAccessed: "2026-06-11T09:00:00Z", owner: "AI Orchestrator", description: "Primary OpenAI API key for GPT-4o powered agents.", status: "active" },
-    { name: "Anthropic — API Key", category: "API Key", permissionLevel: "read-write", lastAccessed: "2026-06-11T08:45:00Z", owner: "AI Orchestrator", description: "Anthropic API key for Claude 3.5 Sonnet agents.", status: "active" },
-    { name: "AWS — Root Certificate", category: "Certificate", permissionLevel: "admin", lastAccessed: "2026-06-01T09:00:00Z", owner: "Infrastructure", description: "AWS root certificate for infrastructure management.", status: "active" },
-    { name: "SSL Certificate — nexuscommand.app", category: "Certificate", permissionLevel: "read", lastAccessed: "2026-06-11T00:00:00Z", owner: "DevOps", description: "Production SSL certificate. Expires 2027-03-15.", status: "active" },
-  ]);
+  // Vault is a real encrypted secret store now (see routes/vault.ts) — it
+  // starts empty for a real user rather than seeding illustrative-but-fake
+  // rows, the same call already made for Skill Sets/Integrations.
 
   // Research Items
   await db.insert(researchItemsTable).values([

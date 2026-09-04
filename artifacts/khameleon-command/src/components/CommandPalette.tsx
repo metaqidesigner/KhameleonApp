@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, LayoutDashboard, Bot, FlaskConical, BrainCircuit, Shield, BarChart2, Settings, MessageSquare, Zap, FolderKanban, Plug, CalendarDays, Inbox } from 'lucide-react';
+import { Search, LayoutDashboard, Bot, FlaskConical, BrainCircuit, Shield, BarChart2, Settings, MessageSquare, Zap, FolderKanban, Plug, CalendarDays, Inbox, Lock } from 'lucide-react';
 import { useJarvisStore, type TabId, type AgentType } from '@/store/jarvisStore';
 
 const MODULES: { id: TabId; label: string; icon: React.ReactNode }[] = [
@@ -13,6 +13,7 @@ const MODULES: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'comms',     label: 'COMMS',     icon: <MessageSquare size={13}/> },
   { id: 'analytics', label: 'ANALYTICS', icon: <BarChart2 size={13}/> },
   { id: 'security',  label: 'SECURITY',  icon: <Shield size={13}/> },
+  { id: 'vault',     label: 'VAULT',     icon: <Lock size={13}/> },
   { id: 'skills',       label: 'SKILL SETS',  icon: <Zap size={13}/> },
   { id: 'integrations', label: 'INTEGRATIONS', icon: <Plug size={13}/> },
   { id: 'settings',  label: 'SETTINGS',  icon: <Settings size={13}/> },
