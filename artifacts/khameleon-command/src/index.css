@@ -690,6 +690,21 @@ html, body, #root {
   --j-text:        #1a2040;
   --j-text-muted:  #4a5580;
   --j-text-faint:  #7888b8;
+  /* design-spec.md §9: "verify... against bg-field, not just bg-void" -
+     the 5 accent colors below were never overridden for light mode, so
+     it silently reused hues tuned for a near-black background (12.7:1
+     to 5.8:1 contrast there) against this near-white one, where they
+     measured 1.4:1 to 3.0:1 - all five failing WCAG AA's 4.5:1 minimum
+     by a wide margin (computed, not estimated - see
+     lib/colorContrast.test.ts). Same hue family, darkened until each
+     clears 4.5:1 against #f0f4f8. */
+  --j-teal:   #167e5a;
+  --j-cyan:   #167e5a;
+  --j-violet: #4a31e7;
+  --j-amber:  #a55e0e;
+  --j-coral:  #d42626;
+  --j-red:    #d42626;
+  --j-green:  #1f7f53;
   --background:    214 40% 95%;
   --foreground:    225 52% 16%;
 }
