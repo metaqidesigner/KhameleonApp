@@ -8,7 +8,7 @@ import {
   ClipboardList, LayoutList, CalendarDays, Sparkles, Bot, ListTree, Pencil,
 } from 'lucide-react';
 import JPanel from '@/components/JPanel';
-import { StatusBadge, TriggerBadge, StepRow } from '@/components/taskRun/TaskRunParts';
+import { StatusBadge, TriggerBadge, AgentTypeBadge, StepRow } from '@/components/taskRun/TaskRunParts';
 import { useJarvisStore } from '@/store/jarvisStore';
 import {
   submitCommand, getTaskRuns, retryTaskRun, cancelTaskRun, streamTaskRun,
@@ -1180,6 +1180,7 @@ function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
           <TriggerBadge type={run.triggerType} />
+          <AgentTypeBadge type={run.agentType} />
           <StatusBadge status={run.status} />
           <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{relativeTime(run.createdAt)}</span>
           {(run.status === 'completed' || run.status === 'awaiting_confirmation') && (
@@ -1469,6 +1470,7 @@ function HistoryRow({ run, onRerun }: { run: TaskRun; onRerun: (text: string) =>
         {expanded ? <ChevronDown size={9} style={{ color: 'var(--j-text-faint)', flexShrink: 0 }} /> : <ChevronRight size={9} style={{ color: 'var(--j-text-faint)', flexShrink: 0 }} />}
         <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', flexShrink: 0 }}>{relativeTime(run.createdAt)}</span>
         <TriggerBadge type={run.triggerType} />
+        <AgentTypeBadge type={run.agentType} />
         <StatusBadge status={run.status} />
         <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{run.commandText}</span>
         <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', flexShrink: 0 }}>{run.steps.length} steps</span>
@@ -1535,6 +1537,11 @@ function CommandsPanel() {
         addActiveTask(taskRunId);
         const optimistic: TaskRun = {
           id: taskRunId, commandText: text, triggerType: 'manual', agentId: 'claude',
+          // Real classification (§11.1) hasn't happened yet at this
+          // queued, optimistic-placeholder stage - 'orchestrator'
+          // matches the DB column's own default until the real value
+          // streams in from the backend.
+          agentType: 'orchestrator',
           status: 'queued', steps: [], retryCount: 0,
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         };

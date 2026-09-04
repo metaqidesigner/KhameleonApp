@@ -1,6 +1,6 @@
 import React from 'react';
 import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
-import type { TaskRunStatus, TaskStep, TriggerType } from '@/lib/taskRunApi';
+import type { TaskAgentType, TaskRunStatus, TaskStep, TriggerType } from '@/lib/taskRunApi';
 
 /**
  * Small presentational pieces shared between the Tasks page's run list
@@ -47,6 +47,33 @@ export function TriggerBadge({ type }: { type: TriggerType }) {
       borderRadius: 8, color, opacity: 0.8,
     }}>
       {icon} {label}
+    </span>
+  );
+}
+
+/**
+ * design-spec.md §11.1's execution-model contract, made visible - which
+ * path actually ran (real data from the backend's classifyComplexity(),
+ * not a decorative label). 'orchestrator' is the pre-existing default
+ * and isn't worth calling out on every run; only the newer paths are
+ * badged, the same restraint used elsewhere in this app for "nothing
+ * to say" states.
+ */
+export function AgentTypeBadge({ type }: { type: TaskAgentType }) {
+  if (type === 'orchestrator') return null;
+  const cfg: Record<Exclude<TaskAgentType, 'orchestrator'>, { color: string; label: string }> = {
+    simple:    { color: 'var(--j-text-muted)', label: 'SIMPLE' },
+    traced:    { color: 'var(--j-violet)',     label: 'TRACED' },
+    sandboxed: { color: 'var(--j-amber)',      label: 'SANDBOXED' },
+  };
+  const { color, label } = cfg[type];
+  return (
+    <span className="j-mono" style={{
+      fontSize: 8, letterSpacing: '0.08em', padding: '2px 6px',
+      border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`,
+      borderRadius: 8, color, opacity: 0.8,
+    }}>
+      {label}
     </span>
   );
 }

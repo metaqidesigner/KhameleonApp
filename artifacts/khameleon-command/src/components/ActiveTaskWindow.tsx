@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Clock as ClockIcon, Zap, AlertTriangle, FileText, Terminal, RotateCcw } from 'lucide-react';
 import JPanel from '@/components/JPanel';
-import { StatusBadge, TriggerBadge, StepRow } from '@/components/taskRun/TaskRunParts';
+import { StatusBadge, TriggerBadge, AgentTypeBadge, StepRow } from '@/components/taskRun/TaskRunParts';
 import { useJarvisStore } from '@/store/jarvisStore';
 import {
   getTaskRun, retryTaskRun, streamTaskRun,
@@ -135,6 +135,7 @@ export function ActiveTaskWindow() {
             action={
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <TriggerBadge type={run.triggerType} />
+                <AgentTypeBadge type={run.agentType} />
                 <StatusBadge status={run.status} />
                 <span className="j-mono" style={{ fontSize: 9, color: 'var(--j-text-faint)' }}>
                   {formatElapsed(run.createdAt, now)}

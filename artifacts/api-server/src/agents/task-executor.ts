@@ -11,6 +11,7 @@ import { TOOL_DEFINITIONS } from "./tools/definitions.js";
 import { dispatchTool } from "./tools/dispatcher.js";
 import { emitTaskEvent } from "./taskEvents.js";
 import { logger } from "../lib/logger.js";
+import { buildClassificationRequest, parseClassification, type Complexity } from "./commandClassifier.js";
 
 function getClient(): Anthropic {
   return new Anthropic({
@@ -44,33 +45,45 @@ async function planSteps(command: string): Promise<string[]> {
   }
 }
 
-// ── Single step execution ─────────────────────────────────────
+// ── Complexity classification (design-spec.md §11.1) ───────────
 
-async function executeStep(
-  command: string,
-  step: TaskStep,
-  completedSteps: TaskStep[],
-  currentPreview: string,
-  taskId: string,
-): Promise<{ output: string; preview: string }> {
+/**
+ * §11.1: the `simple` agent type exists specifically to skip planSteps()
+ * (a whole extra Claude call) for one-shot requests that need no tools.
+ * This classification call is itself cheap by construction (see
+ * commandClassifier.ts's tiny max_tokens) - it's meant to pay for
+ * itself, not add a second expensive call in front of the first one.
+ */
+async function classifyComplexity(command: string): Promise<Complexity> {
+  try {
+    const client = getClient();
+    const req = buildClassificationRequest(command);
+    const res = await client.messages.create({
+      model:      "claude-sonnet-4-6",
+      max_tokens: req.maxTokens,
+      system:     req.system,
+      messages:   [{ role: "user", content: req.userMessage }],
+    });
+    const text = res.content[0]?.type === "text" ? res.content[0].text : "";
+    return parseClassification(text);
+  } catch (err) {
+    logger.warn({ err }, "Complexity classification failed, defaulting to complex");
+    return "complex";
+  }
+}
+
+// ── Shared tool-calling loop ────────────────────────────────────
+
+/**
+ * The actual Claude-with-tools loop, extracted from what used to be
+ * inline in executeStep() so both the existing multi-step orchestrator
+ * path and the new single-shot `simple` path (runSimple, below) share
+ * one implementation instead of two copies that could drift.
+ */
+async function runToolLoop(systemPrompt: string, userMessage: string, taskId: string): Promise<string> {
   const client = getClient();
-  const context = completedSteps
-    .map((s) => `[${s.label}]: ${s.output ?? "done"}`)
-    .join("\n");
-
-  const systemPrompt = [
-    `You are Khameleon, an AI assistant executing a multi-step task.`,
-    `Overall command: "${command}"`,
-    `Current step (${step.index + 1}): "${step.label}"`,
-    context ? `\nCompleted steps:\n${context}` : "",
-    currentPreview ? `\nCurrent work product:\n${currentPreview}` : "",
-    `\nExecute this step. Use your tools if they help. After completing, your response MUST contain:`,
-    `STEP_RESULT: <one or two sentences describing what was accomplished>`,
-    `WORK_PRODUCT:\n<the complete current state of the work product being built — this accumulates>`,
-  ].join("\n");
-
   let messages: Anthropic.Messages.MessageParam[] = [
-    { role: "user", content: `Execute step: "${step.label}"` },
+    { role: "user", content: userMessage },
   ];
 
   let content = "";
@@ -114,12 +127,63 @@ async function executeStep(
     }
   }
 
+  return content;
+}
+
+// ── Single step execution (orchestrator path) ──────────────────
+
+async function executeStep(
+  command: string,
+  step: TaskStep,
+  completedSteps: TaskStep[],
+  currentPreview: string,
+  taskId: string,
+): Promise<{ output: string; preview: string }> {
+  const context = completedSteps
+    .map((s) => `[${s.label}]: ${s.output ?? "done"}`)
+    .join("\n");
+
+  const systemPrompt = [
+    `You are Khameleon, an AI assistant executing a multi-step task.`,
+    `Overall command: "${command}"`,
+    `Current step (${step.index + 1}): "${step.label}"`,
+    context ? `\nCompleted steps:\n${context}` : "",
+    currentPreview ? `\nCurrent work product:\n${currentPreview}` : "",
+    `\nExecute this step. Use your tools if they help. After completing, your response MUST contain:`,
+    `STEP_RESULT: <one or two sentences describing what was accomplished>`,
+    `WORK_PRODUCT:\n<the complete current state of the work product being built — this accumulates>`,
+  ].join("\n");
+
+  const content = await runToolLoop(systemPrompt, `Execute step: "${step.label}"`, taskId);
+
   // Parse STEP_RESULT and WORK_PRODUCT
   const resultMatch  = content.match(/STEP_RESULT:\s*([\s\S]*?)(?=\nWORK_PRODUCT:|$)/);
   const productMatch = content.match(/WORK_PRODUCT:\s*([\s\S]*)/);
   const output  = resultMatch?.[1]?.trim()  ?? content.slice(0, 300).trim();
   const preview = productMatch?.[1]?.trim() ?? currentPreview;
   return { output, preview };
+}
+
+// ── Single-shot execution (simple path, §11.1) ─────────────────
+
+/**
+ * The whole point of the `simple` agent type: one call, no planning
+ * call first, no STEP_RESULT/WORK_PRODUCT scaffolding a one-shot answer
+ * doesn't need. Still goes through the same tool loop (a "simple"
+ * classification isn't a promise no tool will ever be called, just
+ * that none was expected to be needed - the model can still reach for
+ * one if the request turns out to need it).
+ */
+async function runSimple(command: string, taskId: string): Promise<{ output: string; preview: string }> {
+  const systemPrompt = [
+    `You are Khameleon, an AI assistant. The user's request was classified as a simple,`,
+    `single-shot request - answer it directly and completely in this one response.`,
+    `Use a tool only if you genuinely need to; most requests classified this way need none.`,
+  ].join("\n");
+
+  const content = await runToolLoop(systemPrompt, command, taskId);
+  const output = content.trim();
+  return { output, preview: output };
 }
 
 // ── Main entry point ──────────────────────────────────────────
@@ -147,15 +211,26 @@ async function runTask(taskId: string, retryFromStep: number): Promise<void> {
 
     // Plan steps (or restore from prior run)
     let steps: TaskStep[] = (task.steps ?? []) as TaskStep[];
+    // §11.1: classified once, on the first run only - a retry reuses
+    // whichever path the task already committed to rather than
+    // reclassifying (the command hasn't changed, and re-litigating the
+    // agent type mid-retry would risk a `simple` run growing extra
+    // steps it never had, or vice versa).
+    let agentType: string = task.agentType ?? "orchestrator";
 
     if (steps.length === 0) {
-      const labels = await planSteps(task.commandText);
-      steps = labels.map((label, index) => ({
-        index, label,
-        status: index >= retryFromStep ? "pending" : "done",
-      }));
+      const complexity = await classifyComplexity(task.commandText);
+      agentType = complexity === "simple" ? "simple" : "orchestrator";
+
+      steps = agentType === "simple"
+        ? [{ index: 0, label: "Answering directly", status: "pending" }]
+        : (await planSteps(task.commandText)).map((label, index) => ({
+            index, label,
+            status: index >= retryFromStep ? "pending" : "done",
+          }));
+
       await db.update(taskRunsTable)
-        .set({ steps, updatedAt: new Date() })
+        .set({ steps, agentType, updatedAt: new Date() })
         .where(eq(taskRunsTable.id, taskId));
       emit("steps", { steps });
     } else if (retryFromStep > 0) {
@@ -184,7 +259,9 @@ async function runTask(taskId: string, retryFromStep: number): Promise<void> {
       emit("step", { step: runningStep });
 
       const completedSteps = steps.filter((s) => s.status === "done");
-      const result = await executeStep(task.commandText, runningStep, completedSteps, preview, taskId);
+      const result = agentType === "simple"
+        ? await runSimple(task.commandText, taskId)
+        : await executeStep(task.commandText, runningStep, completedSteps, preview, taskId);
 
       preview = result.preview || preview;
       const doneStep: TaskStep = {

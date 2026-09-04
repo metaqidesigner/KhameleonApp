@@ -22,6 +22,16 @@ export const taskRunsTable = pgTable(
     /** schedule name, event description, etc. */
     triggerSource: text("trigger_source"),
     agentId:       text("agent_id").notNull().default("claude"),
+    /**
+     * design-spec.md §11.1's execution-model contract: which path ran
+     * this task, not which persona (that's agentId). 'orchestrator' is
+     * today's existing multi-step plan-then-execute path; 'simple' is
+     * a single-shot, single-step path added for §11.1's `simple` agent
+     * type (no tool calls needed, skips the separate planning call
+     * entirely). 'traced' and 'sandboxed' are reserved per §11.1/§11.6
+     * but not built yet.
+     */
+    agentType:     text("agent_type").notNull().default("orchestrator"),
     /** 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' */
     status:        text("status").notNull().default("queued"),
     /** JSON array of TaskStep */

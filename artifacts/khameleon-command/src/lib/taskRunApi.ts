@@ -19,12 +19,20 @@ export interface TaskStep {
   completedAt?: string;
 }
 
+/**
+ * design-spec.md §11.1's execution-model contract - which path ran this
+ * task, not which persona (that's agentId). 'traced'/'sandboxed' are
+ * reserved per §11.1/§11.6 but not built yet.
+ */
+export type TaskAgentType = 'orchestrator' | 'simple' | 'traced' | 'sandboxed';
+
 export interface TaskRun {
   id: string;
   commandText: string;
   triggerType: TriggerType;
   triggerSource?: string;
   agentId: string;
+  agentType: TaskAgentType;
   status: TaskRunStatus;
   steps: TaskStep[];
   previewContent?: string;
