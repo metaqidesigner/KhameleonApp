@@ -51,6 +51,41 @@ router.get("/", async (req, res) => {
   }
 });
 
+/**
+ * GET /tasks/completion-trend — design-spec.md §8: a chart "built from
+ * a live read of the connected system at the moment it's generated...
+ * not from a persisted analytics store." No completedAt column exists
+ * on tasks - updatedAt is used as the completion timestamp, since the
+ * $onUpdate trigger stamps it at the moment a task's status is set to
+ * 'done', which is what this trend is actually measuring.
+ */
+router.get("/completion-trend", async (req, res) => {
+  try {
+    const doneTasks = await db.select().from(tasksTable).where(eq(tasksTable.status, "done"));
+
+    const days = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (13 - i));
+      return d;
+    });
+    const buckets = days.map(d => ({
+      label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      dayStart: d.getTime(),
+      completed: 0,
+    }));
+
+    for (const t of doneTasks) {
+      const ts = new Date(t.updatedAt).getTime();
+      const bucket = buckets.find((b, i) => ts >= b.dayStart && (i === buckets.length - 1 || ts < buckets[i + 1].dayStart));
+      if (bucket) bucket.completed += 1;
+    }
+
+    res.json(buckets.map(({ label, completed }) => ({ label, completed })));
+  } catch (err) {
+    req.log.error({ err }, "Error computing task completion trend");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── GET /tasks/daily — today's tasks bucketed by day section ──────────────────
 router.get("/daily", async (req, res) => {
   try {

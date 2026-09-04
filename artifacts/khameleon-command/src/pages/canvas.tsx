@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
   Database, Clock, DollarSign, Zap, Activity, Cpu, Settings as SettingsIcon,
   Coffee, Sparkles, Users, MessageSquare, FileText, SunMedium,
   CalendarDays, ChevronDown, ChevronRight, Plus, Bot, AlarmClock,
-  Compass, ListTodo, Radio, Gauge, RotateCcw,
+  Compass, ListTodo, Radio, Gauge, RotateCcw, TrendingUp, X,
 } from 'lucide-react';
 import { useJarvisHealth, useJarvisTelemetry } from '@/hooks/useJarvis';
 import { getDailyTasks, getSchedulerStatus, type Task, type SchedulerStatus, OFFLINE_HEALTH, MOCK_TELEMETRY } from '@/lib/jarvisApi';
+import { getTaskCompletionTrend, type CompletionTrendPoint } from '@/lib/taskTrendApi';
 import {
   useJarvisStore,
   type CanvasWindowPosition,
@@ -512,6 +514,54 @@ function AgentActivityBody() {
   );
 }
 
+// ── Task Trend window body (design-spec.md §8, on-demand) ──────
+// A real, live-read chart - not the full §8 vision (no role-aware
+// selection, no proactive-briefing auto-trigger; both need systems this
+// app doesn't have yet, see the decisions log) but genuinely real data,
+// genuinely a floating window, opened only when the user asks for it.
+function TaskTrendBody() {
+  const [data, setData] = useState<CompletionTrendPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getTaskCompletionTrend().then(d => { setData(d); setLoading(false); });
+  }, []);
+
+  const total = data.reduce((sum, d) => sum + d.completed, 0);
+
+  if (loading) {
+    return <div style={{ color: 'var(--j-text-faint)', fontFamily: 'var(--j-font-mono)', fontSize: 10, padding: '20px 0', textAlign: 'center' }}>Loading…</div>;
+  }
+  if (total === 0) {
+    return <div style={{ color: 'var(--j-text-faint)', fontFamily: 'var(--j-font-mono)', fontSize: 10, padding: '20px 0', textAlign: 'center' }}>No tasks completed in the last 14 days</div>;
+  }
+
+  return (
+    <div>
+      <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)', marginBottom: 6 }}>
+        {total} completed, last 14 days
+      </div>
+      <ResponsiveContainer width="100%" height={140}>
+        <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 4 }}>
+          <defs>
+            <linearGradient id="taskTrendFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#6FE6BD" stopOpacity={0.3} />
+              <stop offset="100%" stopColor="#6FE6BD" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="rgba(0,212,255,0.08)" vertical={false} />
+          <XAxis dataKey="label" tick={{ fontFamily: 'var(--j-font-ui)', fontSize: 8, fill: 'var(--j-text-muted)' }} interval={3} />
+          <YAxis allowDecimals={false} tick={{ fontFamily: 'var(--j-font-ui)', fontSize: 8, fill: 'var(--j-text-muted)' }} />
+          <Tooltip
+            contentStyle={{ background: 'rgba(0,4,12,0.97)', border: '1px solid rgba(0,212,255,0.3)', fontFamily: 'var(--j-font-ui)', fontSize: 10 }}
+          />
+          <Area type="monotone" dataKey="completed" stroke="var(--j-teal)" strokeWidth={1.5} fill="url(#taskTrendFill)" dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function KhameleonBody() {
   return (
     <div className="ac-concept-pills" style={{ maxWidth: 'none' }}>
@@ -571,6 +621,12 @@ function CanvasWindow({ windowId, zone, activityFocused, onMove }: CanvasWindowP
 
 // ── Unified Canvas page ───────────────────────────────────────
 export default function UnifiedCanvas() {
+  // §8: "on demand whenever the user explicitly asks for one" - not
+  // auto-injected (no proactive-briefing system exists to trigger it),
+  // and not persisted in canvasWindowsPositions like the four fixed
+  // windows above - it's summoned, not part of the standing layout.
+  const [showTaskTrend, setShowTaskTrend] = useState(false);
+
   // Newest event is always prepended, so its id changes on every push —
   // this keeps working even after the history hits its 50-item cap.
   const latestEventId = useJarvisStore(s => s.agentHistory[0]?.id);
@@ -665,16 +721,35 @@ export default function UnifiedCanvas() {
 
   return (
     <div className="kc-canvas">
-      <button
-        type="button"
-        className="kc-canvas-reset"
-        onClick={resetCanvasLayout}
-        title="Expand all canvas windows"
-        aria-label="Reset canvas layout"
-      >
-        <RotateCcw size={11} />
-        <span>Reset layout</span>
-      </button>
+      {/* .kc-canvas-reset hardcodes its own position:absolute (top/right
+          12px) for the single original button - both buttons here
+          reuse its visual styling but position:static, letting this
+          wrapper (absolutely positioned once) lay them out side by side
+          instead of both landing on the exact same spot. */}
+      <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 5, display: 'flex', gap: 6 }}>
+        <button
+          type="button"
+          className="kc-canvas-reset"
+          style={{ position: 'static' }}
+          onClick={() => setShowTaskTrend(v => !v)}
+          title={showTaskTrend ? 'Remove the task-completion chart' : 'Add a real task-completion chart'}
+          aria-label="Toggle task completion chart"
+        >
+          {showTaskTrend ? <X size={11} /> : <TrendingUp size={11} />}
+          <span>{showTaskTrend ? 'Remove chart' : 'Add chart'}</span>
+        </button>
+        <button
+          type="button"
+          className="kc-canvas-reset"
+          style={{ position: 'static' }}
+          onClick={resetCanvasLayout}
+          title="Expand all canvas windows"
+          aria-label="Reset canvas layout"
+        >
+          <RotateCcw size={11} />
+          <span>Reset layout</span>
+        </button>
+      </div>
 
       {/* ── Left zone: in-progress work ─────────────────── */}
       <div
@@ -707,6 +782,12 @@ export default function UnifiedCanvas() {
         {windowsInZone('right').map(windowId => (
           <CanvasWindow key={windowId} windowId={windowId} zone="right" activityFocused={activityFocused} onMove={moveCanvasWindow} />
         ))}
+
+        {showTaskTrend && (
+          <FloatingWindow icon={<TrendingUp size={11} />} label="Task Completion (14d)">
+            <TaskTrendBody />
+          </FloatingWindow>
+        )}
 
         <div className="kc-assistant-slot">
           <AssistantCard />
