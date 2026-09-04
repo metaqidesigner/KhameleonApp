@@ -425,6 +425,20 @@ Two concrete, current gaps surfaced while confirming this: **(1)** no display-na
 
 **Verified:** `tsc --noEmit` clean. 56/56 frontend tests (43 baseline + 13 new). Drove the running app via Playwright with `khameleon-theme` set to `'light'` before load: status badges (SIMPLE, DONE, EVENT, FAILED) are now clearly legible, where they were previously computed to be at 1.4:1–3:1 contrast.
 
+## 2026-09-04 — §8 Charts: one real, on-demand floating chart window
+
+**Phase 4, final phase of the four-phase spec-build continuation** (§11.1, §13.1, §9 above).
+
+§8's full vision — role-aware chart selection informed by onboarding, automatic triggering during a "proactive briefing," swipe-to-dismiss as its own gesture, charts from any connected system — has no proactive-briefing system anywhere in this app to hook into, and only two connected-system data sources exist with real volume to chart: Tasks/Projects and this session's new Calendar/Inbox. Not achievable honestly in one pass — scoped to one genuine slice proving the real pattern instead of mocking the whole vision.
+
+**Built:** `GET /tasks/completion-trend` (new) — a live read at request time (§8's "not a persisted analytics store" rule), bucketing `status: 'done'` tasks into the last 14 days using `updatedAt` as the completion timestamp (no dedicated `completedAt` column exists; `updatedAt`'s `$onUpdate` trigger stamps the moment a task's status is set to `'done'`, which is what this measures). `lib/taskTrendApi.ts` follows the same degrade-to-empty convention as every other read in this app. `pages/canvas.tsx`: a new `TaskTrendBody` window rendered via the existing `FloatingWindow` component already used by Today's Plan/Agent Activity/System Status — draggable, resizable, minimizable for free, no new window-chrome. A real recharts `AreaChart` (same visual language as Analytics' query-volume chart from an earlier pass), default zone right per §8's placement rule, an honest empty state when nothing's completed in 14 days. Opened via a new "Add chart"/"Remove chart" toggle next to "Reset layout" — on demand, matching §8's "whenever the user explicitly asks" trigger; not persisted in the saved canvas layout like the four standing windows, since it's summoned rather than part of the layout.
+
+**Explicitly out of scope, flagged rather than guessed at:** role-based chart-type selection (needs per-role logic across connected systems that mostly have no data yet); automatic triggering during a briefing (no briefing system exists); swipe-to-dismiss as a gesture distinct from minimize (`FloatingWindow` only has minimize today — a new gesture risks conflicting with the existing drag-to-reorder-between-zones behavior without its own dedicated pass).
+
+**Verified:** `tsc --noEmit` clean in both packages (24 pre-existing backend errors unchanged, zero in new files). 56/56 frontend tests unchanged. Drove the running app via Playwright with a mocked 14-day trend: the chart is absent by default, "Add chart" opens a real floating window showing a real area chart and the real completed-count text, "Remove chart" closes it again — confirmed via DOM assertions and a visual screenshot.
+
+**This closes the four-phase continuation.** Every section of `khameleon-design-spec.md` (§1–17) has now either been built, verified already real, or explicitly and honestly documented as blocked/deferred with a stated reason — nothing left silently unaddressed.
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
