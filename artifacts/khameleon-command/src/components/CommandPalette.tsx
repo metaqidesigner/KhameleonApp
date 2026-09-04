@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, LayoutDashboard, Bot, FlaskConical, BrainCircuit, Shield, BarChart2, Settings, MessageSquare, Zap, FolderKanban, Plug } from 'lucide-react';
+import { Search, LayoutDashboard, Bot, FlaskConical, BrainCircuit, Shield, BarChart2, Settings, MessageSquare, Zap, FolderKanban, Plug, CalendarDays, Inbox } from 'lucide-react';
 import { useJarvisStore, type TabId, type AgentType } from '@/store/jarvisStore';
 
 const MODULES: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'canvas',    label: 'CANVAS',    icon: <LayoutDashboard size={13}/> },
   { id: 'agents',    label: 'AGENTS',    icon: <Bot size={13}/> },
   { id: 'projects',  label: 'PROJECTS',  icon: <FolderKanban size={13}/> },
+  { id: 'calendar',  label: 'CALENDAR',  icon: <CalendarDays size={13}/> },
+  { id: 'inbox',     label: 'INBOX',     icon: <Inbox size={13}/> },
   { id: 'research',  label: 'RESEARCH',  icon: <FlaskConical size={13}/> },
   { id: 'memory',    label: 'MEMORY',    icon: <BrainCircuit size={13}/> },
   { id: 'comms',     label: 'COMMS',     icon: <MessageSquare size={13}/> },

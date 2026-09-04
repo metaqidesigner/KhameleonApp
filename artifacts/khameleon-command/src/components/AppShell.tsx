@@ -24,6 +24,8 @@ const Settings   = lazy(() => import('@/pages/settings'));
 const Tasks      = lazy(() => import('@/pages/tasks'));
 const Approvals  = lazy(() => import('@/pages/approvals'));
 const Projects   = lazy(() => import('@/pages/projects'));
+const Calendar   = lazy(() => import('@/pages/calendar'));
+const Inbox      = lazy(() => import('@/pages/inbox'));
 
 function Fallback() {
   return (
@@ -54,6 +56,8 @@ function PageRouter() {
       {activeTab === 'settings'  && <Settings />}
       {activeTab === 'tasks'     && <Tasks />}
       {activeTab === 'projects'  && <Projects />}
+      {activeTab === 'calendar'  && <Calendar />}
+      {activeTab === 'inbox'     && <Inbox />}
     </Suspense>
   );
 }

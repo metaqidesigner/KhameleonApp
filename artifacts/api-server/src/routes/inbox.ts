@@ -7,15 +7,33 @@ import { getFreshToken, isConnected } from "../lib/oauthTokens.js";
 
 const router = Router();
 
-// ── Normalised inbox item shape ───────────────────────────────────────────────
+/**
+ * Normalised inbox item shape - matches inbox_items' real DB columns
+ * (lib/db/src/schema/inbox.ts) exactly, since that's the more
+ * authoritative, already-established shape. The live Gmail/Outlook
+ * fetch functions below used to return a different, ad hoc shape
+ * (`type`/`title`/`content` instead of `source`/`subject`/`summary`,
+ * missing `classification`/`aiRecommendation`/etc. entirely) - a real
+ * bug nothing ever caught, since GET / returned one shape or the other
+ * depending on which branch ran, with no shared type checking either
+ * against the other or against the DB rows the fallback branch returns
+ * unmapped. A frontend built against either shape alone would have
+ * silently broken against the other.
+ */
 interface InboxItem {
   id: string | number;
-  type: string;
-  title: string;
-  content: string;
+  source: string;
+  sourceIcon: string;
   sender: string;
+  subject: string;
+  summary: string;
   priority: string;
+  classification: string;
+  aiRecommendation: string;
+  relatedProject: string;
+  priorityScore: number;
   isRead: boolean;
+  isArchived: boolean;
   createdAt: string;
 }
 
@@ -53,12 +71,21 @@ async function fetchGmail(): Promise<InboxItem[]> {
       msg.payload.headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? "";
     return {
       id: msg.id,
-      type: "email",
-      title: header("Subject") || "(no subject)",
-      content: msg.snippet ?? "",
+      source: "gmail",
+      sourceIcon: "gmail",
       sender: header("From"),
+      subject: header("Subject") || "(no subject)",
+      summary: msg.snippet ?? "",
       priority: "normal",
+      // These four are AI-enrichment fields the DB fallback carries but
+      // a raw provider fetch has no equivalent for - honest defaults,
+      // not fabricated values.
+      classification: "task",
+      aiRecommendation: "",
+      relatedProject: "",
+      priorityScore: 50,
       isRead: !msg.labelIds.includes("UNREAD"),
+      isArchived: false,
       createdAt: msg.internalDate
         ? new Date(parseInt(msg.internalDate)).toISOString()
         : new Date().toISOString(),
@@ -89,20 +116,35 @@ async function fetchOutlook(): Promise<InboxItem[]> {
   };
   return json.value.map(msg => ({
     id: msg.id,
-    type: "email",
-    title: msg.subject || "(no subject)",
-    content: msg.bodyPreview ?? "",
+    source: "outlook",
+    sourceIcon: "outlook",
     sender: msg.from?.emailAddress?.name
       ? `${msg.from.emailAddress.name} <${msg.from.emailAddress.address}>`
       : (msg.from?.emailAddress?.address ?? ""),
+    subject: msg.subject || "(no subject)",
+    summary: msg.bodyPreview ?? "",
     priority: msg.importance === "high" ? "high" : "normal",
+    classification: "task",
+    aiRecommendation: "",
+    relatedProject: "",
+    priorityScore: 50,
     isRead: msg.isRead,
+    isArchived: false,
     createdAt: msg.receivedDateTime,
   }));
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
+/**
+ * `source` in the response tells the frontend which path served the
+ * list: PATCH /:id below only ever writes to the local DB table (its
+ * `id` is a serial int; Gmail/Outlook ids are opaque provider strings
+ * that will never match a DB row), so "mark as read" can only actually
+ * work when source === 'local' - the frontend uses this to gate that
+ * control honestly instead of offering a button that would silently
+ * 404 against a live-provider item.
+ */
 router.get("/", async (req, res) => {
   try {
     // Try live providers first (Google then Microsoft), fall back to DB
@@ -113,24 +155,24 @@ router.get("/", async (req, res) => {
 
     if (googleOk) {
       const items = await fetchGmail();
-      res.json(items);
+      res.json({ items, source: "gmail" });
       return;
     }
     if (msOk) {
       const items = await fetchOutlook();
-      res.json(items);
+      res.json({ items, source: "outlook" });
       return;
     }
 
     // No connector — serve from local DB
     const items = await db.select().from(inboxItemsTable).orderBy(inboxItemsTable.createdAt);
-    res.json(items.reverse());
+    res.json({ items: items.reverse(), source: "local" });
   } catch (err) {
     req.log.error({ err }, "Error fetching inbox");
     // Fall back to DB on any upstream error
     try {
       const items = await db.select().from(inboxItemsTable).orderBy(inboxItemsTable.createdAt);
-      res.json(items.reverse());
+      res.json({ items: items.reverse(), source: "local" });
     } catch {
       res.status(500).json({ error: "Internal server error" });
     }
