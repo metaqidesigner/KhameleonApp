@@ -522,3 +522,18 @@ A Skill Set or Integration may carry zero, one, or multiple Work Domain tags. Ta
 ### 17.3 UI surface
 
 Domains render as a user-editable grouping/filter layer, not a mode switch. The agent stays one continuous entity regardless of which domain a Skill Set came from — domains organize the user's library, they don't fork the agent into separate personas (unlike a multi-bot model).
+
+## 18. Provider Access Model (Commercial)
+
+Khameleon does not hold or proxy a shared AI provider key on behalf of users. Each user connects their own access to the AI providers they have available:
+
+- Personal accounts (e.g. Claude free tier, ChatGPT free tier)
+- Organisation-provisioned agents (e.g. Microsoft Copilot, Gemini) where the user's employer has licensed and permitted their use
+
+### 18.1 Implications for build
+
+- Per-user credential/connection storage, isolated per account (not a single shared `.env`)
+- A connection-management UI: add, view, swap, and revoke provider connections per user
+- Provider abstraction must resolve to "whichever providers *this* user has connected," not a fixed global set
+- Graceful degradation: a user with only one provider connected must still get sensible behaviour from every feature, not assume any specific provider is present
+- No Khameleon-side usage metering/billing for model calls — cost is borne by the user via their own provider account/licence
