@@ -11,13 +11,14 @@
  * not a hard gate.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
 import { taskRunsTable, tasksTable, type TaskStep } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { emitTaskEvent } from "../taskEvents.js";
 import { logger } from "../../lib/logger.js";
 import * as graph from "../../lib/outlookGraph.js";
+import { getAnthropicClient } from "../../lib/anthropicClient.js";
 
 const STEP_LABELS = [
   "Fetch unread mail",
@@ -65,13 +66,6 @@ export function classifyByRule(message: Pick<graph.GraphMessage, "subject" | "fr
 
 function isTriageClassification(value: unknown): value is TriageClassification {
   return value === "urgent" || value === "action_needed" || value === "fyi" || value === "low_priority";
-}
-
-function getClient(): Anthropic {
-  return new Anthropic({
-    apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY,
-    baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL ?? undefined,
-  });
 }
 
 function textOf(res: Anthropic.Messages.Message): string {
@@ -193,7 +187,7 @@ export async function runOutlookTriageInbox(): Promise<TriageResult> {
     // Step 3 — instructional: for unclassified items, classify using judgment
     await setStep(taskRunId, steps, 2, { status: "running", startedAt: new Date().toISOString() });
     if (unclassified.length > 0) {
-      const client = getClient();
+      const client = await getAnthropicClient();
       const listing = unclassified
         .map((m, i) => `${i}. From: ${m.from?.emailAddress?.address ?? "unknown"} | Subject: ${m.subject} | Preview: ${m.bodyPreview}`)
         .join("\n");
@@ -278,7 +272,7 @@ export async function runOutlookTriageInbox(): Promise<TriageResult> {
     const needsAction = classified.filter((c) => c.classification === "urgent" || c.classification === "action_needed");
     const actionItems: TriageActionItem[] = [];
     if (needsAction.length > 0) {
-      const client = getClient();
+      const client = await getAnthropicClient();
       const listing = needsAction
         .map((c) => `From: ${c.message.from?.emailAddress?.address ?? "unknown"} | Subject: ${c.message.subject} | Preview: ${c.message.bodyPreview}`)
         .join("\n");

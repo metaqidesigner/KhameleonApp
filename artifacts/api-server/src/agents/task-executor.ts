@@ -12,19 +12,13 @@ import { dispatchTool } from "./tools/dispatcher.js";
 import { emitTaskEvent } from "./taskEvents.js";
 import { logger } from "../lib/logger.js";
 import { buildClassificationRequest, parseClassification, type Complexity } from "./commandClassifier.js";
-
-function getClient(): Anthropic {
-  return new Anthropic({
-    apiKey:  process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY,
-    baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL ?? undefined,
-  });
-}
+import { getAnthropicClient } from "../lib/anthropicClient.js";
 
 // ── Step planning ─────────────────────────────────────────────
 
 async function planSteps(command: string): Promise<string[]> {
   try {
-    const client = getClient();
+    const client = await getAnthropicClient();
     const res = await client.messages.create({
       model:      "claude-sonnet-4-6",
       max_tokens: 512,
@@ -56,7 +50,7 @@ async function planSteps(command: string): Promise<string[]> {
  */
 async function classifyComplexity(command: string): Promise<Complexity> {
   try {
-    const client = getClient();
+    const client = await getAnthropicClient();
     const req = buildClassificationRequest(command);
     const res = await client.messages.create({
       model:      "claude-sonnet-4-6",
@@ -81,7 +75,7 @@ async function classifyComplexity(command: string): Promise<Complexity> {
  * one implementation instead of two copies that could drift.
  */
 async function runToolLoop(systemPrompt: string, userMessage: string, taskId: string): Promise<string> {
-  const client = getClient();
+  const client = await getAnthropicClient();
   let messages: Anthropic.Messages.MessageParam[] = [
     { role: "user", content: userMessage },
   ];

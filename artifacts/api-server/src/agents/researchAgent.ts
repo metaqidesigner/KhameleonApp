@@ -16,10 +16,11 @@
  * backend-route audit, not by running it.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { dispatchTool } from "./tools/dispatcher.js";
 import { TOOL_DEFINITIONS } from "./tools/definitions.js";
 import { costForTokens } from "./gateway.js";
+import { getAnthropicClient } from "../lib/anthropicClient.js";
 
 const FETCH_URL_TOOL = TOOL_DEFINITIONS.find((t) => t.name === "fetch_url");
 if (!FETCH_URL_TOOL) {
@@ -27,13 +28,6 @@ if (!FETCH_URL_TOOL) {
 }
 
 const MODEL = "claude-sonnet-4-6";
-
-function getClient(): Anthropic {
-  return new Anthropic({
-    apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY,
-    baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL ?? undefined,
-  });
-}
 
 export interface ResearchToolResult {
   name: string;
@@ -69,7 +63,7 @@ export async function runDeepResearch(
   const maxIterations = clampIterations(opts.maxIterations);
   const webSearch = opts.webSearch !== false;
 
-  const client = getClient();
+  const client = await getAnthropicClient();
   const t0 = Date.now();
   const tools = webSearch ? [FETCH_URL_TOOL!] : [];
   const system = [

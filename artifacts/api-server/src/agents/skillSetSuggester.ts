@@ -10,21 +10,12 @@
  * 'complex' rather than throwing.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "../lib/logger.js";
 import {
   buildSuggestionRequest, parseSuggestionResponse,
   type SkillSetSuggestionCandidate, type SuggestionTask, type ParsedSuggestion,
 } from "../lib/skillSetSuggestionMatch.js";
-
-// Mirrors task-executor.ts's own getClient() - not extracted into a shared
-// module, to avoid touching that central file for an unrelated refactor.
-function getClient(): Anthropic {
-  return new Anthropic({
-    apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY,
-    baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL ?? undefined,
-  });
-}
+import { getAnthropicClient } from "../lib/anthropicClient.js";
 
 export async function suggestSkillSetForTask(
   task: SuggestionTask,
@@ -34,7 +25,7 @@ export async function suggestSkillSetForTask(
   if (!req) return null;
 
   try {
-    const client = getClient();
+    const client = await getAnthropicClient();
     const res = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: req.maxTokens,
