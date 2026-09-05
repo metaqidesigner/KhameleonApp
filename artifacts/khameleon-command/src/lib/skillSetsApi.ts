@@ -89,6 +89,16 @@ export function uninstallSkillSet(id: number): Promise<SkillSet> {
   return mutate(`/skill-sets/${id}/uninstall`, { method: 'POST' });
 }
 
+/**
+ * Installs an existing catalog entry (status 'available') - a starter
+ * Skill Set, or one accepted from a §15.2 contextual suggestion. Same
+ * gating result shape as createSkillSet(): a null approvalId means it's
+ * already installed; a real one means confirmSkillSetInstall() is next.
+ */
+export function installSkillSetFromCatalog(id: number): Promise<CreateSkillSetResult> {
+  return mutate(`/skill-sets/${id}/install`, { method: 'POST' });
+}
+
 export interface UpdateSkillSetResult {
   skillSet: SkillSet;
   approvalId: number | null;

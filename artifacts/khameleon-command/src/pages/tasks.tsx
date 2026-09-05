@@ -15,13 +15,15 @@ import {
   type TaskRun, type TaskStep, type TaskRunStatus, type TriggerType,
 } from '@/lib/taskRunApi';
 import {
-  getTasks, createTask, updateTask, deleteTask,
+  getTasks, createTask, updateTask, deleteTask, dismissSkillSetSuggestion,
   getSchedulerStatus,
   type Task, type TaskCategory, type TaskPriority, type TaskRecurrence,
   type SchedulerStatus,
 } from '@/lib/jarvisApi';
 import { computeRoots, computeChildren } from '@/lib/taskNesting';
 import { streamAgentChat } from '@/lib/agentsApi';
+import { installSkillSetFromCatalog, confirmSkillSetInstall } from '@/lib/skillSetsApi';
+import { ConfirmGate } from '@/components/ConfirmGate';
 
 // ── Task taxonomy constants ───────────────────────────────────
 
@@ -170,6 +172,10 @@ interface TaskCardProps {
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
   onBreakdown?: (task: Task) => void;
+  /** design-spec.md §15.2 - accept/dismiss a contextually-suggested Skill Set. */
+  onAcceptSuggestion?: (task: Task) => void;
+  onDismissSuggestion?: (task: Task) => void;
+  suggestionBusy?: boolean;
   /** Full unfiltered task list — enables the inline parent-picker edit */
   allTasks?: Task[];
   onSetParent?: (id: number, parentTaskId: number | null) => Promise<void>;
@@ -178,7 +184,7 @@ interface TaskCardProps {
   subtaskProgress?: { done: number; total: number };
 }
 
-function TaskCard({ task, onToggle, onDelete, onBreakdown, allTasks, onSetParent, compact, indent, subtaskProgress }: TaskCardProps) {
+function TaskCard({ task, onToggle, onDelete, onBreakdown, onAcceptSuggestion, onDismissSuggestion, suggestionBusy, allTasks, onSetParent, compact, indent, subtaskProgress }: TaskCardProps) {
   const pri = getPri(task.priority);
   const isDone = task.status === 'done';
   const [editingParent, setEditingParent] = useState(false);
@@ -359,6 +365,38 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown, allTasks, onSetParent
           </button>
         </div>
       )}
+
+      {/* ── §15.2 contextual Skill Set suggestion — "accept or dismiss with one action" ── */}
+      {task.skillSetSuggestion && (onAcceptSuggestion || onDismissSuggestion) && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '5px 12px',
+          paddingLeft: indent ? 28 : 12,
+          background: 'rgba(120,96,194,0.05)',
+          borderTop: '1px solid rgba(120,96,194,0.12)',
+        }}>
+          <Sparkles size={10} style={{ color: 'rgba(180,150,255,0.85)', flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: 10, color: 'var(--j-text-muted)', fontFamily: 'var(--j-font-ui)' }}>
+            Try the <strong style={{ color: 'rgba(180,150,255,0.9)' }}>{task.skillSetSuggestion.name}</strong> Skill Set — {task.skillSetSuggestion.reason}
+          </span>
+          <button
+            onClick={() => onAcceptSuggestion?.(task)}
+            disabled={suggestionBusy}
+            className="j-btn-ghost"
+            style={{ height: 22, padding: '0 8px', fontSize: 9, flexShrink: 0, borderColor: 'rgba(120,96,194,0.3)', color: 'rgba(180,150,255,0.85)' }}
+          >
+            {suggestionBusy ? '…' : 'INSTALL'}
+          </button>
+          <button
+            onClick={() => onDismissSuggestion?.(task)}
+            disabled={suggestionBusy}
+            className="j-btn-ghost"
+            style={{ height: 22, padding: '0 8px', fontSize: 9, flexShrink: 0 }}
+          >
+            DISMISS
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -526,10 +564,14 @@ interface TaskListViewProps {
   onToggle: (id: number, done: boolean) => void;
   onDelete: (id: number) => void;
   onBreakdown?: (task: Task) => void;
+  /** design-spec.md §15.2 - only the List view surfaces suggestions, not the Daily view. */
+  onAcceptSuggestion?: (task: Task) => void;
+  onDismissSuggestion?: (task: Task) => void;
+  suggestionBusyId?: number | null;
   onSetParent?: (id: number, parentTaskId: number | null) => Promise<void>;
 }
 
-function TaskListView({ tasks, allTasks, unfilteredTasks, groupBy, onToggle, onDelete, onBreakdown, onSetParent }: TaskListViewProps) {
+function TaskListView({ tasks, allTasks, unfilteredTasks, groupBy, onToggle, onDelete, onBreakdown, onAcceptSuggestion, onDismissSuggestion, suggestionBusyId, onSetParent }: TaskListViewProps) {
   // A task is a "root" in the current view if it has no parent OR its parent isn't currently visible.
   // This preserves filter semantics: a filtered-in subtask whose parent is filtered out still appears.
   const visibleIds = new Set(tasks.map(t => t.id));
@@ -599,7 +641,7 @@ function TaskListView({ tasks, allTasks, unfilteredTasks, groupBy, onToggle, onD
                 : undefined;
               return (
                 <React.Fragment key={t.id}>
-                  <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} allTasks={progressPool} onSetParent={onSetParent} subtaskProgress={subtaskProgress} />
+                  <TaskCard task={t} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} onAcceptSuggestion={onAcceptSuggestion} onDismissSuggestion={onDismissSuggestion} suggestionBusy={suggestionBusyId === t.id} allTasks={progressPool} onSetParent={onSetParent} subtaskProgress={subtaskProgress} />
                   {children.map(child => (
                     <TaskCard key={child.id} task={child} onToggle={onToggle} onDelete={onDelete} onBreakdown={onBreakdown} allTasks={progressPool} onSetParent={onSetParent} indent />
                   ))}
@@ -878,6 +920,11 @@ function MyTasksPanel() {
   const [creating,            setCreating]            = useState(false);
   const [breakdownTask,       setBreakdownTask]       = useState<Task | null>(null);
 
+  // §15.2 contextual Skill Set suggestions
+  const [suggestionBusyId, setSuggestionBusyId] = useState<number | null>(null);
+  const [suggestionError,  setSuggestionError]  = useState<string>();
+  const [suggestionGate,   setSuggestionGate]   = useState<{ skillSetId: number; skillSetName: string; approvalId: number } | null>(null);
+
   const loadTasks = useCallback(async () => {
     const [data, allData] = await Promise.all([
       getTasks({
@@ -931,6 +978,50 @@ function MyTasksPanel() {
   const handleBreakdownDone = () => {
     // Reload tasks so newly-created subtasks appear
     loadTasks();
+  };
+
+  // §15.2: install an existing catalog Skill Set that was suggested for this task.
+  // A null approvalId means it installed immediately (today's real-world case,
+  // since both starter Skill Sets request no new tools/integrations) - a real
+  // one means a hard gate is required, same tiering as skills.tsx's own flow.
+  const handleAcceptSuggestion = async (task: Task) => {
+    if (!task.skillSetSuggestion) return;
+    setSuggestionBusyId(task.id);
+    setSuggestionError(undefined);
+    try {
+      const { skillSet, approvalId } = await installSkillSetFromCatalog(task.skillSetSuggestion.skillSetId);
+      if (approvalId) {
+        setSuggestionGate({ skillSetId: skillSet.id, skillSetName: skillSet.name, approvalId });
+      } else {
+        loadTasks(); // the suggestion disappears next fetch - its target is no longer 'available'
+      }
+    } catch (err) {
+      setSuggestionError(err instanceof Error ? err.message : 'Failed to install suggested Skill Set');
+    } finally {
+      setSuggestionBusyId(null);
+    }
+  };
+
+  const handleDismissSuggestion = async (task: Task) => {
+    setSuggestionError(undefined);
+    try {
+      await dismissSkillSetSuggestion(task.id);
+      loadTasks();
+    } catch (err) {
+      setSuggestionError(err instanceof Error ? err.message : 'Failed to dismiss suggestion');
+    }
+  };
+
+  const handleConfirmSuggestionInstall = async () => {
+    if (!suggestionGate) return;
+    try {
+      await confirmSkillSetInstall(suggestionGate.skillSetId, suggestionGate.approvalId);
+      setSuggestionGate(null);
+      loadTasks();
+    } catch (err) {
+      setSuggestionError(err instanceof Error ? err.message : 'Failed to confirm install');
+      throw err; // keeps the gate open so the user can retry, matching skills.tsx's convention
+    }
   };
 
   const selStyle: React.CSSProperties = {
@@ -1078,9 +1169,13 @@ function MyTasksPanel() {
             <TaskDailyView tasks={tasks} allTasks={tasks} unfilteredTasks={allTasksUnfiltered} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} onSetParent={handleSetParent} />
           </div>
         ) : (
-          <TaskListView tasks={tasks} allTasks={tasks} unfilteredTasks={allTasksUnfiltered} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} onSetParent={handleSetParent} />
+          <TaskListView tasks={tasks} allTasks={tasks} unfilteredTasks={allTasksUnfiltered} groupBy={groupBy} onToggle={handleToggle} onDelete={handleDelete} onBreakdown={handleBreakdown} onAcceptSuggestion={handleAcceptSuggestion} onDismissSuggestion={handleDismissSuggestion} suggestionBusyId={suggestionBusyId} onSetParent={handleSetParent} />
         )}
       </div>
+
+      {suggestionError && (
+        <div style={{ padding: '6px 12px', fontSize: 11, color: '#E77A7A', flexShrink: 0 }}>{suggestionError}</div>
+      )}
 
       {/* ── Orchestrator breakdown panel ── */}
       {breakdownTask && (
@@ -1088,6 +1183,23 @@ function MyTasksPanel() {
           task={breakdownTask}
           onClose={() => setBreakdownTask(null)}
           onDone={handleBreakdownDone}
+        />
+      )}
+
+      {/* ── §15.2: hard gate for a suggested Skill Set that requests new scope
+          (not exercised by today's two starter Skill Sets, both instructions-only,
+          but a real path per §15.3 for any future catalog item that does) ── */}
+      {suggestionGate && (
+        <ConfirmGate
+          title={`Install "${suggestionGate.skillSetName}"`}
+          category="skill_set_install"
+          target={suggestionGate.skillSetName}
+          scope="requested tools/integrations - see payload"
+          severity="medium"
+          confirmLabel="Confirm & Install"
+          payload={<div>Requested by a §15.2 contextual suggestion. Review in Skill Sets before confirming if unsure.</div>}
+          onConfirm={handleConfirmSuggestionInstall}
+          onCancel={() => setSuggestionGate(null)}
         />
       )}
     </div>

@@ -261,6 +261,8 @@ export interface Task {
   aiRecommendation: string;
   createdAt:        string;
   updatedAt:        string;
+  /** design-spec.md §15.2 - a not-yet-installed Skill Set closely matching this task, or null. */
+  skillSetSuggestion?: { skillSetId: number; name: string; reason: string } | null;
 }
 
 export interface CreateTaskInput {
@@ -343,6 +345,13 @@ export async function updateTask(id: number, input: UpdateTaskInput): Promise<Ta
 export async function deleteTask(id: number): Promise<void> {
   const res = await fetch(`${BASE}/tasks/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete task');
+  useJarvisStore.getState().notifyTasksChanged();
+}
+
+/** §15.2: "does not repeat for the same task thread" - permanent once dismissed. */
+export async function dismissSkillSetSuggestion(taskId: number): Promise<void> {
+  const res = await fetch(`${BASE}/tasks/${taskId}/skill-set-suggestion/dismiss`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to dismiss suggestion');
   useJarvisStore.getState().notifyTasksChanged();
 }
 

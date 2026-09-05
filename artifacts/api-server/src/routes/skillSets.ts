@@ -148,6 +148,84 @@ router.post("/", async (req, res) => {
   }
 });
 
+/**
+ * POST /:id/install — installs an existing catalog entry (status
+ * 'available'), e.g. one of the seeded starter Skill Sets, or one
+ * accepted from a §15.2 contextual suggestion. Distinct from POST /,
+ * which creates a brand new Skill Set - this one only ever transitions
+ * an existing row. Same gating decision as POST / (requiresHardGate()),
+ * because installing a catalog item is still "installing a Skill Set"
+ * per §15.3 - the fact that it was pre-authored by someone else doesn't
+ * change whether it's requesting new tool/data access.
+ */
+router.post("/:id/install", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const [skillSet] = await db.select().from(skillSetsTable).where(eq(skillSetsTable.id, id));
+    if (!skillSet) { res.status(404).json({ error: "Skill set not found" }); return; }
+    if (skillSet.status !== "available") { res.status(400).json({ error: `Skill set is not available to install (status: ${skillSet.status})` }); return; }
+
+    const requestedTools = parseJsonArray(skillSet.requestedTools);
+    const requestedIntegrationIds = parseJsonArray(skillSet.requestedIntegrationIds);
+    const gated = requiresHardGate({ sourceType: skillSet.sourceType, requestedTools, requestedIntegrationIds });
+
+    if (!gated) {
+      const [updated] = await db
+        .update(skillSetsTable)
+        .set({ status: "installed", installedAt: new Date() })
+        .where(eq(skillSetsTable.id, id))
+        .returning();
+
+      await db.insert(actionReceiptsTable).values({
+        description: `Installed Skill Set "${updated.name}"`,
+        category: "skill_set_install",
+        scope: "local, no new tool/data access",
+        outcome: "success",
+        target: updated.name,
+        canUndo: true,
+      });
+
+      res.status(201).json({ skillSet: updated, approvalId: null });
+      return;
+    }
+
+    // Scope-affecting or externally-sourced: same hard-gate treatment as
+    // POST / — the existing POST /:id/confirm-install below finishes the
+    // job regardless of which route started it.
+    const reason = skillSet.sourceType === "authored"
+      ? `Requests ${requestedTools.length} tool(s) and ${requestedIntegrationIds.length} Integration dependency(ies).`
+      : `Imported from ${skillSet.sourceType}${skillSet.sourceUrl ? ` (${skillSet.sourceUrl})` : ""}.`;
+    const [approval] = await db
+      .insert(approvalsTable)
+      .values({
+        action: `skill_set_install:${skillSet.id}`,
+        requestingAgent: "user",
+        reason,
+        riskLevel: skillSet.sourceType === "authored" ? "medium" : "high",
+        dataInvolved: JSON.stringify({
+          requestedTools,
+          requestedIntegrationIds,
+          sourceType: skillSet.sourceType,
+          sourceUrl: skillSet.sourceUrl,
+          sourceAuthor: skillSet.sourceAuthor,
+          content: skillSet.sourceType === "authored" ? undefined : skillSet.content,
+        }),
+      })
+      .returning();
+
+    const [pendingSkillSet] = await db
+      .update(skillSetsTable)
+      .set({ status: "pending" })
+      .where(eq(skillSetsTable.id, id))
+      .returning();
+
+    res.status(201).json({ skillSet: pendingSkillSet, approvalId: approval.id });
+  } catch (err) {
+    req.log.error({ err }, "Error installing skill set from catalog");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /:id/confirm-install — approves the linked approval, flips status to installed, writes the receipt.
 router.post("/:id/confirm-install", async (req, res) => {
   try {
