@@ -20,6 +20,8 @@ It's built for people (and, longer-term, organisations) who already have access 
 
 **Users pick the right tool per task, not per session.** Khameleon orchestrates and routes across a user's already-connected agents based on which is best suited for a given piece of work — it is the router, not another destination model.
 
+**"Runs on your own instance" is a real differentiator, not just infrastructure.** The default deployment model (§3) means an org's data and connected-provider credentials never sit in a Khameleon-operated database at all — a sharper, more concrete trust claim than most SaaS competitors can make, and one worth putting in front of the same IT/security reviewer §2's IT-trust pitch is aimed at.
+
 *Related existing analysis:* [`Khameleon_v1_Scope.md`](Khameleon_v1_Scope.md)'s "Competitive landscape" section covers a different, adjacent angle — workflow-automation competitors (Bardeen, Gumloop, Lindy, Grok Bot) rather than foundation-model vendors. Both are real competitive fronts; this section is the foundation-model-vendor angle specifically.
 
 ## 3. Architecture
@@ -32,7 +34,10 @@ It's built for people (and, longer-term, organisations) who already have access 
 - **Multi-agent modes:** a real Roster/Compare/Council system exists for running the same request across multiple connected agents and comparing or voting on results — this is the shipped version of the "parallel/vote/council agent modes" concept.
 - **Voice:** ElevenLabs integration (`routes/voice.ts`) for voice output; a real wake-word/voice-input path exists client-side.
 - **Desktop control:** `apps/khameleon-shell` — a minimal real Electron app (a small always-on-top control panel) giving a local agent window/file/memory control on macOS. Not the primary interface — the browser SPA is.
-- **Provider access model:** design-spec §18 — each user connects their own provider access rather than Khameleon holding a shared key. Partially built: a user can save their own Anthropic/OpenAI/Google/OpenRouter/Minimax key, encrypted at rest, and (as of 2026-09-06) every core AI call site actually resolves that saved key first before falling back to a server-level one. What's *not* built yet: true per-account isolation, because this app has no concept of "a user" at all — see Open Questions.
+- **Provider access model:** design-spec §18 — each user connects their own provider access rather than Khameleon holding a shared key. Partially built: a user can save their own Anthropic/OpenAI/Google/OpenRouter/Minimax key, encrypted at rest, and (as of 2026-09-06) every core AI call site actually resolves that saved key first before falling back to a server-level one. True per-account isolation is deliberately deferred to the hosted deployment mode below, not the default one.
+- **Deployment model — decided 2026-09-08, hybrid.** Two distinct modes, not one architecture pretending to be both:
+  - **Default: single-tenant per install.** Matches the original 2026-08-07 native-app decision — each user/org runs their own separate instance (own Postgres, own api-server), isolated because nothing is shared, not because of row-level permissions. This is also the trust story: consistent with §2's "nothing new to trust with your data," and the reason Composio was rejected in 2026-08-12 (a managed-auth platform that would have put user credentials in *someone else's* cloud — the same shape problem a shared multi-tenant backend would create). Not yet packaged for real self-hosting — today "deploying an instance" means a developer manually running the app and hand-exporting env vars.
+  - **Opt-in: hosted/managed mode**, for orgs that explicitly want convenience over the per-install trust guarantee. This is the actual home for real accounts, login, and per-account data isolation — §11.4's org-approved trust tier and §18's full "per-user isolated storage" both belong here specifically, not to the default mode. Not yet started.
 
 **Note on the FastAPI/LiteLLM origin story:** an early prototype was described (and possibly built, outside this repo) around FastAPI + LiteLLM. No trace of either exists in the current codebase — confirmed by search, 2026-09-08. Treat that as historical framing for *why* Khameleon has always been multi-model, not as a description of what ships today.
 
@@ -58,12 +63,13 @@ It's built for people (and, longer-term, organisations) who already have access 
 - Real local Postgres dev environment, schema, and end-to-end verification pipeline
 
 **In Progress / Recently Landed:**
-- Provider Access Model (§18) — the single-user-scoped fix (every AI call site uses the user's own saved key) shipped 2026-09-06; the multi-tenant/accounts foundation it ultimately implies has not been started (see Open Questions)
+- Provider Access Model (§18) — the single-user-scoped fix (every AI call site uses the user's own saved key) shipped 2026-09-06
+- Deployment model decided (hybrid, 2026-09-08) — see Architecture. Neither mode's remaining work has started yet.
 
 **Planned:**
 - **Mobile Morning Briefing** — see full description below
-- Full multi-tenant/accounts foundation (real per-user data isolation — a prerequisite for genuine "per-user connections," not just per-installation)
-- §11.4 trust tiers (sandboxed/org-approved agent execution) — blocked on the same multi-tenant prerequisite
+- Package the default single-tenant mode for real self-hosting (installer / Docker Compose / Electron wrap of the existing web app — mechanism undecided, see Open Questions)
+- Hosted/managed deployment mode — real accounts, login, per-account data isolation. The actual home for §11.4's org-approved trust tier and §18's full per-account credential isolation.
 - §13.1 web-app windows (embedding Gmail/Slack/etc. live inside Khameleon) — blocked on a decision to ship a fuller Electron build
 - §13.2 full agent browser automation (clicks, logins, JS-rendered pages) — today's web-reading tool only handles static/server-rendered pages
 - Live-parsing an imported OpenAPI/MCP spec into real callable tools
@@ -87,7 +93,7 @@ An audio-predominant, minimal-visual experience for use on a commute (car or pub
 - Permissions inherit from the underlying connected system — Khameleon never becomes a way to see more than a user's existing access already allows (`khameleon-design-spec.md` §2).
 - Task history logs actions and outcomes, not raw content duplicates — the underlying system of record remains authoritative.
 - **Not yet solved:** the encryption key itself lives in a server-level env var, not a real secrets manager (HSM / HashiCorp Vault / AWS Secrets Manager) — flagged as future work since 2026-08-27, unchanged.
-- **Not yet solved:** no real multi-tenant data isolation exists (see Open Questions) — a real blocker for any commercial, multi-user deployment claim.
+- **Not yet solved:** no real per-account data isolation exists yet — by design, deferred to the hosted deployment mode (§3), not needed for the single-tenant default.
 
 ## 7. Adoption & UX Strategy
 
@@ -100,8 +106,9 @@ Most enterprise AI fails at adoption, not capability — this section is about c
 
 ## 8. Open Questions
 
-- **Full multi-tenant/accounts foundation** — this app currently has no concept of "a user" at all; every table is global/single-installation. §18's "per-user isolated credential storage" needs this as a prerequisite and it hasn't been started. This is the single biggest open architectural question blocking any genuinely multi-user or commercial deployment, and it's come up from three separate directions now (§11.4 trust tiers, the original 2026-08-07 build-sequencing note, and §18) without being decided.
-- **§13.1 Electron decision** — ship a fuller Electron build (to support embedding live web-app sessions) or stay a browser SPA? `apps/khameleon-shell` gives a real head start either way, but the call hasn't been made.
+- **Self-host packaging mechanism** — installer, Docker Compose, or an Electron wrap of the existing web app? The default deployment mode (§3) needs one of these to actually be usable outside a developer's own machine; none is built.
+- **Hosted mode scope and pricing** — since §18 already rules out Khameleon metering/billing *model calls* (those are always the user's own provider account), a hosted convenience tier still needs its own answer for what Khameleon itself charges for (hosting, support, admin console?) — not addressed yet.
+- **§13.1 Electron decision** — ship a fuller Electron build (to support embedding live web-app sessions) or stay a browser SPA? `apps/khameleon-shell` gives a real head start either way, but the call hasn't been made. Related to, but distinct from, the deployment-mode decision above — an Electron wrap could serve either mode.
 - **Demo/gimmick feature policy** — never explicitly ruled on.
 - **Mobile Morning Briefing platform/delivery mechanism** — not yet decided (native app vs. PWA vs. something else); the continuity requirement with desktop may itself constrain this choice.
 - **AI-provider ToS review** — whether rebranding/reselling access via others' APIs is compliant with their usage policies, before any commercial claim is made. Not yet done.
@@ -109,3 +116,4 @@ Most enterprise AI fails at adoption, not capability — this section is about c
 ## 9. Changelog
 
 - **2026-09-08** — Created this spec document. Recorded Product Overview, Positioning & Competitive Strategy, Core Principles, Adoption & UX Strategy, and the Mobile Morning Briefing feature spec from planning conversation. Corrected the Architecture section to describe the actual shipped stack (Express, direct provider SDKs) rather than the originally-described FastAPI/LiteLLM approach, which has no trace in the current codebase — flagged as historical/origin context, not current fact.
+- **2026-09-08** — Decided the deployment-model shape that three separate features (§11.4, §18, the original 2026-08-07 note) had each been bumping into without it ever being pinned down: hybrid, single-tenant-per-install by default, hosted/managed mode opt-in and separate. Moved this from Open Questions into Architecture and Positioning; replaced the old vague "multi-tenant foundation" Planned item with the two concrete pieces of work it actually splits into (self-host packaging; a real hosted mode). Full reasoning in `khameleon-decisions-log.md`, 2026-09-08.

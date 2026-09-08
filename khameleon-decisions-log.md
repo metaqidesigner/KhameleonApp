@@ -525,6 +525,24 @@ Metqi chose (a) from the fork above: fix the real bug now, defer the multi-tenan
 
 **Not resolved, and not attempted:** §18's actual "per-user isolated storage" — this app still has no concept of "a user" to isolate by. This fix makes the *single* local user's own connected key actually get used everywhere; it doesn't make the credential store multi-tenant. That remains flagged as its own, larger, unstarted decision.
 
+## 2026-09-08 — DECISION: Multi-tenancy shape — hybrid, single-tenant by default
+
+**The real question, surfaced before deciding:** "multi-tenancy" had been used loosely across three separate flags this session (§11.4 trust tiers, §18 per-account isolation, and the original 2026-08-07 build-sequencing note) without ever being pinned down to one of two genuinely different shapes:
+
+1. **Per-install isolation** — the shape the 2026-08-07 "Application type" decision already implied without using the word: a native app, "distributed org-wide via MDM, single installer, per-user onboarding configures **each instance** on first launch." Many independent installs, each with its own local data. Isolation is free because nothing is shared — no new DB schema, no accounts system. This is also the shape consistent with §2's core pitch ("no extraction, no shadow copy... nothing new to trust with your data") and with the 2026-08-12 Composio rejection, which turned down a managed-auth platform specifically because it meant user credentials living in *someone else's* cloud.
+2. **True hosted multi-tenant SaaS** — one shared backend, many users/orgs, real accounts, every table gaining a `userId`/`orgId` column and query-level isolation. The bigger, more conventional build — but means Khameleon itself becomes exactly the kind of place holding many users' credentials and data that reason (1) above says Khameleon shouldn't be.
+
+What's actually been built this session (`khameleon-command` + a shared Postgres `api-server`) has drifted toward shape (2)'s *architecture* — a browser app talking to one shared backend — even though only one person has ever used the running instance. That drift, not a considered choice, is what's been quietly creating the tension every time "multi-tenant" came up.
+
+**Decision, given directly by Metqi: hybrid.** Single-tenant-per-install stays the default and the trust story — matching the original native-app decision and the "nothing new to trust" pitch. A hosted/managed option is offered separately, for orgs that explicitly want convenience over that guarantee, as a distinct second deployment mode rather than one architecture pretending to be both.
+
+**Implications, not yet scoped into a build:**
+- The default mode needs real packaging/self-host work that doesn't exist today — right now, standing up an instance means a developer manually running `pnpm` commands and hand-exporting env vars (this session's own local Postgres setup is a good example of exactly that manual process). A real installer, a documented Docker Compose path, or an Electron wrap of the existing web app are all real candidates, undecided.
+- The hosted mode is the actual trigger for real accounts/login/per-account data isolation — but now scoped as a deliberately *separate, opt-in* deployment mode, not a rearchitecture of the only mode that exists. §11.4's org-approved trust tier and §18's "per-user isolated storage" both belong to this mode specifically, not to the default.
+- Neither is built yet. This decision settles the *shape*, not the implementation order — that's the next real thing to scope.
+
+**Updated `KHAMELEON_SPEC.md`** to reflect this: moved the multi-tenancy item out of Open Questions into Architecture/Positioning, since it's now a decision, not a question.
+
 ## 2026-08-12 — Commercial readiness caveats (deferred)
 
 **Decision:** Not addressing these now — flagged here so they aren't lost before the org-wide/commercial push.
