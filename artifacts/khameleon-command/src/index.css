@@ -143,8 +143,8 @@ html, body, #root {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 15% 10%, rgba(111,230,189,0.16) 0%, rgba(111,230,189,0) 32%),
-    radial-gradient(circle at 88% 12%, rgba(240,163,76,0.13) 0%, rgba(240,163,76,0) 34%),
+    radial-gradient(circle at 15% 10%, rgba(111,230,189,0.08) 0%, rgba(111,230,189,0) 32%),
+    radial-gradient(circle at 88% 12%, rgba(240,163,76,0.065) 0%, rgba(240,163,76,0) 34%),
     linear-gradient(180deg, #06080a 0%, #030405 60%, #000000 100%);
 }
 
