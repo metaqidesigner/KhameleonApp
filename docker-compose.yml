@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: khameleon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env - see .env.example}
+      POSTGRES_DB: khameleon
+    volumes:
+      - khameleon_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U khameleon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Not published to the host - only the khameleon service talks to it.
+    # Matches §2's "nothing new to trust" positioning: no shared backend,
+    # no exposed database, isolation because nothing outside this compose
+    # stack can reach it at all.
+
+  khameleon:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://khameleon:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env - see .env.example}@postgres:5432/khameleon
+      KHAMELEON_ENCRYPTION_KEY: ${KHAMELEON_ENCRYPTION_KEY:?Set KHAMELEON_ENCRYPTION_KEY in .env - see .env.example (openssl rand -base64 32)}
+      # Optional - most providers are meant to be connected per-user via the
+      # real onboarding flow (design-spec.md §18), not set here. Uncomment
+      # only for a deployment-wide fallback.
+      # ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # SCHEDULER_ADMIN_KEY: ${SCHEDULER_ADMIN_KEY:-}
+    ports:
+      - "${KHAMELEON_PORT:-4001}:4001"
+
+volumes:
+  khameleon_pgdata:

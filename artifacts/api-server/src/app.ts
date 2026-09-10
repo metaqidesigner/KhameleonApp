@@ -1,3 +1,4 @@
+import path from "node:path";
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
@@ -30,5 +31,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// Self-hosted single-container deployments (see /Dockerfile, /docker-compose.yml)
+// serve the built frontend from this same process instead of running a
+// separate Vite dev server - a no-op for every existing dev/prod-non-Docker
+// workflow, since WEB_DIST_PATH is never set outside that container image.
+const webDistPath = process.env.WEB_DIST_PATH;
+if (webDistPath) {
+  app.use(express.static(webDistPath));
+  // SPA fallback for any non-API GET route - after the static + /api handlers above,
+  // so a real 404 from either of those still wins.
+  app.get(/^(?!\/api).*/, (_req, res) => {
+    res.sendFile(path.join(webDistPath, "index.html"));
+  });
+}
 
 export default app;

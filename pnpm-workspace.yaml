@@ -6,11 +6,18 @@ packages:
   - lib/integrations/*
   - scripts
 
+# Resolved 2026-09-09 so `pnpm install` is non-interactive (needed for the
+# Docker build in /Dockerfile, and for any future non-Claude developer who
+# hits this same prompt). electron/extract-file-icon/node-window-manager are
+# only needed by apps/khameleon-shell - real, local, native window/desktop
+# control, never installed in the Docker image. If you're actually working on
+# khameleon-shell locally, flip these back to `true` and run
+# `pnpm approve-builds` so its native bindings/Electron binary install.
 allowBuilds:
-  electron: set this to true or false
+  electron: false
   esbuild: true
-  extract-file-icon: set this to true or false
-  node-window-manager: set this to true or false
+  extract-file-icon: false
+  node-window-manager: false
 
 autoInstallPeers: false
 
@@ -50,6 +57,13 @@ onlyBuiltDependencies:
   - msw
   - unrs-resolver
 
+# Most non-darwin-arm64 platform binaries for esbuild/lightningcss/rollup/
+# tailwindcss-oxide are pruned below to keep the lockfile lean for this
+# project's own dev machine. linux-arm64-gnu is deliberately kept installable
+# (not pruned) for all four - needed to build /Dockerfile's image, which runs
+# on Linux (confirmed via a real build under colima, 2026-09-09). linux-x64-gnu
+# was never pruned in the first place, so an x64 Linux self-host target
+# already worked without this change.
 overrides:
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
   '@expo/ngrok-bin>@expo/ngrok-bin-darwin-arm64': '-'
@@ -66,7 +80,6 @@ overrides:
   '@tailwindcss/oxide>@tailwindcss/oxide-darwin-x64': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-freebsd-x64': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-linux-arm-gnueabihf': '-'
-  '@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-gnu': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-musl': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-linux-x64-musl': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-win32-arm64-msvc': '-'
@@ -80,7 +93,6 @@ overrides:
   esbuild>@esbuild/freebsd-arm64: '-'
   esbuild>@esbuild/freebsd-x64: '-'
   esbuild>@esbuild/linux-arm: '-'
-  esbuild>@esbuild/linux-arm64: '-'
   esbuild>@esbuild/linux-ia32: '-'
   esbuild>@esbuild/linux-loong64: '-'
   esbuild>@esbuild/linux-mips64el: '-'
@@ -100,7 +112,6 @@ overrides:
   lightningcss>lightningcss-darwin-x64: '-'
   lightningcss>lightningcss-freebsd-x64: '-'
   lightningcss>lightningcss-linux-arm-gnueabihf: '-'
-  lightningcss>lightningcss-linux-arm64-gnu: '-'
   lightningcss>lightningcss-linux-arm64-musl: '-'
   lightningcss>lightningcss-linux-x64-musl: '-'
   lightningcss>lightningcss-win32-arm64-msvc: '-'
@@ -112,7 +123,6 @@ overrides:
   rollup>@rollup/rollup-freebsd-x64: '-'
   rollup>@rollup/rollup-linux-arm-gnueabihf: '-'
   rollup>@rollup/rollup-linux-arm-musleabihf: '-'
-  rollup>@rollup/rollup-linux-arm64-gnu: '-'
   rollup>@rollup/rollup-linux-arm64-musl: '-'
   rollup>@rollup/rollup-linux-loong64-gnu: '-'
   rollup>@rollup/rollup-linux-loong64-musl: '-'

@@ -86,7 +86,6 @@ overrides:
   '@tailwindcss/oxide>@tailwindcss/oxide-darwin-x64': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-freebsd-x64': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-linux-arm-gnueabihf': '-'
-  '@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-gnu': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-linux-arm64-musl': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-linux-x64-musl': '-'
   '@tailwindcss/oxide>@tailwindcss/oxide-win32-arm64-msvc': '-'
@@ -100,7 +99,6 @@ overrides:
   esbuild>@esbuild/freebsd-arm64: '-'
   esbuild>@esbuild/freebsd-x64: '-'
   esbuild>@esbuild/linux-arm: '-'
-  esbuild>@esbuild/linux-arm64: '-'
   esbuild>@esbuild/linux-ia32: '-'
   esbuild>@esbuild/linux-loong64: '-'
   esbuild>@esbuild/linux-mips64el: '-'
@@ -120,7 +118,6 @@ overrides:
   lightningcss>lightningcss-darwin-x64: '-'
   lightningcss>lightningcss-freebsd-x64: '-'
   lightningcss>lightningcss-linux-arm-gnueabihf: '-'
-  lightningcss>lightningcss-linux-arm64-gnu: '-'
   lightningcss>lightningcss-linux-arm64-musl: '-'
   lightningcss>lightningcss-linux-x64-musl: '-'
   lightningcss>lightningcss-win32-arm64-msvc: '-'
@@ -132,7 +129,6 @@ overrides:
   rollup>@rollup/rollup-freebsd-x64: '-'
   rollup>@rollup/rollup-linux-arm-gnueabihf: '-'
   rollup>@rollup/rollup-linux-arm-musleabihf: '-'
-  rollup>@rollup/rollup-linux-arm64-gnu: '-'
   rollup>@rollup/rollup-linux-arm64-musl: '-'
   rollup>@rollup/rollup-linux-loong64-gnu: '-'
   rollup>@rollup/rollup-linux-loong64-musl: '-'
@@ -942,6 +938,12 @@ packages:
     cpu: [arm64]
     os: [darwin]
 
+  '@esbuild/linux-arm64@0.27.3':
+    resolution: {integrity: sha512-sZOuFz/xWnZ4KH3YfFrKCf1WyPZHakVzTiqji3WDc0BCl2kBwiJLCXpzLzUBLgmp4veFZdvN5ChW4Eq/8Fc2Fg==}
+    engines: {node: '>=18'}
+    cpu: [arm64]
+    os: [linux]
+
   '@esbuild/linux-x64@0.27.3':
     resolution: {integrity: sha512-Czi8yzXUWIQYAtL/2y6vogER8pvcsOsk5cpwL4Gk5nJqH5UZiVByIY8Eorm5R13gq+DQKYg0+JyQoytLQas4dA==}
     engines: {node: '>=18'}
@@ -1704,6 +1706,12 @@ packages:
     cpu: [arm64]
     os: [darwin]
 
+  '@rollup/rollup-linux-arm64-gnu@4.62.5':
+    resolution: {integrity: sha512-rRqILAndyzHzP7T9NFQrq+4HFWNhqkqkKur7eiBpfLmz01PO0JKx5Vchu3YllE4YXI/Ftgq/szrDWg5GJ0mI8g==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
   '@rollup/rollup-linux-x64-gnu@4.62.5':
     resolution: {integrity: sha512-6RHPJR1g/uvdYU8uXBnfq3nlqyZCP82Fr6NHgfGoaIeSh0YEqnX/x6uA9MmJJbnSH7swqX4F+CkGdUF+6doiQA==}
     cpu: [x64]
@@ -1793,6 +1801,13 @@ packages:
     engines: {node: '>= 20'}
     cpu: [arm64]
     os: [darwin]
+
+  '@tailwindcss/oxide-linux-arm64-gnu@4.3.3':
+    resolution: {integrity: sha512-nDxldcEENOxZRzC2uu9jrutZdAAQtb+8WWDCSnWL1zvBk1+FN+x6MtDViPB5AJMfttVCUhehGWus3XBPgatM/w==}
+    engines: {node: '>= 20'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
 
   '@tailwindcss/oxide-linux-x64-gnu@4.3.3':
     resolution: {integrity: sha512-tx7us1muwOKAKWao2v/GaafFeQboE6aj88vC6ziN2NCGcRm8gWUhwjzg+YdVB1e4boAtdtma4L43onunI6NS4w==}
@@ -2952,6 +2967,13 @@ packages:
     engines: {node: '>= 12.0.0'}
     cpu: [arm64]
     os: [darwin]
+
+  lightningcss-linux-arm64-gnu@1.32.0:
+    resolution: {integrity: sha512-0nnMyoyOLRJXfbMOilaSRcLH3Jw5z9HDNGfT/gwCPgaDjnx0i8w7vBzFLFR1f6CMLKF8gVbebmkUN3fa/kQJpQ==}
+    engines: {node: '>= 12.0.0'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
 
   lightningcss-linux-x64-gnu@1.32.0:
     resolution: {integrity: sha512-V7Qr52IhZmdKPVr+Vtw8o+WLsQJYCTd8loIfpDaMRWGUZfBOYEJeyJIkqGIDMZPwPx24pUMfwSxxI8phr/MbOA==}
@@ -4370,6 +4392,9 @@ snapshots:
   '@esbuild/darwin-arm64@0.27.3':
     optional: true
 
+  '@esbuild/linux-arm64@0.27.3':
+    optional: true
+
   '@esbuild/linux-x64@0.27.3':
     optional: true
 
@@ -5251,6 +5276,9 @@ snapshots:
   '@rollup/rollup-darwin-arm64@4.62.5':
     optional: true
 
+  '@rollup/rollup-linux-arm64-gnu@4.62.5':
+    optional: true
+
   '@rollup/rollup-linux-x64-gnu@4.62.5':
     optional: true
 
@@ -5342,6 +5370,9 @@ snapshots:
   '@tailwindcss/oxide-darwin-arm64@4.3.3':
     optional: true
 
+  '@tailwindcss/oxide-linux-arm64-gnu@4.3.3':
+    optional: true
+
   '@tailwindcss/oxide-linux-x64-gnu@4.3.3':
     optional: true
 
@@ -5351,6 +5382,7 @@ snapshots:
   '@tailwindcss/oxide@4.3.3':
     optionalDependencies:
       '@tailwindcss/oxide-darwin-arm64': 4.3.3
+      '@tailwindcss/oxide-linux-arm64-gnu': 4.3.3
       '@tailwindcss/oxide-linux-x64-gnu': 4.3.3
       '@tailwindcss/oxide-wasm32-wasi': 4.3.3
 
@@ -6041,6 +6073,7 @@ snapshots:
   esbuild@0.27.3:
     optionalDependencies:
       '@esbuild/darwin-arm64': 0.27.3
+      '@esbuild/linux-arm64': 0.27.3
       '@esbuild/linux-x64': 0.27.3
 
   escalade@3.2.0: {}
@@ -6462,6 +6495,9 @@ snapshots:
   lightningcss-darwin-arm64@1.32.0:
     optional: true
 
+  lightningcss-linux-arm64-gnu@1.32.0:
+    optional: true
+
   lightningcss-linux-x64-gnu@1.32.0:
     optional: true
 
@@ -6470,6 +6506,7 @@ snapshots:
       detect-libc: 2.1.2
     optionalDependencies:
       lightningcss-darwin-arm64: 1.32.0
+      lightningcss-linux-arm64-gnu: 1.32.0
       lightningcss-linux-x64-gnu: 1.32.0
 
   linkify-it@5.0.2:
@@ -7070,6 +7107,7 @@ snapshots:
     optionalDependencies:
       '@napi-rs/lzma-linux-x64-gnu': 1.5.1
       '@rollup/rollup-darwin-arm64': 4.62.5
+      '@rollup/rollup-linux-arm64-gnu': 4.62.5
       '@rollup/rollup-linux-x64-gnu': 4.62.5
       fsevents: 2.3.3
 

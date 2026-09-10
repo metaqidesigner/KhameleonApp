@@ -36,7 +36,7 @@ It's built for people (and, longer-term, organisations) who already have access 
 - **Desktop control:** `apps/khameleon-shell` — a minimal real Electron app (a small always-on-top control panel) giving a local agent window/file/memory control on macOS. Not the primary interface — the browser SPA is.
 - **Provider access model:** design-spec §18 — each user connects their own provider access rather than Khameleon holding a shared key. Partially built: a user can save their own Anthropic/OpenAI/Google/OpenRouter/Minimax key, encrypted at rest, and (as of 2026-09-06) every core AI call site actually resolves that saved key first before falling back to a server-level one. True per-account isolation is deliberately deferred to the hosted deployment mode below, not the default one.
 - **Deployment model — decided 2026-09-08, hybrid.** Two distinct modes, not one architecture pretending to be both:
-  - **Default: single-tenant per install.** Matches the original 2026-08-07 native-app decision — each user/org runs their own separate instance (own Postgres, own api-server), isolated because nothing is shared, not because of row-level permissions. This is also the trust story: consistent with §2's "nothing new to trust with your data," and the reason Composio was rejected in 2026-08-12 (a managed-auth platform that would have put user credentials in *someone else's* cloud — the same shape problem a shared multi-tenant backend would create). Not yet packaged for real self-hosting — today "deploying an instance" means a developer manually running the app and hand-exporting env vars.
+  - **Default: single-tenant per install.** Matches the original 2026-08-07 native-app decision — each user/org runs their own separate instance (own Postgres, own api-server), isolated because nothing is shared, not because of row-level permissions. This is also the trust story: consistent with §2's "nothing new to trust with your data," and the reason Composio was rejected in 2026-08-12 (a managed-auth platform that would have put user credentials in *someone else's* cloud — the same shape problem a shared multi-tenant backend would create). **Packaged for real self-hosting as of 2026-09-10** — see [`SELF_HOSTING.md`](SELF_HOSTING.md): `docker compose up -d` after setting one required secret, verified live end to end (build, schema push, a real mutation surviving a full restart) via a real headless Docker runtime.
   - **Opt-in: hosted/managed mode**, for orgs that explicitly want convenience over the per-install trust guarantee. This is the actual home for real accounts, login, and per-account data isolation — §11.4's org-approved trust tier and §18's full "per-user isolated storage" both belong here specifically, not to the default mode. Not yet started.
 
 **Note on the FastAPI/LiteLLM origin story:** an early prototype was described (and possibly built, outside this repo) around FastAPI + LiteLLM. No trace of either exists in the current codebase — confirmed by search, 2026-09-08. Treat that as historical framing for *why* Khameleon has always been multi-model, not as a description of what ships today.
@@ -61,14 +61,14 @@ It's built for people (and, longer-term, organisations) who already have access 
 - Voice output (ElevenLabs) and voice input/wake-word
 - A minimal real Electron desktop-control shell (window/file/memory tools) — separate from the main web app
 - Real local Postgres dev environment, schema, and end-to-end verification pipeline
+- Real self-hosting via Docker Compose (`Dockerfile`, `docker-compose.yml`, `SELF_HOSTING.md`) for the default single-tenant deployment mode
 
 **In Progress / Recently Landed:**
 - Provider Access Model (§18) — the single-user-scoped fix (every AI call site uses the user's own saved key) shipped 2026-09-06
-- Deployment model decided (hybrid, 2026-09-08) — see Architecture. Neither mode's remaining work has started yet.
+- Deployment model decided (hybrid, 2026-09-08) and the default mode packaged for self-hosting (2026-09-10) — see Architecture. The hosted/managed mode has not been started.
 
 **Planned:**
 - **Mobile Morning Briefing** — see full description below
-- Package the default single-tenant mode for real self-hosting (installer / Docker Compose / Electron wrap of the existing web app — mechanism undecided, see Open Questions)
 - Hosted/managed deployment mode — real accounts, login, per-account data isolation. The actual home for §11.4's org-approved trust tier and §18's full per-account credential isolation.
 - §13.1 web-app windows (embedding Gmail/Slack/etc. live inside Khameleon) — blocked on a decision to ship a fuller Electron build
 - §13.2 full agent browser automation (clicks, logins, JS-rendered pages) — today's web-reading tool only handles static/server-rendered pages
@@ -106,7 +106,6 @@ Most enterprise AI fails at adoption, not capability — this section is about c
 
 ## 8. Open Questions
 
-- **Self-host packaging mechanism** — installer, Docker Compose, or an Electron wrap of the existing web app? The default deployment mode (§3) needs one of these to actually be usable outside a developer's own machine; none is built.
 - **Hosted mode scope and pricing** — since §18 already rules out Khameleon metering/billing *model calls* (those are always the user's own provider account), a hosted convenience tier still needs its own answer for what Khameleon itself charges for (hosting, support, admin console?) — not addressed yet.
 - **§13.1 Electron decision** — ship a fuller Electron build (to support embedding live web-app sessions) or stay a browser SPA? `apps/khameleon-shell` gives a real head start either way, but the call hasn't been made. Related to, but distinct from, the deployment-mode decision above — an Electron wrap could serve either mode.
 - **Demo/gimmick feature policy** — never explicitly ruled on.
@@ -117,3 +116,4 @@ Most enterprise AI fails at adoption, not capability — this section is about c
 
 - **2026-09-08** — Created this spec document. Recorded Product Overview, Positioning & Competitive Strategy, Core Principles, Adoption & UX Strategy, and the Mobile Morning Briefing feature spec from planning conversation. Corrected the Architecture section to describe the actual shipped stack (Express, direct provider SDKs) rather than the originally-described FastAPI/LiteLLM approach, which has no trace in the current codebase — flagged as historical/origin context, not current fact.
 - **2026-09-08** — Decided the deployment-model shape that three separate features (§11.4, §18, the original 2026-08-07 note) had each been bumping into without it ever being pinned down: hybrid, single-tenant-per-install by default, hosted/managed mode opt-in and separate. Moved this from Open Questions into Architecture and Positioning; replaced the old vague "multi-tenant foundation" Planned item with the two concrete pieces of work it actually splits into (self-host packaging; a real hosted mode). Full reasoning in `khameleon-decisions-log.md`, 2026-09-08.
+- **2026-09-10** — Packaged the default single-tenant deployment mode for real self-hosting via Docker Compose, closing the "self-host packaging mechanism" Open Question. Verified live end to end using a real headless Docker runtime (`colima`, installed for this) — build, schema push against a fresh database, a real mutation through the running container, and restart-persistence all confirmed, not assumed. Full build/debugging detail (including two real fixes to the lockfile/workspace config, not just Docker files) in `khameleon-decisions-log.md`, 2026-09-09/10.

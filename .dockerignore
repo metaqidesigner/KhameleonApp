@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+.git
+.env
+screenshots
+attached_assets
+/*.png
+/*.html
