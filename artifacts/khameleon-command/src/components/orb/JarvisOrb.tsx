@@ -246,9 +246,9 @@ export function JarvisOrb() {
         onClick={onClick}
         onContextMenu={onContextMenu}
       >
-        <div className={`jarvis-orb-container ${voiceEnabled ? orbStatus : 'muted'}${orbMinimized ? ' minimized' : ''}`}>
+        <div className={`jarvis-orb-container ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}${orbMinimized ? ' minimized' : ''}`}>
           {/* Ambient bloom behind everything */}
-          <div className={`orb-glow ${voiceEnabled ? orbStatus : 'muted'}`} />
+          <div className={`orb-glow ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}`} />
 
           {/* Layer 1 — outer decorative partial arcs (slow, counter-rotating) */}
           <div className="orb-arc orb-arc-1" />
@@ -265,8 +265,10 @@ export function JarvisOrb() {
           </div>
 
           {/* Layer 3 — core sphere with nebula texture */}
-          <div className="orb-core" ref={coreRef} />
-          {!voiceEnabled && !orbMinimized && <MicOff size={16} className="orb-muted-icon" />}
+          <div className="orb-core" ref={coreRef}>
+            <div className="orb-dust" />
+          </div>
+          {!voiceEnabled && orbStatus === 'online' && !orbMinimized && <MicOff size={16} className="orb-muted-icon" />}
         </div>
 
         <OutputWaveform visible={orbStatus === 'speaking'} />

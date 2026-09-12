@@ -208,14 +208,16 @@ export function AssistantCard() {
 
   const orbEl = (
     <div style={{ position: 'relative', width: 90, height: 90 }}>
-      <div className={`jarvis-orb-container ${voiceEnabled ? orbStatus : 'muted'}`}>
-        <div className={`orb-glow ${voiceEnabled ? orbStatus : 'muted'}`} />
+      <div className={`jarvis-orb-container ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}`}>
+        <div className={`orb-glow ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}`} />
         <div className="orb-arc orb-arc-1" />
         <div className="orb-arc orb-arc-2" />
         <div className="orb-ring orb-ring-outer"><div className="orb-moon" /></div>
         <div className="orb-ring orb-ring-inner"><div className="orb-beacon" /></div>
-        <div className="orb-core" ref={coreRef} />
-        {!voiceEnabled && <MicOff size={16} className="orb-muted-icon" />}
+        <div className="orb-core" ref={coreRef}>
+          <div className="orb-dust" />
+        </div>
+        {!voiceEnabled && orbStatus === 'online' && <MicOff size={16} className="orb-muted-icon" />}
       </div>
     </div>
   );
