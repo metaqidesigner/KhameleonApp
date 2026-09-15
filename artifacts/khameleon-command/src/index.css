@@ -1588,8 +1588,8 @@ html.light body {
    SIGNAL GLASS — shared material recipe for every panel/card
    ════════════════════════════════════════════════════════════ */
 
-/* Normal panels: task cards, metric tiles, concept cards, and standard JPanel surfaces. */
-.j-panel,
+/* Normal (small) panels: metric tiles, concept pills, mini-cards - things
+   that sit alongside a window rather than being one. */
 .j-card,
 .j-metric,
 .j-metric-box,
@@ -1612,10 +1612,20 @@ html.light body {
     var(--signal-rim-glow);
 }
 
-/* Important panels: the main canvas windows and assistant surface. */
+/* Important panels: every actual "window" in the app - the Workspace
+   canvas windows, the assistant hero surface, AND every JPanel-rendered
+   page (My Tasks, Connections, Analytics, Integrations, Approvals, etc.)
+   via .j-panel. .j-panel used to sit in the smaller tier above, which is
+   why those tabs looked visibly flatter than the Assistant/Workspace
+   windows even though they're the same kind of element - one shared
+   "window" tier now, so every tab's panels read the same. */
+.j-panel,
 .kc-window,
 .ac-card {
-  --signal-rim-glow: 0 0 24px rgba(111,230,189,0.16);
+  /* Default for any .j-panel/.kc-window without its own category override
+     below - the same bigger, softer, dual-radius bloom .ac-card carries,
+     just single-toned teal instead of the orb's teal+violet pairing. */
+  --signal-rim-glow: 0 0 50px rgba(111,230,189,0.14), 0 0 90px rgba(111,230,189,0.07);
   background: rgba(255,255,255,0.055);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
@@ -1629,10 +1639,16 @@ html.light body {
 }
 
 /* Accent rims stay in the shadow only; panel borders remain neutral Signal Glass. */
-.ac-pill-command,
+.ac-pill-command {
+  --signal-rim-glow: 0 0 24px rgba(111,230,189,0.16);
+}
+/* Workspace's windows get the same bigger, dual-radius bloom as .ac-card,
+   just tinted to each window's own category color instead of a flat
+   single-layer ring - so they read as the same tier of "window" as the
+   hero assistant surface, not a lesser variant. */
 .kc-window-khameleon,
 .kc-window-agent-activity {
-  --signal-rim-glow: 0 0 24px rgba(111,230,189,0.16);
+  --signal-rim-glow: 0 0 50px rgba(111,230,189,0.14), 0 0 90px rgba(111,230,189,0.07);
 }
 /* The hero assistant surface carries home-implemented.html's own dual-radius
    bloom (bigger, softer, dimmer than a category rim) rather than a flat
@@ -1643,15 +1659,19 @@ html.light body {
 }
 .ac-pill-context,
 .j-metric-box-amber,
-.j-section-pill-core_work,
-.kc-window-todays-plan {
+.j-section-pill-core_work {
   --signal-rim-glow: 0 0 24px rgba(240,163,76,0.16);
+}
+.kc-window-todays-plan {
+  --signal-rim-glow: 0 0 50px rgba(240,163,76,0.14), 0 0 90px rgba(240,163,76,0.07);
 }
 .ac-pill-status,
 .ac-focus-card,
-.j-section-pill-start_of_day,
-.kc-window-system-status {
+.j-section-pill-start_of_day {
   --signal-rim-glow: 0 0 24px rgba(140,124,240,0.16);
+}
+.kc-window-system-status {
+  --signal-rim-glow: 0 0 50px rgba(140,124,240,0.14), 0 0 90px rgba(140,124,240,0.07);
 }
 .j-section-pill-administrative {
   --signal-rim-glow: 0 0 24px rgba(231,122,122,0.16);
@@ -1738,7 +1758,6 @@ html.light body {
 
 /* The normal recipe remains exact in hover and light states. */
 .ac-pill:hover,
-.light .j-panel,
 .light .j-card,
 .light .j-metric,
 .light .j-metric-box,
@@ -1757,6 +1776,7 @@ html.light body {
     var(--signal-rim-glow);
 }
 
+.light .j-panel,
 .light .kc-window,
 .light .ac-card {
   background: rgba(255,255,255,0.055);
