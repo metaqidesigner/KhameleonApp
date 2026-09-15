@@ -458,11 +458,16 @@
   border-radius: 50%;
   overflow: hidden;
 
-  /* Nebula texture — desaturated + high contrast so cloud detail reads clearly */
+  /* Nebula texture — desaturated, reference-matched contrast/brightness
+     (khameleon-home-implemented.html's .texture: grayscale(1) contrast(1.1)
+     brightness(1.15)). The previous contrast(1.85) crushed the nebula's
+     continuous wispy-cloud detail into a sparse scatter of bright dots at
+     this element's small native size - confirmed by comparing this exact
+     source image (identical file) rendered at both filter settings. */
   background-image: url('/khameleon-command/nebula-core.png');
   background-size: cover;
   background-position: center;
-  filter: saturate(0) contrast(1.85) brightness(1.3);
+  filter: saturate(0) contrast(1.15) brightness(1.15);
 
   /* Soft outer glow/bloom ring */
   box-shadow:
