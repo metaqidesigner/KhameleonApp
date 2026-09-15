@@ -1830,14 +1830,8 @@ html.light body {
   display: flex;
   flex-direction: column;
   gap: 30px;
-  /* The reference's own vivid background - correctly scoped this time to
-     only the page it was modeled on, not the app-wide .j-bg-layer that
-     sits behind every tab (see the note on .j-bg-layer::before above for
-     what went wrong there). */
-  background:
-    radial-gradient(circle at 15% 10%, rgba(111,230,189,0.16) 0%, rgba(111,230,189,0) 32%),
-    radial-gradient(circle at 88% 12%, rgba(240,163,76,0.13) 0%, rgba(240,163,76,0) 34%),
-    radial-gradient(circle at 55% 85%, rgba(140,124,240,0.14) 0%, rgba(140,124,240,0) 40%);
+  /* No page-specific background here anymore - this page uses the same
+     restrained .j-bg-layer as every other tab, full stop. No exception. */
   /* Scoped to this page only — the shared --j-text* tokens elsewhere in the
      app (e.g. the Workspace canvas) intentionally stay untouched. These
      correct the base palette to design-spec.md §3's locked values
@@ -1880,8 +1874,10 @@ html.light body {
    actual on-screen rect - stacking with the ambient .j-bg-layer glow
    behind it and washing the cards' background bright enough to weaken
    their (dark-background-calibrated) text contrast. */
-.kh-flare-teal { top: -20px; left: 8%; background: radial-gradient(circle, rgba(111,230,189,0.10) 0%, rgba(111,230,189,0) 70%); }
-.kh-flare-amber { top: 0; right: 4%; background: radial-gradient(circle, rgba(240,163,76,0.08) 0%, rgba(240,163,76,0) 70%); }
+/* Removed entirely - no page gets extra glow beyond the shared, restrained
+   .j-bg-layer every other tab already uses. The elements are still in the
+   DOM (harmless, pointer-events:none, no visible background left). */
+.kh-flare-teal, .kh-flare-amber { background: none; }
 .kh-layout, .kh-filmstrip { position: relative; z-index: 1; }
 .kh-layout {
   display: grid;
