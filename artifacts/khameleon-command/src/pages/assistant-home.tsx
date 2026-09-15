@@ -3,6 +3,7 @@ import { ActiveTaskWindow } from '@/components/ActiveTaskWindow';
 import { SignalGlassTile } from '@/components/SignalGlassTile';
 import { TodaysFocusPanel } from '@/components/TodaysFocusPanel';
 import { ActivityFilmstrip } from '@/components/ActivityFilmstrip';
+import { ConnectedToolsRow } from '@/components/ConnectedToolsRow';
 import { PILLS } from '@/pages/canvas';
 import { useJarvisStore } from '@/store/jarvisStore';
 
@@ -40,9 +41,12 @@ export function AssistantHome() {
 
         <div>
           {!hasActiveTask && (
-            <div className="kh-hero-slot">
-              <AssistantCard />
-            </div>
+            <>
+              <div className="kh-hero-slot">
+                <AssistantCard />
+              </div>
+              <ConnectedToolsRow />
+            </>
           )}
           <ActiveTaskWindow />
         </div>
