@@ -1855,8 +1855,16 @@ html.light body {
   filter: blur(6px);
   z-index: 0;
 }
-.kh-flare-teal { top: -20px; left: 8%; background: radial-gradient(circle, rgba(111,230,189,0.28) 0%, rgba(111,230,189,0) 70%); }
-.kh-flare-amber { top: 0; right: 4%; background: radial-gradient(circle, rgba(240,163,76,0.22) 0%, rgba(240,163,76,0) 70%); }
+/* Dimmed well below the reference's own values: the reference's mini-col
+   sits in a compact ~1150px-wide card, so this flare's fixed 260px size
+   only ever brushed its edge. Ported at full-page scale (this app has no
+   bounded "scene" card), the same 260px blob sits almost directly on top
+   of the Command/Context/Status text instead - confirmed by reading its
+   actual on-screen rect - stacking with the ambient .j-bg-layer glow
+   behind it and washing the cards' background bright enough to weaken
+   their (dark-background-calibrated) text contrast. */
+.kh-flare-teal { top: -20px; left: 8%; background: radial-gradient(circle, rgba(111,230,189,0.10) 0%, rgba(111,230,189,0) 70%); }
+.kh-flare-amber { top: 0; right: 4%; background: radial-gradient(circle, rgba(240,163,76,0.08) 0%, rgba(240,163,76,0) 70%); }
 .kh-layout, .kh-filmstrip { position: relative; z-index: 1; }
 .kh-layout {
   display: grid;
