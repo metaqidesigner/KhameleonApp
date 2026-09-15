@@ -1765,6 +1765,19 @@ html.light body {
   z-index: 1;
 }
 
+/* The "Khameleon" window's whole body is the three Command/Context/Status
+   tiles - each already has its own sheen (.kh-mini::before). This window's
+   OWN sheen, sized for its full tall box, was stacking a second, much
+   bigger diagonal highlight on top of that - visibly washing over
+   "I understand what matters" / "I keep you in the loop" and reading as
+   different lighting than the Assistant page's bare tiles, which have no
+   such outer window. Suppressed so this window's nested tiles read
+   exactly like the Assistant page's do - the goal, not a coincidence. */
+.kc-window-khameleon::before,
+.kc-window-khameleon::after {
+  display: none;
+}
+
 /* The normal recipe remains exact in hover and light states. */
 .ac-pill:hover,
 .light .j-card,
