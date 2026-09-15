@@ -142,10 +142,19 @@ html, body, #root {
   content: '';
   position: absolute;
   inset: 0;
+  /* This paints behind every tab in the app, not just the Assistant page -
+     restored to the deliberately-dimmed values a past session already
+     chose (see git history: "Dim the global ambient background glow").
+     An earlier change here copied the reference mockup's background
+     straight onto this global layer, which is what was actually producing
+     the "white light radiating from the right side" complaint (the amber
+     radial sits at 88% 12% - top-right, wide falloff toward center) on
+     every single page, not something scoped to the one page it was
+     modeled on. The Assistant tab gets its own equivalent, brighter,
+     properly-scoped background below (.kh-home) instead. */
   background:
-    radial-gradient(circle at 15% 10%, rgba(111,230,189,0.16) 0%, rgba(111,230,189,0) 32%),
-    radial-gradient(circle at 88% 12%, rgba(240,163,76,0.13) 0%, rgba(240,163,76,0) 34%),
-    radial-gradient(circle at 55% 85%, rgba(140,124,240,0.14) 0%, rgba(140,124,240,0) 40%),
+    radial-gradient(circle at 15% 10%, rgba(111,230,189,0.08) 0%, rgba(111,230,189,0) 32%),
+    radial-gradient(circle at 88% 12%, rgba(240,163,76,0.065) 0%, rgba(240,163,76,0) 34%),
     linear-gradient(180deg, #06080a 0%, #030405 60%, #000000 100%);
 }
 
@@ -1821,6 +1830,14 @@ html.light body {
   display: flex;
   flex-direction: column;
   gap: 30px;
+  /* The reference's own vivid background - correctly scoped this time to
+     only the page it was modeled on, not the app-wide .j-bg-layer that
+     sits behind every tab (see the note on .j-bg-layer::before above for
+     what went wrong there). */
+  background:
+    radial-gradient(circle at 15% 10%, rgba(111,230,189,0.16) 0%, rgba(111,230,189,0) 32%),
+    radial-gradient(circle at 88% 12%, rgba(240,163,76,0.13) 0%, rgba(240,163,76,0) 34%),
+    radial-gradient(circle at 55% 85%, rgba(140,124,240,0.14) 0%, rgba(140,124,240,0) 40%);
   /* Scoped to this page only — the shared --j-text* tokens elsewhere in the
      app (e.g. the Workspace canvas) intentionally stay untouched. These
      correct the base palette to design-spec.md §3's locked values
