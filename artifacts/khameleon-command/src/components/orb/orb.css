@@ -99,6 +99,28 @@
   height: 48px;
 }
 
+/* ── Reference-matched size boost (persistent floating widget only) ─────
+   1.4x on every layer, real dimensions rather than transform:scale() -
+   AssistantCard's hero orb already gets a bigger, more detailed render via
+   its own transform:scale(1.82) on a shared parent, which works there
+   because it's scaling up rings/arcs (plain CSS shapes, lose nothing when
+   stretched) alongside a core that was always going to be re-rendered at
+   that final composited size. This orb has no such parent transform, so
+   the same trick would only stretch blurry 54px-native pixels bigger, not
+   add the real detail khameleon-home-implemented.html's orb has. Giving
+   the core real bigger dimensions instead means the browser rasterizes
+   its nebula background-image from more of the source photo. Not scoped
+   to .minimized - that state stays as a small mic-off pill regardless. */
+.jarvis-orb-wrapper .jarvis-orb-container:not(.minimized) { width: 126px; height: 126px; }
+.jarvis-orb-wrapper .orb-glow { inset: -28px; }
+.jarvis-orb-wrapper .orb-arc-1 { width: 134px; height: 134px; margin-left: -67px; margin-top: -67px; border-width: 2.1px; }
+.jarvis-orb-wrapper .orb-arc-2 { width: 118px; height: 118px; margin-left: -59px; margin-top: -59px; border-width: 1.4px; }
+.jarvis-orb-wrapper .orb-ring-outer { width: 101px; height: 101px; margin-left: -50.5px; margin-top: -50.5px; }
+.jarvis-orb-wrapper .orb-ring-inner { width: 84px; height: 84px; margin-left: -42px; margin-top: -42px; }
+.jarvis-orb-wrapper .orb-moon { width: 11px; height: 11px; top: -5.5px; left: calc(50% - 5.5px); }
+.jarvis-orb-wrapper .orb-beacon { width: 8px; height: 8px; top: -4px; left: calc(50% - 4px); }
+.jarvis-orb-wrapper .orb-core { width: 76px; height: 76px; }
+
 /* ── Ambient glow bloom ────────────────────────────────────── */
 .orb-glow {
   position: absolute;
