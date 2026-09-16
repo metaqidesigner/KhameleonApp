@@ -39,7 +39,7 @@ export function AssistantHome() {
           ))}
         </div>
 
-        <div>
+        <div className="kh-center-col">
           {!hasActiveTask && (
             <>
               <div className="kh-hero-slot">

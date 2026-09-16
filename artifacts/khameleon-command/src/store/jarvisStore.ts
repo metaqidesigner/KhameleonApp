@@ -107,6 +107,14 @@ interface JarvisStore {
   orbPosition: { x: number; y: number } | null;
   orbMinimized: boolean;
   orbChatOpen: boolean;
+  /** Count of currently-mounted AssistantCard instances (its own embedded
+      orb+chat - the Assistant tab's hero, Workspace's compact panel). The
+      persistent floating orb (JarvisOrbPortal) hides itself while this is
+      >0, so there is never more than one orb on screen at once. A count
+      rather than a boolean survives two instances briefly overlapping
+      (e.g. a tab-switch transition) without one's unmount hiding the
+      other's still-mounted orb. */
+  embeddedOrbMountCount: number;
   orbActiveAgentId: string;
   voiceEnabled: boolean;
   autoSpeak: boolean;
@@ -151,6 +159,7 @@ interface JarvisStore {
   setOrbStatus: (s: OrbStatus) => void;
   setOrbPosition: (p: { x: number; y: number }) => void;
   setOrbMinimized: (v: boolean) => void;
+  adjustEmbeddedOrbMountCount: (delta: 1 | -1) => void;
   toggleOrbChat: () => void;
   setOrbChatOpen: (v: boolean) => void;
   openOrbChat: () => void;
@@ -189,6 +198,7 @@ export const useJarvisStore = create<JarvisStore>()(
       orbPosition: null,
       orbMinimized: false,
       orbChatOpen: false,
+      embeddedOrbMountCount: 0,
       orbActiveAgentId: 'claude',
       voiceEnabled: true,
       autoSpeak: true,
@@ -289,6 +299,7 @@ export const useJarvisStore = create<JarvisStore>()(
       setOrbStatus:          (s)      => set({ orbStatus: s }),
       setOrbPosition:        (p)      => set({ orbPosition: p }),
       setOrbMinimized:       (v)      => set({ orbMinimized: v }),
+      adjustEmbeddedOrbMountCount: (delta) => set(s => ({ embeddedOrbMountCount: Math.max(0, s.embeddedOrbMountCount + delta) })),
       toggleOrbChat:         ()       => set(s => ({ orbChatOpen: !s.orbChatOpen })),
       setOrbChatOpen:        (v)      => set({ orbChatOpen: v }),
       openOrbChat:           ()       => set({ orbChatOpen: true }),

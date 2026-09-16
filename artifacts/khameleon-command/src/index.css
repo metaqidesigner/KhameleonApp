@@ -1564,12 +1564,15 @@ html.light body {
 /* AssistantCard as assistant-home.tsx's center-column hero — same in-flow
    override as .kc-assistant-slot above, sized to the mockup's .main-panel
    proportions instead of the compact right-rail width. */
-.kh-hero-slot { display: flex; width: 100%; }
+/* No width:100% here (and a fixed width, not width:100%+max-width, on the
+   card itself below) - .kh-center-col's align-items:flex-end needs an
+   actual shrink-wrapped box to push right; a full-width wrapper leaves
+   nothing for that alignment to do. */
+.kh-hero-slot { display: flex; }
 .kh-hero-slot .ac-card {
   position: static;
-  width: 100%;
-  max-width: 460px;
-  margin: 0 auto;
+  width: 460px;
+  max-width: 100%;
   right: auto;
   top: auto;
   z-index: 1;
@@ -1909,6 +1912,25 @@ html.light body {
 @media (min-width: 1101px) {
   .kh-mini-col { grid-column: 1; }
   .kh-focus-panel { grid-column: 3; }
+}
+
+/* ── Center col: the hero orb/chat card ────────────────────────
+   Newton asked for the orb window to sit bottom-right (matching where
+   the persistent floating orb used to sit before it started hiding
+   itself here - see AssistantCard's mount-count effect) rather than
+   pinned to the top of its grid track. A tall min-height plus
+   justify-content:flex-end sinks it to the bottom of the center column;
+   align-items:flex-end hugs it to that column's right edge, the side
+   nearest the focus panel - as close to "bottom-right of the page" as a
+   3-column grid (mini-col | center | focus-panel) allows without moving
+   it into a different column's space entirely. */
+.kh-center-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 560px;
 }
 
 /* ── Mini col: Command / Context / Status ───────────────────── */

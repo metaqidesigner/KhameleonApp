@@ -64,6 +64,7 @@ export function AssistantCard() {
   const voiceEnabled        = useJarvisStore(s => s.voiceEnabled);
   const voiceSettings       = useJarvisStore(s => s.voiceSettings);
   const pushAgentEvent      = useJarvisStore(s => s.pushAgentEvent);
+  const adjustEmbeddedOrbMountCount = useJarvisStore(s => s.adjustEmbeddedOrbMountCount);
 
   const [roster, setRoster]     = useState<AgentConfig[]>(FALLBACK_ROSTER);
   const [messages, setMessages] = useState<AcMsg[]>([]);
@@ -84,6 +85,14 @@ export function AssistantCard() {
   useEffect(() => {
     getOnboardingStatus().then(s => setDisplayName(s.profile.displayName));
   }, []);
+
+  // This component carries its own orb (below) - while it's mounted anywhere
+  // (the Assistant tab's hero, Workspace's compact panel), the persistent
+  // floating orb hides itself so there's never more than one on screen.
+  useEffect(() => {
+    adjustEmbeddedOrbMountCount(1);
+    return () => adjustEmbeddedOrbMountCount(-1);
+  }, [adjustEmbeddedOrbMountCount]);
 
   useEffect(() => {
     getRoster().then(setRoster).catch(() => {});

@@ -41,6 +41,7 @@ export function JarvisOrb() {
   const toggleVoice         = useJarvisStore(s => s.toggleVoice);
   const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
   const voiceEnabled        = useJarvisStore(s => s.voiceEnabled);
+  const embeddedOrbMountCount = useJarvisStore(s => s.embeddedOrbMountCount);
 
   const pos     = orbPosition ?? getDefaultPos();
   const orbSize = orbMinimized ? ORB_SIZE_MIN : ORB_SIZE;
@@ -233,6 +234,12 @@ export function JarvisOrb() {
     setOrbStatus('online');
     setOrbChatOpen(true);
   }, [orbMinimized, setOrbMinimized, setOrbStatus, setOrbChatOpen]);
+
+  // AssistantCard carries its own orb wherever it's mounted (the Assistant
+  // tab's hero, Workspace's compact panel) - this persistent one hides
+  // itself rather than showing a second orb at the same time. After every
+  // hook above, never before - hooks must still run unconditionally.
+  if (embeddedOrbMountCount > 0) return null;
 
   return (
     <>
