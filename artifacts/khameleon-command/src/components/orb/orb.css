@@ -147,6 +147,15 @@
   background: radial-gradient(circle, rgba(140,124,240,0.28) 0%, transparent 68%);
   animation-duration: 1.8s;
 }
+/* Researching — amber, ported from khameleon-orb-states-preview.html
+   (real trigger: the active agent's role is 'research', e.g. Gemini -
+   see AssistantCard/OrbChatPanel's handleSend). Same structure/timing as
+   thinking, just amber instead of violet - the reference draws no
+   behavioral distinction beyond color. */
+.orb-glow.researching {
+  background: radial-gradient(circle, rgba(240,163,76,0.28) 0%, transparent 68%);
+  animation-duration: 1.8s;
+}
 .orb-glow.error {
   background: radial-gradient(circle, rgba(231,122,122,0.4) 0%, transparent 68%);
   animation: orb-error-flash 0.9s ease-out 1;
@@ -231,6 +240,16 @@
 }
 .thinking .orb-arc-2 {
   border-color: transparent rgba(140,124,240,0.38) rgba(140,124,240,0.38) rgba(140,124,240,0.38);
+  animation-duration: 24s;
+}
+
+/* researching — arcs lock amber */
+.researching .orb-arc-1 {
+  border-color: rgba(240,163,76,0.50) rgba(240,163,76,0.50) transparent rgba(240,163,76,0.50);
+  animation-duration: 14s;
+}
+.researching .orb-arc-2 {
+  border-color: transparent rgba(240,163,76,0.38) rgba(240,163,76,0.38) rgba(240,163,76,0.38);
   animation-duration: 24s;
 }
 
@@ -337,6 +356,16 @@
   animation: orb-ring-ccw 2.2s linear infinite, orb-breathe 2.2s ease-in-out infinite;
 }
 
+.researching .orb-ring-outer {
+  border-color: rgba(240,163,76,0.34);
+  animation-duration: 4s;
+}
+.researching .orb-ring-inner {
+  border-color: rgba(240,163,76,0.9) rgba(240,163,76,0.9) transparent transparent;
+  box-shadow: 0 0 10px rgba(240,163,76,0.5);
+  animation: orb-ring-ccw 2.2s linear infinite, orb-breathe 2.2s ease-in-out infinite;
+}
+
 /* error — coral, brief stutter (spec §4: "ring briefly stutters, returns to idle") */
 .error .orb-ring-outer {
   border-color: rgba(231,122,122,0.32);
@@ -408,6 +437,12 @@
     0 0 7px 3px rgba(140,124,240,1),
     0 0 16px rgba(140,124,240,0.6);
 }
+.researching .orb-moon {
+  background: rgba(250,210,160,0.95);
+  box-shadow:
+    0 0 7px 3px rgba(240,163,76,1),
+    0 0 16px rgba(240,163,76,0.6);
+}
 .error .orb-moon {
   background: rgba(255,190,190,0.95);
   box-shadow:
@@ -456,6 +491,13 @@
   box-shadow:
     0 0 6px 2px rgba(140,124,240,1),
     0 0 14px rgba(140,124,240,0.6);
+  animation-duration: 0.9s;
+}
+.researching .orb-beacon {
+  background: rgba(250,210,160,0.95);
+  box-shadow:
+    0 0 6px 2px rgba(240,163,76,1),
+    0 0 14px rgba(240,163,76,0.6);
   animation-duration: 0.9s;
 }
 .error .orb-beacon {
@@ -609,6 +651,23 @@
 }
 .thinking .orb-core::before {
   background: #8C7CF0;
+  opacity: 0.62;
+}
+
+/* Researching — amber lock-in, same "core rotates" treatment as thinking
+   (khameleon-orb-states-preview.html: single color-blend tint over the
+   neutral texture, no separate animation called for beyond that). Real
+   trigger: the active agent's role is 'research' (e.g. Gemini). */
+.researching .orb-core {
+  filter: saturate(0.6) contrast(1.5) brightness(1.0);
+  box-shadow:
+    0 0 20px rgba(240,163,76,0.55),
+    0 0 40px rgba(240,163,76,0.20),
+    0 0 0 1px rgba(240,163,76,0.18);
+  animation: orb-core-think-spin 6s linear infinite;
+}
+.researching .orb-core::before {
+  background: #F0A34C;
   opacity: 0.62;
 }
 

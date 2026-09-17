@@ -1561,18 +1561,29 @@ html.light body {
   z-index: 1;
 }
 
-/* AssistantCard as assistant-home.tsx's center-column hero — same in-flow
-   override as .kc-assistant-slot above, sized to the mockup's .main-panel
-   proportions instead of the compact right-rail width. */
-/* No width:100% here (and a fixed width, not width:100%+max-width, on the
-   card itself below) - .kh-center-col's align-items:flex-end needs an
-   actual shrink-wrapped box to push right; a full-width wrapper leaves
-   nothing for that alignment to do. */
-.kh-hero-slot { display: flex; }
-.kh-hero-slot .ac-card {
-  position: static;
+/* AssistantCard as assistant-home.tsx's hero — a fixed overlay pinned to
+   the viewport's bottom-right corner, NOT a participant in .kh-layout's
+   grid (an earlier version sank it to the bottom of the center grid
+   track instead, which still confined its width to that column - not
+   what "overlaid, not fitted into any of the columns" asked for). Sized
+   to the mockup's .main-panel proportions rather than the compact
+   right-rail width .kc-assistant-slot above uses. */
+.kh-hero-overlay {
+  position: fixed;
+  right: 34px;
+  bottom: 34px;
   width: 460px;
-  max-width: 100%;
+  max-width: calc(100vw - 68px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+.kh-hero-overlay > * { pointer-events: auto; }
+.kh-hero-overlay .ac-card {
+  position: static;
+  width: 100%;
   right: auto;
   top: auto;
   z-index: 1;
@@ -1924,14 +1935,11 @@ html.light body {
    nearest the focus panel - as close to "bottom-right of the page" as a
    3-column grid (mini-col | center | focus-panel) allows without moving
    it into a different column's space entirely. */
-.kh-center-col {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 12px;
-  min-height: 560px;
-}
+/* Holds only ActiveTaskWindow now - the hero moved to .kh-hero-overlay
+   (a fixed viewport overlay, not a grid participant). Plain top-aligned
+   flow is all this needs once a task is actually running and takes over
+   the center track. */
+.kh-center-col { display: flex; flex-direction: column; gap: 12px; }
 
 /* ── Mini col: Command / Context / Status ───────────────────── */
 .kh-mini-col { display: flex; flex-direction: column; gap: 16px; }

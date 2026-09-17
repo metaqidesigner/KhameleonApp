@@ -19,7 +19,7 @@ export type TabId =
 //              reverts to 'online' (spec §4: "single pulse, not sustained").
 // 'muted'    — visual override applied at render time when voice output
 //              is disabled, regardless of the underlying status.
-export type OrbStatus = 'online' | 'speaking' | 'listening' | 'thinking' | 'error' | 'offline' | 'muted';
+export type OrbStatus = 'online' | 'speaking' | 'listening' | 'thinking' | 'researching' | 'error' | 'offline' | 'muted';
 
 export interface ChatMessage {
   id: string;

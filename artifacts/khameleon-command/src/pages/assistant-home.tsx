@@ -40,14 +40,6 @@ export function AssistantHome() {
         </div>
 
         <div className="kh-center-col">
-          {!hasActiveTask && (
-            <>
-              <div className="kh-hero-slot">
-                <AssistantCard />
-              </div>
-              <ConnectedToolsRow />
-            </>
-          )}
           <ActiveTaskWindow />
         </div>
 
@@ -55,6 +47,18 @@ export function AssistantHome() {
       </div>
 
       <ActivityFilmstrip />
+
+      {/* Not part of the grid above - a fixed overlay pinned to the
+          viewport's bottom-right corner, sitting over the mini-col/
+          filmstrip rather than sharing column space with them. Only
+          the idle hero; once a task is actually running, ActiveTaskWindow
+          (in the grid) takes the spotlight instead. */}
+      {!hasActiveTask && (
+        <div className="kh-hero-overlay">
+          <AssistantCard />
+          <ConnectedToolsRow />
+        </div>
+      )}
     </div>
   );
 }

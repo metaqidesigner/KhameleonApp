@@ -202,7 +202,11 @@ export function OrbChatPanel({ style, onClose }: Props) {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setStreaming(true);
-    setOrbStatus('thinking');
+    // Researching (amber) rather than generic thinking (violet) when the
+    // active agent is actually a research-role one (e.g. Gemini) - see
+    // the same check in AssistantCard.tsx.
+    const sendingAgent = roster.find(a => a.id === orbActiveAgentId);
+    setOrbStatus(sendingAgent?.role === 'research' ? 'researching' : 'thinking');
     streamBufRef.current = '';
 
     const history: ChatMessage[] = [
@@ -265,7 +269,7 @@ export function OrbChatPanel({ style, onClose }: Props) {
         ));
       },
     );
-  }, [streaming, messages, orbActiveAgentId, setOrbStatus, voiceSettings, pushAgentEvent, speakResponse]);
+  }, [streaming, messages, orbActiveAgentId, roster, setOrbStatus, voiceSettings, pushAgentEvent, speakResponse]);
 
   // Pick up queries injected by VoiceController
   useEffect(() => {

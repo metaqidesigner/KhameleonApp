@@ -164,7 +164,11 @@ export function AssistantCard() {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setStreaming(true);
-    setOrbStatus('thinking');
+    // Researching (amber) rather than generic thinking (violet) when the
+    // active agent is actually a research-role one (e.g. Gemini) - a real
+    // distinction already in the roster data, not a fabricated state.
+    const activeAgent = roster.find(a => a.id === orbActiveAgentId);
+    setOrbStatus(activeAgent?.role === 'research' ? 'researching' : 'thinking');
     streamBufRef.current = '';
 
     const history: ChatMessage[] = [
@@ -211,7 +215,7 @@ export function AssistantCard() {
         ));
       },
     );
-  }, [streaming, messages, orbActiveAgentId, setOrbStatus, voiceSettings, pushAgentEvent, speakResponse]);
+  }, [streaming, messages, orbActiveAgentId, roster, setOrbStatus, voiceSettings, pushAgentEvent, speakResponse]);
 
   const hasMessages = messages.length > 0;
 
