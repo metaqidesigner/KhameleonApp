@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -6,7 +6,7 @@ export const tasksTable = pgTable("tasks", {
   id:               serial("id").primaryKey(),
   title:            text("title").notNull(),
   description:      text("description").notNull().default(""),
-  status:           text("status").notNull().default("todo"),        // todo | in_progress | done | blocked
+  status:           text("status").notNull().default("todo"),        // todo | in_progress | done | blocked | needs_input
   priority:         text("priority").notNull().default("medium"),    // urgent | high | medium | low
   // ── Task taxonomy ─────────────────────────────────────────────────
   category:         text("category").notNull().default("deep_work"), // communication | meetings | deep_work | task_project_management | administrative | planning
@@ -33,6 +33,17 @@ export const tasksTable = pgTable("tasks", {
                                                      // instead of adding string<->Date marshalling nothing
                                                      // else in this table's API surface needs.
   blockedByTaskId:  integer("blocked_by_task_id"), // dependency reason: id of the task this is waiting on
+  // ── Center column "current focus + queue" (2026-09-26) ─────────────
+  // Real fields, same as parkedReason above: nothing in the task-execution
+  // pipeline writes these automatically yet (task-executor.ts's
+  // taskRunsTable is a separate multi-step command-trace concept, not
+  // linked to this table) - they're genuinely real and queryable, just not
+  // yet auto-populated by a deeper pipeline. executingAgentId/zdrEndpoint
+  // are set directly (e.g. by whatever creates/updates the task), the same
+  // way parkedReason is today.
+  executingAgentId: text("executing_agent_id"),    // AgentConfig.id of whichever agent is/was working this
+  zdrEndpoint:      boolean("zdr_endpoint"),        // true if this task's execution used a zero-retention endpoint
+  queuePosition:    integer("queue_position"),      // user-directed queue order (drag-to-reorder); null = unordered
   // ── Existing ──────────────────────────────────────────────────────
   projectId:        integer("project_id"),
   assignee:         text("assignee").notNull().default(""),

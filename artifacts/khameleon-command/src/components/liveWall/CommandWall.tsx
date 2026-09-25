@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import {
-  Activity, Archive, ArrowUpRight, Bell, ChevronDown, Clock, Eye, EyeOff, Filter,
+  Activity, AlertTriangle, Archive, ArrowUpRight, Bell, Bot, CheckCircle2, ChevronDown, ChevronRight, Clock, Eye, EyeOff, Filter,
   GitBranch, GripVertical, LockKeyhole, Mail, Pause, Play,
-  Plug, Radio, RotateCcw, Send, ShieldCheck, Sparkles, Timer, UsersRound, Wand2, X,
+  Plug, Radio, RotateCcw, Send, Sparkles, Timer, Wand2, X,
 } from "lucide-react";
 import { useJarvisStore } from "@/store/jarvisStore";
 import { useJarvisHealth, useJarvisTelemetry } from "@/hooks/useJarvis";
 import {
-  getDailyTasks, getConnectors, updateTask, type Task, type TaskCategory, type JarvisConnector,
+  getDailyTasks, getConnectors, getTasks, updateTask, type Task, type TaskCategory, type JarvisConnector,
 } from "@/lib/jarvisApi";
 import {
   streamAgentChat, FALLBACK_ROSTER, getRoster, getAgentStatus,
@@ -71,14 +71,6 @@ const CATEGORY_ACCENTS: Record<TaskCategory, string> = {
   task_project_management: "#f68e7b",
   administrative: "#63e1d3",
   planning: "#a999ff",
-};
-const CATEGORY_ICONS: Record<TaskCategory, typeof Activity> = {
-  communication: UsersRound,
-  meetings: UsersRound,
-  deep_work: Activity,
-  task_project_management: Activity,
-  administrative: ShieldCheck,
-  planning: ShieldCheck,
 };
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as TaskCategory[];
 
@@ -152,6 +144,12 @@ export function CommandWall() {
   const [byCategory, setByCategory] = useState<Record<string, number>>({});
   const [totalTasks, setTotalTasks] = useState(0);
   const [doneTasks, setDoneTasks] = useState(0);
+  const [recentDone, setRecentDone] = useState<Task[]>([]);
+  const [queueExpanded, setQueueExpanded] = useState(false);
+  const [draggedQueueId, setDraggedQueueId] = useState<number | null>(null);
+  const [promoting, setPromoting] = useState(false);
+  const [focusAnnouncement, setFocusAnnouncement] = useState<string | null>(null);
+  const promotedIdsRef = useRef<Set<number>>(new Set());
 
   const orbRef = useRef<HTMLDivElement>(null);
   const streamBufRef = useRef("");
@@ -164,6 +162,10 @@ export function CommandWall() {
       setTotalTasks(d.total ?? 0);
       setDoneTasks(d.doneCount ?? 0);
     });
+    // getDailyTasks' own "done" bucket is id-only (no title) - the recent
+    // completions trail needs real titles, so this reads the plain /tasks
+    // list filtered server-side instead of trying to reuse that response.
+    getTasks({ status: "done" }).then(setRecentDone);
   }, []);
   useEffect(() => { loadTasks(); }, [loadTasks, taskRevision]);
   // This page carries its own orb-window (below) - suppress the persistent
@@ -210,18 +212,16 @@ export function CommandWall() {
     () => Object.values(dailyData).flat(),
     [dailyData],
   );
-  const visibleTasks = useMemo(
-    () => allTasks.filter(t => t.status !== "done" && (activeDomains.size === 0 || activeDomains.has(t.category))),
-    [allTasks, activeDomains],
-  );
   // Parked (2026-09-25 left-column spec): work stalled on something outside
-  // the agent's control, organized by *why* - distinct from a plain 'todo'
-  // task that just hasn't started yet. Only tasks explicitly tagged with a
-  // real parkedReason get grouped; anything blocked/todo without one yet
-  // (all pre-existing data, since this field is new) falls into "unsorted"
-  // rather than being hidden or guessed at.
+  // the agent's control - distinct from a plain 'todo' task that just
+  // hasn't started yet (that's the center column's queue now, see below).
+  // A task counts as parked if it's genuinely blocked, or explicitly
+  // reason-tagged (a 'deferred' task can still be status:'todo' - it's the
+  // parkedReason tag that makes it parked, not the status alone). Blocked
+  // tasks without a reason tag yet fall into "unsorted" rather than being
+  // hidden or guessed at.
   const allParked = useMemo(
-    () => allTasks.filter(t => t.status === "blocked" || t.status === "todo"),
+    () => allTasks.filter(t => t.status === "blocked" || t.parkedReason != null),
     [allTasks],
   );
   const parkedByReason = useMemo(() => ({
@@ -233,15 +233,80 @@ export function CommandWall() {
     () => allParked.filter(t => t.parkedReason == null).slice(0, 3),
     [allParked],
   );
+  const parkedIds = useMemo(() => new Set(allParked.map(t => t.id)), [allParked]);
   const taskById = useMemo(() => new Map(allTasks.map(t => [t.id, t])), [allTasks]);
+
+  // Center column "current focus + queue" (2026-09-26). Focus prioritizes a
+  // task that genuinely needs the user's input over one merely in progress
+  // (a needs-input task is more urgent to surface), then falls back to
+  // whichever in-progress task was touched most recently - the Workspace
+  // canvas still allows unlimited concurrent tasks (design-spec.md §5),
+  // this just picks one of them to feature here, it doesn't restrict that.
+  const focusTask = useMemo(() => {
+    const byRecency = (a: Task, b: Task) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    const needsInput = allTasks.filter(t => t.status === "needs_input").sort(byRecency);
+    if (needsInput.length > 0) return needsInput[0];
+    return allTasks.filter(t => t.status === "in_progress").sort(byRecency)[0] ?? null;
+  }, [allTasks]);
+  // Queue = forward plan, not-yet-started work - distinct from parked
+  // (stalled on something outside the agent's control) and from focus
+  // (the one thing active right now). Ordered by real, persisted
+  // queuePosition (drag-to-reorder writes this) with createdAt as the
+  // tie-breaker for anything not yet manually ordered.
+  const queueTasks = useMemo(() => {
+    const candidates = allTasks.filter(t =>
+      t.status === "todo" && !parkedIds.has(t.id) && t.id !== focusTask?.id &&
+      (activeDomains.size === 0 || activeDomains.has(t.category)),
+    );
+    return candidates.sort((a, b) => {
+      const ap = a.queuePosition ?? Number.MAX_SAFE_INTEGER;
+      const bp = b.queuePosition ?? Number.MAX_SAFE_INTEGER;
+      return ap !== bp ? ap - bp : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+  }, [allTasks, parkedIds, focusTask, activeDomains]);
+  const sortedRecentDone = useMemo(
+    () => [...recentDone].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5),
+    [recentDone],
+  );
+  function agentName(id?: string | null): string | null {
+    if (!id) return null;
+    return roster.find(a => a.id === id)?.name ?? id;
+  }
+  async function reorderQueue(draggedId: number, targetId: number) {
+    if (draggedId === targetId) return;
+    const ids = queueTasks.map(t => t.id);
+    const from = ids.indexOf(draggedId);
+    const to = ids.indexOf(targetId);
+    if (from === -1 || to === -1) return;
+    const reordered = [...ids];
+    reordered.splice(from, 1);
+    reordered.splice(to, 0, draggedId);
+    await Promise.all(reordered.map((id, i) => updateTask(id, { queuePosition: i })));
+    loadTasks();
+  }
   async function resumeParkedTask(task: Task) {
     await updateTask(task.id, { status: "todo", parkedReason: null, waitingOn: null, waitingSince: null, blockedByTaskId: null });
     loadTasks();
   }
-  const reasoningTask = useMemo(
-    () => allTasks.find(t => t.aiRecommendation && t.aiRecommendation.trim().length > 0) ?? null,
-    [allTasks],
-  );
+  // Auto-promote (2026-09-26): when nothing is in focus and the queue has
+  // work, the top item becomes focus immediately - no manual confirm click,
+  // per the spec, with a brief on-screen announcement so the switch isn't
+  // silent. promotedIdsRef guards against re-promoting the same task if the
+  // update round-trip is slower than a re-render.
+  useEffect(() => {
+    if (focusTask || queueTasks.length === 0 || promoting) return;
+    const next = queueTasks[0];
+    if (promotedIdsRef.current.has(next.id)) return;
+    promotedIdsRef.current.add(next.id);
+    setPromoting(true);
+    updateTask(next.id, { status: "in_progress" })
+      .then(() => {
+        setFocusAnnouncement(`Now focusing: ${next.title}`);
+        loadTasks();
+        setTimeout(() => setFocusAnnouncement(null), 4000);
+      })
+      .finally(() => setPromoting(false));
+  }, [focusTask, queueTasks, promoting, loadTasks]);
   const ticker = useMemo(() => {
     if (agentHistory.length === 0) return "No recent activity — query Khameleon to begin.";
     return agentHistory.slice(0, 6)
@@ -367,20 +432,10 @@ export function CommandWall() {
         .activity-slideout-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.activity-slideout-head strong{font-size:13px}.activity-slideout-head button{border:0;background:none;color:#9db4b1;cursor:pointer}
         .activity-empty{font-size:10px;color:#718987;line-height:1.5}
         .activity-slideout-item{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06)}.activity-slideout-top{display:flex;justify-content:space-between;font-size:9px;color:var(--teal);margin-bottom:5px}.activity-slideout-item p{margin:0;font-size:10px;color:#c3d3d0;line-height:1.4}
-        .clock{text-align:right;color:var(--teal)}.clock b{display:block;font-size:12px}.clock span{color:#6c8584;font-size:9px}
          .wall-plane{height:574px;margin:0 22px;position:relative}.panel{position:absolute;overflow:visible}.panel:after{content:"";position:absolute;right:-70px;top:-90px;width:230px;height:230px;border-radius:50%;background:radial-gradient(circle,rgba(99,225,211,.13),transparent 65%);filter:blur(5px);pointer-events:none}.eyebrow,.micro{color:#6c8685;font-size:10px;letter-spacing:.16em;text-transform:uppercase}.panel-title{font-size:18px;font-weight:600;letter-spacing:-.03em;margin-top:5px}.panel-title span{color:var(--teal)}.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.status-pill,.privacy{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:8px;font-size:10px;color:var(--teal);background:rgba(99,225,211,.08);border:1px solid rgba(99,225,211,.16)}.privacy{color:#b8aaff;border-color:rgba(169,153,255,.2)}.left-cluster{left:1%;top:8px;width:29%;height:435px;transform:rotate(-1.6deg);z-index:2}.center-cluster{left:25%;top:8px;width:53%;height:550px;z-index:3}.right-cluster{right:1%;top:8px;width:23%;height:390px;transform:rotate(1.8deg);z-index:2}
-        .swipe-stack{position:relative;height:270px;margin:4px -4px 0}.swipe-card{position:absolute;left:10px;width:calc(100% - 22px);border-radius:15px;padding:12px;background:linear-gradient(145deg,rgba(21,56,64,.72),rgba(5,20,29,.8));border:1px solid rgba(176,255,242,.22);box-shadow:18px 22px 36px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.2);backdrop-filter:blur(13px)}.swipe-card.back{top:10px;transform:translateX(24px) rotate(3deg);opacity:.55}.swipe-card.mid{top:38px;transform:translateX(10px) rotate(-2deg);opacity:.78}.swipe-card.video{top:92px;transform:translateX(-12px) rotate(-4deg);z-index:2}.swipe-card-head{display:flex;align-items:center;justify-content:space-between;font-size:9px;color:#a7c1bd}.swipe-card-head svg{width:13px}.thumb{height:78px;margin:10px 0;border-radius:10px;background:radial-gradient(circle at 67% 38%,rgba(244,190,164,.95) 0 4%,transparent 5%),linear-gradient(132deg,#163b4b 0 24%,#2f6b72 25% 39%,#8d5a60 40% 59%,#f0ad99 60% 63%,#213b4b 64%);box-shadow:inset 0 0 30px rgba(0,0,0,.4)}.video-meta{display:flex;align-items:center;gap:8px;color:#cde5e0;font-size:10px}.play-button{width:25px;height:25px;display:grid;place-items:center;border:1px solid rgba(99,225,211,.5);border-radius:50%;color:var(--teal);background:rgba(0,20,25,.48);cursor:pointer}.play-button svg{width:12px}.progress{height:3px;border-radius:4px;background:rgba(255,255,255,.12);margin:9px 0 5px}.progress i{display:block;width:63%;height:100%;background:linear-gradient(90deg,var(--teal),var(--amber))}.swipe-hint{display:flex;align-items:center;gap:7px;margin:8px 2px;color:#738f8c;font-size:9px}.mission{border-radius:16px;padding:13px 15px;background:linear-gradient(120deg,rgba(6,39,44,.64),rgba(4,19,28,.52));border:1px solid rgba(99,225,211,.13)}.mission-top{display:flex;justify-content:space-between;align-items:center}.mission strong{font-size:12px}.mission p{font-size:10px;color:#8ca2a1;line-height:1.5;margin:8px 0 0}.visual-workspace{height:322px;position:relative;border-radius:17px;overflow:hidden;margin:3px 0 12px;background:linear-gradient(140deg,#152e45,#2d5661 38%,#594b64 67%,#211e39);border:1px solid rgba(209,255,246,.32);box-shadow:0 20px 44px rgba(0,0,0,.3),inset 0 1px rgba(255,255,255,.32)}.visual-workspace:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 48% 39%,rgba(246,222,190,.9) 0 3%,transparent 3.5%),radial-gradient(circle at 48% 39%,rgba(255,190,152,.32) 0 17%,transparent 18%),linear-gradient(165deg,transparent 0 29%,rgba(154,223,220,.38) 30% 31%,transparent 32% 52%,rgba(233,162,137,.34) 53% 54%,transparent 55%);animation:drift 10s ease-in-out infinite}.workspace-label{position:absolute;left:13px;top:12px;z-index:1;font-size:9px;letter-spacing:.13em;color:#dcf8f2}.workspace-footer{position:absolute;left:12px;right:12px;bottom:10px;z-index:1;display:flex;justify-content:space-between;align-items:end}.workspace-footer strong{font-size:12px;font-weight:500}.workspace-footer span{display:block;color:#b0c8c2;font-size:9px;margin-top:3px}.workspace-tools{display:flex;gap:5px}.workspace-tools i{width:22px;height:22px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.22);border-radius:6px;background:rgba(4,17,26,.4)}.workspace-tools svg{width:11px}.mini-float{position:absolute;right:15px;top:58px;width:116px;padding:9px;border-radius:11px;z-index:2;background:rgba(7,24,33,.75);border:1px solid rgba(233,184,114,.35);box-shadow:0 15px 27px rgba(0,0,0,.32);transform:rotate(3deg)}.mini-float b{display:block;color:#f0c98b;font-size:9px}.mini-float p{margin:6px 0 0;color:#a8bfba;font-size:8px;line-height:1.45}.mini-float em{display:block;margin-top:7px;color:var(--teal);font-style:normal;font-size:8px}
-        .domain-row,.mode{display:flex;gap:6px;overflow:hidden}.domain-row button,.mode button{white-space:nowrap;cursor:pointer;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.025);color:#819796;border-radius:8px;padding:7px 9px;font-size:9px}.domain-row button.active,.mode button.active{color:var(--teal);border-color:rgba(99,225,211,.35);background:rgba(99,225,211,.09)}.route-head{display:flex;justify-content:space-between;align-items:end;margin:12px 0 9px}.route-head strong{font-size:13px}.route-head span{display:block;color:#6d8684;font-size:9px;margin-top:4px}.task-list{display:grid;grid-template-columns:1fr 1fr;gap:7px}.task{display:grid;grid-template-columns:25px 1fr;gap:8px;padding:10px;border-radius:13px;background:rgba(7,24,26,.63);border:1px solid rgba(255,255,255,.065)}.task-icon{width:25px;height:25px;display:grid;place-items:center;border-radius:8px;background:rgba(255,255,255,.05)}.task-icon svg{width:13px}.task-title{font-size:10px;color:#d8e6e3}.task-meta{font-size:8px;color:#6f8886;margin-top:4px}.reasoning{margin-top:10px;padding:10px;border-radius:12px;background:rgba(169,153,255,.055);border:1px solid rgba(169,153,255,.2)}.reasoning p{font-size:9px;color:#b8b0e8;line-height:1.45;margin:0}.toggle{width:30px;height:17px;border:0;border-radius:20px;background:#345254;padding:2px;cursor:pointer}.toggle i{display:block;width:13px;height:13px;border-radius:50%;background:#9aacab;transition:transform .18s}.toggle.on{background:var(--violet)}.toggle.on i{transform:translateX(13px);background:#fff}.activity-card{padding:12px;border-radius:15px;background:rgba(5,20,22,.5);border:1px solid rgba(255,255,255,.07)}.reason-head{display:flex;justify-content:space-between;align-items:center;color:#c4baff;font-size:10px}.activity-line{display:flex;gap:8px;padding-top:10px}.activity-line svg{width:14px;color:var(--teal)}.activity-line p{margin:0;font-size:9px}.activity-line small{display:block;color:#718b89;margin-top:3px}.rail-stat{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08)}.rail-stat span{display:block;color:#76918e;font-size:9px;text-transform:uppercase;letter-spacing:.12em}.rail-stat strong{display:block;margin-top:4px;font-size:17px;font-weight:500}.right-float{margin:13px -8px 0;padding:12px;border-radius:15px;background:linear-gradient(140deg,rgba(24,56,57,.64),rgba(5,21,30,.7));border:1px solid rgba(169,153,255,.24);box-shadow:12px 18px 32px rgba(0,0,0,.25);transform:rotate(-2deg)}.right-float-head{display:flex;justify-content:space-between;color:#b9b0fa;font-size:9px}.right-float p{font-size:9px;color:#8ca5a1;line-height:1.4;margin:8px 0}.rail-actions{display:flex;gap:6px;margin-top:12px}.rail-actions button{flex:1;border:1px solid rgba(99,225,211,.18);background:rgba(99,225,211,.06);border-radius:8px;color:#9bd4cd;padding:8px 4px;font-size:9px;cursor:pointer}.footer{margin:0 22px 18px;height:42px;border:1px solid rgba(246,142,123,.2);background:rgba(8,27,28,.62);border-radius:12px;display:flex;align-items:center;overflow:hidden}.feed-label{height:100%;display:flex;align-items:center;gap:9px;padding:0 15px;color:var(--coral);font-size:10px;letter-spacing:.16em}.feed-label svg{width:14px}.ticker{font-family:ui-monospace,monospace;color:#b8928a;font-size:10px;padding-left:17px;white-space:nowrap}@keyframes drift{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}@media(max-width:900px){.wall-shell{min-height:100dvh}.topbar{margin:10px;height:auto;min-height:68px}.nav{display:none}.clock{display:none}.top-right{margin-left:auto}.wall-plane{height:auto;margin:0 10px;display:grid;gap:14px}.panel{position:relative!important;inset:auto!important;width:auto!important;height:auto!important;min-height:0;transform:none!important}.center-cluster{order:-1}.task-list{grid-template-columns:1fr}.footer{margin:14px 10px}.domain-row{overflow:auto}}
+        .mission{border-radius:16px;padding:13px 15px;background:linear-gradient(120deg,rgba(6,39,44,.64),rgba(4,19,28,.52));border:1px solid rgba(99,225,211,.13)}.mission-top{display:flex;justify-content:space-between;align-items:center}.mission strong{font-size:12px}.mission p{font-size:10px;color:#8ca2a1;line-height:1.5;margin:8px 0 0}
+        .route-head{display:flex;justify-content:space-between;align-items:end;margin:12px 0 9px}.route-head strong{font-size:13px}.route-head span{display:block;color:#6d8684;font-size:9px;margin-top:4px}.rail-stat{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08)}.rail-stat span{display:block;color:#76918e;font-size:9px;text-transform:uppercase;letter-spacing:.12em}.rail-stat strong{display:block;margin-top:4px;font-size:17px;font-weight:500}.footer{margin:0 22px 18px;height:42px;border:1px solid rgba(246,142,123,.2);background:rgba(8,27,28,.62);border-radius:12px;display:flex;align-items:center;overflow:hidden}.feed-label{height:100%;display:flex;align-items:center;gap:9px;padding:0 15px;color:var(--coral);font-size:10px;letter-spacing:.16em}.feed-label svg{width:14px}.ticker{font-family:ui-monospace,monospace;color:#b8928a;font-size:10px;padding-left:17px;white-space:nowrap}@media(max-width:900px){.wall-shell{min-height:100dvh}.topbar{margin:10px;height:auto;min-height:68px}.nav{display:none}.top-right{margin-left:auto}.wall-plane{height:auto;margin:0 10px;display:grid;gap:14px}.panel{position:relative!important;inset:auto!important;width:auto!important;height:auto!important;min-height:0;transform:none!important}.center-cluster{order:-1}.footer{margin:14px 10px}}
          .rail-stat{margin:0 0 8px;padding:12px 13px;border:1px solid rgba(161,255,241,.14);border-radius:14px;background:linear-gradient(140deg,rgba(24,56,57,.48),rgba(5,21,30,.58));box-shadow:10px 14px 28px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.12);backdrop-filter:blur(13px)}.wall-plane>.panel.glass{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none}.wall-plane>.panel.glass:after{content:none}
-        /* Original had .mode{overflow:hidden} sharing that rule with
-           .domain-row - fine for domain-row's wider row, but .mode sits
-           beside route-head's heading text in a zone the right-cluster
-           panel physically overlaps (left+width and right+width put both
-           panels over the same ~76-78% band) - "Vote"/"Council" were
-           rendering underneath it, not clipped by overflow at all. Drops
-           the mode row onto its own full-width line below the heading,
-           clear of that overlap zone, instead. */
-        .route-head{flex-wrap:wrap;row-gap:8px}
         /* Left column spec (2026-09-25): parked work grouped by *why* it's
            stuck, distinct from the swipe-deck look (dropped - grouped cards
            read better stacked, not fanned) */
@@ -401,6 +456,34 @@ export function CommandWall() {
         .rail-stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)}.rail-stat-row span{color:#76918e;font-size:9px;text-transform:uppercase;letter-spacing:.1em}.rail-stat-row strong{font-size:13px;font-weight:500}
         .rail-scroll{max-height:243px;overflow-y:auto;overflow-x:hidden;padding-right:4px;margin-top:2px}
         .rail-scroll::-webkit-scrollbar{width:4px}.rail-scroll::-webkit-scrollbar-thumb{background:rgba(99,225,211,.25);border-radius:4px}
+        /* Center column "current focus + queue" (2026-09-26) */
+        .focus-announcement{display:flex;align-items:center;gap:7px;margin-bottom:10px;padding:8px 12px;border-radius:9px;background:rgba(99,225,211,.1);border:1px solid rgba(99,225,211,.25);color:var(--teal);font-size:10px;animation:focus-announce-in .3s ease}
+        @keyframes focus-announce-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+        .focus-card{padding:14px 16px;border-radius:15px;background:rgba(7,24,26,.63);border:1px solid rgba(255,255,255,.08);margin-bottom:14px}
+        .focus-card.needs-input{background:rgba(246,142,123,.08);border-color:rgba(246,142,123,.4);box-shadow:0 0 0 1px rgba(246,142,123,.15)}
+        .focus-empty{padding:6px 0;color:#8ca2a1;font-size:10px}
+        .focus-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+        .focus-title{font-size:15px;font-weight:600;color:#e8f3f0;margin-top:4px}
+        .focus-input-badge{display:flex;align-items:center;gap:5px;padding:5px 9px;border-radius:7px;background:rgba(246,142,123,.15);border:1px solid rgba(246,142,123,.4);color:var(--coral);font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+        .focus-meta{display:flex;align-items:center;gap:10px;margin-top:9px;flex-wrap:wrap}
+        .focus-tag{font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+        .focus-agent,.focus-zdr{display:flex;align-items:center;gap:4px;font-size:9px;color:#9bb3af}
+        .focus-reasoning{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)}
+        .focus-reasoning p{margin:0;font-size:10px;color:#b8b0e8;line-height:1.45}
+        .focus-reasoning-summary{color:#8ca2a1!important}
+        .focus-reasoning-empty{color:#718987!important}
+        .completions-trail{display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;padding-bottom:4px;-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent)}
+        .completion-chip{display:flex;align-items:center;gap:5px;white-space:nowrap;padding:5px 10px;border-radius:20px;background:rgba(99,225,211,.06);border:1px solid rgba(99,225,211,.15);color:#8fb8b1;font-size:9px;flex-shrink:0}
+        .completion-chip svg{color:var(--teal)}
+        .queue-empty{padding:10px;border-radius:11px;background:rgba(7,24,26,.5);color:#8ca2a1;font-size:10px}
+        .queue-list{display:flex;flex-direction:column;gap:6px}
+        .queue-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:rgba(7,24,26,.55);border:1px solid rgba(255,255,255,.05);cursor:grab}
+        .queue-item.dragging{opacity:.4}
+        .queue-item-drag{color:#5c7472;flex-shrink:0}
+        .queue-item-title{flex:1;font-size:10px;color:#d8e6e3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .queue-item-tag{font-size:8px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0}
+        .queue-item-agent{display:inline-flex;color:#76918e;flex-shrink:0}
+        .queue-fold{display:flex;align-items:center;gap:5px;margin-top:8px;border:0;background:none;color:#76918e;font-size:9px;cursor:pointer;padding:4px 0}
         /* Replit refresh: footer pinned to the wall's own bottom edge
            (was in-flow), so the orb window's own bottom offset and width
            moved from a flat 18px/380px to a responsive figure that
@@ -413,27 +496,10 @@ export function CommandWall() {
         .footer{position:absolute!important;left:22px;right:22px;bottom:0;margin:0!important;height:42px;z-index:30;border-radius:12px 12px 0 0;background:rgba(8,27,28,.9)}
         .orb-window{position:absolute!important;right:22px!important;bottom:64px!important;width:calc((100% - 44px) * .24 - 10px)!important;max-width:calc(100% - 36px)!important}
         .right-cluster{padding-bottom:58px!important;box-sizing:border-box}
-        .right-float{margin-bottom:60px!important;position:absolute!important;left:0;right:0;bottom:8px}
         @media(max-width:900px){.footer{left:10px;right:10px}.orb-window{bottom:58px!important;width:calc(100% - 36px)!important}}
       `}</style>
       <style>{`
         .left-cluster,.right-cluster{transform:none!important}
-        .swipe-card.back,.swipe-card.mid,.swipe-card.video,.right-float,.mini-float{transform:none!important}
-        .swipe-card{border-radius:14px}
-        .sheet-grid{position:absolute;left:0;right:0;top:39px;bottom:43px;overflow:hidden;padding:0 12px;z-index:1}
-        .sheet-row{display:grid;grid-template-columns:42px 1.4fr .8fr .8fr .9fr 1fr;min-height:25px;border-bottom:1px solid rgba(202,244,238,.1);font-size:8px;color:#b9d1cd}
-        .sheet-row span{padding:7px 6px;border-right:1px solid rgba(202,244,238,.08);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .sheet-row.head{background:rgba(99,225,211,.1);color:#d9f8f1;font-weight:600}
-        .sheet-row.head span{padding-top:6px;padding-bottom:6px}
-        .sheet-row.total{color:#f0c98b;background:rgba(233,184,114,.07)}
-        .sheet-badge{color:var(--teal);background:rgba(99,225,211,.09);border-radius:4px;padding:3px 5px!important;text-align:center}
-        .spreadsheet-card{position:absolute;left:27%;top:218px;width:47%;height:238px;z-index:5;padding:13px 15px;border-radius:15px;background:linear-gradient(145deg,rgba(19,53,60,.9),rgba(5,20,29,.93));border:1px solid rgba(161,255,241,.34);box-shadow:0 24px 52px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.24);backdrop-filter:blur(18px)}
-        .spreadsheet-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}.spreadsheet-title{font-size:12px;color:#e8f3f0}.spreadsheet-sub{display:block;margin-top:3px;color:#78908f;font-size:8px}.spreadsheet-live{color:var(--teal);font-size:8px;border:1px solid rgba(99,225,211,.25);padding:5px 7px;border-radius:7px}
-        .visual-workspace{background:transparent!important;border:0!important;box-shadow:none!important}
-        .visual-workspace>*{visibility:hidden}
-        .spreadsheet-card{left:25%;top:168px;width:53%;height:322px;padding:14px 15px;border-radius:17px;background:linear-gradient(140deg,rgba(26,57,69,.95),rgba(12,31,43,.96));border:1px solid rgba(209,255,246,.34);box-shadow:0 20px 44px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.3);backdrop-filter:blur(16px)}
-        .spreadsheet-card:after{content:"AI FORMULA ACTIVITY   4 checks aligned   •   1 approval needed     APPROVE   ↗";position:absolute;left:15px;right:15px;bottom:13px;height:25px;display:flex;align-items:center;padding:0 9px;border-radius:7px;background:rgba(99,225,211,.08);border:1px solid rgba(99,225,211,.18);color:#9ddbd3;font:8px ui-monospace,monospace;letter-spacing:.04em}
-        .spreadsheet-card .sheet-grid{top:75px;bottom:49px}
         .orb-window{position:absolute;right:22px;bottom:18px;width:min(380px,calc(100% - 36px));height:322px;z-index:20;padding:15px 17px 13px;border-radius:17px;background:linear-gradient(140deg,rgba(26,57,69,.93),rgba(10,27,40,.95));border:1px solid rgba(209,255,246,.34);box-shadow:0 20px 44px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.3),0 0 40px rgba(99,225,211,.08);backdrop-filter:blur(16px);overflow:hidden}
         .wall-plane{z-index:4}
         .orb-window:before{content:"";position:absolute;inset:-35%;pointer-events:none;background:radial-gradient(circle at 50% 58%,rgba(99,225,211,.12),transparent 28%),radial-gradient(circle at 66% 42%,rgba(169,153,255,.12),transparent 32%);filter:blur(4px)}
@@ -457,16 +523,14 @@ export function CommandWall() {
         .orb-tint{position:absolute;inset:0;z-index:1;border-radius:50%;mix-blend-mode:color;opacity:0;transition:background .3s ease,opacity .3s ease}.orb-core.listening .orb-tint{background:var(--teal);opacity:1}.orb-core.thinking .orb-tint{background:var(--violet);opacity:1}.orb-core.researching .orb-tint{background:var(--amber);opacity:1}.orb-core.speaking .orb-tint{background:linear-gradient(135deg,var(--teal),var(--violet));opacity:1}.orb-core.error .orb-tint{background:var(--coral);opacity:1}
         .orb-ring{position:absolute;border-radius:50%;border:1px solid rgba(231,255,251,.52);box-shadow:0 0 10px rgba(231,255,251,.3),inset 0 0 10px rgba(231,255,251,.1)}.orb-ring.one{inset:10px;animation:orb-spin 10s linear infinite}.orb-ring.two{inset:-3px;border-color:rgba(188,222,255,.28);animation:orb-spin-reverse 16s linear infinite}.orb-ring.three{inset:-16px;border-color:rgba(169,153,255,.18);border-left-color:transparent;border-bottom-color:transparent;animation:orb-spin 22s linear infinite}.orb-ring.one:after,.orb-ring.two:after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:#ecfffb;box-shadow:0 0 8px 3px rgba(231,255,251,.72);top:-3px;left:50%;transform:translateX(-50%)}.orb-ring.two:after{right:-3px;left:auto;top:46%;transform:none;width:7px;height:7px}
         .orb-trail{position:absolute;left:-16px;right:-16px;bottom:-18px;height:50px;border-bottom:1px solid rgba(99,225,211,.4);border-radius:50%;transform:rotate(-12deg);opacity:.7;filter:blur(.2px)}.orb-trail:after{content:"";position:absolute;right:18%;bottom:5px;width:4px;height:4px;border-radius:50%;background:var(--teal);box-shadow:0 0 9px 3px var(--teal)}
-        .orb-center-mark{position:absolute;z-index:3;width:24px;height:24px;border-radius:50%;border:1px solid rgba(235,255,250,.7);box-shadow:0 0 14px rgba(99,225,211,.48),inset 0 0 9px rgba(255,255,255,.25);background:radial-gradient(circle,rgba(245,255,252,.86) 0 10%,rgba(99,225,211,.38) 11% 24%,rgba(8,24,33,.3) 25% 100%)}.orb-center-mark:after{content:"";position:absolute;inset:6px;border-radius:50%;border:1px solid rgba(236,255,250,.5)}
         .orb-state-row{position:absolute;z-index:3;left:15px;right:15px;bottom:77px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}.orb-state{min-width:0;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.035);color:#849e9a;border-radius:7px;padding:5px 2px;font-size:7px;line-height:1;cursor:pointer;white-space:nowrap}.orb-state.active{color:var(--teal);border-color:rgba(99,225,211,.42);background:rgba(99,225,211,.09)}.orb-state[data-state="thinking"].active{color:var(--violet);border-color:rgba(169,153,255,.42);background:rgba(169,153,255,.09)}.orb-state[data-state="researching"].active{color:var(--amber);border-color:rgba(233,184,114,.42);background:rgba(233,184,114,.09)}.orb-state[data-state="error"].active{color:var(--coral);border-color:rgba(246,142,123,.42);background:rgba(246,142,123,.09)}
         .orb-chat{position:absolute;z-index:4;left:15px;right:15px;bottom:39px;height:29px;display:flex;align-items:center;gap:7px;padding:3px 4px 3px 10px;border:1px solid rgba(161,255,241,.2);border-radius:9px;background:rgba(4,19,28,.62);box-shadow:inset 0 1px rgba(255,255,255,.1)}
         .orb-chat input{min-width:0;flex:1;border:0;outline:0;background:transparent;color:#d9f4ee;font:9px ui-sans-serif,system-ui,sans-serif}.orb-chat input::placeholder{color:#718b89}.orb-chat button{width:22px;height:22px;display:grid;place-items:center;border:1px solid rgba(99,225,211,.32);border-radius:6px;background:rgba(99,225,211,.1);color:var(--teal);cursor:pointer}.orb-chat button:disabled{opacity:.4;cursor:not-allowed}.orb-chat svg{width:11px;height:11px}
-        .orb-window-footer{position:absolute;left:15px;right:15px;bottom:13px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;color:#78908f;font:7px ui-monospace,monospace;letter-spacing:.03em}.orb-window-footer span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.orb-window-footer b{color:var(--teal);font-weight:500;white-space:nowrap}@keyframes orb-spin{to{transform:rotate(360deg)}}@keyframes orb-spin-reverse{to{transform:rotate(-360deg)}}@keyframes orb-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}@keyframes orb-live-shimmer{0%{transform:scale(1.005) translate3d(-1px,1px,0) rotate(-.4deg);background-position:47% 54%}13%{transform:scale(1.018) translate3d(2px,-1px,0) rotate(.25deg);background-position:54% 47%}29%{transform:scale(.998) translate3d(-2px,-2px,0) rotate(.6deg);background-position:43% 49%}46%{transform:scale(1.012) translate3d(1px,2px,0) rotate(-.2deg);background-position:52% 56%}64%{transform:scale(1.02) translate3d(3px,0,0) rotate(-.55deg);background-position:56% 45%}81%{transform:scale(1.002) translate3d(-1px,-2px,0) rotate(.35deg);background-position:45% 52%}100%{transform:scale(1.01) translate3d(1px,1px,0) rotate(-.1deg);background-position:50% 48%}}@keyframes orb-drift{0%{transform:scale(1) translate3d(-1px,1px,0)}50%{transform:scale(1.018) translate3d(1px,-1px,0)}100%{transform:scale(1.035) translate3d(-1px,1px,0)}}@keyframes orb-think{0%{transform:scale(1.03) rotate(0deg);background-position:46% 52%}50%{transform:scale(1.12) rotate(180deg);background-position:58% 44%}100%{transform:scale(1.03) rotate(360deg);background-position:46% 52%}}@keyframes orb-voice{0%{transform:scale(1.02) translateY(1px)}25%{transform:scale(1.07) translateY(-2px)}50%{transform:scale(1.12) translateY(1px)}75%{transform:scale(1.05) translateY(-1px)}100%{transform:scale(1.14) translateY(1px)}}
+        .orb-window-footer{position:absolute;left:15px;right:15px;bottom:13px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;color:#78908f;font:7px ui-monospace,monospace;letter-spacing:.03em}.orb-window-footer span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.orb-window-footer b{color:var(--teal);font-weight:500;white-space:nowrap}@keyframes orb-spin{to{transform:rotate(360deg)}}@keyframes orb-spin-reverse{to{transform:rotate(-360deg)}}@keyframes orb-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}@keyframes orb-think{0%{transform:scale(1.03) rotate(0deg);background-position:46% 52%}50%{transform:scale(1.12) rotate(180deg);background-position:58% 44%}100%{transform:scale(1.03) rotate(360deg);background-position:46% 52%}}@keyframes orb-voice{0%{transform:scale(1.02) translateY(1px)}25%{transform:scale(1.07) translateY(-2px)}50%{transform:scale(1.12) translateY(1px)}75%{transform:scale(1.05) translateY(-1px)}100%{transform:scale(1.14) translateY(1px)}}
         @media (min-width:901px){
           .left-cluster{left:0;width:calc(24% - 10px)}
           .center-cluster{left:calc(24% + 10px);width:calc(52% - 20px)}
           .right-cluster{right:0;left:auto;width:calc(24% - 10px)}
-          .spreadsheet-card{left:calc(24% + 10px);width:calc(52% - 20px)}
         }
         .orb-core.speaking{animation:none}
         .orb-core.speaking .orb-texture{animation:none;transform:translate(var(--voice-shift-x,0px),var(--voice-shift-y,0px)) scale(var(--voice-scale,1.015)) rotate(var(--voice-angle,0deg));transition:transform .09s ease-out}
@@ -574,27 +638,79 @@ export function CommandWall() {
 
         <article className="panel glass center-cluster">
           <div className="panel-head"><div><div className="eyebrow">Live orchestration / 02</div><div className="panel-title">Work in <span>motion</span></div></div></div>
-          <div className="route-head"><div><strong>Live task routing</strong><span>{visibleTasks.length} active signals{activeDomains.size > 0 ? ` · filtered to ${activeDomains.size} domain${activeDomains.size > 1 ? "s" : ""}` : ""}</span></div></div>
-          <div className="task-list">
-            {visibleTasks.length === 0 ? (
-              <div style={{ gridColumn: "1 / -1", padding: 10, borderRadius: 13, background: "rgba(7,24,26,.63)", border: "1px solid rgba(255,255,255,.065)" }}><span className="task-title">No active tasks in this domain.</span></div>
-            ) : visibleTasks.slice(0, 4).map((task) => {
-              const Icon = CATEGORY_ICONS[task.category];
-              return (
-                <div className="task" key={task.id}>
-                  <div className="task-icon"><Icon size={13} color={CATEGORY_ACCENTS[task.category]}/></div>
-                  <div><div className="task-title">{task.title}</div><div className="task-meta">{CATEGORY_LABELS[task.category]} · {timeAgo(task.updatedAt)}</div></div>
+
+          {focusAnnouncement && <div className="focus-announcement"><Sparkles size={12}/>{focusAnnouncement}</div>}
+
+          {/* Center column spec (2026-09-26): current focus (hero, one task,
+              full detail) + queue (compact ordered list of what's next) -
+              replacing the old domain-filtered task grid now that domain
+              filtering and orchestration mode both live in the top bar.
+              executingAgentId/zdrEndpoint are real fields but nothing in the
+              task-execution pipeline auto-populates them yet (same honest
+              caveat as parkedReason) - they render only when actually set. */}
+          <div className={`focus-card ${focusTask?.status === "needs_input" ? "needs-input" : ""}`}>
+            {!focusTask ? (
+              <div className="focus-empty"><p>Nothing in focus right now{queueTasks.length > 0 ? " — promoting the next queued task…" : "."}</p></div>
+            ) : (
+              <>
+                <div className="focus-head">
+                  <div><div className="eyebrow">Current focus</div><div className="focus-title">{focusTask.title}</div></div>
+                  {focusTask.status === "needs_input" && <span className="focus-input-badge"><AlertTriangle size={12}/>Needs your input</span>}
                 </div>
-              );
-            })}
+                <div className="focus-meta">
+                  <span className="focus-tag" style={{ color: CATEGORY_ACCENTS[focusTask.category] }}>{CATEGORY_LABELS[focusTask.category]}</span>
+                  {agentName(focusTask.executingAgentId) && <span className="focus-agent"><Bot size={11}/>{agentName(focusTask.executingAgentId)}</span>}
+                  {focusTask.zdrEndpoint && <span className="focus-zdr"><LockKeyhole size={11}/>ZDR</span>}
+                </div>
+                <div className="focus-reasoning">
+                  {showReasoning ? (
+                    focusTask.aiRecommendation ? <p>{focusTask.aiRecommendation}</p> : <p className="focus-reasoning-empty">No reasoning trace recorded for this task yet.</p>
+                  ) : (
+                    <p className="focus-reasoning-summary">{focusTask.aiRecommendation ? `${focusTask.aiRecommendation.slice(0, 80)}${focusTask.aiRecommendation.length > 80 ? "…" : ""}` : "Reasoning collapsed — toggle in the top bar to expand."}</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
-          <div className="activity-card">
-            <div className="eyebrow" style={{ marginBottom: 5 }}>Reasoning trace</div>
-            <div className="reason-head"><span>Show how the result was reached</span><button className={`toggle ${showReasoning ? "on" : ""}`} onClick={() => setShowReasoning(!showReasoning)} aria-label="Toggle reasoning"><i/></button></div>
-            {showReasoning ? (
-              reasoningTask ? <div className="reasoning"><p>{reasoningTask.aiRecommendation}</p></div> : <p style={{ fontSize: 9, color: "#718987", lineHeight: 1.5, marginTop: 10 }}>No reasoning trace available yet — it appears here once a task carries one.</p>
-            ) : <p style={{ fontSize: 9, color: "#718987", lineHeight: 1.5, marginTop: 10 }}>Off for a clean wall view. Turn on to inspect the latest decision path.</p>}
-            <div className="activity-line"><Sparkles/><p><b>Orchestration</b><small>{mode} mode · {doneTasks}/{totalTasks} tasks done today</small></p></div>
+
+          {sortedRecentDone.length > 0 && (
+            <div className="completions-trail">
+              {sortedRecentDone.map(t => <span className="completion-chip" key={t.id}><CheckCircle2 size={10}/>{t.title}</span>)}
+            </div>
+          )}
+
+          <div className="queue-section">
+            <div className="route-head"><div><strong>Queue</strong><span>{queueTasks.length} up next{activeDomains.size > 0 ? ` · filtered to ${activeDomains.size} domain${activeDomains.size > 1 ? "s" : ""}` : ""}</span></div></div>
+            {queueTasks.length === 0 ? (
+              <div className="queue-empty">Nothing queued.</div>
+            ) : (
+              <>
+                <div className="queue-list">
+                  {(queueExpanded ? queueTasks : queueTasks.slice(0, 4)).map(task => (
+                    <div
+                      className={`queue-item ${draggedQueueId === task.id ? "dragging" : ""}`}
+                      key={task.id}
+                      draggable
+                      onDragStart={() => setDraggedQueueId(task.id)}
+                      onDragOver={e => e.preventDefault()}
+                      onDrop={e => { e.preventDefault(); if (draggedQueueId != null) void reorderQueue(draggedQueueId, task.id); setDraggedQueueId(null); }}
+                      onDragEnd={() => setDraggedQueueId(null)}
+                    >
+                      <GripVertical size={13} className="queue-item-drag"/>
+                      <span className="queue-item-title">{task.title}</span>
+                      <span className="queue-item-tag" style={{ color: CATEGORY_ACCENTS[task.category] }}>{CATEGORY_LABELS[task.category]}</span>
+                      {agentName(task.executingAgentId) && <span className="queue-item-agent" title={agentName(task.executingAgentId) ?? undefined}><Bot size={12}/></span>}
+                    </div>
+                  ))}
+                </div>
+                {queueTasks.length > 4 && (
+                  <button type="button" className="queue-fold" onClick={() => setQueueExpanded(v => !v)}>
+                    {queueExpanded ? <ChevronDown size={12}/> : <ChevronRight size={12}/>}
+                    {queueExpanded ? "Show less" : `+${queueTasks.length - 4} more`}
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </article>
 

@@ -16,6 +16,7 @@ const STATUS_LABEL: Record<Task['status'], string> = {
   in_progress: 'In progress',
   todo: 'Pending',
   blocked: 'Blocked',
+  needs_input: 'Needs input',
 };
 
 export function TodaysFocusPanel() {

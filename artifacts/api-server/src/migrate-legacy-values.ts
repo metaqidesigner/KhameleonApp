@@ -6,7 +6,7 @@
  *
  * Canonical values
  *   priority : urgent | high | medium | low
- *   status   : todo   | in_progress | done | blocked
+ *   status   : todo   | in_progress | done | blocked | needs_input
  *
  * Legacy → canonical mappings
  *   priority "critical"     → "urgent"
@@ -86,7 +86,7 @@ export async function migrateLegacyTaskValues(): Promise<void> {
     // ── Status: unknown fallback → "todo" ─────────────────────────────────
     const unknownStatus = await tx.execute(
       sql`UPDATE tasks SET status = 'todo'
-          WHERE status NOT IN ('todo','in_progress','done','blocked')`,
+          WHERE status NOT IN ('todo','in_progress','done','blocked','needs_input')`,
     );
     const usCount = (unknownStatus as unknown as { rowCount: number }).rowCount ?? 0;
     if (usCount > 0) {

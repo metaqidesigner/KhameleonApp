@@ -353,7 +353,7 @@ export const ListTasksResponse = zod.array(ListTasksResponseItem)
 export const CreateTaskBody = zod.object({
   "title":           zod.string(),
   "description":     zod.string().optional(),
-  "status":          zod.enum(["todo", "in_progress", "done", "blocked"]).optional().default("todo"),
+  "status":          zod.enum(["todo", "in_progress", "done", "blocked", "needs_input"]).optional().default("todo"),
   "priority":        zod.enum(["urgent", "high", "medium", "low"]).optional().default("medium"),
   "category":        zod.string().optional().default("deep_work"),
   "recurrence":      zod.string().optional().default("one_off"),
@@ -367,7 +367,11 @@ export const CreateTaskBody = zod.object({
   "parkedReason":    zod.enum(["external_input", "deferred", "dependency"]).nullish(),
   "waitingOn":       zod.string().nullish(),
   "waitingSince":    zod.string().nullish(),
-  "blockedByTaskId": zod.number().nullish()
+  "blockedByTaskId": zod.number().nullish(),
+  "executingAgentId": zod.string().nullish(),
+  "zdrEndpoint":      zod.boolean().nullish(),
+  "queuePosition":    zod.number().nullish(),
+  "aiRecommendation": zod.string().optional()
 })
 
 
@@ -381,7 +385,7 @@ export const UpdateTaskParams = zod.object({
 export const UpdateTaskBody = zod.object({
   "title":           zod.string().optional(),
   "description":     zod.string().optional(),
-  "status":          zod.enum(["todo", "in_progress", "done", "blocked"]).optional(),
+  "status":          zod.enum(["todo", "in_progress", "done", "blocked", "needs_input"]).optional(),
   "priority":        zod.enum(["urgent", "high", "medium", "low"]).optional(),
   "category":        zod.string().optional(),
   "recurrence":      zod.string().optional(),
@@ -393,7 +397,11 @@ export const UpdateTaskBody = zod.object({
   "parkedReason":    zod.enum(["external_input", "deferred", "dependency"]).nullish(),
   "waitingOn":       zod.string().nullish(),
   "waitingSince":    zod.string().nullish(),
-  "blockedByTaskId": zod.number().nullish()
+  "blockedByTaskId": zod.number().nullish(),
+  "executingAgentId": zod.string().nullish(),
+  "zdrEndpoint":      zod.boolean().nullish(),
+  "queuePosition":    zod.number().nullish(),
+  "aiRecommendation": zod.string().optional()
 })
 
 export const UpdateTaskResponse = zod.object({

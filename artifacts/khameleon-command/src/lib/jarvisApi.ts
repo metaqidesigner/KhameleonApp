@@ -239,7 +239,7 @@ export async function runResearch(query: string, opts?: { max_iterations?: numbe
 export type TaskCategory   = 'communication' | 'meetings' | 'deep_work' | 'task_project_management' | 'administrative' | 'planning';
 export type TaskPriority   = 'urgent' | 'high' | 'medium' | 'low';
 export type TaskRecurrence = 'one_off' | 'daily' | 'weekly' | 'custom';
-export type TaskStatus     = 'todo' | 'in_progress' | 'done' | 'blocked';
+export type TaskStatus     = 'todo' | 'in_progress' | 'done' | 'blocked' | 'needs_input';
 export type TaskSource     = 'manual' | 'agent';
 
 export interface Task {
@@ -270,6 +270,12 @@ export interface Task {
   blockedByTaskId?: number | null;
   /** design-spec.md §15.2 - a not-yet-installed Skill Set closely matching this task, or null. */
   skillSetSuggestion?: { skillSetId: number; name: string; reason: string } | null;
+  /** Center column "current focus" (2026-09-26) - AgentConfig.id of whichever agent is/was working this, if known. */
+  executingAgentId?: string | null;
+  /** Whether this task's execution used a zero-data-retention endpoint. */
+  zdrEndpoint?:      boolean | null;
+  /** User-directed queue order (drag-to-reorder); null = unordered. */
+  queuePosition?:    number | null;
 }
 
 export interface CreateTaskInput {
@@ -284,6 +290,7 @@ export interface CreateTaskInput {
   parentTaskId?:    number | null;
   projectId?:       number | null;
   dueDate?:         string | null;
+  aiRecommendation?: string;
 }
 
 export interface UpdateTaskInput {
@@ -299,6 +306,10 @@ export interface UpdateTaskInput {
   waitingOn?:       string | null;
   waitingSince?:    string | null;
   blockedByTaskId?: number | null;
+  executingAgentId?: string | null;
+  zdrEndpoint?:      boolean | null;
+  queuePosition?:    number | null;
+  aiRecommendation?: string;
 }
 
 export interface DailyTasksResponse {
