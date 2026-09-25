@@ -295,6 +295,24 @@ async function seed() {
   await db.update(tasksTable).set({ blockedByTaskId: externalInputExample.id }).where(eq(tasksTable.id, dependencyExample.id));
   // ══════════════════════════════════════════════════════════════════ end
 
+  // ══════════════════════════════════════════════════════════════════════
+  // EXAMPLE DATA — Live Wall "current focus + queue" (2026-09-26).
+  // One needs-input focus example (with an executing agent and ZDR flag
+  // set, so both render) plus three plain queue examples, so the center
+  // column shows the hero/queue split instead of the empty state on a
+  // fresh seed. DELETE THIS WHOLE BLOCK before shipping the initial
+  // prototype — the feature itself (schema columns, API fields, the
+  // hero+queue UI, drag-to-reorder, auto-promotion in CommandWall.tsx) is
+  // real and stays; only these four rows are demo content.
+  // ══════════════════════════════════════════════════════════════════════
+  await db.insert(tasksTable).values([
+    { title: "Confirm counter-proposal risk allocation for Meridian term sheet", description: "EXAMPLE DATA - remove before shipping the initial prototype.", status: "needs_input", priority: "urgent", category: "deep_work", executingAgentId: "claude", zdrEndpoint: true, queuePosition: null, aiRecommendation: "Drafted three counter-proposal structures based on the term sheet's liquidation preference clause. Structure A favors faster close, Structure B protects downside better, Structure C splits the difference. Need your call on which risk allocation to lead with before I send it to their counsel." },
+    { title: "Review Q3 admin expense batch", description: "EXAMPLE DATA - remove before shipping the initial prototype.", status: "todo", priority: "low", category: "administrative", executingAgentId: null, zdrEndpoint: null, queuePosition: 0, aiRecommendation: "" },
+    { title: "Summarize competitor pricing changes this week", description: "EXAMPLE DATA - remove before shipping the initial prototype.", status: "todo", priority: "medium", category: "deep_work", executingAgentId: "gemini", zdrEndpoint: null, queuePosition: 1, aiRecommendation: "" },
+    { title: "Draft follow-up to yesterday's board Q&A", description: "EXAMPLE DATA - remove before shipping the initial prototype.", status: "todo", priority: "high", category: "communication", executingAgentId: "gpt4o", zdrEndpoint: null, queuePosition: 2, aiRecommendation: "" },
+  ] as unknown as (typeof tasksTable.$inferInsert)[]);
+  // ══════════════════════════════════════════════════════════════════ end
+
   // Calendar Events
   await db.insert(calendarEventsTable).values([
     {
