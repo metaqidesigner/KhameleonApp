@@ -261,6 +261,13 @@ export interface Task {
   aiRecommendation: string;
   createdAt:        string;
   updatedAt:        string;
+  /** Live Wall left column (2026-09-25) - why a parked task isn't progressing on its own. null for anything not parked for a specific tracked reason. */
+  parkedReason?:    'external_input' | 'deferred' | 'dependency' | null;
+  /** What/who it's waiting on, e.g. "tenant reply" - required context for parkedReason to be useful, not just "paused". */
+  waitingOn?:       string | null;
+  waitingSince?:    string | null;
+  /** parkedReason 'dependency' only: which other task this is waiting on to finish first. */
+  blockedByTaskId?: number | null;
   /** design-spec.md §15.2 - a not-yet-installed Skill Set closely matching this task, or null. */
   skillSetSuggestion?: { skillSetId: number; name: string; reason: string } | null;
 }
@@ -288,6 +295,10 @@ export interface UpdateTaskInput {
   recurrence?:      TaskRecurrence;
   dueDate?:         string | null;
   parentTaskId?:    number | null;
+  parkedReason?:    'external_input' | 'deferred' | 'dependency' | null;
+  waitingOn?:       string | null;
+  waitingSince?:    string | null;
+  blockedByTaskId?: number | null;
 }
 
 export interface DailyTasksResponse {

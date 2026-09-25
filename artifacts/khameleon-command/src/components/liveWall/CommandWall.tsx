@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import {
-  Activity, Archive, ArrowUpRight, GripVertical, LockKeyhole, Menu, MoveHorizontal,
-  Radio, Send, ShieldCheck, Sparkles, Timer, UsersRound, Wand2,
+  Activity, Archive, ArrowUpRight, Bell, ChevronDown, Clock, Eye, EyeOff, Filter,
+  GitBranch, GripVertical, LockKeyhole, Mail, Pause, Play,
+  Plug, Radio, RotateCcw, Send, ShieldCheck, Sparkles, Timer, UsersRound, Wand2, X,
 } from "lucide-react";
 import { useJarvisStore } from "@/store/jarvisStore";
 import { useJarvisHealth, useJarvisTelemetry } from "@/hooks/useJarvis";
 import {
-  getDailyTasks, type Task, type TaskCategory,
+  getDailyTasks, getConnectors, updateTask, type Task, type TaskCategory, type JarvisConnector,
 } from "@/lib/jarvisApi";
 import {
-  streamAgentChat, FALLBACK_ROSTER, getRoster,
-  type AgentConfig, type ChatMessage,
+  streamAgentChat, FALLBACK_ROSTER, getRoster, getAgentStatus,
+  type AgentConfig, type AgentStatus, type ChatMessage,
 } from "@/lib/agentsApi";
 
 /**
@@ -80,6 +82,19 @@ const CATEGORY_ICONS: Record<TaskCategory, typeof Activity> = {
 };
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as TaskCategory[];
 
+type ParkedReason = "external_input" | "deferred" | "dependency";
+const PARKED_REASON_LABELS: Record<ParkedReason, string> = {
+  external_input: "Waiting on a reply",
+  deferred: "Deferred by you",
+  dependency: "Blocked by a dependency",
+};
+const PARKED_REASON_ICONS: Record<ParkedReason, typeof Mail> = {
+  external_input: Mail,
+  deferred: Clock,
+  dependency: GitBranch,
+};
+const MODE_ABBR: Record<Mode, string> = { Single: "S", Parallel: "P", Vote: "V", Council: "C" };
+
 function toWallState(s: OrbState): WallOrbState {
   return s === "online" || s === "offline" ? "idle" : s;
 }
@@ -97,6 +112,10 @@ function timeAgo(iso: string): string {
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
 }
+function fmtSentDate(iso?: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-US", { weekday: "short" });
+}
 
 export function CommandWall() {
   const orbStatus           = useJarvisStore(s => s.orbStatus);
@@ -110,15 +129,25 @@ export function CommandWall() {
   const { data: health    = undefined } = useJarvisHealth();
   const { data: telemetry = undefined } = useJarvisTelemetry();
 
-  const [domain, setDomain] = useState<"all" | TaskCategory>("all");
+  const [activeDomains, setActiveDomains] = useState<Set<TaskCategory>>(new Set());
   const [mode, setMode] = useState<Mode>("Parallel");
   const [isLive, setIsLive] = useState(true);
   const [showReasoning, setShowReasoning] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const [domainMenuOpen, setDomainMenuOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  // Top bar spec (2026-09-25): icon-only controls need a first-run labeled
+  // pass since orchestration-mode's S/P/V/C abbreviation isn't self
+  // explanatory on first use. Persisted per-browser so it only shows once.
+  const [topBarLabeled, setTopBarLabeled] = useState(() => {
+    try { return localStorage.getItem("khameleon-topbar-seen") !== "1"; } catch { return true; }
+  });
   const [chatDraft, setChatDraft] = useState("");
   const [chatSent, setChatSent] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [roster, setRoster] = useState<AgentConfig[]>(FALLBACK_ROSTER);
+  const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
+  const [connectors, setConnectors] = useState<JarvisConnector[]>([]);
   const [dailyData, setDailyData] = useState<Record<string, Task[]>>({});
   const [byCategory, setByCategory] = useState<Record<string, number>>({});
   const [totalTasks, setTotalTasks] = useState(0);
@@ -145,6 +174,30 @@ export function CommandWall() {
     return () => adjustEmbeddedOrbMountCount(-1);
   }, [adjustEmbeddedOrbMountCount]);
   useEffect(() => { getRoster().then(setRoster).catch(() => {}); }, []);
+  // First-run labeled pass: mark this session as "seen" immediately, so the
+  // *next* session starts icons-only - this session stays labeled throughout
+  // rather than fading mid-session, since the control most needing a label
+  // (orchestration mode's S/P/V/C) benefits from a stable first look.
+  useEffect(() => {
+    if (topBarLabeled) { try { localStorage.setItem("khameleon-topbar-seen", "1"); } catch { /* private mode etc - just stays labeled every session */ } }
+  }, [topBarLabeled]);
+  useEffect(() => { getConnectors().then(setConnectors).catch(() => {}); }, []);
+  useEffect(() => {
+    if (!modeMenuOpen && !domainMenuOpen) return;
+    const closeOnOutsideClick = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest(".bar-menu")) return;
+      setModeMenuOpen(false);
+      setDomainMenuOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [modeMenuOpen, domainMenuOpen]);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(roster.map(a => getAgentStatus(a.id).then(s => [a.id, s.status] as const).catch(() => [a.id, "offline"] as const)))
+      .then(pairs => { if (!cancelled) setAgentStatuses(Object.fromEntries(pairs)); });
+    return () => { cancelled = true; };
+  }, [roster]);
   useEffect(() => {
     if ("speechSynthesis" in window) {
       const load = () => { voicesRef.current = window.speechSynthesis.getVoices(); };
@@ -158,15 +211,33 @@ export function CommandWall() {
     [dailyData],
   );
   const visibleTasks = useMemo(
-    () => domain === "all" ? allTasks.filter(t => t.status !== "done") : allTasks.filter(t => t.status !== "done" && t.category === domain),
-    [allTasks, domain],
+    () => allTasks.filter(t => t.status !== "done" && (activeDomains.size === 0 || activeDomains.has(t.category))),
+    [allTasks, activeDomains],
   );
-  // "Parked" = blocked or not-yet-started, capped to 3 - the original's
-  // fixed swipe-deck placeholders, replaced with whatever's actually held.
-  const parkedTasks = useMemo(
-    () => allTasks.filter(t => t.status === "blocked" || t.status === "todo").slice(0, 3),
+  // Parked (2026-09-25 left-column spec): work stalled on something outside
+  // the agent's control, organized by *why* - distinct from a plain 'todo'
+  // task that just hasn't started yet. Only tasks explicitly tagged with a
+  // real parkedReason get grouped; anything blocked/todo without one yet
+  // (all pre-existing data, since this field is new) falls into "unsorted"
+  // rather than being hidden or guessed at.
+  const allParked = useMemo(
+    () => allTasks.filter(t => t.status === "blocked" || t.status === "todo"),
     [allTasks],
   );
+  const parkedByReason = useMemo(() => ({
+    external_input: allParked.filter(t => t.parkedReason === "external_input"),
+    deferred:       allParked.filter(t => t.parkedReason === "deferred"),
+    dependency:     allParked.filter(t => t.parkedReason === "dependency"),
+  }), [allParked]);
+  const unsortedParked = useMemo(
+    () => allParked.filter(t => t.parkedReason == null).slice(0, 3),
+    [allParked],
+  );
+  const taskById = useMemo(() => new Map(allTasks.map(t => [t.id, t])), [allTasks]);
+  async function resumeParkedTask(task: Task) {
+    await updateTask(task.id, { status: "todo", parkedReason: null, waitingOn: null, waitingSince: null, blockedByTaskId: null });
+    loadTasks();
+  }
   const reasoningTask = useMemo(
     () => allTasks.find(t => t.aiRecommendation && t.aiRecommendation.trim().length > 0) ?? null,
     [allTasks],
@@ -273,16 +344,31 @@ export function CommandWall() {
     <main className="wall-shell">
       <style>{`
         .wall-shell{--ink:#e8f3f0;--muted:#78908f;--teal:#63e1d3;--violet:#a999ff;--amber:#e9b872;--coral:#f68e7b;position:relative;isolation:isolate;min-height:800px;overflow:hidden;background:rgba(5,15,23,.16);color:var(--ink);font-family:ui-sans-serif,system-ui,sans-serif}
-        .desktop-layer{position:absolute;inset:0;z-index:0;overflow:hidden;background:linear-gradient(135deg,#6d7d86,#364e5e 38%,#182a3b);color:rgba(236,245,247,.78)}
-        .desktop-layer:before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 72% 35%,rgba(184,219,226,.78),transparent 24%),radial-gradient(ellipse at 20% 80%,rgba(170,193,203,.52),transparent 30%),linear-gradient(140deg,rgba(255,255,255,.13),transparent 30%,rgba(8,17,30,.34));filter:blur(1px)}
-        .desktop-layer:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(9,18,29,.3),transparent 28%,transparent 72%,rgba(9,18,29,.28)),linear-gradient(0deg,rgba(8,19,29,.5),transparent 18%);pointer-events:none}
-        .desktop-top{position:absolute;left:0;right:0;top:0;height:29px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;background:rgba(8,17,28,.48);border-bottom:1px solid rgba(255,255,255,.12);font-size:10px}.desktop-system{opacity:.72}
-        .desktop-icons{position:absolute;left:22px;top:82px;display:grid;gap:17px;width:72px}.desktop-icon{display:grid;justify-items:center;gap:6px;font-size:9px;text-shadow:0 1px 4px #000;opacity:.78}.desktop-icon i{width:28px;height:24px;border-radius:7px;background:linear-gradient(145deg,rgba(221,244,250,.74),rgba(78,129,153,.58));border:1px solid rgba(255,255,255,.45);box-shadow:0 6px 15px rgba(0,0,0,.22)}
-        .desktop-window{position:absolute;right:66px;bottom:73px;width:305px;height:192px;border-radius:12px;background:rgba(11,26,39,.32);border:1px solid rgba(228,250,255,.3);box-shadow:0 22px 44px rgba(6,15,24,.23),inset 0 1px rgba(255,255,255,.24);backdrop-filter:blur(5px)}.desktop-window-head{height:28px;padding:0 11px;display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(255,255,255,.13);font-size:9px}.desktop-window-head b{width:7px;height:7px;border-radius:50%;background:#ed9f92;box-shadow:12px 0 #e7bf7a,24px 0 #8bd9bd;margin-right:27px}.desktop-window-body{display:grid;grid-template-columns:72px 1fr;height:calc(100% - 28px)}.desktop-window-nav{padding:11px 8px;border-right:1px solid rgba(255,255,255,.11);font-size:8px;line-height:2.2;opacity:.66}.desktop-window-chart{padding:13px;position:relative}.desktop-window-chart:before{content:"";position:absolute;left:13px;right:13px;bottom:20px;height:76px;background:linear-gradient(145deg,transparent 30%,rgba(104,231,218,.65) 31% 33%,transparent 34% 48%,rgba(240,185,119,.6) 49% 51%,transparent 52% 67%,rgba(162,153,255,.66) 68% 70%,transparent 71%);opacity:.68}.desktop-dock{position:absolute;left:50%;bottom:17px;transform:translateX(-50%);height:38px;padding:0 13px;display:flex;align-items:center;gap:8px;border-radius:14px;background:rgba(7,18,29,.42);border:1px solid rgba(255,255,255,.2);box-shadow:0 9px 24px rgba(0,0,0,.25);backdrop-filter:blur(7px)}.desktop-dock i{display:block;width:22px;height:22px;border-radius:6px;background:linear-gradient(145deg,rgba(243,252,255,.8),rgba(99,182,205,.65));border:1px solid rgba(255,255,255,.4)}
         .space-field{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:radial-gradient(ellipse at 50% 98%,rgba(80,198,211,.12),transparent 34%)}.space-field:before{content:"";position:absolute;inset:0;opacity:.48;background-image:radial-gradient(circle at 11% 22%,rgba(210,255,247,.92) 0 1px,transparent 1.8px),radial-gradient(circle at 25% 17%,rgba(136,205,255,.72) 0 1px,transparent 1.7px),radial-gradient(circle at 43% 28%,rgba(255,225,170,.7) 0 1px,transparent 1.7px),radial-gradient(circle at 66% 13%,rgba(201,181,255,.85) 0 1px,transparent 1.8px),radial-gradient(circle at 83% 25%,rgba(166,250,240,.75) 0 1px,transparent 1.7px)}.reflection-plane{position:absolute;left:3%;right:3%;bottom:-2px;height:170px;z-index:0;pointer-events:none;opacity:.7;transform:perspective(520px) rotateX(58deg);transform-origin:bottom;background:linear-gradient(to bottom,rgba(7,24,31,.08),rgba(3,10,18,.72)),radial-gradient(ellipse at 50% 0,rgba(108,243,231,.12),transparent 46%);border-top:1px solid rgba(145,244,235,.14);box-shadow:0 -18px 45px rgba(62,218,213,.1)}
         .topbar,.wall-plane,.footer{position:relative;z-index:1}.glass{background:linear-gradient(132deg,rgba(45,95,99,.32),rgba(7,26,35,.43) 42%,rgba(9,20,31,.5));border:1px solid rgba(161,255,241,.28);box-shadow:0 22px 70px rgba(0,0,0,.22),inset 0 1px rgba(225,255,251,.35),inset 0 -1px rgba(0,0,0,.38);backdrop-filter:blur(16px) saturate(165%)}
-        .topbar{height:74px;margin:18px 22px 6px;padding:0 20px;border-radius:19px;display:flex;align-items:center;gap:28px}.brand{display:flex;align-items:center;gap:11px;min-width:220px}.brand-mark{width:26px;height:26px;position:relative}.brand-mark i{position:absolute;width:8px;height:8px;border:2px solid var(--teal);border-radius:50%;box-shadow:0 0 14px rgba(99,225,211,.6)}.brand-mark i:nth-child(1){left:1px;top:9px}.brand-mark i:nth-child(2){left:9px;top:3px}.brand-mark i:nth-child(3){left:17px;top:11px}.wordmark{font-size:15px;letter-spacing:.2em;font-weight:700}.wordmark small{display:block;color:#73918f;font-size:8px;letter-spacing:.16em;margin-top:3px;font-weight:500}.nav{display:flex;gap:23px;align-items:center;flex:1}.nav button,.menu button{border:0;background:none;color:#78908f;font-size:12px;padding:25px 0 22px;cursor:pointer}.nav button.active{color:var(--teal);border-bottom:2px solid var(--teal)}.top-right{display:flex;align-items:center;gap:17px}.clock{text-align:right;color:var(--teal)}.clock b{display:block;font-size:12px}.clock span{color:#6c8584;font-size:9px}.live-switch{display:flex;align-items:center;gap:8px;border:1px solid rgba(99,225,211,.2);background:rgba(99,225,211,.07);border-radius:20px;padding:8px 11px;color:var(--teal);cursor:pointer}.live-dot{width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 4px rgba(99,225,211,.11)}.paused .live-dot{background:var(--amber);box-shadow:none}.menu{position:relative}.menu-pop{position:absolute;right:0;top:40px;width:140px;padding:6px;border-radius:10px;z-index:5}.menu-pop button{display:block;width:100%;text-align:left;padding:8px;color:#9db4b1;font-size:10px}
-         .wall-plane{height:574px;margin:0 22px;position:relative}.panel{position:absolute;overflow:visible}.panel:after{content:"";position:absolute;right:-70px;top:-90px;width:230px;height:230px;border-radius:50%;background:radial-gradient(circle,rgba(99,225,211,.13),transparent 65%);filter:blur(5px);pointer-events:none}.eyebrow,.micro{color:#6c8685;font-size:10px;letter-spacing:.16em;text-transform:uppercase}.panel-title{font-size:18px;font-weight:600;letter-spacing:-.03em;margin-top:5px}.panel-title span{color:var(--teal)}.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.status-pill,.privacy{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:8px;font-size:10px;color:var(--teal);background:rgba(99,225,211,.08);border:1px solid rgba(99,225,211,.16)}.privacy{color:#b8aaff;border-color:rgba(169,153,255,.2)}.left-cluster{left:1%;top:60px;width:29%;height:435px;transform:rotate(-1.6deg);z-index:2}.center-cluster{left:25%;top:8px;width:53%;height:550px;z-index:3}.right-cluster{right:1%;top:93px;width:23%;height:390px;transform:rotate(1.8deg);z-index:2}
+        .topbar{height:74px;margin:18px 22px 6px;padding:0 20px;border-radius:19px;display:flex;align-items:center;gap:28px}.brand{display:flex;align-items:center;gap:11px;min-width:220px}.brand-mark{width:26px;height:26px;position:relative}.brand-mark i{position:absolute;width:8px;height:8px;border:2px solid var(--teal);border-radius:50%;box-shadow:0 0 14px rgba(99,225,211,.6)}.brand-mark i:nth-child(1){left:1px;top:9px}.brand-mark i:nth-child(2){left:9px;top:3px}.brand-mark i:nth-child(3){left:17px;top:11px}.wordmark{font-size:15px;letter-spacing:.2em;font-weight:700}.wordmark small{display:block;color:#73918f;font-size:8px;letter-spacing:.16em;margin-top:3px;font-weight:500}.nav{display:flex;gap:23px;align-items:center;flex:1}.nav button{border:0;background:none;color:#78908f;font-size:12px;padding:25px 0 22px;cursor:pointer}.nav button.active{color:var(--teal);border-bottom:2px solid var(--teal)}.top-right{display:flex;align-items:center;gap:8px}
+        /* Top bar spec (2026-09-25): icon-first, compact global controls that
+           act on the whole wall (all three lanes) - live/pause, orchestration
+           mode, Work Domain filter, reasoning-visibility default, activity
+           feed. First-run shows a label alongside each icon (see topBarLabeled
+           in the component); every control also carries a hover title as the
+           non-negotiable minimum even once icons-only. */
+        .bar-btn{position:relative;display:flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:#9db4b1;border-radius:9px;padding:8px 10px;font-size:10px;cursor:pointer;white-space:nowrap}
+        .bar-btn.live{color:var(--teal);border-color:rgba(99,225,211,.28);background:rgba(99,225,211,.08)}.bar-btn.live svg{animation:live-pulse 2s ease-in-out infinite}
+        .bar-btn.live.paused{color:var(--amber);border-color:rgba(233,184,114,.28);background:rgba(233,184,114,.07)}.bar-btn.live.paused svg{animation:none}
+        @keyframes live-pulse{0%,100%{opacity:1}50%{opacity:.45}}
+        .bar-chip-abbr{display:grid;place-items:center;width:16px;height:16px;border-radius:5px;background:rgba(99,225,211,.16);color:var(--teal);font-size:9px;font-weight:700}
+        .bar-badge{position:absolute;top:-5px;right:-5px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:var(--coral);color:#1a0e0c;font-size:8px;font-weight:700;display:grid;place-items:center;line-height:1}
+        .bar-menu{position:relative}.bar-pop{position:absolute;right:0;top:38px;min-width:150px;padding:6px;border-radius:10px;z-index:6}
+        .bar-pop button{display:flex;align-items:center;gap:7px;width:100%;text-align:left;border:0;background:none;padding:7px 8px;border-radius:6px;color:#9db4b1;font-size:10px;cursor:pointer}
+        .bar-pop button.active{color:var(--teal);background:rgba(99,225,211,.08)}
+        .activity-scrim{position:fixed;inset:0;z-index:500;background:rgba(3,10,15,.4)}
+        .activity-slideout{position:absolute;right:0;top:0;bottom:0;width:min(340px,90vw);padding:18px;overflow-y:auto;border-radius:0}
+        .activity-slideout-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.activity-slideout-head strong{font-size:13px}.activity-slideout-head button{border:0;background:none;color:#9db4b1;cursor:pointer}
+        .activity-empty{font-size:10px;color:#718987;line-height:1.5}
+        .activity-slideout-item{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06)}.activity-slideout-top{display:flex;justify-content:space-between;font-size:9px;color:var(--teal);margin-bottom:5px}.activity-slideout-item p{margin:0;font-size:10px;color:#c3d3d0;line-height:1.4}
+        .clock{text-align:right;color:var(--teal)}.clock b{display:block;font-size:12px}.clock span{color:#6c8584;font-size:9px}
+         .wall-plane{height:574px;margin:0 22px;position:relative}.panel{position:absolute;overflow:visible}.panel:after{content:"";position:absolute;right:-70px;top:-90px;width:230px;height:230px;border-radius:50%;background:radial-gradient(circle,rgba(99,225,211,.13),transparent 65%);filter:blur(5px);pointer-events:none}.eyebrow,.micro{color:#6c8685;font-size:10px;letter-spacing:.16em;text-transform:uppercase}.panel-title{font-size:18px;font-weight:600;letter-spacing:-.03em;margin-top:5px}.panel-title span{color:var(--teal)}.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.status-pill,.privacy{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:8px;font-size:10px;color:var(--teal);background:rgba(99,225,211,.08);border:1px solid rgba(99,225,211,.16)}.privacy{color:#b8aaff;border-color:rgba(169,153,255,.2)}.left-cluster{left:1%;top:8px;width:29%;height:435px;transform:rotate(-1.6deg);z-index:2}.center-cluster{left:25%;top:8px;width:53%;height:550px;z-index:3}.right-cluster{right:1%;top:8px;width:23%;height:390px;transform:rotate(1.8deg);z-index:2}
         .swipe-stack{position:relative;height:270px;margin:4px -4px 0}.swipe-card{position:absolute;left:10px;width:calc(100% - 22px);border-radius:15px;padding:12px;background:linear-gradient(145deg,rgba(21,56,64,.72),rgba(5,20,29,.8));border:1px solid rgba(176,255,242,.22);box-shadow:18px 22px 36px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.2);backdrop-filter:blur(13px)}.swipe-card.back{top:10px;transform:translateX(24px) rotate(3deg);opacity:.55}.swipe-card.mid{top:38px;transform:translateX(10px) rotate(-2deg);opacity:.78}.swipe-card.video{top:92px;transform:translateX(-12px) rotate(-4deg);z-index:2}.swipe-card-head{display:flex;align-items:center;justify-content:space-between;font-size:9px;color:#a7c1bd}.swipe-card-head svg{width:13px}.thumb{height:78px;margin:10px 0;border-radius:10px;background:radial-gradient(circle at 67% 38%,rgba(244,190,164,.95) 0 4%,transparent 5%),linear-gradient(132deg,#163b4b 0 24%,#2f6b72 25% 39%,#8d5a60 40% 59%,#f0ad99 60% 63%,#213b4b 64%);box-shadow:inset 0 0 30px rgba(0,0,0,.4)}.video-meta{display:flex;align-items:center;gap:8px;color:#cde5e0;font-size:10px}.play-button{width:25px;height:25px;display:grid;place-items:center;border:1px solid rgba(99,225,211,.5);border-radius:50%;color:var(--teal);background:rgba(0,20,25,.48);cursor:pointer}.play-button svg{width:12px}.progress{height:3px;border-radius:4px;background:rgba(255,255,255,.12);margin:9px 0 5px}.progress i{display:block;width:63%;height:100%;background:linear-gradient(90deg,var(--teal),var(--amber))}.swipe-hint{display:flex;align-items:center;gap:7px;margin:8px 2px;color:#738f8c;font-size:9px}.mission{border-radius:16px;padding:13px 15px;background:linear-gradient(120deg,rgba(6,39,44,.64),rgba(4,19,28,.52));border:1px solid rgba(99,225,211,.13)}.mission-top{display:flex;justify-content:space-between;align-items:center}.mission strong{font-size:12px}.mission p{font-size:10px;color:#8ca2a1;line-height:1.5;margin:8px 0 0}.visual-workspace{height:322px;position:relative;border-radius:17px;overflow:hidden;margin:3px 0 12px;background:linear-gradient(140deg,#152e45,#2d5661 38%,#594b64 67%,#211e39);border:1px solid rgba(209,255,246,.32);box-shadow:0 20px 44px rgba(0,0,0,.3),inset 0 1px rgba(255,255,255,.32)}.visual-workspace:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 48% 39%,rgba(246,222,190,.9) 0 3%,transparent 3.5%),radial-gradient(circle at 48% 39%,rgba(255,190,152,.32) 0 17%,transparent 18%),linear-gradient(165deg,transparent 0 29%,rgba(154,223,220,.38) 30% 31%,transparent 32% 52%,rgba(233,162,137,.34) 53% 54%,transparent 55%);animation:drift 10s ease-in-out infinite}.workspace-label{position:absolute;left:13px;top:12px;z-index:1;font-size:9px;letter-spacing:.13em;color:#dcf8f2}.workspace-footer{position:absolute;left:12px;right:12px;bottom:10px;z-index:1;display:flex;justify-content:space-between;align-items:end}.workspace-footer strong{font-size:12px;font-weight:500}.workspace-footer span{display:block;color:#b0c8c2;font-size:9px;margin-top:3px}.workspace-tools{display:flex;gap:5px}.workspace-tools i{width:22px;height:22px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.22);border-radius:6px;background:rgba(4,17,26,.4)}.workspace-tools svg{width:11px}.mini-float{position:absolute;right:15px;top:58px;width:116px;padding:9px;border-radius:11px;z-index:2;background:rgba(7,24,33,.75);border:1px solid rgba(233,184,114,.35);box-shadow:0 15px 27px rgba(0,0,0,.32);transform:rotate(3deg)}.mini-float b{display:block;color:#f0c98b;font-size:9px}.mini-float p{margin:6px 0 0;color:#a8bfba;font-size:8px;line-height:1.45}.mini-float em{display:block;margin-top:7px;color:var(--teal);font-style:normal;font-size:8px}
         .domain-row,.mode{display:flex;gap:6px;overflow:hidden}.domain-row button,.mode button{white-space:nowrap;cursor:pointer;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.025);color:#819796;border-radius:8px;padding:7px 9px;font-size:9px}.domain-row button.active,.mode button.active{color:var(--teal);border-color:rgba(99,225,211,.35);background:rgba(99,225,211,.09)}.route-head{display:flex;justify-content:space-between;align-items:end;margin:12px 0 9px}.route-head strong{font-size:13px}.route-head span{display:block;color:#6d8684;font-size:9px;margin-top:4px}.task-list{display:grid;grid-template-columns:1fr 1fr;gap:7px}.task{display:grid;grid-template-columns:25px 1fr;gap:8px;padding:10px;border-radius:13px;background:rgba(7,24,26,.63);border:1px solid rgba(255,255,255,.065)}.task-icon{width:25px;height:25px;display:grid;place-items:center;border-radius:8px;background:rgba(255,255,255,.05)}.task-icon svg{width:13px}.task-title{font-size:10px;color:#d8e6e3}.task-meta{font-size:8px;color:#6f8886;margin-top:4px}.reasoning{margin-top:10px;padding:10px;border-radius:12px;background:rgba(169,153,255,.055);border:1px solid rgba(169,153,255,.2)}.reasoning p{font-size:9px;color:#b8b0e8;line-height:1.45;margin:0}.toggle{width:30px;height:17px;border:0;border-radius:20px;background:#345254;padding:2px;cursor:pointer}.toggle i{display:block;width:13px;height:13px;border-radius:50%;background:#9aacab;transition:transform .18s}.toggle.on{background:var(--violet)}.toggle.on i{transform:translateX(13px);background:#fff}.activity-card{padding:12px;border-radius:15px;background:rgba(5,20,22,.5);border:1px solid rgba(255,255,255,.07)}.reason-head{display:flex;justify-content:space-between;align-items:center;color:#c4baff;font-size:10px}.activity-line{display:flex;gap:8px;padding-top:10px}.activity-line svg{width:14px;color:var(--teal)}.activity-line p{margin:0;font-size:9px}.activity-line small{display:block;color:#718b89;margin-top:3px}.rail-stat{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08)}.rail-stat span{display:block;color:#76918e;font-size:9px;text-transform:uppercase;letter-spacing:.12em}.rail-stat strong{display:block;margin-top:4px;font-size:17px;font-weight:500}.right-float{margin:13px -8px 0;padding:12px;border-radius:15px;background:linear-gradient(140deg,rgba(24,56,57,.64),rgba(5,21,30,.7));border:1px solid rgba(169,153,255,.24);box-shadow:12px 18px 32px rgba(0,0,0,.25);transform:rotate(-2deg)}.right-float-head{display:flex;justify-content:space-between;color:#b9b0fa;font-size:9px}.right-float p{font-size:9px;color:#8ca5a1;line-height:1.4;margin:8px 0}.rail-actions{display:flex;gap:6px;margin-top:12px}.rail-actions button{flex:1;border:1px solid rgba(99,225,211,.18);background:rgba(99,225,211,.06);border-radius:8px;color:#9bd4cd;padding:8px 4px;font-size:9px;cursor:pointer}.footer{margin:0 22px 18px;height:42px;border:1px solid rgba(246,142,123,.2);background:rgba(8,27,28,.62);border-radius:12px;display:flex;align-items:center;overflow:hidden}.feed-label{height:100%;display:flex;align-items:center;gap:9px;padding:0 15px;color:var(--coral);font-size:10px;letter-spacing:.16em}.feed-label svg{width:14px}.ticker{font-family:ui-monospace,monospace;color:#b8928a;font-size:10px;padding-left:17px;white-space:nowrap}@keyframes drift{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}@media(max-width:900px){.wall-shell{min-height:100dvh}.topbar{margin:10px;height:auto;min-height:68px}.nav{display:none}.clock{display:none}.top-right{margin-left:auto}.wall-plane{height:auto;margin:0 10px;display:grid;gap:14px}.panel{position:relative!important;inset:auto!important;width:auto!important;height:auto!important;min-height:0;transform:none!important}.center-cluster{order:-1}.task-list{grid-template-columns:1fr}.footer{margin:14px 10px}.domain-row{overflow:auto}}
          .rail-stat{margin:0 0 8px;padding:12px 13px;border:1px solid rgba(161,255,241,.14);border-radius:14px;background:linear-gradient(140deg,rgba(24,56,57,.48),rgba(5,21,30,.58));box-shadow:10px 14px 28px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.12);backdrop-filter:blur(13px)}.wall-plane>.panel.glass{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none}.wall-plane>.panel.glass:after{content:none}
@@ -294,7 +380,41 @@ export function CommandWall() {
            rendering underneath it, not clipped by overflow at all. Drops
            the mode row onto its own full-width line below the heading,
            clear of that overlap zone, instead. */
-        .route-head{flex-wrap:wrap;row-gap:8px}.mode{overflow:visible;flex-basis:100%;justify-content:flex-start}
+        .route-head{flex-wrap:wrap;row-gap:8px}
+        /* Left column spec (2026-09-25): parked work grouped by *why* it's
+           stuck, distinct from the swipe-deck look (dropped - grouped cards
+           read better stacked, not fanned) */
+        .parked-empty{padding:14px;border-radius:13px;background:rgba(7,24,26,.5);border:1px solid rgba(255,255,255,.06);color:#a7c1bd;font-size:10px}
+        .parked-groups{display:flex;flex-direction:column;gap:14px;margin-top:4px}
+        .parked-group-head{display:flex;align-items:center;gap:6px;color:#9bb3af;font-size:9px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px}.parked-group-head em{margin-left:auto;font-style:normal;color:#6d8684}
+        .parked-card{padding:10px 11px;border-radius:13px;background:rgba(7,24,26,.63);border:1px solid rgba(255,255,255,.065);margin-bottom:7px}
+        .parked-card-top{display:flex;justify-content:space-between;align-items:center;color:#a7c1bd}
+        .parked-card-title{font-size:10px;margin:8px 0 4px;color:#d8e6e3}
+        .parked-card-waiting{font-size:9px;color:#8ca2a1;line-height:1.4;margin:0}
+        .parked-resume{display:flex;align-items:center;gap:5px;margin-top:8px;border:1px solid rgba(99,225,211,.22);background:rgba(99,225,211,.07);color:var(--teal);border-radius:7px;padding:5px 9px;font-size:9px;cursor:pointer}
+        /* Right column spec (2026-09-25): strictly system health, no controls */
+        .rail-section-label{color:#6c8685;font-size:9px;letter-spacing:.14em;text-transform:uppercase;margin:0 0 8px}
+        .agent-status-row{display:flex;align-items:center;gap:7px;padding:6px 0}
+        .agent-dot{width:6px;height:6px;border-radius:50%;background:#5c7472}.agent-dot.online{background:var(--teal);box-shadow:0 0 6px rgba(99,225,211,.6)}.agent-dot.busy{background:var(--amber)}.agent-dot.standby{background:#8ca2a1}.agent-dot.offline{background:#4a5d5b}
+        .agent-status-name{font-size:10px;color:#c3d3d0}.agent-status-value{margin-left:auto;font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:#76918e}
+        .rail-empty{font-size:9px;color:#718987}
+        .rail-stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)}.rail-stat-row span{color:#76918e;font-size:9px;text-transform:uppercase;letter-spacing:.1em}.rail-stat-row strong{font-size:13px;font-weight:500}
+        .rail-scroll{max-height:243px;overflow-y:auto;overflow-x:hidden;padding-right:4px;margin-top:2px}
+        .rail-scroll::-webkit-scrollbar{width:4px}.rail-scroll::-webkit-scrollbar-thumb{background:rgba(99,225,211,.25);border-radius:4px}
+        /* Replit refresh: footer pinned to the wall's own bottom edge
+           (was in-flow), so the orb window's own bottom offset and width
+           moved from a flat 18px/380px to a responsive figure that
+           clears the now-pinned footer bar at every viewport width.
+           Pinned via position:absolute against .wall-shell rather than
+           position:fixed against the browser viewport - this app wraps
+           the wall in a left nav rail Replit's own preview doesn't have,
+           so a viewport-relative fixed position/vw-based width drifts
+           from .right-cluster's real edges by exactly the rail's width. */
+        .footer{position:absolute!important;left:22px;right:22px;bottom:0;margin:0!important;height:42px;z-index:30;border-radius:12px 12px 0 0;background:rgba(8,27,28,.9)}
+        .orb-window{position:absolute!important;right:22px!important;bottom:64px!important;width:calc((100% - 44px) * .24 - 10px)!important;max-width:calc(100% - 36px)!important}
+        .right-cluster{padding-bottom:58px!important;box-sizing:border-box}
+        .right-float{margin-bottom:60px!important;position:absolute!important;left:0;right:0;bottom:8px}
+        @media(max-width:900px){.footer{left:10px;right:10px}.orb-window{bottom:58px!important;width:calc(100% - 36px)!important}}
       `}</style>
       <style>{`
         .left-cluster,.right-cluster{transform:none!important}
@@ -314,12 +434,21 @@ export function CommandWall() {
         .spreadsheet-card{left:25%;top:168px;width:53%;height:322px;padding:14px 15px;border-radius:17px;background:linear-gradient(140deg,rgba(26,57,69,.95),rgba(12,31,43,.96));border:1px solid rgba(209,255,246,.34);box-shadow:0 20px 44px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.3);backdrop-filter:blur(16px)}
         .spreadsheet-card:after{content:"AI FORMULA ACTIVITY   4 checks aligned   •   1 approval needed     APPROVE   ↗";position:absolute;left:15px;right:15px;bottom:13px;height:25px;display:flex;align-items:center;padding:0 9px;border-radius:7px;background:rgba(99,225,211,.08);border:1px solid rgba(99,225,211,.18);color:#9ddbd3;font:8px ui-monospace,monospace;letter-spacing:.04em}
         .spreadsheet-card .sheet-grid{top:75px;bottom:49px}
-        .orb-window{position:fixed;right:18px;bottom:18px;width:min(380px,calc(100vw - 36px));height:322px;z-index:20;padding:15px 17px 13px;border-radius:17px;background:linear-gradient(140deg,rgba(26,57,69,.93),rgba(10,27,40,.95));border:1px solid rgba(209,255,246,.34);box-shadow:0 20px 44px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.3),0 0 40px rgba(99,225,211,.08);backdrop-filter:blur(16px);overflow:hidden}
+        .orb-window{position:absolute;right:22px;bottom:18px;width:min(380px,calc(100% - 36px));height:322px;z-index:20;padding:15px 17px 13px;border-radius:17px;background:linear-gradient(140deg,rgba(26,57,69,.93),rgba(10,27,40,.95));border:1px solid rgba(209,255,246,.34);box-shadow:0 20px 44px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.3),0 0 40px rgba(99,225,211,.08);backdrop-filter:blur(16px);overflow:hidden}
         .wall-plane{z-index:4}
         .orb-window:before{content:"";position:absolute;inset:-35%;pointer-events:none;background:radial-gradient(circle at 50% 58%,rgba(99,225,211,.12),transparent 28%),radial-gradient(circle at 66% 42%,rgba(169,153,255,.12),transparent 32%);filter:blur(4px)}
         .orb-window-head{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:flex-start}.orb-window-title{font-size:12px;color:#e8f3f0}.orb-window-sub{display:block;margin-top:3px;color:#78908f;font-size:8px}.orb-window-live{color:var(--teal);font-size:8px;border:1px solid rgba(99,225,211,.25);padding:5px 7px;border-radius:7px}
         .orb-stage{position:absolute;left:50%;top:42%;width:126px;height:126px;transform:translate(-50%,-50%);display:grid;place-items:center}.orb-stage:before{content:"";position:absolute;inset:-32px;border-radius:50%;background:radial-gradient(circle,rgba(99,225,211,.16),transparent 61%);filter:blur(6px)}
-        .orb-core{position:relative;width:100px;height:100px;border-radius:50%;overflow:hidden;background:#7f8b90;box-shadow:inset -15px -18px 23px rgba(0,0,0,.65),inset 10px 8px 18px rgba(255,255,255,.16),0 0 36px rgba(99,225,211,.28),0 0 60px rgba(169,153,255,.16);transition:box-shadow .35s ease,filter .35s ease}
+        /* .orb-core collides with the unrelated global .orb-core rule in
+           components/orb/orb.css (the persistent floating-orb widget uses
+           the same class name) - that rule sets top/left/transform for its
+           own 54px orb, and since this rule never declared those three
+           properties, they leaked straight through the cascade and dragged
+           this 100px orb ~26px toward the bottom-right of its rings.
+           !important pins these three regardless of stylesheet load order,
+           since two unrelated bare .orb-core selectors have equal
+           specificity and would otherwise depend on it. */
+        .orb-core{position:relative;top:auto!important;left:auto!important;transform:none!important;width:100px;height:100px;border-radius:50%;overflow:hidden;background:#7f8b90;box-shadow:inset -15px -18px 23px rgba(0,0,0,.65),inset 10px 8px 18px rgba(255,255,255,.16),0 0 36px rgba(99,225,211,.28),0 0 60px rgba(169,153,255,.16);transition:box-shadow .35s ease,filter .35s ease}
         .orb-texture{position:absolute;inset:-10%;background-image:url("/khameleon-command/nebula-core.png");background-size:118% 118%;background-position:var(--shimmer-position,center);filter:grayscale(1) contrast(1.1) brightness(1.15);transition:transform 2.8s cubic-bezier(.22,.72,.28,1),background-position 3.2s cubic-bezier(.22,.72,.28,1),filter .6s ease;transform:translate3d(var(--shimmer-x,0px),var(--shimmer-y,0px),0) scale(var(--shimmer-scale,1)) rotate(var(--shimmer-rotate,0deg));animation:none}.orb-core.idle.wall-paused .orb-texture{transition:none}
         .orb-light{position:absolute;z-index:1;inset:-18%;pointer-events:none;mix-blend-mode:screen;opacity:var(--light-opacity,.22);transform:translate3d(var(--light-x,0px),var(--light-y,0px),0) scale(var(--light-scale,1));transition:transform 2.2s cubic-bezier(.22,.72,.28,1),opacity 2.2s ease;filter:blur(8px)}.orb-light-one{background:radial-gradient(circle at 35% 30%,rgba(99,225,211,.95) 0%,rgba(99,225,211,.42) 18%,transparent 58%)}.orb-light-two{background:radial-gradient(circle at 70% 68%,rgba(169,153,255,.82) 0%,rgba(169,153,255,.28) 22%,transparent 62%);filter:blur(10px)}
         .orb-core:before{content:"";position:absolute;inset:0;z-index:2;background-image:radial-gradient(1px 1px at 30% 40%,rgba(255,255,255,.9),transparent 1.7px),radial-gradient(1px 1px at 60% 25%,rgba(255,255,255,.7),transparent 1.7px),radial-gradient(1.5px 1.5px at 45% 65%,rgba(255,255,255,.8),transparent 2px),radial-gradient(1px 1px at 72% 55%,rgba(255,255,255,.75),transparent 1.7px),radial-gradient(1px 1px at 20% 60%,rgba(255,255,255,.5),transparent 1.7px),radial-gradient(1px 1px at 82% 40%,rgba(255,255,255,.6),transparent 1.7px),radial-gradient(1px 1px at 40% 80%,rgba(255,255,255,.55),transparent 1.7px),radial-gradient(1px 1px at 15% 30%,rgba(255,255,255,.5),transparent 1.7px),radial-gradient(1px 1px at 55% 15%,rgba(255,255,255,.5),transparent 1.7px),radial-gradient(1px 1px at 88% 70%,rgba(255,255,255,.5),transparent 1.7px);opacity:.65;pointer-events:none}
@@ -329,15 +458,15 @@ export function CommandWall() {
         .orb-ring{position:absolute;border-radius:50%;border:1px solid rgba(231,255,251,.52);box-shadow:0 0 10px rgba(231,255,251,.3),inset 0 0 10px rgba(231,255,251,.1)}.orb-ring.one{inset:10px;animation:orb-spin 10s linear infinite}.orb-ring.two{inset:-3px;border-color:rgba(188,222,255,.28);animation:orb-spin-reverse 16s linear infinite}.orb-ring.three{inset:-16px;border-color:rgba(169,153,255,.18);border-left-color:transparent;border-bottom-color:transparent;animation:orb-spin 22s linear infinite}.orb-ring.one:after,.orb-ring.two:after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:#ecfffb;box-shadow:0 0 8px 3px rgba(231,255,251,.72);top:-3px;left:50%;transform:translateX(-50%)}.orb-ring.two:after{right:-3px;left:auto;top:46%;transform:none;width:7px;height:7px}
         .orb-trail{position:absolute;left:-16px;right:-16px;bottom:-18px;height:50px;border-bottom:1px solid rgba(99,225,211,.4);border-radius:50%;transform:rotate(-12deg);opacity:.7;filter:blur(.2px)}.orb-trail:after{content:"";position:absolute;right:18%;bottom:5px;width:4px;height:4px;border-radius:50%;background:var(--teal);box-shadow:0 0 9px 3px var(--teal)}
         .orb-center-mark{position:absolute;z-index:3;width:24px;height:24px;border-radius:50%;border:1px solid rgba(235,255,250,.7);box-shadow:0 0 14px rgba(99,225,211,.48),inset 0 0 9px rgba(255,255,255,.25);background:radial-gradient(circle,rgba(245,255,252,.86) 0 10%,rgba(99,225,211,.38) 11% 24%,rgba(8,24,33,.3) 25% 100%)}.orb-center-mark:after{content:"";position:absolute;inset:6px;border-radius:50%;border:1px solid rgba(236,255,250,.5)}
-        .orb-state-row{position:absolute;z-index:3;left:15px;right:15px;bottom:77px;display:flex;justify-content:center;gap:5px}.orb-state{border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.035);color:#849e9a;border-radius:7px;padding:5px 7px;font-size:8px;cursor:pointer}.orb-state.active{color:var(--teal);border-color:rgba(99,225,211,.42);background:rgba(99,225,211,.09)}.orb-state[data-state="thinking"].active{color:var(--violet);border-color:rgba(169,153,255,.42);background:rgba(169,153,255,.09)}.orb-state[data-state="researching"].active{color:var(--amber);border-color:rgba(233,184,114,.42);background:rgba(233,184,114,.09)}.orb-state[data-state="error"].active{color:var(--coral);border-color:rgba(246,142,123,.42);background:rgba(246,142,123,.09)}
+        .orb-state-row{position:absolute;z-index:3;left:15px;right:15px;bottom:77px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}.orb-state{min-width:0;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.035);color:#849e9a;border-radius:7px;padding:5px 2px;font-size:7px;line-height:1;cursor:pointer;white-space:nowrap}.orb-state.active{color:var(--teal);border-color:rgba(99,225,211,.42);background:rgba(99,225,211,.09)}.orb-state[data-state="thinking"].active{color:var(--violet);border-color:rgba(169,153,255,.42);background:rgba(169,153,255,.09)}.orb-state[data-state="researching"].active{color:var(--amber);border-color:rgba(233,184,114,.42);background:rgba(233,184,114,.09)}.orb-state[data-state="error"].active{color:var(--coral);border-color:rgba(246,142,123,.42);background:rgba(246,142,123,.09)}
         .orb-chat{position:absolute;z-index:4;left:15px;right:15px;bottom:39px;height:29px;display:flex;align-items:center;gap:7px;padding:3px 4px 3px 10px;border:1px solid rgba(161,255,241,.2);border-radius:9px;background:rgba(4,19,28,.62);box-shadow:inset 0 1px rgba(255,255,255,.1)}
         .orb-chat input{min-width:0;flex:1;border:0;outline:0;background:transparent;color:#d9f4ee;font:9px ui-sans-serif,system-ui,sans-serif}.orb-chat input::placeholder{color:#718b89}.orb-chat button{width:22px;height:22px;display:grid;place-items:center;border:1px solid rgba(99,225,211,.32);border-radius:6px;background:rgba(99,225,211,.1);color:var(--teal);cursor:pointer}.orb-chat button:disabled{opacity:.4;cursor:not-allowed}.orb-chat svg{width:11px;height:11px}
-        .orb-window-footer{position:absolute;left:15px;right:15px;bottom:13px;display:flex;justify-content:space-between;align-items:center;color:#78908f;font:8px ui-monospace,monospace;letter-spacing:.04em}.orb-window-footer b{color:var(--teal);font-weight:500}@keyframes orb-spin{to{transform:rotate(360deg)}}@keyframes orb-spin-reverse{to{transform:rotate(-360deg)}}@keyframes orb-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}@keyframes orb-live-shimmer{0%{transform:scale(1.005) translate3d(-1px,1px,0) rotate(-.4deg);background-position:47% 54%}13%{transform:scale(1.018) translate3d(2px,-1px,0) rotate(.25deg);background-position:54% 47%}29%{transform:scale(.998) translate3d(-2px,-2px,0) rotate(.6deg);background-position:43% 49%}46%{transform:scale(1.012) translate3d(1px,2px,0) rotate(-.2deg);background-position:52% 56%}64%{transform:scale(1.02) translate3d(3px,0,0) rotate(-.55deg);background-position:56% 45%}81%{transform:scale(1.002) translate3d(-1px,-2px,0) rotate(.35deg);background-position:45% 52%}100%{transform:scale(1.01) translate3d(1px,1px,0) rotate(-.1deg);background-position:50% 48%}}@keyframes orb-drift{0%{transform:scale(1) translate3d(-1px,1px,0)}50%{transform:scale(1.018) translate3d(1px,-1px,0)}100%{transform:scale(1.035) translate3d(-1px,1px,0)}}@keyframes orb-think{0%{transform:scale(1.03) rotate(0deg);background-position:46% 52%}50%{transform:scale(1.12) rotate(180deg);background-position:58% 44%}100%{transform:scale(1.03) rotate(360deg);background-position:46% 52%}}@keyframes orb-voice{0%{transform:scale(1.02) translateY(1px)}25%{transform:scale(1.07) translateY(-2px)}50%{transform:scale(1.12) translateY(1px)}75%{transform:scale(1.05) translateY(-1px)}100%{transform:scale(1.14) translateY(1px)}}
+        .orb-window-footer{position:absolute;left:15px;right:15px;bottom:13px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;color:#78908f;font:7px ui-monospace,monospace;letter-spacing:.03em}.orb-window-footer span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.orb-window-footer b{color:var(--teal);font-weight:500;white-space:nowrap}@keyframes orb-spin{to{transform:rotate(360deg)}}@keyframes orb-spin-reverse{to{transform:rotate(-360deg)}}@keyframes orb-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}@keyframes orb-live-shimmer{0%{transform:scale(1.005) translate3d(-1px,1px,0) rotate(-.4deg);background-position:47% 54%}13%{transform:scale(1.018) translate3d(2px,-1px,0) rotate(.25deg);background-position:54% 47%}29%{transform:scale(.998) translate3d(-2px,-2px,0) rotate(.6deg);background-position:43% 49%}46%{transform:scale(1.012) translate3d(1px,2px,0) rotate(-.2deg);background-position:52% 56%}64%{transform:scale(1.02) translate3d(3px,0,0) rotate(-.55deg);background-position:56% 45%}81%{transform:scale(1.002) translate3d(-1px,-2px,0) rotate(.35deg);background-position:45% 52%}100%{transform:scale(1.01) translate3d(1px,1px,0) rotate(-.1deg);background-position:50% 48%}}@keyframes orb-drift{0%{transform:scale(1) translate3d(-1px,1px,0)}50%{transform:scale(1.018) translate3d(1px,-1px,0)}100%{transform:scale(1.035) translate3d(-1px,1px,0)}}@keyframes orb-think{0%{transform:scale(1.03) rotate(0deg);background-position:46% 52%}50%{transform:scale(1.12) rotate(180deg);background-position:58% 44%}100%{transform:scale(1.03) rotate(360deg);background-position:46% 52%}}@keyframes orb-voice{0%{transform:scale(1.02) translateY(1px)}25%{transform:scale(1.07) translateY(-2px)}50%{transform:scale(1.12) translateY(1px)}75%{transform:scale(1.05) translateY(-1px)}100%{transform:scale(1.14) translateY(1px)}}
         @media (min-width:901px){
-          .left-cluster{left:0;width:24%}
-          .center-cluster{left:24%;width:52%}
-          .right-cluster{right:0;left:auto;width:24%}
-          .spreadsheet-card{left:24%;width:52%}
+          .left-cluster{left:0;width:calc(24% - 10px)}
+          .center-cluster{left:calc(24% + 10px);width:calc(52% - 20px)}
+          .right-cluster{right:0;left:auto;width:calc(24% - 10px)}
+          .spreadsheet-card{left:calc(24% + 10px);width:calc(52% - 20px)}
         }
         .orb-core.speaking{animation:none}
         .orb-core.speaking .orb-texture{animation:none;transform:translate(var(--voice-shift-x,0px),var(--voice-shift-y,0px)) scale(var(--voice-scale,1.015)) rotate(var(--voice-angle,0deg));transition:transform .09s ease-out}
@@ -345,43 +474,107 @@ export function CommandWall() {
         .orb-core.wall-paused .orb-texture,.orb-core.wall-paused .orb-light{animation:none!important;transition:none!important}
         @media(prefers-reduced-motion:reduce){.orb-ring,.orb-texture,.orb-core{animation:none!important}}
       `}</style>
-      <div className="desktop-layer" aria-hidden="true"><div className="desktop-top"><span>Finder&nbsp;&nbsp; File&nbsp;&nbsp; Edit&nbsp;&nbsp; View&nbsp;&nbsp; Window</span><span className="desktop-system">Wi-Fi&nbsp;&nbsp; Connected</span></div><div className="desktop-icons"><div className="desktop-icon"><i/><span>Projects</span></div><div className="desktop-icon"><i/><span>Briefings</span></div><div className="desktop-icon"><i/><span>Archive</span></div></div><div className="desktop-window"><div className="desktop-window-head"><b/><span>Weekly operations · {totalTasks} items</span></div><div className="desktop-window-body"><div className="desktop-window-nav">Overview<br/>Reports<br/>People<br/>Notes</div><div className="desktop-window-chart"/></div></div><div className="desktop-dock"><i/><i/><i/><i/></div></div>
       <div className="space-field" aria-hidden="true"/><div className="reflection-plane" aria-hidden="true"/>
-      <header className="topbar glass"><div className="brand"><span className="brand-mark"><i/><i/><i/></span><span className="wordmark">KHAMELEON<small>LIVE WALL / ORGANISATIONAL SIGNAL</small></span></div><nav className="nav"><button>Work mode</button><button className="active">Overview</button><button>Agents</button><button>Research</button></nav><div className="top-right"><button className={`live-switch ${isLive ? "" : "paused"}`} onClick={() => setIsLive(!isLive)}><span className="live-dot"/>{isLive ? "LIVE" : "PAUSED"}</button><div className="menu"><button onClick={() => setMenuOpen(!menuOpen)} aria-label="Open wall menu"><Menu size={18}/></button>{menuOpen && <div className="menu-pop glass"><button onClick={() => setShowReasoning(!showReasoning)}>Reasoning {showReasoning ? "on" : "off"}</button><button onClick={() => setIsLive(!isLive)}>Set {isLive ? "pause" : "live"}</button></div>}</div></div></header>
+      <header className="topbar glass">
+        <div className="brand"><span className="brand-mark"><i/><i/><i/></span><span className="wordmark">KHAMELEON<small>LIVE WALL / ORGANISATIONAL SIGNAL</small></span></div>
+        <nav className="nav"><button>Work mode</button><button className="active">Overview</button><button>Agents</button><button>Research</button></nav>
+        <div className="top-right">
+          <button type="button" className={`bar-btn live ${isLive ? "" : "paused"}`} onClick={() => setIsLive(!isLive)} title={isLive ? "Live - click to pause" : "Paused - click to resume"} aria-label={isLive ? "Pause wall" : "Resume wall"}>
+            {isLive ? <Play size={14}/> : <Pause size={14}/>}{topBarLabeled && <span>{isLive ? "Live" : "Paused"}</span>}
+          </button>
+          <div className="bar-menu">
+            <button type="button" className="bar-btn chip" onClick={() => { setModeMenuOpen(v => !v); setDomainMenuOpen(false); }} title={`Orchestration mode: ${mode}`} aria-label="Change orchestration mode">
+              <span className="bar-chip-abbr">{MODE_ABBR[mode]}</span>{topBarLabeled && <span>{mode}</span>}<ChevronDown size={11}/>
+            </button>
+            {modeMenuOpen && <div className="bar-pop glass">{(["Single","Parallel","Vote","Council"] as Mode[]).map(m => <button key={m} type="button" className={mode === m ? "active" : ""} onClick={() => { setMode(m); setModeMenuOpen(false); }}><span className="bar-chip-abbr">{MODE_ABBR[m]}</span>{m}</button>)}</div>}
+          </div>
+          <div className="bar-menu">
+            <button type="button" className="bar-btn" onClick={() => { setDomainMenuOpen(v => !v); setModeMenuOpen(false); }} title="Filter by Work Domain" aria-label="Filter by Work Domain">
+              <Filter size={14}/>{topBarLabeled && <span>Domains</span>}{activeDomains.size > 0 && <span className="bar-badge">{activeDomains.size}</span>}
+            </button>
+            {domainMenuOpen && <div className="bar-pop glass">
+              <button type="button" className={activeDomains.size === 0 ? "active" : ""} onClick={() => setActiveDomains(new Set())}>All domains</button>
+              {CATEGORIES.map(c => <button key={c} type="button" className={activeDomains.has(c) ? "active" : ""} onClick={() => setActiveDomains(prev => { const next = new Set(prev); next.has(c) ? next.delete(c) : next.add(c); return next; })}>{CATEGORY_LABELS[c]}{byCategory[c] ? ` · ${byCategory[c]}` : ""}</button>)}
+            </div>}
+          </div>
+          <button type="button" className="bar-btn" onClick={() => setShowReasoning(!showReasoning)} title={showReasoning ? "Reasoning expanded by default - click to collapse" : "Reasoning collapsed by default - click to expand"} aria-label="Toggle default reasoning visibility">
+            {showReasoning ? <Eye size={14}/> : <EyeOff size={14}/>}{topBarLabeled && <span>Reasoning</span>}
+          </button>
+          <div className="bar-menu">
+            <button type="button" className="bar-btn" onClick={() => { setActivityOpen(true); setModeMenuOpen(false); setDomainMenuOpen(false); }} title="Activity feed" aria-label="Open activity feed">
+              <Bell size={14}/>{topBarLabeled && <span>Activity</span>}{agentHistory.length > 0 && <span className="bar-badge">{Math.min(agentHistory.length, 9)}</span>}
+            </button>
+          </div>
+        </div>
+      </header>
+      {activityOpen && createPortal(
+        // .wall-shell sets isolation:isolate, trapping any z-index inside its
+        // own stacking context - a fixed-position slideout meant to sit above
+        // the whole app (including the outer shell's own header) has to
+        // render outside it entirely, the same way JarvisOrbPortal does.
+        <div className="activity-scrim" onClick={() => setActivityOpen(false)}>
+          <aside className="activity-slideout glass" onClick={e => e.stopPropagation()}>
+            <div className="activity-slideout-head"><strong>Activity feed</strong><button type="button" onClick={() => setActivityOpen(false)} aria-label="Close activity feed"><X size={16}/></button></div>
+            {agentHistory.length === 0 ? <p className="activity-empty">No recent activity — query Khameleon to begin.</p> : agentHistory.map(ev => (
+              <div className="activity-slideout-item" key={ev.id}>
+                <div className="activity-slideout-top"><b>{ev.agent}</b><span>{timeAgo(new Date(ev.ts).toISOString())}</span></div>
+                <p>{ev.prompt}</p>
+              </div>
+            ))}
+          </aside>
+        </div>,
+        document.body,
+      )}
       <section className="wall-plane">
         <article className="panel glass left-cluster">
-          <div className="panel-head"><div><div className="eyebrow">Parked / 01</div><div className="panel-title">Parked <span>orbit</span></div></div><div className="status-pill"><Archive size={12}/>{parkedTasks.length} held</div></div>
-          <div className="swipe-stack">
-            {parkedTasks.length === 0 ? (
-              <div className="swipe-card mid" style={{ top: 40 }}>
-                <div className="swipe-card-head"><span>NOTHING PARKED</span></div>
-                <p style={{ fontSize: 10, margin: "18px 0 6px", color: "#a7c1bd" }}>No blocked or unstarted tasks right now.</p>
-              </div>
-            ) : parkedTasks.map((task, i) => {
-              const posClass = i === 0 ? "back" : i === 1 ? "mid" : "video";
-              return (
-                <div className="swipe-card" key={task.id} style={i === 2 ? { top: 66, transform: "translateX(-6px) rotate(-2deg)", zIndex: 2 } : undefined}>
-                  <div className="swipe-card-head">
-                    <span>{task.status === "blocked" ? "BLOCKED" : "QUEUED"} / {CATEGORY_LABELS[task.category].toUpperCase()}</span>
-                    <GripVertical/>
+          <div className="panel-head"><div><div className="eyebrow">Parked / 01</div><div className="panel-title">Parked <span>orbit</span></div></div><div className="status-pill"><Archive size={12}/>{allParked.length} held</div></div>
+          {allParked.length === 0 ? (
+            <div className="parked-empty"><p>No blocked or unstarted tasks right now.</p></div>
+          ) : (
+            <div className="parked-groups">
+              {(["external_input","deferred","dependency"] as ParkedReason[]).map(reason => {
+                const items = parkedByReason[reason];
+                if (items.length === 0) return null;
+                const Icon = PARKED_REASON_ICONS[reason];
+                return (
+                  <div className="parked-group" key={reason}>
+                    <div className="parked-group-head"><Icon size={12}/><span>{PARKED_REASON_LABELS[reason]}</span><em>{items.length}</em></div>
+                    {items.map(task => (
+                      <div className="parked-card" key={task.id}>
+                        <div className="parked-card-top"><span className="micro" style={{ color: CATEGORY_ACCENTS[task.category] }}>{CATEGORY_LABELS[task.category].toUpperCase()}</span><GripVertical size={13}/></div>
+                        <p className="parked-card-title">{task.title}</p>
+                        <p className="parked-card-waiting">
+                          {reason === "dependency"
+                            ? (task.blockedByTaskId != null && taskById.get(task.blockedByTaskId) ? `Needs "${taskById.get(task.blockedByTaskId)!.title}" done first` : "Waiting on another task")
+                            : (task.waitingOn ? `Waiting on ${task.waitingOn}${task.waitingSince ? `, sent ${fmtSentDate(task.waitingSince)}` : ""}` : "Waiting — no detail recorded")}
+                        </p>
+                        <button type="button" className="parked-resume" onClick={() => void resumeParkedTask(task)}><RotateCcw size={11}/>Resume</button>
+                      </div>
+                    ))}
                   </div>
-                  <p style={{ fontSize: 10, margin: "18px 0 6px" }}>{task.title}</p>
-                  <span className="micro" style={{ color: CATEGORY_ACCENTS[task.category] }}>{timeAgo(task.updatedAt)}</span>
+                );
+              })}
+              {unsortedParked.length > 0 && (
+                <div className="parked-group">
+                  <div className="parked-group-head"><Archive size={12}/><span>Unsorted (no reason recorded)</span><em>{unsortedParked.length}</em></div>
+                  {unsortedParked.map(task => (
+                    <div className="parked-card" key={task.id}>
+                      <div className="parked-card-top"><span className="micro" style={{ color: CATEGORY_ACCENTS[task.category] }}>{CATEGORY_LABELS[task.category].toUpperCase()}</span><GripVertical size={13}/></div>
+                      <p className="parked-card-title">{task.title}</p>
+                      <p className="parked-card-waiting">{task.status === "blocked" ? "Blocked — reason not yet tagged" : "Not started"}</p>
+                      <button type="button" className="parked-resume" onClick={() => void resumeParkedTask(task)}><RotateCcw size={11}/>Resume</button>
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-          <div className="swipe-hint"><MoveHorizontal/> Swipe aside to keep context.</div>
-          <div className="mission"><div className="mission-top"><strong>Parked capacity</strong><span className="micro" style={{ color: "#e9b872" }}>{parkedTasks.length} held</span></div><p>Held work stays spatially close, without competing with the active stream.</p></div>
+              )}
+            </div>
+          )}
+          <div className="mission"><div className="mission-top"><strong>Parked capacity</strong><span className="micro" style={{ color: "#e9b872" }}>{allParked.length} held</span></div><p>Held work stays spatially close, without competing with the active stream.</p></div>
         </article>
 
         <article className="panel glass center-cluster">
-          <div className="panel-head"><div><div className="eyebrow">Live orchestration / 02</div><div className="panel-title">Work in <span>motion</span></div></div><div className="privacy"><LockKeyhole size={13}/>ZDR endpoint</div></div>
-          <div className="domain-row">
-            <button className={domain === "all" ? "active" : ""} onClick={() => setDomain("all")}>All domains</button>
-            {CATEGORIES.map((c) => <button key={c} className={domain === c ? "active" : ""} onClick={() => setDomain(c)}>{CATEGORY_LABELS[c]}{byCategory[c] ? ` · ${byCategory[c]}` : ""}</button>)}
-          </div>
-          <div className="route-head"><div><strong>Live task routing</strong><span>{visibleTasks.length} active signals</span></div><div className="mode">{(["Single","Parallel","Vote","Council"] as Mode[]).map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{item}</button>)}</div></div>
+          <div className="panel-head"><div><div className="eyebrow">Live orchestration / 02</div><div className="panel-title">Work in <span>motion</span></div></div></div>
+          <div className="route-head"><div><strong>Live task routing</strong><span>{visibleTasks.length} active signals{activeDomains.size > 0 ? ` · filtered to ${activeDomains.size} domain${activeDomains.size > 1 ? "s" : ""}` : ""}</span></div></div>
           <div className="task-list">
             {visibleTasks.length === 0 ? (
               <div style={{ gridColumn: "1 / -1", padding: 10, borderRadius: 13, background: "rgba(7,24,26,.63)", border: "1px solid rgba(255,255,255,.065)" }}><span className="task-title">No active tasks in this domain.</span></div>
@@ -407,34 +600,72 @@ export function CommandWall() {
 
         <article className="panel glass right-cluster">
           <div className="panel-head"><div><div className="eyebrow">Signal cluster / 03</div><div className="panel-title">Wall <span>status</span></div></div><div className="status-pill"><Radio size={12}/>{isLive ? "Live" : "Held"}</div></div>
-          <div className="rail-stat"><span>Total queries</span><strong style={{ color: "#63e1d3" }}>{health?.total_queries ?? 0}</strong></div>
-          <div className="rail-stat"><span>Avg latency</span><strong>{fmtMs(health?.avg_latency_ms)}</strong></div>
-          <div className="rail-stat"><span>Uptime</span><strong>{fmtUptime(health?.uptime ?? 0)}</strong></div>
-          <div className="rail-stat"><span>Total cost</span><strong style={{ color: "#a999ff" }}>{fmtCost(health?.total_cost_usd)}</strong></div>
-          <div className="mission" style={{ marginTop: 14 }}>
-            <div className="mission-top"><strong>Today's progress</strong><Timer size={15} color="#e9b872"/></div>
-            <p><b style={{ fontSize: 18 }}>{doneTasks}/{totalTasks}</b> tasks completed today.</p>
-            <div className="rail-actions"><button onClick={() => setShowReasoning(!showReasoning)}>Reasoning</button><button onClick={() => setIsLive(!isLive)}>{isLive ? "Pause wall" : "Resume"}</button></div>
-          </div>
-          {parkedTasks[0] && <div className="right-float"><div className="right-float-head"><span>PARKED UTILITY / 02</span><GripVertical size={13}/></div><p>{parkedTasks[0].title}</p><span className="micro" style={{ color: "#63e1d3" }}>{CATEGORY_LABELS[parkedTasks[0].category].toUpperCase()} · {parkedTasks[0].status === "blocked" ? "BLOCKED" : "QUEUED"}</span></div>}
-        </article>
+          {/* Right column spec (2026-09-25): strictly system health, no
+              controls, nothing representing work being done. Connected
+              agents = real per-agent online/offline (agentsApi.getAgentStatus);
+              no rate-limit/quota shown since nothing in this app tracks it -
+              omitted rather than invented. ZDR is the single global indicator
+              (moved from the center panel's old per-panel badge - there's no
+              per-task ZDR field to break it down further honestly).
+              Everything below panel-head is one bounded, independently
+              scrollable region: right-cluster sits directly above the
+              (bottom-anchored, overlaying) orb window, so unbounded content
+              here would render underneath it rather than push it down - this
+              was already quietly true of the old 3-stat + mission-card
+              content before today's additions, just not visible until now. */}
+          <div className="rail-scroll">
+            <div className="rail-stat-row"><span>Total queries</span><strong style={{ color: "#63e1d3" }}>{health?.total_queries ?? 0}</strong></div>
+            <div className="rail-stat-row"><span>Avg latency</span><strong>{fmtMs(health?.avg_latency_ms)}</strong></div>
+            <div className="rail-stat-row"><span>Uptime</span><strong>{fmtUptime(health?.uptime ?? 0)}</strong></div>
 
-        <article className="orb-window">
-          <div className="orb-window-head"><div><div className="eyebrow">Orb window / assistant state</div><div className="orb-window-title">Khameleon <span style={{ color: "#63e1d3" }}>presence</span></div><span className="orb-window-sub">One continuous agent · state drives the atmosphere</span></div><span className="orb-window-live">{wallState.toUpperCase()}</span></div>
-          <div className={`orb-stage ${wallState}`}>
-            <div className="orb-ring three"/><div className="orb-ring two"/><div className="orb-ring one"/><div className="orb-trail"/>
-            <div ref={orbRef} className={`orb-core ${wallState} ${isLive ? "wall-live" : "wall-paused"}`}>
-              <span className="orb-texture"/><span className="orb-light orb-light-one"/><span className="orb-light orb-light-two"/><span className="orb-tint"/>
+            <div className="rail-section-label" style={{ marginTop: 12 }}>Connected agents</div>
+            {roster.slice(0, 4).map(a => (
+              <div className="agent-status-row" key={a.id}>
+                <span className={`agent-dot ${agentStatuses[a.id] ?? "offline"}`}/>
+                <span className="agent-status-name">{a.name}</span>
+                <span className="agent-status-value">{agentStatuses[a.id] ?? "offline"}</span>
+              </div>
+            ))}
+            <div className="privacy" style={{ marginTop: 8 }}><LockKeyhole size={13}/>ZDR endpoint active</div>
+
+            <div className="rail-section-label" style={{ marginTop: 12 }}>Integrations</div>
+            {connectors.length === 0 ? <p className="rail-empty">No connectors configured yet.</p> : connectors.slice(0, 4).map(c => (
+              <div className="agent-status-row" key={c.id}>
+                <Plug size={11} color={c.connected ? "#63e1d3" : "#f68e7b"}/>
+                <span className="agent-status-name">{c.name}</span>
+                <span className="agent-status-value" style={{ color: c.connected ? "#63e1d3" : "#f68e7b" }}>{c.connected ? "connected" : "disconnected"}</span>
+              </div>
+            ))}
+
+            <div className="mission" style={{ marginTop: 12 }}>
+              <div className="mission-top"><strong>Today's progress</strong><Timer size={15} color="#e9b872"/></div>
+              <p><b style={{ fontSize: 18 }}>{doneTasks}/{totalTasks}</b> tasks completed today.</p>
             </div>
           </div>
-          <form className="orb-chat" onSubmit={submitChat}>
-            <input value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} placeholder={chatSent ? "Ask another question…" : "Ask Khameleon anything…"} aria-label="Chat with Khameleon" disabled={streaming}/>
-            <button type="submit" disabled={!chatDraft.trim() || streaming} aria-label="Send message"><Send/></button>
-          </form>
-          <div className="orb-state-row">{(["idle","listening","thinking","researching","speaking","error","muted"] as WallOrbState[]).map((state) => <button key={state} type="button" className={`orb-state ${wallState === state ? "active" : ""}`} data-state={state} aria-label={state === "speaking" ? "Play a short Khameleon voice demo" : `Set ${state} state`} onClick={() => selectOrbState(state)}>{state}</button>)}</div>
-          <div className="orb-window-footer"><span>{chatSent ? `${streaming ? "PROCESSING" : "SENT"} · ${chatSent.slice(0, 28)}${chatSent.length > 28 ? "…" : ""}` : (orbStatus === "speaking" ? "LIVE VOICE" : "TEXTURE / NEBULA NEUTRAL · LIGHT / REFRACTION ACTIVE")}</span><b>{wallState === "listening" ? "LISTENING" : wallState === "speaking" ? "SPEAKING" : wallState === "thinking" || wallState === "researching" ? "PROCESSING" : wallState === "error" ? "ATTENTION" : "READY"}</b></div>
         </article>
       </section>
+
+      {/* Sibling of .wall-plane (not nested inside it) so its %-based
+          right/width resolve against .wall-shell's own real box - .wall-shell
+          renders narrower than 100vw inside this app (a left nav rail eats
+          into the viewport that Replit's own standalone preview didn't have),
+          so vw-based sizing here would drift from .right-cluster's actual
+          edges the way it did before this fix. */}
+      <article className="orb-window">
+        <div className="orb-window-head"><div><div className="eyebrow">Orb window / assistant state</div><div className="orb-window-title">Khameleon <span style={{ color: "#63e1d3" }}>presence</span></div><span className="orb-window-sub">One continuous agent · state drives the atmosphere</span></div><span className="orb-window-live">{wallState.toUpperCase()}</span></div>
+        <div className={`orb-stage ${wallState}`}>
+          <div className="orb-ring three"/><div className="orb-ring two"/><div className="orb-ring one"/><div className="orb-trail"/>
+          <div ref={orbRef} className={`orb-core ${wallState} ${isLive ? "wall-live" : "wall-paused"}`}>
+            <span className="orb-texture"/><span className="orb-light orb-light-one"/><span className="orb-light orb-light-two"/><span className="orb-tint"/>
+          </div>
+        </div>
+        <form className="orb-chat" onSubmit={submitChat}>
+          <input value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} placeholder={chatSent ? "Ask another question…" : "Ask Khameleon anything…"} aria-label="Chat with Khameleon" disabled={streaming}/>
+          <button type="submit" disabled={!chatDraft.trim() || streaming} aria-label="Send message"><Send/></button>
+        </form>
+        <div className="orb-state-row">{(["idle","listening","thinking","researching","speaking","error","muted"] as WallOrbState[]).map((state) => <button key={state} type="button" className={`orb-state ${wallState === state ? "active" : ""}`} data-state={state} aria-label={state === "speaking" ? "Play a short Khameleon voice demo" : `Set ${state} state`} onClick={() => selectOrbState(state)}>{state}</button>)}</div>
+        <div className="orb-window-footer"><span>{chatSent ? `${streaming ? "PROCESSING" : "SENT"} · ${chatSent.slice(0, 28)}${chatSent.length > 28 ? "…" : ""}` : (orbStatus === "speaking" ? "LIVE VOICE" : "TEXTURE / NEBULA NEUTRAL · LIGHT / REFRACTION ACTIVE")}</span><b>{wallState === "listening" ? "LISTENING" : wallState === "speaking" ? "SPEAKING" : wallState === "thinking" || wallState === "researching" ? "PROCESSING" : wallState === "error" ? "ATTENTION" : "READY"}</b></div>
+      </article>
       <footer className="footer"><div className="feed-label"><Radio/>KHAMELEON FEED</div><div className="ticker"><b>{isLive ? "LIVE" : "PAUSED"}</b>　///　{ticker}</div></footer>
     </main>
   );

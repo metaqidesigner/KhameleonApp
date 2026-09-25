@@ -363,7 +363,11 @@ export const CreateTaskBody = zod.object({
   "parentTaskId":    zod.number().nullish(),
   "projectId":       zod.number().nullish(),
   "assignee":        zod.string().optional(),
-  "dueDate":         zod.string().nullish()
+  "dueDate":         zod.string().nullish(),
+  "parkedReason":    zod.enum(["external_input", "deferred", "dependency"]).nullish(),
+  "waitingOn":       zod.string().nullish(),
+  "waitingSince":    zod.string().nullish(),
+  "blockedByTaskId": zod.number().nullish()
 })
 
 
@@ -385,7 +389,11 @@ export const UpdateTaskBody = zod.object({
   "calendarEventId": zod.string().nullish(),
   "threadId":        zod.string().nullish(),
   "parentTaskId":    zod.number().nullish(),
-  "dueDate":         zod.string().nullish()
+  "dueDate":         zod.string().nullish(),
+  "parkedReason":    zod.enum(["external_input", "deferred", "dependency"]).nullish(),
+  "waitingOn":       zod.string().nullish(),
+  "waitingSince":    zod.string().nullish(),
+  "blockedByTaskId": zod.number().nullish()
 })
 
 export const UpdateTaskResponse = zod.object({
