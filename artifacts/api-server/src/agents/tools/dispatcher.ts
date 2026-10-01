@@ -9,15 +9,19 @@ import {
 } from "./shell.js";
 import { createTask, listTasks, updateTask } from "./taskOps.js";
 import { fetchUrl } from "./webFetch.js";
+import { checkToolRateLimit } from "./rateLimiter.js";
 
 export type ToolInput = Record<string, unknown>;
 
 /**
  * Execute a named tool with the given input.
- * Throws if the tool name is unknown or input fails validation.
- * Returns a string result to send back to Claude as a tool_result.
+ * Throws if the tool name is unknown, rate-limited, or input fails
+ * validation. Returns a string result to send back to Claude as a
+ * tool_result.
  */
 export async function dispatchTool(name: string, input: ToolInput): Promise<string> {
+  checkToolRateLimit(name);
+
   switch (name) {
     case "read_file": {
       const p = requireString(input, "path");

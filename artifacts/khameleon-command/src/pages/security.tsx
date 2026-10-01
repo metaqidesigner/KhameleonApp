@@ -6,19 +6,20 @@ import { getApiKeyStatus, clearApiKey, type ApiKeyProvider, type ApiKeyStatus } 
 import { getSessionStatus, logout, type SessionStatus } from '@/lib/sessionApi';
 
 /**
- * Real guardrails only get an ACTIVE badge. `Injection Scanner`, `Rate
- * Limiter`, and `File Policy` have no implementation anywhere in the
- * codebase (checked directly, not assumed) - this page used to show all
- * five as unconditionally ACTIVE regardless, which is a security status
- * page fabricating security status. SSRF Protection is real
- * (agents/tools/webFetch.ts's private-address/cloud-metadata guard) and
- * Audit Log is real (the panel on the right, backed by real agent
- * history) - those two, and only those two, get the real badge.
+ * Real guardrails only get an ACTIVE badge - this page used to show all
+ * five as unconditionally ACTIVE regardless of what existed, which is a
+ * security status page fabricating security status. All five are real as
+ * of 2026-10-01 (khameleon-decisions-log.md): File Policy and a rate
+ * limiter were added to agents/tools/{shell,rateLimiter}.ts guarding
+ * dispatcher.ts (the one choke point every agent tool call passes
+ * through), and an injection-content wrapper was added to webFetch.ts.
+ * `note` is shown for the three that are real-but-bounded mitigations,
+ * not absolute guarantees - so the badge doesn't overclaim either.
  */
-const GUARDRAILS: { label: string; implemented: boolean }[] = [
-  { label: 'Injection Scanner', implemented: false },
-  { label: 'Rate Limiter', implemented: false },
-  { label: 'File Policy', implemented: false },
+const GUARDRAILS: { label: string; implemented: boolean; note?: string }[] = [
+  { label: 'Injection Scanner', implemented: true, note: 'Pattern-based heuristic on fetched web content, not a complete defense' },
+  { label: 'Rate Limiter', implemented: true, note: '20 write/command calls, 100 read calls, per 5 min (global)' },
+  { label: 'File Policy', implemented: true, note: 'Path/size restrictions on agent file read/write and shell commands' },
   { label: 'SSRF Protection', implemented: true },
   { label: 'Audit Log', implemented: true },
 ];
@@ -136,18 +137,25 @@ export default function Security() {
         >
           <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
             {GUARDRAILS.map(g => (
-              <div key={g.label} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid rgba(0,212,255,0.06)' }}>
-                <span style={{ fontFamily:'var(--j-font-ui)', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--j-text)' }}>{g.label}</span>
-                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <div style={{
-                    width:6, height:6, borderRadius:'50%',
-                    background: g.implemented ? 'var(--j-green)' : 'var(--j-text-faint)',
-                    animation: g.implemented ? 'jarvis-pulse 2s ease-in-out infinite' : 'none',
-                  }}/>
-                  <span className="j-mono" style={{ fontSize:10, color: g.implemented ? 'var(--j-green)' : 'var(--j-text-faint)' }}>
-                    {g.implemented ? 'ACTIVE' : 'NOT IMPLEMENTED'}
-                  </span>
+              <div key={g.label} style={{ padding:'8px 0', borderBottom:'1px solid rgba(0,212,255,0.06)' }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <span style={{ fontFamily:'var(--j-font-ui)', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--j-text)' }}>{g.label}</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <div style={{
+                      width:6, height:6, borderRadius:'50%',
+                      background: g.implemented ? 'var(--j-green)' : 'var(--j-text-faint)',
+                      animation: g.implemented ? 'jarvis-pulse 2s ease-in-out infinite' : 'none',
+                    }}/>
+                    <span className="j-mono" style={{ fontSize:10, color: g.implemented ? 'var(--j-green)' : 'var(--j-text-faint)' }}>
+                      {g.implemented ? 'ACTIVE' : 'NOT IMPLEMENTED'}
+                    </span>
+                  </div>
                 </div>
+                {g.note && (
+                  <div style={{ marginTop:4, fontFamily:'var(--j-font-mono)', fontSize:9, color:'var(--j-text-faint)' }}>
+                    {g.note}
+                  </div>
+                )}
               </div>
             ))}
           </div>
