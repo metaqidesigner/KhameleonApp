@@ -8,6 +8,7 @@ import { LeftSidebar } from './LeftSidebar';
 import { JarvisOrbPortal } from './orb/JarvisOrbPortal';
 import { VoiceController } from './orb/VoiceController';
 import { OnboardingWizard } from './OnboardingWizard';
+import { NeedsInputWatcher } from './NeedsInputWatcher';
 import { useJarvisStore } from '@/store/jarvisStore';
 
 const Home = lazy(() => import('@/pages/home'));
@@ -82,6 +83,9 @@ export function AppShell() {
 
       {/* Floating orb — always present */}
       <JarvisOrbPortal />
+
+      {/* design-spec.md §6.5.1 real needs-input interrupt (2026-10-01) */}
+      <NeedsInputWatcher />
 
       <VoiceController />
       <OnboardingWizard />

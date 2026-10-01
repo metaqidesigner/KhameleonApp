@@ -781,3 +781,18 @@ export const ListMarketplaceAgentsResponseItem = zod.object({
 export const ListMarketplaceAgentsResponse = zod.array(ListMarketplaceAgentsResponseItem)
 
 
+/**
+ * @summary Create an action receipt (design-spec.md §6.5.2 durable record)
+ */
+export const CreateActionReceiptBody = zod.object({
+  "description":       zod.string(),
+  "category":          zod.string(),
+  "scope":             zod.string(),
+  "outcome":           zod.enum(["success", "failure", "pending", "needs_review"]).optional().default("success"),
+  "target":            zod.string().nullish(),
+  "detail":            zod.string().nullish(),
+  "canUndo":           zod.boolean().optional().default(false),
+  "relatedApprovalId": zod.number().nullish()
+})
+
+

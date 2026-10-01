@@ -8,7 +8,7 @@ import { AlertCircle, Mail, Send, FileSearch, Inbox, RefreshCw } from 'lucide-re
 import { ActionReceiptList, type ActionReceiptProps } from '@/components/ActionReceipt';
 import { ConfirmGate } from '@/components/ConfirmGate';
 import { createApproval } from '@/lib/approvalsApi';
-import { getActionReceipts } from '@/lib/actionReceiptsApi';
+import { getActionReceipts, createActionReceipt } from '@/lib/actionReceiptsApi';
 import {
   runOutlookDraftEmail, sendOutlookDraft, rejectOutlookDraft,
   runOutlookSummarizeThread,
@@ -35,6 +35,7 @@ export default function Approvals() {
       outcome: r.outcome,
       timestamp: r.createdAt,
       target: r.target ?? undefined,
+      detail: r.detail ?? undefined,
       canUndo: r.canUndo && !r.undone,
     }))));
   }, []);
@@ -104,17 +105,37 @@ export default function Approvals() {
     setOutlookSendError(undefined);
     try {
       const { sentAt } = await sendOutlookDraft(outlookDraft.approvalId, editedContent);
+      const detail = `Subject: ${outlookDraft.subject}\n\n${editedContent ?? outlookDraft.body}`;
+      // Persist first (design-spec.md §6.5.2 - this must be a durable record,
+      // not just local state that vanishes on reload, per the 2026-10-01
+      // audit). Falls back to a local-only row if the write fails, so the
+      // user still sees the action happened even though it isn't saved -
+      // surfaced honestly via the console rather than silently swallowed.
+      let persistedId: string | null = null;
+      try {
+        const saved = await createActionReceipt({
+          description: `Email sent to ${outlookDraft.to}`,
+          category: 'email_sent',
+          scope: 'mail.send',
+          outcome: 'success',
+          target: outlookDraft.to,
+          detail,
+          canUndo: false, // real send, real irreversibility - no undo offered (§6.5.3)
+        });
+        persistedId = String(saved.id);
+      } catch (err) {
+        console.error('Failed to persist action receipt for sent email:', err);
+      }
       setReceipts(r => [{
-        id: `outlook-${outlookDraft.approvalId}`,
+        id: persistedId ?? `outlook-${outlookDraft.approvalId}`,
         description: `Email sent to ${outlookDraft.to}`,
         category: 'email_sent',
         scope: 'mail.send',
         outcome: 'success' as const,
         timestamp: sentAt,
         target: outlookDraft.to,
-        // Real send, real irreversibility — no undo offered (§6.5.3).
         canUndo: false,
-        detail: `Subject: ${outlookDraft.subject}\n\n${editedContent ?? outlookDraft.body}`,
+        detail,
       }, ...r]);
       setOutlookDraft(null);
       setOutlookMessageId('');

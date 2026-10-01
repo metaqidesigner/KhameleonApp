@@ -3,9 +3,10 @@ import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { TaskAgentType, TaskRunStatus, TaskStep, TriggerType } from '@/lib/taskRunApi';
 
 /**
- * Small presentational pieces shared between the Tasks page's run list
- * (pages/tasks.tsx) and the assistant-home center zone's ActiveTaskWindow —
- * kept in one place so both stay visually identical rather than drifting.
+ * Small presentational pieces for the Tasks page's run list (pages/tasks.tsx).
+ * Previously also shared with the assistant-home center zone's
+ * ActiveTaskWindow, removed 2026-10-01 as dead code once assistant-home.tsx
+ * was reduced to <CommandWall/> and nothing rendered it anymore.
  */
 
 export function StatusBadge({ status }: { status: TaskRunStatus }) {

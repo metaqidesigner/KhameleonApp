@@ -1214,7 +1214,11 @@ interface CardProps { run: TaskRun; onRemove: (id: string) => void; }
 
 function TaskRunCard({ run: initialRun, onRemove }: CardProps) {
   const [run, setRun]           = useState<TaskRun>(initialRun);
-  const [expanded, setExpanded] = useState(initialRun.status !== 'completed' && initialRun.status !== 'cancelled');
+  // design-spec.md §6.5.1: "never auto-expanded for routine work" - a
+  // running task is routine work, so this starts collapsed regardless of
+  // status (previously defaulted open for anything not completed/cancelled,
+  // flagged in the 2026-10-01 audit as a direct contradiction of that rule).
+  const [expanded, setExpanded] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const removeActiveTask        = useJarvisStore(s => s.removeActiveTask);
 
