@@ -48,5 +48,7 @@ Thumbs.db
 .cache/
 .local/
 
-# Self-hosting (see SELF_HOSTING.md) - real secrets, never commit
+# Self-hosting (see SELF_HOSTING.md) - real secrets/data, never commit
 .env
+/Caddyfile
+/backups/
