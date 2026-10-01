@@ -13,6 +13,7 @@ import {
   getSpotifyNowPlaying, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, type SpotifyNowPlaying,
   getOnboardingStatus, saveProfile, type Profile,
 } from '@/lib/jarvisApi';
+import { getQuotaSnapshots, type QuotaSnapshots } from '@/lib/quotaApi';
 
 type Section = 'GENERAL' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED';
 const SECTIONS: Section[] = ['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MEMORY', 'TELEMETRY', 'ADVANCED'];
@@ -465,10 +466,12 @@ function WeatherLocationRow() {
 function ApiKeysSection() {
   const [statuses, setStatuses] = useState<ApiKeyStatus>({});
   const [encryptionConfigured, setEncryptionConfigured] = useState<boolean | null>(null);
+  const [quota, setQuota] = useState<QuotaSnapshots>({});
 
   const refresh = useCallback(() => {
     getApiKeyStatus().then(setStatuses);
     getOnboardingStatus().then((s) => setEncryptionConfigured(s.encryptionConfigured));
+    getQuotaSnapshots().then(setQuota).catch(() => {});
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -492,7 +495,14 @@ function ApiKeysSection() {
       )}
 
       {API_KEY_PROVIDER_DEFS.map((def) => (
-        <ApiKeyRow key={def.id} def={def} isSet={!!statuses[def.id]} onSaved={refresh} onCleared={refresh} />
+        <ApiKeyRow
+          key={def.id}
+          def={def}
+          isSet={!!statuses[def.id]}
+          onSaved={refresh}
+          onCleared={refresh}
+          quota={def.id === 'anthropic' || def.id === 'openai' ? quota[def.id] : undefined}
+        />
       ))}
     </>
   );

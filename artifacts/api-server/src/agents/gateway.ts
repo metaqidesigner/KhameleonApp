@@ -4,6 +4,7 @@ import type { AgentConfig, AgentResponse, ChatMessage, Provider, ToolCallRecord,
 import { TOOL_DEFINITIONS } from "./tools/definitions.js";
 import { dispatchTool } from "./tools/dispatcher.js";
 import { getApiKey } from "../lib/apiKeys.js";
+import { trackingFetch } from "../lib/providerQuota.js";
 
 // ── Cost tables (USD per 1k tokens) ──────────────────────────
 const COST_TABLE: Record<string, number> = {
@@ -176,7 +177,7 @@ async function askAnthropic(
   const baseURL = resolveBaseUrl(agent);
   if (!apiKey) throw new Error("Anthropic API key not configured");
 
-  const client    = new Anthropic({ apiKey, baseURL: baseURL ?? undefined });
+  const client    = new Anthropic({ apiKey, baseURL: baseURL ?? undefined, fetch: trackingFetch("anthropic") });
   const systemMsg = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
   const chatMsgs: AnthMsgParam[] = messages
     .filter((m) => m.role !== "system")
@@ -250,7 +251,15 @@ async function askOpenAI(
   const baseURL = resolveBaseUrl(agent);
   if (!apiKey) throw new Error(`API key not configured for provider ${agent.provider}`);
 
-  const client = new OpenAI({ apiKey, baseURL: baseURL ?? undefined });
+  // Rate-limit header tracking (providerQuota.ts) only applies to the real
+  // OpenAI API - google/openrouter/minimax/ollama/custom share this same
+  // OpenAI-compatible code path via a different baseURL, but nothing
+  // confirms they send the same x-ratelimit-* headers, so they're left
+  // untracked rather than guessed at.
+  const client = new OpenAI({
+    apiKey, baseURL: baseURL ?? undefined,
+    ...(agent.provider === "openai" ? { fetch: trackingFetch("openai") } : {}),
+  });
   const msgs = messages.map((m) => ({
     role: m.role as "user" | "assistant" | "system",
     content: m.content,

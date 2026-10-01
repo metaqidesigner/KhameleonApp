@@ -39,6 +39,7 @@ import skillSetsRouter from "./skillSets";
 import workDomainsRouter from "./workDomains";
 import integrationsRouter from "./integrations";
 import actionReceiptsRouter from "./actionReceipts";
+import quotaRouter from "./quota";
 
 const router: IRouter = Router();
 
@@ -82,5 +83,6 @@ router.use("/skill-sets", skillSetsRouter);
 router.use("/work-domains", workDomainsRouter);
 router.use("/integrations", integrationsRouter);
 router.use("/action-receipts", actionReceiptsRouter);
+router.use("/quota", quotaRouter);
 
 export default router;
