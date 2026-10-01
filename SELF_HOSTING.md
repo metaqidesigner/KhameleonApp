@@ -38,6 +38,35 @@ By default there's no login at all — anyone who reaches the URL gets full acce
 
 Set `KHAMELEON_APP_PASSWORD` in `.env` to put one shared password in front of the whole app. Restart (`docker compose up -d --build`) and you'll be asked for it before you can use anything. There's no per-person separation here — everyone who knows the password sees the same data, same connected accounts, same everything — this is a lock on the front door, not real multi-user accounts (see the gap below for that).
 
+## Putting TLS in front of it (optional)
+
+By default Khameleon talks plain HTTP on whatever port you expose — fine on your own machine or behind your own VPN, not fine for a real domain on the open internet.
+
+1. Point your domain's DNS A record at this machine.
+2. Copy the Caddy config: `cp Caddyfile.example Caddyfile`, and replace `your-domain.com` with your real domain.
+3. Bring the stack up with the TLS override applied:
+   ```
+   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+   ```
+
+Caddy gets and renews a real Let's Encrypt certificate automatically — no manual cert handling. The override also stops publishing Khameleon's own port directly (verified: a direct request to it is refused once this is applied) — only Caddy, on 80/443, can reach it from here on.
+
+## Backing up your data
+
+```
+./backup-postgres.sh
+```
+
+Dumps the database to a timestamped, gzipped file in `./backups/` and keeps the most recent 14. Schedule it with cron for real automated backups, e.g. nightly at 3am:
+```
+0 3 * * * cd /path/to/KhameleonApp && ./backup-postgres.sh >> backup.log 2>&1
+```
+
+To restore one (this overwrites the current database — it'll ask you to confirm):
+```
+./restore-postgres.sh backups/khameleon-20261001-030000.sql.gz
+```
+
 ## Updating
 
 ```
@@ -51,8 +80,6 @@ The schema is re-applied automatically on every start (idempotent — it's a no-
 
 Read this before you consider Khameleon launch-ready — these are real, known gaps, not hypothetical edge cases. Each one was deliberately deferred, not missed; check `khameleon-decisions-log.md` (search the date noted) for the full reasoning behind each decision if you want it before deciding whether to accept the gap or close it first.
 
-- **No TLS/reverse-proxy guidance** — put this behind your own reverse proxy (Caddy, nginx, Cloudflare Tunnel, etc.) if exposing it beyond your local network.
-- **No automated backup story** for the Postgres volume — back it up the way you'd back up any Postgres database (`pg_dump`, or snapshot the volume).
 - **No real per-account data isolation.** You can put a shared password on the whole instance now (see above), which stops a stranger from walking up to the URL — but everyone who knows that password still sees the exact same data. Real multi-user accounts (separate logins, each seeing only their own tasks/vault/etc.) is the hosted/managed mode in `KHAMELEON_SPEC.md` — a genuinely larger, separate deployment mode, not a setting to turn on here, and hasn't been started.
 - **The encryption key lives in a plain environment variable** (`KHAMELEON_ENCRYPTION_KEY`), not a dedicated secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.). Everything it protects (API keys, OAuth tokens, Vault secrets) is genuinely encrypted — this gap is specifically about where that one key itself is stored.
 - **No AI-provider spend/budget tracking.** Khameleon shows real cost and query-count data, and (for Anthropic/OpenAI) a real per-minute rate-limit snapshot in Settings → API Keys — but nothing warns you before you hit your actual monthly spending cap, because neither provider exposes that over API.
