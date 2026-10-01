@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
+import { LoginGate } from "@/components/LoginGate";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -8,7 +9,9 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppShell />
+      <LoginGate>
+        <AppShell />
+      </LoginGate>
     </QueryClientProvider>
   );
 }

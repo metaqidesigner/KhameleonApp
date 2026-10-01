@@ -1,20 +1,63 @@
 /**
- * OAuth routes for all connectors.
+ * OAuth routes for all connectors, plus the shared-password session routes
+ * (account isolation, Option A - khameleon-decisions-log.md, 2026-10-01).
  *
  * GET  /api/auth/oauth/google/start     → redirect to Google consent screen
  * GET  /api/auth/oauth/microsoft/start  → redirect to Microsoft consent screen
  * GET  /api/auth/oauth/callback         → exchange code, store token, redirect home
  * GET  /api/auth/oauth/:provider/status → check if connected
  * DELETE /api/auth/oauth/:provider      → revoke & delete stored token
+ *
+ * GET  /api/auth/session         → { authRequired, authenticated } - always reachable, even logged out
+ * POST /api/auth/session         → { password } - log in, sets the session cookie
+ * POST /api/auth/session/logout  → clears the session cookie
  */
 
 import { Router, type Request, type Response } from "express";
 import { saveToken, deleteToken, isConnected } from "../lib/oauthTokens.js";
+import {
+  isAppAuthConfigured, verifyPassword, createSession, isValidSession, destroySession, SESSION_COOKIE,
+} from "../lib/session.js";
 import { db } from "@workspace/db";
 import { actionReceiptsTable } from "@workspace/db";
 import crypto from "node:crypto";
 
 const router = Router();
+
+const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+router.get("/session", (req: Request, res: Response) => {
+  const authRequired = isAppAuthConfigured();
+  const authenticated = !authRequired || isValidSession(req.cookies?.[SESSION_COOKIE]);
+  res.json({ authRequired, authenticated });
+});
+
+router.post("/session", (req: Request, res: Response) => {
+  if (!isAppAuthConfigured()) {
+    // Nothing to log into - matches the open-by-default behavior everywhere else.
+    res.json({ ok: true });
+    return;
+  }
+  const { password } = req.body as { password?: unknown };
+  if (typeof password !== "string" || !verifyPassword(password)) {
+    res.status(401).json({ error: "Incorrect password." });
+    return;
+  }
+  res.cookie(SESSION_COOKIE, createSession(), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: req.secure || req.headers["x-forwarded-proto"] === "https",
+    maxAge: SESSION_MAX_AGE_MS,
+    path: "/",
+  });
+  res.json({ ok: true });
+});
+
+router.post("/session/logout", (req: Request, res: Response) => {
+  destroySession(req.cookies?.[SESSION_COOKIE]);
+  res.clearCookie(SESSION_COOKIE, { path: "/" });
+  res.json({ ok: true });
+});
 
 // ── CSRF state store (in-memory; single-user, short-lived) ───────────────────
 interface PendingState { provider: string; createdAt: number; }

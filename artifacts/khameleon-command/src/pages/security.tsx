@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Shield, Lock } from 'lucide-react';
+import { Shield, Lock, LogOut } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { getApiKeyStatus, clearApiKey, type ApiKeyProvider, type ApiKeyStatus } from '@/lib/jarvisApi';
+import { getSessionStatus, logout, type SessionStatus } from '@/lib/sessionApi';
 
 /**
  * Real guardrails only get an ACTIVE badge. `Injection Scanner`, `Rate
@@ -35,12 +36,25 @@ export default function Security() {
   const agentHistory = useJarvisStore(s => s.agentHistory);
   const [keySet, setKeySet] = useState<ApiKeyStatus>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [session, setSession] = useState<SessionStatus | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const refresh = useCallback(() => {
     getApiKeyStatus().then(setKeySet);
+    getSessionStatus().then(setSession).catch(() => {});
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logout();
+      window.location.reload();
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   const revoke = async (id: ApiKeyProvider) => {
     setBusy(b => ({ ...b, [id]: true }));
@@ -56,6 +70,32 @@ export default function Security() {
     <div style={{ display:'grid', gridTemplateColumns:'40% 60%', gap:6, height:'100%', padding:8 }}>
       {/* Left */}
       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+        <JPanel title="ACCESS CONTROL" icon={<Lock size={13}/>}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: session?.authRequired ? 10 : 0 }}>
+            <span style={{ fontFamily:'var(--j-font-ui)', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--j-text)' }}>
+              Shared password gate
+            </span>
+            <span className={`j-badge ${session?.authRequired ? 'j-badge-green' : 'j-badge-red'}`}>
+              {session === null ? '…' : session.authRequired ? '● ON' : '✕ OFF'}
+            </span>
+          </div>
+          <p style={{ fontFamily:'var(--j-font-ui)', fontSize:11, color:'var(--j-text-muted)', lineHeight:1.5, margin:0 }}>
+            {session?.authRequired
+              ? 'Anyone without the password is refused access. Everyone who logs in shares the same data — this is not per-account separation (see SELF_HOSTING.md).'
+              : 'No password set — anyone who reaches this URL has full access. Set KHAMELEON_APP_PASSWORD (see SELF_HOSTING.md) before exposing this beyond your own network.'}
+          </p>
+          {session?.authRequired && (
+            <button
+              className="j-btn-ghost"
+              style={{ height:26, padding:'0 10px', fontSize:9, marginTop:10, display:'flex', alignItems:'center', gap:6, opacity: loggingOut ? 0.5 : 1 }}
+              disabled={loggingOut}
+              onClick={handleLogout}
+            >
+              <LogOut size={10} />{loggingOut ? 'LOGGING OUT…' : 'LOG OUT'}
+            </button>
+          )}
+        </JPanel>
+
         <JPanel title="CREDENTIAL VAULT STATUS" icon={<Lock size={13}/>}>
           <table className="j-table">
             <thead className="j-table-header">
