@@ -43,6 +43,12 @@ The schema is re-applied automatically on every start (idempotent — it's a no-
 
 ## What this first pass does not cover
 
-- No TLS/reverse-proxy guidance — put this behind your own reverse proxy (Caddy, nginx, Cloudflare Tunnel, etc.) if exposing it beyond your local network.
-- No automated backup story for the Postgres volume — back it up the way you'd back up any Postgres database (`pg_dump`, or snapshot the volume).
-- The hosted/managed deployment mode described in `KHAMELEON_SPEC.md` — for orgs that want a managed instance instead of running their own — doesn't exist yet; this document is for the self-hosted, single-tenant default only.
+Read this before you consider Khameleon launch-ready — these are real, known gaps, not hypothetical edge cases. Each one was deliberately deferred, not missed; check `khameleon-decisions-log.md` (search the date noted) for the full reasoning behind each decision if you want it before deciding whether to accept the gap or close it first.
+
+- **No TLS/reverse-proxy guidance** — put this behind your own reverse proxy (Caddy, nginx, Cloudflare Tunnel, etc.) if exposing it beyond your local network.
+- **No automated backup story** for the Postgres volume — back it up the way you'd back up any Postgres database (`pg_dump`, or snapshot the volume).
+- **No account isolation.** This instance has exactly one shared login-less front door — anyone who reaches the URL has full access. Fine for a single person or a trusted local network; not fine for anything exposed more broadly without your own access control in front of it. The hosted/managed mode in `KHAMELEON_SPEC.md` would eventually solve this properly (real accounts, per-account data isolation) but hasn't been started — it's a separate deployment mode, not a setting to turn on here.
+- **The encryption key lives in a plain environment variable** (`KHAMELEON_ENCRYPTION_KEY`), not a dedicated secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.). Everything it protects (API keys, OAuth tokens, Vault secrets) is genuinely encrypted — this gap is specifically about where that one key itself is stored.
+- **No AI-provider quota/usage-limit tracking.** Khameleon shows real cost and query-count data, but nothing warns you before you hit a provider's own rate or spending limit.
+- **Gmail is read-only.** It can read your Gmail inbox but can't draft or send email through it yet — Outlook has the full read/draft/send skillset; Gmail doesn't.
+- **The hosted/managed deployment mode** described in `KHAMELEON_SPEC.md` — for orgs that want a managed instance instead of running their own — doesn't exist yet; this document is for the self-hosted, single-tenant default only.
