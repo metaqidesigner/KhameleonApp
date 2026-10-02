@@ -17,9 +17,10 @@
  */
 
 import crypto from "node:crypto";
-import { db, usersTable, oauthTokensTable, type User, type PublicUser, toPublicUser } from "@workspace/db";
+import { db, usersTable, oauthTokensTable, vaultItemsTable, settingsTable, type User, type PublicUser, toPublicUser } from "@workspace/db";
 import { eq, isNull } from "drizzle-orm";
 import { logger } from "./logger.js";
+import { API_KEY_PROVIDERS } from "./apiKeys.js";
 
 const SALT_LENGTH = 16;
 const HASH_LENGTH = 64;
@@ -110,11 +111,36 @@ export async function createUser(email: string, password: string, displayName: s
  * here rather than a separate script nobody will remember to run.
  */
 async function backfillOwnershipToFirstAccount(adminUserId: number): Promise<void> {
-  const result = await db
+  const oauthResult = await db
     .update(oauthTokensTable)
     .set({ userId: adminUserId })
     .where(isNull(oauthTokensTable.userId));
-  logger.info({ adminUserId, rowCount: result.rowCount }, "accounts.ts: backfilled pre-existing oauth_tokens rows to the first admin account");
+  const vaultResult = await db
+    .update(vaultItemsTable)
+    .set({ userId: adminUserId })
+    .where(isNull(vaultItemsTable.userId));
+
+  // settingsTable's key is its own primary key, not a userId column to bulk
+  // UPDATE - each legacy apikey.<provider> row (if any) is moved to
+  // apikey.<adminId>.<provider> individually. The value is already
+  // encrypted ciphertext - copied as-is, never decrypted here.
+  let apiKeyRowsMoved = 0;
+  for (const provider of API_KEY_PROVIDERS) {
+    const legacyKey = `apikey.${provider}`;
+    const [legacyRow] = await db.select().from(settingsTable).where(eq(settingsTable.key, legacyKey)).limit(1);
+    if (!legacyRow) continue;
+    await db
+      .insert(settingsTable)
+      .values({ key: `apikey.${adminUserId}.${provider}`, value: legacyRow.value })
+      .onConflictDoUpdate({ target: settingsTable.key, set: { value: legacyRow.value, updatedAt: new Date() } });
+    await db.delete(settingsTable).where(eq(settingsTable.key, legacyKey));
+    apiKeyRowsMoved++;
+  }
+
+  logger.info(
+    { adminUserId, oauthRowCount: oauthResult.rowCount, vaultRowCount: vaultResult.rowCount, apiKeyRowsMoved },
+    "accounts.ts: backfilled pre-existing oauth_tokens/vault_items/apikey rows to the first admin account",
+  );
 }
 
 /** Returns the authenticated user, or null for a wrong email/password/inactive account - never distinguishes which, to avoid leaking which emails are registered. */
