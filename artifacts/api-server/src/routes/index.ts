@@ -40,6 +40,7 @@ import workDomainsRouter from "./workDomains";
 import integrationsRouter from "./integrations";
 import actionReceiptsRouter from "./actionReceipts";
 import quotaRouter from "./quota";
+import briefingRouter from "./briefing";
 
 const router: IRouter = Router();
 
@@ -84,5 +85,6 @@ router.use("/work-domains", workDomainsRouter);
 router.use("/integrations", integrationsRouter);
 router.use("/action-receipts", actionReceiptsRouter);
 router.use("/quota", quotaRouter);
+router.use("/briefing", briefingRouter);
 
 export default router;
