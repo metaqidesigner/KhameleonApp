@@ -132,6 +132,18 @@ interface JarvisStore {
   // completion flag), reopenable from Settings' "Redo setup" button.
   onboardingWizardOpen: boolean;
 
+  // Chat Window (2026-10-02) - persisted per the same convention as the
+  // canvas windows above (jarvisStore, not a new store). Position/size are
+  // only meaningful while floating; docked ignores them and uses the
+  // right-rail's own layout.
+  chatWindowBounds: { x: number; y: number; width: number; height: number };
+  chatWindowDocked: boolean;
+  chatWindowMinimized: boolean;
+  chatReasoningDefault: boolean;
+  chatRouteMode: 'single' | 'parallel' | 'vote' | 'council';
+  chatLastDomainId: number | 'all';
+  chatLastThreadId: string | null;
+
   setActiveTab: (t: TabId) => void;
   setChatOpen: (v: boolean) => void;
   setStreaming: (v: boolean) => void;
@@ -172,6 +184,14 @@ interface JarvisStore {
   setVoiceSettings: (s: Partial<VoiceSettings>) => void;
   setMicPermissionModalOpen: (v: boolean) => void;
   setOnboardingWizardOpen: (v: boolean) => void;
+
+  setChatWindowBounds: (b: { x: number; y: number; width: number; height: number }) => void;
+  setChatWindowDocked: (v: boolean) => void;
+  setChatWindowMinimized: (v: boolean) => void;
+  setChatReasoningDefault: (v: boolean) => void;
+  setChatRouteMode: (m: 'single' | 'parallel' | 'vote' | 'council') => void;
+  setChatLastDomainId: (id: number | 'all') => void;
+  setChatLastThreadId: (id: string | null) => void;
 }
 
 export const useJarvisStore = create<JarvisStore>()(
@@ -207,6 +227,14 @@ export const useJarvisStore = create<JarvisStore>()(
       pendingVoiceQuery: null,
       micPermissionModalOpen: false,
       onboardingWizardOpen: false,
+
+      chatWindowBounds: { x: 0, y: 0, width: 400, height: 600 },
+      chatWindowDocked: false,
+      chatWindowMinimized: false,
+      chatReasoningDefault: false,
+      chatRouteMode: 'single',
+      chatLastDomainId: 'all',
+      chatLastThreadId: null,
       voiceSettings: {
         voice: '',
         rate: 1.05,
@@ -312,6 +340,14 @@ export const useJarvisStore = create<JarvisStore>()(
       setVoiceSettings:      (patch)  => set(s => ({ voiceSettings: { ...s.voiceSettings, ...patch } })),
       setMicPermissionModalOpen: (v)  => set({ micPermissionModalOpen: v }),
       setOnboardingWizardOpen:   (v)  => set({ onboardingWizardOpen: v }),
+
+      setChatWindowBounds:       (b)  => set({ chatWindowBounds: b }),
+      setChatWindowDocked:       (v)  => set({ chatWindowDocked: v }),
+      setChatWindowMinimized:    (v)  => set({ chatWindowMinimized: v }),
+      setChatReasoningDefault:   (v)  => set({ chatReasoningDefault: v }),
+      setChatRouteMode:          (m)  => set({ chatRouteMode: m }),
+      setChatLastDomainId:       (id) => set({ chatLastDomainId: id }),
+      setChatLastThreadId:       (id) => set({ chatLastThreadId: id }),
     }),
     {
       name: 'jarvis-ui',
@@ -331,6 +367,13 @@ export const useJarvisStore = create<JarvisStore>()(
         voiceEnabled: s.voiceEnabled,
         autoSpeak: s.autoSpeak,
         voiceSettings: s.voiceSettings,
+        chatWindowBounds: s.chatWindowBounds,
+        chatWindowDocked: s.chatWindowDocked,
+        chatWindowMinimized: s.chatWindowMinimized,
+        chatReasoningDefault: s.chatReasoningDefault,
+        chatRouteMode: s.chatRouteMode,
+        chatLastDomainId: s.chatLastDomainId,
+        chatLastThreadId: s.chatLastThreadId,
       }),
     }
   )

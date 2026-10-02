@@ -41,7 +41,7 @@ export function NeedsInputWatcher() {
     let cancelled = false;
 
     async function check() {
-      const tasks = await getTasks({ status: 'needs_input' }).catch(() => []);
+      const tasks = await getTasks({ status: 'needs_input' }).catch(() => [] as Task[]);
       if (cancelled) return;
 
       const currentIds = new Set(tasks.map(t => t.id));
