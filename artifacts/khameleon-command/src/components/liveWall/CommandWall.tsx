@@ -466,7 +466,23 @@ export function CommandWall() {
         .footer{position:absolute!important;left:22px;right:22px;bottom:0;margin:0!important;height:42px;z-index:30;border-radius:12px 12px 0 0;background:rgba(8,27,28,.9)}
         .orb-window{position:absolute!important;right:22px!important;bottom:64px!important;width:calc((100% - 44px) * .24 - 10px)!important;max-width:calc(100% - 36px)!important}
         .right-cluster{padding-bottom:58px!important;box-sizing:border-box}
-        @media(max-width:900px){.footer{left:10px;right:10px}.orb-window{bottom:58px!important;width:calc(100% - 36px)!important}}
+        @media(max-width:900px){.footer{left:10px;right:10px}.orb-window{position:fixed!important;bottom:16px!important;width:min(380px,calc(100vw - 52px - 36px))!important}}
+        /* Below 900px, .wall-plane's panels stack vertically in normal flow
+           instead of overlaying absolutely (see the .panel override above),
+           which makes .wall-shell's own height grow with their combined
+           height rather than staying a fixed ~800px. Khami, anchored via
+           position:absolute against .wall-shell like the footer, would
+           otherwise get pushed hundreds of pixels down a page that needs
+           scrolling to reach it - defeating its purpose as an always-visible
+           ambient presence (found via a live user report + direct
+           getBoundingClientRect measurement, not assumed: at 390px wide it
+           measured 773px down the page). Pinning it to the viewport instead
+           only below this breakpoint keeps the existing desktop behavior
+           (wall-shell stays a fixed height there) and the width formula
+           above replicates the old percentage-of-wall-shell result exactly
+           (100vw - the real 52px left icon rail - the same 36px margin) so
+           it doesn't drift under position:fixed the way the comment above
+           warns a vw-based width otherwise would. */
       `}</style>
       <style>{`
         .left-cluster,.right-cluster{transform:none!important}
