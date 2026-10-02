@@ -736,7 +736,7 @@ export function CommandWall() {
           so vw-based sizing here would drift from .right-cluster's actual
           edges the way it did before this fix. */}
       <article className="orb-window">
-        <div className="orb-window-head"><div><div className="eyebrow">Orb window / assistant state</div><div className="orb-window-title">Khameleon <span style={{ color: "#63e1d3" }}>presence</span></div><span className="orb-window-sub">One continuous agent · state drives the atmosphere</span></div><span className="orb-window-live">{wallState.toUpperCase()}</span></div>
+        <div className="orb-window-head"><div><div className="eyebrow">Khami</div><div className="orb-window-title">Khameleon <span style={{ color: "#63e1d3" }}>presence</span></div><span className="orb-window-sub">One continuous agent · state drives the atmosphere</span></div><span className="orb-window-live">{wallState.toUpperCase()}</span></div>
         <div className={`orb-stage ${wallState}`}>
           <img className="orb-head" src="/khameleon-head.webp" alt="Khameleon" />
         </div>
