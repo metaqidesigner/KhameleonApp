@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clampToViewport, isNearRailDropZone, resizedBounds, MIN_WIDTH, MIN_HEIGHT } from './useWindowDrag';
+import { clampToViewport, fitToViewport, isNearRailDropZone, resizedBounds, MIN_WIDTH, MIN_HEIGHT } from './useWindowDrag';
 
 describe('clampToViewport', () => {
   it('leaves bounds unchanged when well within the viewport', () => {
@@ -36,6 +36,45 @@ describe('isNearRailDropZone', () => {
   it('is exactly on the boundary at the threshold (not near)', () => {
     // viewportWidth - (x + width) === 90 -> not < 90
     expect(isNearRailDropZone({ x: 950, y: 100, width: 400, height: 600 }, 1440)).toBe(false);
+  });
+});
+
+describe('fitToViewport', () => {
+  it('leaves bounds unchanged when the whole window already fits with margin', () => {
+    const b = { x: 100, y: 100, width: 400, height: 600 };
+    expect(fitToViewport(b, 1440, 900)).toEqual(b);
+  });
+
+  it('pulls the window fully back on screen when it is positioned past the right/bottom edge', () => {
+    const b = { x: 1200, y: 800, width: 400, height: 600 };
+    const fitted = fitToViewport(b, 1440, 900);
+    expect(fitted.x + fitted.width).toBeLessThanOrEqual(1440 - 16);
+    expect(fitted.y + fitted.height).toBeLessThanOrEqual(900 - 16);
+  });
+
+  it('pulls the window back on screen when it is positioned off the top/left edge', () => {
+    const b = { x: -200, y: -200, width: 400, height: 600 };
+    const fitted = fitToViewport(b, 1440, 900);
+    expect(fitted.x).toBeGreaterThanOrEqual(16);
+    expect(fitted.y).toBeGreaterThanOrEqual(16);
+  });
+
+  it('shrinks the window to fit a viewport shorter than its stored height', () => {
+    const b = { x: 100, y: 100, width: 400, height: 600 };
+    const fitted = fitToViewport(b, 1440, 500);
+    expect(fitted.height).toBe(468); // 500 - 16px margin on each side
+  });
+
+  it('never shrinks height below MIN_HEIGHT even on a very short viewport', () => {
+    const b = { x: 100, y: 100, width: 400, height: 600 };
+    const fitted = fitToViewport(b, 1440, 400);
+    expect(fitted.height).toBe(MIN_HEIGHT);
+  });
+
+  it('shrinks the window to fit a viewport narrower than its stored width, never below MIN_WIDTH', () => {
+    const b = { x: 100, y: 100, width: 400, height: 600 };
+    const fitted = fitToViewport(b, 360, 900);
+    expect(fitted.width).toBe(MIN_WIDTH);
   });
 });
 

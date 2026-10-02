@@ -30,6 +30,23 @@ export function clampToViewport(next: ChatWindowBounds, viewportWidth: number, v
   return { ...next, x: Math.min(Math.max(next.x, -next.width + 120), maxX), y: Math.min(Math.max(next.y, 0), maxY) };
 }
 
+/**
+ * Guarantees the whole window is visible with a margin - unlike
+ * clampToViewport above, which deliberately allows most of the window to
+ * hang off-screen (only an 80x60px sliver has to stay put) so the drag-to-
+ * dock-at-the-edge gesture works. Used when the window opens and on
+ * browser resize, never during an active drag/resize gesture itself.
+ * Pure, exported for direct unit testing.
+ */
+export function fitToViewport(bounds: ChatWindowBounds, viewportWidth: number, viewportHeight: number): ChatWindowBounds {
+  const margin = 16;
+  const width = Math.max(MIN_WIDTH, Math.min(bounds.width, viewportWidth - margin * 2));
+  const height = Math.max(MIN_HEIGHT, Math.min(bounds.height, viewportHeight - margin * 2));
+  const x = Math.min(Math.max(bounds.x, margin), viewportWidth - width - margin);
+  const y = Math.min(Math.max(bounds.y, margin), viewportHeight - height - margin);
+  return { x, y, width, height };
+}
+
 /** Pure, exported for direct unit testing. */
 export function isNearRailDropZone(bounds: ChatWindowBounds, viewportWidth: number): boolean {
   return viewportWidth - (bounds.x + bounds.width) < RAIL_SNAP_THRESHOLD;
