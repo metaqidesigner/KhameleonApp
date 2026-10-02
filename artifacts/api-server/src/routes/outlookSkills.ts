@@ -20,6 +20,13 @@ import { isConnected } from "../lib/oauthTokens.js";
 import { runOutlookDraftEmail } from "../agents/skills/outlookDraftEmail.js";
 import * as graph from "../lib/outlookGraph.js";
 import { emitTaskEvent, taskEvents } from "../agents/taskEvents.js";
+import { getAnthropicClient } from "../lib/anthropicClient.js";
+import type Anthropic from "@anthropic-ai/sdk";
+
+function textOf(res: Anthropic.Messages.Message): string {
+  const block = res.content.find((b): b is Anthropic.Messages.TextBlock => b.type === "text");
+  return block?.text?.trim() ?? "";
+}
 
 const router = Router();
 
@@ -120,6 +127,56 @@ router.post("/:id/send", async (req: Request, res: Response) => {
     // send must stay retryable, never silently recorded as sent.
     req.log.error({ err }, "outlook-draft-email send failed");
     res.status(502).json({ error: err instanceof Error ? err.message : "Send failed" });
+  }
+});
+
+// ── POST /:id/rewrite — re-compose with a different tone, per the Mobile ─────
+// Morning Briefing's voice "change the tone" command. One real re-compose
+// pass (reruns the same Claude call outlookDraftEmail.ts's own step 3
+// makes, parameterized by the heard instruction) - not an open-ended
+// conversational rewrite loop. Writes the new body back to both the real
+// Outlook draft and the approval row, so a later /send uses the rewrite.
+
+router.post("/:id/rewrite", async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    const [approval] = await db.select().from(approvalsTable).where(eq(approvalsTable.id, id)).limit(1);
+    if (!approval) {
+      res.status(404).json({ error: "Approval not found" });
+      return;
+    }
+    if (approval.status !== "pending") {
+      res.status(409).json({ error: `Approval already ${approval.status}` });
+      return;
+    }
+
+    const payload = parsePayload(approval.dataInvolved);
+    const { toneInstruction } = req.body as { toneInstruction?: string };
+
+    const client = await getAnthropicClient();
+    const newBody = textOf(
+      await client.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 600,
+        system: [
+          "Rewrite this email reply with a different tone, per the user's spoken instruction.",
+          toneInstruction?.trim()
+            ? `Instruction: ${toneInstruction.trim()}`
+            : "No specific instruction was understood - make it noticeably warmer and more casual than the current draft.",
+          "Reply with ONLY the new email body text - no subject line, no markdown, no commentary.",
+        ].join("\n"),
+        messages: [{ role: "user", content: payload.body }],
+      })
+    );
+
+    await graph.updateDraftBody(payload.draftId, newBody);
+    const updatedPayload: ApprovalPayload = { ...payload, body: newBody };
+    await db.update(approvalsTable).set({ dataInvolved: JSON.stringify(updatedPayload) }).where(eq(approvalsTable.id, id));
+
+    res.json({ approvalId: id, ...updatedPayload });
+  } catch (err) {
+    req.log.error({ err }, "outlook-draft-email rewrite failed");
+    res.status(502).json({ error: err instanceof Error ? err.message : "Rewrite failed" });
   }
 });
 
