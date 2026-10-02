@@ -41,6 +41,7 @@ import integrationsRouter from "./integrations";
 import actionReceiptsRouter from "./actionReceipts";
 import quotaRouter from "./quota";
 import briefingRouter from "./briefing";
+import usersRouter from "./users";
 
 const router: IRouter = Router();
 
@@ -86,5 +87,6 @@ router.use("/integrations", integrationsRouter);
 router.use("/action-receipts", actionReceiptsRouter);
 router.use("/quota", quotaRouter);
 router.use("/briefing", briefingRouter);
+router.use("/users", usersRouter);
 
 export default router;
