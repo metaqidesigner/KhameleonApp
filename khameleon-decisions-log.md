@@ -1185,5 +1185,19 @@ Newton's live review at localhost:4001 surfaced three real issues with the Chat 
 
 **Verification:** 83/83 vitest tests passing (6 new), `tsc --noEmit` clean. Live-verified via Playwright against both the dev server and, after rebuilding, the real redeployed Docker container: a 1200×620 window now fits the chat box fully (previously would have clipped), shrinking an already-open browser window from 900px to 560px tall live-refits it, the head button is present and wired, and the computed border width is genuinely 0px (not just visually subtle). Zero console errors throughout.
 
+## 2026-10-02 — Found the real "can't see it" bug: no scroll anywhere in the app shell, plus a rename
+
+Newton reported he still couldn't see a window, this time describing it as "does seem to extend down the page, but I can't see it" — and separately asked to rename the Live Wall's "Orb Window" assistant panel to "Khami," adding that he thought it needed a typeable chat box rather than voice-only. That second point turned out to already be built: `.orb-chat`'s `<input>` (`chatDraft`/`setChatDraft`/`submitChat`) has been real since this panel was created - the actual problem was that he'd never been able to see it to find out.
+
+**Root cause, found by tracing the real CSS cascade rather than guessing:** `html, body, #root` set `overflow:hidden`, and so do `.j-shell`, `.j-body-row`, and `.j-main-area` beneath them - every single layer between the viewport and a tab's content. The Live Wall's own layout (`.wall-shell{min-height:800px}`, with `.orb-window` and the three column panels positioned via absolute pixel offsets) assumes at least ~844px of vertical space is available. On any browser window shorter than that, the bottom portion of the page - including the entire Khami panel - was clipped by `.j-main-area`'s `overflow:hidden`, with no scrollbar anywhere in the chain to reach it. Confirmed directly: at a 680px-tall viewport, `getBoundingClientRect()` showed the panel's bottom edge 100px below the fold, and `.j-main-area`'s own `scrollHeight` (800px) exceeded its `clientHeight` (602px) - a real, measurable overflow, not a visual guess.
+
+This is an app-wide bug, not specific to the Chat Window work from earlier today - any tab whose content doesn't fit a given viewport would hit the same wall. The Live Wall is simply the first tab built with a hard fixed-pixel layout tall enough to actually trigger it.
+
+**Fix:** `.j-main-area{overflow-y:auto;overflow-x:hidden}` instead of `overflow:hidden` - scoped to the per-tab content pane specifically, not the outer shell, so `TopBar`/`LeftSidebar` stay pinned as designed while only the content underneath becomes scrollable when it doesn't fit. Verified this changes nothing for the common case: at a normal 900px viewport, `.j-main-area`'s `scrollHeight` and `clientHeight` are now equal (822px each) and no scrollbar appears - the fix is additive, not a visual regression.
+
+**Rename:** the eyebrow label read "Orb window / assistant state" - an internal/technical name that had leaked into the shipped UI. Changed to "Khami" per Newton's request.
+
+**Verification:** 83/83 vitest tests still pass, `tsc --noEmit` clean. Playwright-verified against the rebuilt, redeployed Docker container itself (not just dev, learning from the deploy-gap mistake earlier today): at 680px viewport height, `.j-main-area` is confirmed scrollable and scrolling it brings the Khami panel, including its chat input, fully into view; the eyebrow text reads "Khami"; zero console errors. At 900px, confirmed no scrollbar appears and nothing visually changed.
+
 ---
 *Full functional/design spec: khameleon-design-spec.md · Competitor research: khameleon-competitor-research.md*
