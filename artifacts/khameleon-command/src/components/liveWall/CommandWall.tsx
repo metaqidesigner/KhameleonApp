@@ -109,7 +109,47 @@ function fmtSentDate(iso?: string | null): string {
   return new Date(iso).toLocaleDateString("en-US", { weekday: "short" });
 }
 
+/**
+ * Scale-to-fit (2026-10-02, per Newton's request): the Live Wall's internal
+ * layout is hand-tuned around a fixed design size (DESIGN_WIDTH x
+ * DESIGN_HEIGHT, matching .wall-shell's real measured footprint at a normal
+ * desktop viewport) - rather than rework every absolute-positioned panel to
+ * be independently fluid, the whole wall is rendered at its native design
+ * size and uniformly scaled (like a game letterboxing to the window) to
+ * exactly fill whatever space the tab's content area actually has, on any
+ * screen size, with zero scrolling. A ResizeObserver re-measures and
+ * re-scales live as the window resizes. Only an actually-too-small window
+ * (smaller than MIN_SCALE allows) stops shrinking further, matching Newton's
+ * own caveat that a deliberately minimised window is a different case.
+ */
+const STAGE_DESIGN_WIDTH = 1388;
+const STAGE_DESIGN_HEIGHT = 800;
+const STAGE_MIN_SCALE = 0.5;
+
+function useStageFit(designWidth: number, designHeight: number) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const { width, height } = el.getBoundingClientRect();
+      if (width === 0 || height === 0) return;
+      const next = Math.min(width / designWidth, height / designHeight);
+      setScale(Math.max(STAGE_MIN_SCALE, next));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [designWidth, designHeight]);
+
+  return { containerRef, scale };
+}
+
 export function CommandWall() {
+  const { containerRef: stageRef, scale: stageScale } = useStageFit(STAGE_DESIGN_WIDTH, STAGE_DESIGN_HEIGHT);
   const orbStatus           = useJarvisStore(s => s.orbStatus);
   const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
   const orbActiveAgentId    = useJarvisStore(s => s.orbActiveAgentId);
@@ -376,9 +416,19 @@ export function CommandWall() {
   }
 
   return (
-    <main className="wall-shell">
+    <div ref={stageRef} className="wall-stage-fit">
+    {/* This sizing div's own layout box is the real, scaled footprint
+        (unlike .wall-shell's, which transform:scale() leaves at its
+        unscaled 1388x800 for layout purposes) - giving the flex-centered
+        overflow container something correctly-sized to center means any
+        overflow (only expected on a deliberately tiny/extreme window) is
+        genuinely reachable by scroll from every edge, not just hidden by
+        the classic flex-centering-clips-the-start-edge quirk. */}
+    <div style={{ width: STAGE_DESIGN_WIDTH * stageScale, height: STAGE_DESIGN_HEIGHT * stageScale, flexShrink: 0 }}>
+    <main className="wall-shell" style={{ width: STAGE_DESIGN_WIDTH, height: STAGE_DESIGN_HEIGHT, transform: `scale(${stageScale})`, transformOrigin: 'top left' }}>
       <style>{`
-        .wall-shell{--ink:#e8f3f0;--muted:#78908f;--teal:#63e1d3;--violet:#a999ff;--amber:#e9b872;--coral:#f68e7b;position:relative;isolation:isolate;min-height:800px;overflow:hidden;background:rgba(5,15,23,.16);color:var(--ink);font-family:ui-sans-serif,system-ui,sans-serif}
+        .wall-stage-fit{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:auto}
+        .wall-shell{--ink:#e8f3f0;--muted:#78908f;--teal:#63e1d3;--violet:#a999ff;--amber:#e9b872;--coral:#f68e7b;position:relative;isolation:isolate;overflow:hidden;background:rgba(5,15,23,.16);color:var(--ink);font-family:ui-sans-serif,system-ui,sans-serif}
         .space-field{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:radial-gradient(ellipse at 50% 98%,rgba(80,198,211,.12),transparent 34%)}.space-field:before{content:"";position:absolute;inset:0;opacity:.48;background-image:radial-gradient(circle at 11% 22%,rgba(210,255,247,.92) 0 1px,transparent 1.8px),radial-gradient(circle at 25% 17%,rgba(136,205,255,.72) 0 1px,transparent 1.7px),radial-gradient(circle at 43% 28%,rgba(255,225,170,.7) 0 1px,transparent 1.7px),radial-gradient(circle at 66% 13%,rgba(201,181,255,.85) 0 1px,transparent 1.8px),radial-gradient(circle at 83% 25%,rgba(166,250,240,.75) 0 1px,transparent 1.7px)}.reflection-plane{position:absolute;left:3%;right:3%;bottom:-2px;height:170px;z-index:0;pointer-events:none;opacity:.7;transform:perspective(520px) rotateX(58deg);transform-origin:bottom;background:linear-gradient(to bottom,rgba(7,24,31,.08),rgba(3,10,18,.72)),radial-gradient(ellipse at 50% 0,rgba(108,243,231,.12),transparent 46%);border-top:1px solid rgba(145,244,235,.14);box-shadow:0 -18px 45px rgba(62,218,213,.1)}
         .topbar,.wall-plane,.footer{position:relative;z-index:1}.glass{position:relative;overflow:hidden;background:rgba(10,18,20,.5);border:1px solid rgba(255,255,255,.12);border-radius:16px;box-shadow:0 20px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.1),0 0 24px rgba(111,230,189,.12);backdrop-filter:blur(16px)}.glass:before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(122deg,rgba(255,255,255,.08) 0%,rgba(255,255,255,0) 30%);pointer-events:none;z-index:0}.glass:after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.55) 35%,rgba(255,255,255,0) 70%);pointer-events:none;z-index:2}.glass>*{position:relative;z-index:1}
         .topbar{height:74px;margin:18px 22px 6px;padding:0 20px;border-radius:19px;display:flex;align-items:center;gap:28px}.brand{display:flex;align-items:center;gap:11px;min-width:220px}.brand-mark{width:26px;height:26px;position:relative}.brand-mark i{position:absolute;width:8px;height:8px;border:2px solid var(--teal);border-radius:50%;box-shadow:0 0 14px rgba(99,225,211,.6)}.brand-mark i:nth-child(1){left:1px;top:9px}.brand-mark i:nth-child(2){left:9px;top:3px}.brand-mark i:nth-child(3){left:17px;top:11px}.wordmark{font-size:15px;letter-spacing:.2em;font-weight:700}.wordmark small{display:block;color:#73918f;font-size:8px;letter-spacing:.16em;margin-top:3px;font-weight:500}.nav{display:flex;gap:23px;align-items:center;flex:1}.nav button{border:0;background:none;color:#78908f;font-size:12px;padding:25px 0 22px;cursor:pointer}.nav button.active{color:var(--teal);border-bottom:2px solid var(--teal)}.top-right{display:flex;align-items:center;gap:8px}
@@ -404,7 +454,7 @@ export function CommandWall() {
         .activity-slideout-item{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06)}.activity-slideout-top{display:flex;justify-content:space-between;font-size:9px;color:var(--teal);margin-bottom:5px}.activity-slideout-item p{margin:0;font-size:10px;color:#c3d3d0;line-height:1.4}
          .wall-plane{height:574px;margin:0 22px;position:relative}.panel{position:absolute;overflow:visible}.panel:after{content:"";position:absolute;right:-70px;top:-90px;width:230px;height:230px;border-radius:50%;background:radial-gradient(circle,rgba(99,225,211,.13),transparent 65%);filter:blur(5px);pointer-events:none}.eyebrow,.micro{color:#6c8685;font-size:10px;letter-spacing:.16em;text-transform:uppercase}.panel-title{font-size:18px;font-weight:600;letter-spacing:-.03em;margin-top:5px}.panel-title span{color:var(--teal)}.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.status-pill,.privacy{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:8px;font-size:10px;color:var(--teal);background:rgba(99,225,211,.08);border:1px solid rgba(99,225,211,.16)}.privacy{color:#b8aaff;border-color:rgba(169,153,255,.2)}.left-cluster{left:1%;top:8px;width:29%;height:435px;transform:rotate(-1.6deg);z-index:2}.center-cluster{left:25%;top:8px;width:53%;height:550px;z-index:3}.right-cluster{right:1%;top:8px;width:23%;height:390px;transform:rotate(1.8deg);z-index:2}
         .mission{position:relative;border-radius:16px;padding:13px 15px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.06)}.mission-top{display:flex;justify-content:space-between;align-items:center}.mission strong{font-size:12px}.mission p{font-size:10px;color:#8ca2a1;line-height:1.5;margin:8px 0 0}
-        .route-head{display:flex;justify-content:space-between;align-items:end;margin:12px 0 9px}.route-head strong{font-size:13px}.route-head span{display:block;color:#6d8684;font-size:9px;margin-top:4px}.rail-stat{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08)}.rail-stat span{display:block;color:#76918e;font-size:9px;text-transform:uppercase;letter-spacing:.12em}.rail-stat strong{display:block;margin-top:4px;font-size:17px;font-weight:500}.footer{margin:0 22px 18px;height:42px;border:1px solid rgba(246,142,123,.2);background:rgba(8,27,28,.62);border-radius:12px;display:flex;align-items:center;overflow:hidden}.feed-label{height:100%;display:flex;align-items:center;gap:9px;padding:0 15px;color:var(--coral);font-size:10px;letter-spacing:.16em}.feed-label svg{width:14px}.ticker{font-family:ui-monospace,monospace;color:#b8928a;font-size:10px;padding-left:17px;white-space:nowrap}@media(max-width:900px){.wall-shell{min-height:100dvh}.topbar{margin:10px;height:auto;min-height:68px}.nav{display:none}.top-right{margin-left:auto}.wall-plane{height:auto;margin:0 10px;display:grid;gap:14px}.panel{position:relative!important;inset:auto!important;width:auto!important;height:auto!important;min-height:0;transform:none!important}.center-cluster{order:-1}.footer{margin:14px 10px}}
+        .route-head{display:flex;justify-content:space-between;align-items:end;margin:12px 0 9px}.route-head strong{font-size:13px}.route-head span{display:block;color:#6d8684;font-size:9px;margin-top:4px}.rail-stat{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08)}.rail-stat span{display:block;color:#76918e;font-size:9px;text-transform:uppercase;letter-spacing:.12em}.rail-stat strong{display:block;margin-top:4px;font-size:17px;font-weight:500}.footer{margin:0 22px 18px;height:42px;border:1px solid rgba(246,142,123,.2);background:rgba(8,27,28,.62);border-radius:12px;display:flex;align-items:center;overflow:hidden}.feed-label{height:100%;display:flex;align-items:center;gap:9px;padding:0 15px;color:var(--coral);font-size:10px;letter-spacing:.16em}.feed-label svg{width:14px}.ticker{font-family:ui-monospace,monospace;color:#b8928a;font-size:10px;padding-left:17px;white-space:nowrap}
          .rail-stat{margin:0 0 8px;padding:12px 13px;border:1px solid rgba(161,255,241,.14);border-radius:14px;background:linear-gradient(140deg,rgba(24,56,57,.48),rgba(5,21,30,.58));box-shadow:10px 14px 28px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.12);backdrop-filter:blur(13px)}.wall-plane>.panel.glass{overflow:hidden;padding:20px 22px;background:rgba(10,18,20,.5);border:1px solid rgba(255,255,255,.12);border-radius:18px;box-shadow:0 30px 55px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.1),0 0 32px rgba(111,230,189,.12);backdrop-filter:blur(18px)}.wall-plane>.panel.glass:before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(122deg,rgba(255,255,255,.07) 0%,rgba(255,255,255,0) 30%);pointer-events:none;z-index:0}.wall-plane>.panel.glass:after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.5) 35%,rgba(255,255,255,0) 70%);pointer-events:none;z-index:2}.wall-plane>.panel.glass>*{position:relative;z-index:1}
         /* Left column spec (2026-09-25): parked work grouped by *why* it's
            stuck, distinct from the swipe-deck look (dropped - grouped cards
@@ -466,23 +516,6 @@ export function CommandWall() {
         .footer{position:absolute!important;left:22px;right:22px;bottom:0;margin:0!important;height:42px;z-index:30;border-radius:12px 12px 0 0;background:rgba(8,27,28,.9)}
         .orb-window{position:absolute!important;right:22px!important;bottom:64px!important;width:calc((100% - 44px) * .24 - 10px)!important;max-width:calc(100% - 36px)!important}
         .right-cluster{padding-bottom:58px!important;box-sizing:border-box}
-        @media(max-width:900px){.footer{left:10px;right:10px}.orb-window{position:fixed!important;bottom:16px!important;width:min(380px,calc(100vw - 52px - 36px))!important}}
-        /* Below 900px, .wall-plane's panels stack vertically in normal flow
-           instead of overlaying absolutely (see the .panel override above),
-           which makes .wall-shell's own height grow with their combined
-           height rather than staying a fixed ~800px. Khami, anchored via
-           position:absolute against .wall-shell like the footer, would
-           otherwise get pushed hundreds of pixels down a page that needs
-           scrolling to reach it - defeating its purpose as an always-visible
-           ambient presence (found via a live user report + direct
-           getBoundingClientRect measurement, not assumed: at 390px wide it
-           measured 773px down the page). Pinning it to the viewport instead
-           only below this breakpoint keeps the existing desktop behavior
-           (wall-shell stays a fixed height there) and the width formula
-           above replicates the old percentage-of-wall-shell result exactly
-           (100vw - the real 52px left icon rail - the same 36px margin) so
-           it doesn't drift under position:fixed the way the comment above
-           warns a vw-based width otherwise would. */
       `}</style>
       <style>{`
         .left-cluster,.right-cluster{transform:none!important}
@@ -765,5 +798,7 @@ export function CommandWall() {
       </article>
       <footer className="footer"><div className="feed-label"><Radio/>KHAMELEON FEED</div><div className="ticker"><b>{isLive ? "LIVE" : "PAUSED"}</b>　///　{ticker}</div></footer>
     </main>
+    </div>
+    </div>
   );
 }
