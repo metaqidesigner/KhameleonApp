@@ -1225,5 +1225,9 @@ After the Khami viewport-pin fix, Newton asked for something more fundamental: t
 
 **Verification:** tested five real sizes end-to-end (1440×900 normal, 1440×680 short, 1920×1080 large, 800×500 small, 390×844 portrait) - correct scale factor at each via computed `transform` matrix, zero console errors, and confirmed live resize (same page, no reload) re-scales correctly in both directions via the `ResizeObserver`. 83/83 tests passing, `tsc --noEmit` clean. Built in a side dev server, previewed live by redeploying the real Docker container from the uncommitted working tree first (per Newton's explicit request this round: preview before commit, not after) - only committed once he confirmed it on localhost:4001.
 
+## 2026-10-02 — Removed the dead command-palette agent-picker
+
+A quick cleanup Newton asked for after the earlier "what's left" status check: `CommandPalette`'s `AgentType`/`selectedAgent` system (the simple/orchestrator/deep_research/morning_digest/code_assistant pills) had been flagged as functionally dead back when `ChatPanel.tsx` - its only real consumer - was deleted during the Chat Window build, but left in place at the time as a deliberate, separate scope decision. Removed it properly now: `AgentType`, `selectedAgent`, `setSelectedAgent` from `jarvisStore.ts` (including the now-pointless `agentType` field on the store's own, separately-unused `ChatMessage` interface), and every reference in `CommandPalette.tsx` (the `'agent'` result kind, the bottom pill row, the AGENTS array). `tsc --noEmit` clean, 83/83 tests pass, palette verified live (search/navigate still works, no agent section left behind).
+
 ---
 *Full functional/design spec: khameleon-design-spec.md · Competitor research: khameleon-competitor-research.md*
