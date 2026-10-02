@@ -4,7 +4,7 @@ import {
   Eye, EyeOff, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Loader2,
 } from 'lucide-react';
 import { useJarvisStore } from '@/store/jarvisStore';
-import { useWindowDrag } from './useWindowDrag';
+import { useWindowDrag, fitToViewport } from './useWindowDrag';
 import { routeSingleStreaming, routeMultiAgent, pickAutoRouteAgent } from './chatWindowApi';
 import {
   getRoster, getAgentStatus, FALLBACK_ROSTER,
@@ -15,7 +15,7 @@ import { getDailyTasks, getOnboardingStatus, type Task } from '@/lib/jarvisApi';
 import { getTaskRun } from '@/lib/taskRunApi';
 import type { TaskRun } from '@/lib/taskRunApi';
 import { TaskRunCard } from '@/components/taskRun/TaskRunParts';
-import { useVoice } from '@/components/orb/useVoice';
+import { useVoice, type UseVoiceReturn } from '@/components/orb/useVoice';
 import type { AgentRef, ChatMessage, ChatThread, RouteMode, StarterCard } from './types';
 import { ROUTE_MODE_LABELS, ROUTE_MODE_DESCRIPTIONS } from './types';
 
@@ -54,11 +54,18 @@ function starterCardsForRole(role: string | null, domainName?: string): StarterC
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
 
-function HeadAvatar({ size, glow }: { size: number; glow?: boolean }) {
+function HeadAvatar({ size, glow, listening }: { size: number; glow?: boolean; listening?: boolean }) {
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       {glow && (
-        <div style={{ position: 'absolute', inset: -size * 0.3, borderRadius: '50%', background: 'radial-gradient(circle, rgba(95,240,216,.22), transparent 65%)', filter: 'blur(4px)', pointerEvents: 'none' }} />
+        <div
+          className={listening ? 'chat-head-glow-listening' : undefined}
+          style={{
+            position: 'absolute', inset: -size * 0.3, borderRadius: '50%',
+            background: listening ? 'radial-gradient(circle, rgba(95,240,216,.48), transparent 65%)' : 'radial-gradient(circle, rgba(95,240,216,.22), transparent 65%)',
+            filter: 'blur(4px)', pointerEvents: 'none',
+          }}
+        />
       )}
       <img src={HEAD_SRC} alt="" style={{ position: 'relative', width: '100%', height: '100%', objectFit: 'contain', transform: 'translate(1%,-6%)', pointerEvents: 'none' }} />
     </div>
@@ -143,6 +150,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
 function EmptyState({
   domains, activeDomainId, onPickDomain, onStarter, parked, wakeWordActive, wakeWordBlocked, role,
+  isListening, voiceAvailable, onToggleVoice,
 }: {
   domains: WorkDomain[];
   activeDomainId: number | 'all';
@@ -152,6 +160,9 @@ function EmptyState({
   wakeWordActive: boolean;
   wakeWordBlocked: boolean;
   role: string | null;
+  isListening: boolean;
+  voiceAvailable: boolean;
+  onToggleVoice: () => void;
 }) {
   const activeDomain = domains.find(d => d.id === activeDomainId);
   const starters = useMemo(() => starterCardsForRole(role, activeDomain?.name), [activeDomain, role]);
@@ -159,9 +170,18 @@ function EmptyState({
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px 18px', gap: 14, overflowY: 'auto' }}>
-      <div style={{ width: 96, height: 96, marginBottom: 2 }}>
-        <HeadAvatar size={96} glow />
-      </div>
+      <button
+        type="button"
+        onClick={onToggleVoice}
+        disabled={!voiceAvailable}
+        title={voiceAvailable ? (isListening ? 'Stop voice input' : 'Talk to Khameleon') : 'Voice input not available in this browser'}
+        aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
+        aria-pressed={isListening}
+        className="chat-head-btn"
+        style={{ width: 96, height: 96, marginBottom: 2 }}
+      >
+        <HeadAvatar size={96} glow listening={isListening} />
+      </button>
       <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#d6efee', textAlign: 'center' }}>What are we working on?</h2>
       <p style={{ margin: 0, fontSize: 11, color: '#8fb4b6', display: 'flex', alignItems: 'center', gap: 5 }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: wakeWordActive && !wakeWordBlocked ? '#4ee0a0' : '#5a6a6a', animation: wakeWordActive && !wakeWordBlocked ? 'chat-pulse-dot 2s ease-in-out infinite' : 'none' }} />
@@ -226,26 +246,25 @@ function AgentStrip({ roster, statuses, pinnedId, onPin, zdrKnown }: {
 
 // ── Composer ─────────────────────────────────────────────────────────────────
 
-function Composer({ onSend, sending, routeMode, onRouteMode, focusSignal }: {
+function Composer({ onSend, sending, routeMode, onRouteMode, focusSignal, value, onChange, voice }: {
   onSend: (text: string) => void;
   sending: boolean;
   routeMode: RouteMode;
   onRouteMode: (m: RouteMode) => void;
   focusSignal: number;
+  value: string;
+  onChange: (v: string) => void;
+  voice: UseVoiceReturn;
 }) {
-  const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Cmd/Ctrl+J focuses the composer - see ChatWindow's keydown handler.
   useEffect(() => { if (focusSignal > 0) textareaRef.current?.focus(); }, [focusSignal]);
 
-  const handleTranscript = useCallback((text: string) => { setValue(v => (v ? `${v} ${text}` : text)); }, []);
-  const voice = useVoice(handleTranscript);
-
   const submit = () => {
     const text = value.trim();
     if (!text || sending) return;
-    setValue('');
+    onChange('');
     onSend(text);
   };
 
@@ -273,7 +292,7 @@ function Composer({ onSend, sending, routeMode, onRouteMode, focusSignal }: {
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={e => setValue(e.target.value)}
+          onChange={e => onChange(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Ask Khameleon anything…"
           aria-label="Message Khameleon"
@@ -336,9 +355,15 @@ function ChatWindowStyles() {
       .chat-spin{animation:chat-spin 1s linear infinite}
       @keyframes chat-spin{to{transform:rotate(360deg)}}
       @keyframes chat-pulse-dot{0%,100%{opacity:1}50%{opacity:0.35}}
+      .chat-head-btn{background:none;border:none;padding:0;cursor:pointer;border-radius:50%}
+      .chat-head-btn:disabled{cursor:not-allowed;opacity:0.6}
+      .chat-head-btn:focus-visible{outline:2px solid #5ff0d8;outline-offset:4px}
+      .chat-head-glow-listening{animation:chat-head-pulse 1.6s ease-in-out infinite}
+      @keyframes chat-head-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.7;transform:scale(1.08)}}
       .chat-reduced-motion .chat-spin{animation:none}
       .chat-reduced-motion [style*="chat-pulse-dot"]{animation:none}
-      @media (prefers-reduced-motion: reduce){.chat-window .chat-spin{animation:none}}
+      .chat-reduced-motion .chat-head-glow-listening{animation:none}
+      @media (prefers-reduced-motion: reduce){.chat-window .chat-spin{animation:none}.chat-window .chat-head-glow-listening{animation:none}}
     `}</style>
   );
 }
@@ -378,17 +403,51 @@ export default function ChatWindow() {
   const [profileRole, setProfileRole] = useState<string | null>(null);
   const [activeRuns, setActiveRuns] = useState<TaskRun[]>([]);
   const [focusSignal, setFocusSignal] = useState(0);
+  const [draft, setDraft] = useState('');
 
   const bodyRef = useRef<HTMLDivElement>(null);
   const liveRegionRef = useRef<HTMLDivElement>(null);
   const stopStreamRef = useRef<(() => void) | null>(null);
 
+  // Lifted up from the composer so the empty-state head can also drive
+  // voice input, not just the composer's mic button - both need to share
+  // one real speech-recognition session, not run two independent ones.
+  const handleTranscript = useCallback((text: string) => setDraft(d => (d ? `${d} ${text}` : text)), []);
+  const voice = useVoice(handleTranscript);
+
+  // Fit the window to the real viewport every time it opens (not just once
+  // ever at app load) - a position/size stored from a larger window can
+  // otherwise leave the box partly or fully off-screen with no way back.
+  // Skipped while docked (the right-rail layout isn't bounds-driven).
   useEffect(() => {
-    if (bounds.width === 400 && bounds.height === 600 && bounds.x === 0 && bounds.y === 0) {
-      setBounds(newBounds());
+    if (!chatOpen || docked) return;
+    const base = (bounds.width === 400 && bounds.height === 600 && bounds.x === 0 && bounds.y === 0) ? newBounds() : bounds;
+    const fitted = fitToViewport(base, window.innerWidth, window.innerHeight);
+    if (fitted.x !== bounds.x || fitted.y !== bounds.y || fitted.width !== bounds.width || fitted.height !== bounds.height) {
+      setBounds(fitted);
     }
+    // Only re-run on open/dock changes, not on every bounds change - this
+    // re-fits once per open, not continuously while the user drags.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [chatOpen, docked]);
+
+  // Keep the window on-screen across browser resizes too, not just at open.
+  // Reads/writes via a ref rather than depending on `bounds` directly so the
+  // listener doesn't need to be torn down and recreated on every drag.
+  const boundsRef = useRef(bounds);
+  useEffect(() => { boundsRef.current = bounds; }, [bounds]);
+  useEffect(() => {
+    if (!chatOpen || docked) return;
+    const onResize = () => {
+      const current = boundsRef.current;
+      const fitted = fitToViewport(current, window.innerWidth, window.innerHeight);
+      if (fitted.x !== current.x || fitted.y !== current.y || fitted.width !== current.width || fitted.height !== current.height) {
+        setBounds(fitted);
+      }
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [chatOpen, docked, setBounds]);
 
   useEffect(() => {
     getRoster().then(setRoster).catch(() => {});
@@ -519,6 +578,8 @@ export default function ChatWindow() {
     <>
       <div
         onPointerDown={docked ? undefined : startDrag}
+        onDoubleClick={docked ? undefined : () => setBounds(newBounds())}
+        title={docked ? undefined : 'Drag to move · double-click to reset position'}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', height: docked ? 48 : 56,
           borderBottom: '1px solid rgba(95,240,216,0.14)', cursor: docked ? 'default' : (isDragging ? 'grabbing' : 'grab'),
@@ -624,6 +685,9 @@ export default function ChatWindow() {
             wakeWordActive={wakeWordActive}
             wakeWordBlocked={wakeWordBlocked}
             role={profileRole}
+            isListening={voice.isListening}
+            voiceAvailable={voice.voiceInputAvailable}
+            onToggleVoice={voice.toggleListening}
           />
         ) : (
           <div ref={bodyRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 4px', position: 'relative' }}>
@@ -641,7 +705,7 @@ export default function ChatWindow() {
           </div>
         )}
       </div>
-      <Composer onSend={sendMessage} sending={sending} routeMode={routeMode} onRouteMode={setRouteMode} focusSignal={focusSignal} />
+      <Composer onSend={sendMessage} sending={sending} routeMode={routeMode} onRouteMode={setRouteMode} focusSignal={focusSignal} value={draft} onChange={setDraft} voice={voice} />
     </>
   );
 
@@ -655,8 +719,7 @@ export default function ChatWindow() {
           position: 'fixed', top: 0, right: 0, bottom: 0, width: 376, zIndex: 150,
           display: 'flex', flexDirection: 'column',
           background: 'linear-gradient(140deg, rgba(12,36,42,.9), rgba(5,15,20,.96))',
-          borderLeft: '1px solid rgba(95,240,216,0.38)',
-          boxShadow: '-20px 0 60px rgba(0,0,0,0.4)',
+          boxShadow: '-24px 0 70px rgba(0,0,0,0.5)',
         }}>
           {content}
         </div>
@@ -679,8 +742,7 @@ export default function ChatWindow() {
           position: 'fixed', left: liveBounds.x, top: liveBounds.y, width: liveBounds.width, height: liveBounds.height, zIndex: 200,
           display: 'flex', flexDirection: 'column', borderRadius: 28,
           background: 'linear-gradient(140deg, rgba(12,36,42,.9), rgba(5,15,20,.96))',
-          border: '1px solid rgba(95,240,216,0.38)',
-          boxShadow: `0 30px 70px rgba(0,0,0,0.55), 0 0 50px rgba(95,240,216,0.08)${isDragging || isResizing ? ', 0 0 0 2px rgba(95,240,216,0.3)' : ''}`,
+          boxShadow: `0 34px 80px rgba(0,0,0,0.6), 0 0 60px rgba(0,0,0,0.35)${isDragging || isResizing ? ', 0 0 0 2px rgba(95,240,216,0.3)' : ''}`,
           overflow: 'hidden',
         }}
       >
