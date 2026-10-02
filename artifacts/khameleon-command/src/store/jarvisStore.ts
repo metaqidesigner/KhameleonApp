@@ -2,11 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { SharedWindowModel } from '../../../../khameleon-window-agent/src/types';
 
-export type AgentType =
-  | 'simple' | 'orchestrator' | 'deep_research'
-  | 'morning_digest' | 'code_assistant'
-  | 'channel_agent' | 'proactive_agent' | 'operative';
-
 export type TabId =
   | 'canvas'
   | 'agents' | 'research' | 'memory'
@@ -25,7 +20,6 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  agentType?: AgentType;
   timestamp: number;
   model?: string;
   latencyMs?: number;
@@ -90,7 +84,6 @@ interface JarvisStore {
   canvasWindowModels: Record<string, SharedWindowModel>;
   chatMessages: ChatMessage[];
   isStreaming: boolean;
-  selectedAgent: AgentType;
   agentHistory: AgentEvent[];
   panelLayouts: Record<string, PanelLayout[]>;
   commandPaletteOpen: boolean;
@@ -147,7 +140,6 @@ interface JarvisStore {
   setActiveTab: (t: TabId) => void;
   setChatOpen: (v: boolean) => void;
   setStreaming: (v: boolean) => void;
-  setSelectedAgent: (a: AgentType) => void;
   appendMessage: (msg: ChatMessage) => void;
   updateLastMessage: (patch: Partial<ChatMessage>) => void;
   clearChat: () => void;
@@ -204,7 +196,6 @@ export const useJarvisStore = create<JarvisStore>()(
       chatOpen: false,
       chatMessages: [],
       isStreaming: false,
-      selectedAgent: 'simple',
       agentHistory: [],
       panelLayouts: {},
       commandPaletteOpen: false,
@@ -251,7 +242,6 @@ export const useJarvisStore = create<JarvisStore>()(
       setActiveTab:          (t)      => set({ activeTab: t }),
       setChatOpen:           (v)      => set({ chatOpen: v }),
       setStreaming:          (v)      => set({ isStreaming: v }),
-      setSelectedAgent:      (a)      => set({ selectedAgent: a }),
       appendMessage:         (msg)    => set(s => ({ chatMessages: [...s.chatMessages, msg] })),
       updateLastMessage:     (patch)  => set(s => {
         const msgs = [...s.chatMessages];
@@ -360,7 +350,6 @@ export const useJarvisStore = create<JarvisStore>()(
         scanLinesEnabled: s.scanLinesEnabled,
         cornerBracketsEnabled: s.cornerBracketsEnabled,
         tickerSpeed: s.tickerSpeed,
-        selectedAgent: s.selectedAgent,
         orbPosition: s.orbPosition,
         orbMinimized: s.orbMinimized,
         orbActiveAgentId: s.orbActiveAgentId,
