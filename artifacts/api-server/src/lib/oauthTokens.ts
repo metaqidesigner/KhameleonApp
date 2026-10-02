@@ -5,9 +5,10 @@
 
 import { db } from "@workspace/db";
 import { oauthTokensTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { logger } from "./logger.js";
 import { encrypt, decrypt } from "./crypto.js";
+import { getCurrentUserId } from "./requestContext.js";
 
 export interface TokenRecord {
   provider: string;
@@ -19,13 +20,22 @@ export interface TokenRecord {
 
 const EXPIRY_BUFFER_SECS = 300; // refresh 5 min before actual expiry
 
+/** (userId, provider) match - undefined userId (no accounts, or Option-A-only session) matches the one global row, same as every existing single-user instance has always had. */
+function tokenScope(provider: string, userId: number | undefined) {
+  return and(
+    eq(oauthTokensTable.provider, provider),
+    userId === undefined ? isNull(oauthTokensTable.userId) : eq(oauthTokensTable.userId, userId),
+  );
+}
+
 // ── Read ──────────────────────────────────────────────────────────────────────
 
 export async function getToken(provider: string): Promise<TokenRecord | null> {
+  const userId = getCurrentUserId();
   const [row] = await db
     .select()
     .from(oauthTokensTable)
-    .where(eq(oauthTokensTable.provider, provider))
+    .where(tokenScope(provider, userId))
     .limit(1);
   if (!row) return null;
   return {
@@ -48,27 +58,50 @@ export async function saveToken(
   provider: string,
   data: { accessToken: string; refreshToken?: string | null; expiresInSecs?: number | null; scope?: string }
 ): Promise<void> {
+  const userId = getCurrentUserId();
   const expiresAt = data.expiresInSecs ? new Date(Date.now() + data.expiresInSecs * 1000) : null;
   const encryptedAccessToken = encrypt(data.accessToken);
   const encryptedRefreshToken = data.refreshToken ? encrypt(data.refreshToken) : data.refreshToken; // preserves null/undefined as-is
 
-  await db
-    .insert(oauthTokensTable)
-    .values({ provider, accessToken: encryptedAccessToken, refreshToken: encryptedRefreshToken ?? null, expiresAt, scope: data.scope ?? "" })
-    .onConflictDoUpdate({
-      target: oauthTokensTable.provider,
-      set: {
+  // No single-column DB unique constraint exists to ON CONFLICT against
+  // anymore (uniqueness is now (userId, provider), and Postgres unique
+  // indexes don't treat two NULL userIds as colliding - exactly the
+  // behavior the no-accounts case needs) - explicit check-then-write
+  // instead. A single-process app with no realistic concurrent-connect
+  // race for one user's own OAuth flow, same trade-off posture as
+  // lib/session.ts's in-memory map.
+  const [existing] = await db
+    .select({ id: oauthTokensTable.id })
+    .from(oauthTokensTable)
+    .where(tokenScope(provider, userId))
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(oauthTokensTable)
+      .set({
         accessToken: encryptedAccessToken,
         ...(data.refreshToken !== undefined && { refreshToken: encryptedRefreshToken }),
         expiresAt,
         ...(data.scope !== undefined && { scope: data.scope }),
         updatedAt: new Date(),
-      },
+      })
+      .where(eq(oauthTokensTable.id, existing.id));
+  } else {
+    await db.insert(oauthTokensTable).values({
+      userId: userId ?? null,
+      provider,
+      accessToken: encryptedAccessToken,
+      refreshToken: encryptedRefreshToken ?? null,
+      expiresAt,
+      scope: data.scope ?? "",
     });
+  }
 }
 
 export async function deleteToken(provider: string): Promise<void> {
-  await db.delete(oauthTokensTable).where(eq(oauthTokensTable.provider, provider));
+  const userId = getCurrentUserId();
+  await db.delete(oauthTokensTable).where(tokenScope(provider, userId));
 }
 
 // ── Provider refresh logic ─────────────────────────────────────────────────────
