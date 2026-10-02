@@ -17,8 +17,9 @@
  */
 
 import crypto from "node:crypto";
-import { db, usersTable, type User, type PublicUser, toPublicUser } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, oauthTokensTable, type User, type PublicUser, toPublicUser } from "@workspace/db";
+import { eq, isNull } from "drizzle-orm";
+import { logger } from "./logger.js";
 
 const SALT_LENGTH = 16;
 const HASH_LENGTH = 64;
@@ -90,7 +91,30 @@ export async function createUser(email: string, password: string, displayName: s
     })
     .returning();
 
+  if (isFirstAccount) {
+    await backfillOwnershipToFirstAccount(row.id);
+  }
+
   return toPublicUser(row);
+}
+
+/**
+ * Real two-phase migration, run automatically rather than as a manual
+ * operator step (khameleon-decisions-log.md, 2026-10-03 - no migration-file
+ * mechanism exists in this repo, so this runs at the one moment it's
+ * actually needed: the instant accounts mode turns on). Any oauth_tokens
+ * row that predates accounts mode (userId IS NULL - the previous single
+ * global connection) is reassigned to the new admin, the only honest
+ * default when no real per-row ownership data exists. Idempotent and safe
+ * to extend: later phases (vault_items, API keys) add their own backfill
+ * here rather than a separate script nobody will remember to run.
+ */
+async function backfillOwnershipToFirstAccount(adminUserId: number): Promise<void> {
+  const result = await db
+    .update(oauthTokensTable)
+    .set({ userId: adminUserId })
+    .where(isNull(oauthTokensTable.userId));
+  logger.info({ adminUserId, rowCount: result.rowCount }, "accounts.ts: backfilled pre-existing oauth_tokens rows to the first admin account");
 }
 
 /** Returns the authenticated user, or null for a wrong email/password/inactive account - never distinguishes which, to avoid leaking which emails are registered. */
