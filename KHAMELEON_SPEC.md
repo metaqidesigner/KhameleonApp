@@ -64,13 +64,13 @@ It's built for people (and, longer-term, organisations) who already have access 
 - Real local Postgres dev environment, schema, and end-to-end verification pipeline
 - Real self-hosting via Docker Compose (`Dockerfile`, `docker-compose.yml`, `SELF_HOSTING.md`) for the default single-tenant deployment mode
 - A free-floating, draggable, resizable, dockable (to the right rail) Chat Window — the primary way a user talks to their agents, replacing the old fixed `ChatPanel`. Streaming single-agent replies plus genuinely wired Parallel/Vote/Council modes (all real `askAll`/`streamAgentChat` calls), real reasoning steps surfaced from each agent's actual tool calls, and real empty-state/starter-card/parked-task data
+- Mobile Morning Briefing (V1, PWA) — see §"Mobile Morning Briefing" below for what shipped vs. deferred
 
 **In Progress / Recently Landed:**
 - Provider Access Model (§18) — the single-user-scoped fix (every AI call site uses the user's own saved key) shipped 2026-09-06
 - Deployment model decided (hybrid, 2026-09-08) and the default mode packaged for self-hosting (2026-09-10) — see Architecture. The hosted/managed mode has not been started.
 
 **Planned:**
-- **Mobile Morning Briefing** — see full description below
 - Hosted/managed deployment mode — real accounts, login, per-account data isolation. The actual home for §11.4's org-approved trust tier and §18's full per-account credential isolation.
 - §13.1 web-app windows (embedding Gmail/Slack/etc. live inside Khameleon) — blocked on a decision to ship a fuller Electron build
 - §13.2 full agent browser automation (clicks, logins, JS-rendered pages) — today's web-reading tool only handles static/server-rendered pages
@@ -80,7 +80,17 @@ It's built for people (and, longer-term, organisations) who already have access 
 - Demo/gimmick feature policy — never explicitly ruled on; the product's tone leans toward "no," but nothing's decided
 - Mobile device control (beyond the Morning Briefing) — flagged as in-scope back in August, no architecture exists
 
-### Mobile Morning Briefing (Planned — detailed spec)
+### Mobile Morning Briefing (Shipped — V1, PWA; original spec below)
+
+Delivery platform decided 2026-10-03: a PWA at `/briefing` (installable, `manifest.json` + a real icon + an installability-only service worker), not a native app — continuity with desktop is nearly free this way (same codebase, same backend, same session), versus a second tech stack needing its own app-store accounts. A Capacitor native wrapper around this same PWA is a real, deliberately later step, not started.
+
+**What V1 actually ships, against the original spec below:**
+- Tiered delivery — real, built on real data (`GET /api/briefing/today`): tier 1 from real task urgency fields plus drafted-and-awaiting-confirmation actions, tiers 2/3 from the real Outlook triage pipeline (no Gmail triage skill exists, so Gmail only contributes to tier 1's proactive drafting, not tiers 2/3).
+- Proactive drafted solutions — real, for both Outlook and Gmail (both have real draft-email pipelines). Voice-approvable "send it"/"skip" for both; "change the tone" (one real re-compose pass, not an open-ended rewrite loop) is Outlook-only in V1.
+- Continuity — partially real: the underlying mechanism (the real, already-persisted `agent_conversations` session table) is confirmed and ready, but wiring a briefing's conversational follow-up to actually resume in the desktop Chat Window is **not yet built** — scoped out of V1 as a small, non-blocking follow-up, not silently dropped. Treat this specific piece as still open against the original "hard requirement, launch blocker" framing below.
+- Also deferred, flagged not hidden: true background/lock-screen audio (no Wake Lock/Media Session API groundwork exists in this app at all).
+
+Original spec, for what the feature is still aiming at in full:
 
 An audio-predominant, minimal-visual experience for use on a commute (car or public transport):
 
@@ -111,7 +121,6 @@ Most enterprise AI fails at adoption, not capability — this section is about c
 - **Hosted mode scope and pricing** — since §18 already rules out Khameleon metering/billing *model calls* (those are always the user's own provider account), a hosted convenience tier still needs its own answer for what Khameleon itself charges for (hosting, support, admin console?) — not addressed yet.
 - **§13.1 Electron decision** — ship a fuller Electron build (to support embedding live web-app sessions) or stay a browser SPA? `apps/khameleon-shell` gives a real head start either way, but the call hasn't been made. Related to, but distinct from, the deployment-mode decision above — an Electron wrap could serve either mode.
 - **Demo/gimmick feature policy** — never explicitly ruled on.
-- **Mobile Morning Briefing platform/delivery mechanism** — not yet decided (native app vs. PWA vs. something else); the continuity requirement with desktop may itself constrain this choice.
 - **AI-provider ToS review** — whether rebranding/reselling access via others' APIs is compliant with their usage policies, before any commercial claim is made. Not yet done.
 
 ## 9. Changelog
@@ -135,3 +144,5 @@ Most enterprise AI fails at adoption, not capability — this section is about c
 - **2026-10-02** — Found and fixed the actual cause behind a second "can't see it" report: every layer of the app shell (`html`/`body`/`#root`, `.j-shell`, `.j-body-row`, `.j-main-area`) set `overflow:hidden` with no scroll fallback anywhere, so on any browser window shorter than the Live Wall's own ~844px minimum, its bottom content — including the whole assistant panel — was genuinely unreachable, not just visually subtle. This is an app-wide gap, not Chat-Window-specific: any tab with content taller than a given viewport would hit the same wall. Scoped the fix to `.j-main-area` alone (`overflow-y:auto`) so the per-tab content pane scrolls when it needs to while `TopBar`/`LeftSidebar` stay pinned; verified a normal-height viewport shows no scrollbar and nothing changes. Also renamed that panel's leaked internal label ("Orb window / assistant state") to "Khami" — it already had a real typeable chat input, it had just never been visible to find. Full detail in `khameleon-decisions-log.md`, 2026-10-02.
 - **2026-10-02** — A follow-up screenshot showed the scroll fix wasn't sufficient on its own: below the 900px breakpoint, the Live Wall's three panels stack vertically instead of overlaying, so the page grows far taller than desktop (measured 993px+ at 390px wide) and Khami — still anchored to that growing page — ended up 760px down a scroll, technically reachable but not actually visible for a widget meant to be always-present. Fixed by pinning Khami to the viewport (`position:fixed`) below that breakpoint, matching how the floating Chat window already behaves, with a width formula that accounts for the app's left icon rail so it doesn't drift the way a naive `vw`-based width would have. Desktop behavior is bit-for-bit unchanged. Full detail in `khameleon-decisions-log.md`, 2026-10-02.
 - **2026-10-02** — Replaced scrolling with scale-to-fit for the Live Wall: rather than keep reworking scroll/pin fallbacks for different viewport sizes, the whole Wall now renders at its native hand-tuned size and is uniformly scaled (like a game letterboxing to the window) to exactly fill any screen, live, with no scrolling — down to a legibility floor, below which a deliberately tiny window genuinely can't fit everything and falls back to real (now fully-reachable, a flexbox-centering bug was fixed along the way) scroll instead of silent clipping. This made the just-built Khami `position:fixed` viewport-pin and the old mobile panel-stacking rules obsolete — both removed, since a scaled ancestor would have silently broken the pin trick. Verified across five real screen sizes plus live window-resizing. Previewed on the real Docker deployment before committing, per Newton's explicit request this round. Full detail in `khameleon-decisions-log.md`, 2026-10-02.
+- **2026-10-02** — Removed the command palette's dead `AgentType`/`selectedAgent` system, functionally dead since the old `ChatPanel` (its only real consumer) was deleted earlier in the Chat Window build. Full detail in `khameleon-decisions-log.md`, 2026-10-02.
+- **2026-10-03** — Shipped the Mobile Morning Briefing (V1, PWA), closing the "platform/delivery mechanism" Open Question in favor of a PWA over a native app. Real tiered assembly from existing data (task urgency fields, the Outlook triage pipeline, drafted-and-awaiting-confirmation actions), real proactive drafting via both the Outlook and Gmail draft-email pipelines, and voice-driven approve/skip/change-the-tone backed by the existing `useVoice` hook with a real `ConfirmGate` review always available underneath. Caught and corrected a real research-methodology failure along the way: two of three Explore agents researched this in stale, isolated git worktrees that predated most of this session's branch work, and would have fed the plan several false "doesn't exist" claims (the real password/session auth, the real `needs_input` task status, the real Gmail draft skill) had they not been caught and re-verified by hand first. Full build/verification/scope detail in `khameleon-decisions-log.md`, 2026-10-03.
