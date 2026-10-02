@@ -43,3 +43,12 @@ Full discrepancy log, architecture decisions, and both real bugs found/fixed dur
 - This `STATUS_REPORT.md`.
 - `khameleon-decisions-log.md` and `KHAMELEON_SPEC.md` updated (ground truth + build entries, Shipped/Changelog lines).
 - Small, logically-grouped commits on `design/home-implemented-glass`, not `main`. Not pushed — awaiting confirmation per this session's established pattern.
+
+## Re-verified in the real self-hosted Docker deployment (2026-10-02, follow-up pass)
+
+The Chat Window code above was already committed when this pass started — no app code changed here. This closes the loop on whether it actually works the way a real self-hosted user would run it: `docker compose build && docker compose up -d --no-deps khameleon` against the existing `Dockerfile`/`docker-compose.yml` (built in an earlier session, see `khameleon-decisions-log.md` 2026-09-09/10), then driven live with Playwright against the running container on a genuinely fresh database (empty roster, no onboarding completed, no provider key set) — the actual first-run state a stranger following `SELF_HOSTING.md` would hit.
+
+- Build succeeded (`Successfully tagged khameleonapp-khameleon:latest`), container redeployed and healthy, confirmed serving the Chat Window's own bundled font files (`/fonts/space-grotesk-variable.woff2`, `/fonts/jetbrains-mono-variable.woff2`) from the fresh image — proof the deployed container is actually running this feature, not a stale image.
+- Drove the full checklist against the container exactly as done earlier against the dev server: empty state, send a message, drag, resize, dock, float back, minimize, restore, close/reopen. Zero console/page errors throughout.
+- With no provider key configured (the real, honest first-run state — not simulated), sending a message correctly routed to CLAUDE and surfaced **"Error: Anthropic API key not configured"** with honest `0ms $0.0000 n/a`, rather than a fabricated success. This is the same honest-failure path verified against the dev server earlier, now confirmed to hold in the actual packaged container a real self-hosting user would run.
+- No reasoning block appeared, correctly — no tool call occurred (no agent could run at all without a key), so there was nothing real to show. Consistent with the "n/a-by-omission, never fabricated" rule.

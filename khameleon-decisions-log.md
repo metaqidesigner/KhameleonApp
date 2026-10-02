@@ -1159,5 +1159,17 @@ No direct false "shipped" claim found in `KHAMELEON_SPEC.md` (its Features list 
 
 Final state: 77/77 vitest tests passing, `tsc --noEmit` clean, zero console/page errors across the full Playwright verification run.
 
+## 2026-10-02 — Re-verified the Chat Window inside the real self-hosted Docker deployment
+
+The two entries above verified the Chat Window against the local dev server (`pnpm dev`, two separate processes on two ports). That's not what a real self-hosting user actually runs — they run the packaged `Dockerfile`/`docker-compose.yml` from the earlier self-hosting work (2026-09-09/10). This pass closes that gap: rebuilt the image (`docker compose build`, succeeded — `Successfully tagged khameleonapp-khameleon:latest`), redeployed (`docker compose up -d --no-deps khameleon`), and drove the same Playwright checklist against the actual running container instead of assuming the dev-server verification would transfer unchanged.
+
+No app code changed in this pass — this is verification-only, confirming already-committed work actually behaves correctly in the shape a real user would run it.
+
+**What's genuinely different about this environment, and why it mattered to check:** a freshly built container, on a database with no onboarding completed and an empty agent roster — the real first-run state, not a convenient pre-seeded one. Confirmed the container was actually serving the new code (not a stale cached image) by checking its access logs for the Chat Window's own bundled font files, which only exist in this feature's build output.
+
+**Result:** identical honest behavior to the dev-server pass. Sending a message with no provider key configured correctly routed to CLAUDE and surfaced "Error: Anthropic API key not configured" with honest `0ms $0.0000 n/a` — not a fabricated success, not a crash from the empty roster edge case. Drag, resize, dock, float-back, minimize, restore, and close/reopen all worked identically to the dev-server verification, zero console/page errors. No reasoning block appeared, correctly — no real tool call occurred (no agent could run at all without a key), so there was nothing real to show rather than a placeholder being faked in.
+
+Confirms the Chat Window build from the two entries above is genuinely ready for the self-hosted deployment path this app actually ships through, not just the local dev loop it was built and first verified in.
+
 ---
 *Full functional/design spec: khameleon-design-spec.md · Competitor research: khameleon-competitor-research.md*
