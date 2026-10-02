@@ -1,6 +1,8 @@
 /**
- * OAuth routes for all connectors, plus the shared-password session routes
- * (account isolation, Option A - khameleon-decisions-log.md, 2026-10-01).
+ * OAuth routes for all connectors, plus the session routes for both
+ * account-isolation options (Option A, shared password - 2026-10-01; Option
+ * B, real per-user accounts - 2026-10-03. See lib/session.ts's docblock for
+ * how the two compose: Option B wins the moment any account exists).
  *
  * GET  /api/auth/oauth/google/start     → redirect to Google consent screen
  * GET  /api/auth/oauth/microsoft/start  → redirect to Microsoft consent screen
@@ -8,16 +10,20 @@
  * GET  /api/auth/oauth/:provider/status → check if connected
  * DELETE /api/auth/oauth/:provider      → revoke & delete stored token
  *
- * GET  /api/auth/session         → { authRequired, authenticated } - always reachable, even logged out
- * POST /api/auth/session         → { password } - log in, sets the session cookie
+ * GET  /api/auth/session         → { authRequired, authenticated, mode, user? } - always reachable, even logged out
+ * POST /api/auth/session         → { password } (Option A) or { email, password } (Option B) - log in
  * POST /api/auth/session/logout  → clears the session cookie
+ * POST /api/auth/signup          → { email, password, displayName } - creates the first (admin) account when
+ *                                   none exist yet; once accounts mode is active, requires an admin session
+ *                                   (no public registration surface - see accounts.ts's docblock)
  */
 
 import { Router, type Request, type Response } from "express";
 import { saveToken, deleteToken, isConnected } from "../lib/oauthTokens.js";
 import {
-  isAppAuthConfigured, verifyPassword, createSession, isValidSession, destroySession, SESSION_COOKIE,
+  isAppAuthConfigured, verifyPassword, createSession, isValidSession, destroySession, currentUserId, SESSION_COOKIE,
 } from "../lib/session.js";
+import { accountsEnabled, createUser, verifyLogin, getUserById } from "../lib/accounts.js";
 import { db } from "@workspace/db";
 import { actionReceiptsTable } from "@workspace/db";
 import crypto from "node:crypto";
@@ -26,13 +32,75 @@ const router = Router();
 
 const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
-router.get("/session", (req: Request, res: Response) => {
+function setSessionCookie(req: Request, res: Response, userId?: number): void {
+  res.cookie(SESSION_COOKIE, createSession(userId), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: req.secure || req.headers["x-forwarded-proto"] === "https",
+    maxAge: SESSION_MAX_AGE_MS,
+    path: "/",
+  });
+}
+
+router.get("/session", async (req: Request, res: Response) => {
+  if (await accountsEnabled()) {
+    const userId = currentUserId(req);
+    const user = userId !== undefined ? await getUserById(userId) : undefined;
+    res.json({ authRequired: true, authenticated: !!user, mode: "accounts", user: user ? { id: user.id, email: user.email, displayName: user.displayName, isAdmin: user.isAdmin } : null });
+    return;
+  }
   const authRequired = isAppAuthConfigured();
   const authenticated = !authRequired || isValidSession(req.cookies?.[SESSION_COOKIE]);
-  res.json({ authRequired, authenticated });
+  res.json({ authRequired, authenticated, mode: "password" });
 });
 
-router.post("/session", (req: Request, res: Response) => {
+router.post("/signup", async (req: Request, res: Response) => {
+  const { email, password, displayName } = req.body as { email?: unknown; password?: unknown; displayName?: unknown };
+  if (typeof email !== "string" || typeof password !== "string") {
+    res.status(400).json({ error: "Email and password are required." });
+    return;
+  }
+
+  const alreadyHasAccounts = await accountsEnabled();
+  if (alreadyHasAccounts) {
+    // Not the bootstrap case - only an existing admin may create further accounts (no open public signup).
+    const requesterId = currentUserId(req);
+    const requester = requesterId !== undefined ? await getUserById(requesterId) : undefined;
+    if (!requester?.isAdmin) {
+      res.status(403).json({ error: "Only an admin can create new accounts." });
+      return;
+    }
+  }
+
+  try {
+    const user = await createUser(email, password, typeof displayName === "string" ? displayName : "");
+    if (!alreadyHasAccounts) {
+      // Bootstrap: the first account logs itself in immediately.
+      setSessionCookie(req, res, user.id);
+    }
+    res.status(201).json({ ok: true, user });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : "Signup failed." });
+  }
+});
+
+router.post("/session", async (req: Request, res: Response) => {
+  if (await accountsEnabled()) {
+    const { email, password } = req.body as { email?: unknown; password?: unknown };
+    if (typeof email !== "string" || typeof password !== "string") {
+      res.status(400).json({ error: "Email and password are required." });
+      return;
+    }
+    const user = await verifyLogin(email, password);
+    if (!user) {
+      res.status(401).json({ error: "Incorrect email or password." });
+      return;
+    }
+    setSessionCookie(req, res, user.id);
+    res.json({ ok: true, user });
+    return;
+  }
+
   if (!isAppAuthConfigured()) {
     // Nothing to log into - matches the open-by-default behavior everywhere else.
     res.json({ ok: true });
@@ -43,13 +111,7 @@ router.post("/session", (req: Request, res: Response) => {
     res.status(401).json({ error: "Incorrect password." });
     return;
   }
-  res.cookie(SESSION_COOKIE, createSession(), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: req.secure || req.headers["x-forwarded-proto"] === "https",
-    maxAge: SESSION_MAX_AGE_MS,
-    path: "/",
-  });
+  setSessionCookie(req, res);
   res.json({ ok: true });
 });
 
