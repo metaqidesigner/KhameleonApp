@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Shield, Lock, LogOut } from 'lucide-react';
+import { Shield, Lock, LogOut, Users, Power } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { getApiKeyStatus, clearApiKey, type ApiKeyProvider, type ApiKeyStatus } from '@/lib/jarvisApi';
 import { getSessionStatus, logout, signup, type SessionStatus } from '@/lib/sessionApi';
+import { listAccounts, setAccountActive, type Account } from '@/lib/accountsApi';
 
 /**
  * Real guardrails only get an ACTIVE badge - this page used to show all
@@ -45,10 +46,17 @@ export default function Security() {
   const [signupBusy, setSignupBusy] = useState(false);
   const [signupError, setSignupError] = useState<string | null>(null);
   const [signupDone, setSignupDone] = useState(false);
+  const [accounts, setAccounts] = useState<Account[] | null>(null);
+  const [accountBusy, setAccountBusy] = useState<Record<number, boolean>>({});
 
   const refresh = useCallback(() => {
     getApiKeyStatus().then(setKeySet);
-    getSessionStatus().then(setSession).catch(() => {});
+    getSessionStatus().then(s => {
+      setSession(s);
+      if (s.mode === 'accounts' && s.user?.isAdmin) {
+        listAccounts().then(setAccounts).catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -80,6 +88,16 @@ export default function Security() {
       setSignupError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
       setSignupBusy(false);
+    }
+  };
+
+  const toggleActive = async (account: Account) => {
+    setAccountBusy(b => ({ ...b, [account.id]: true }));
+    try {
+      const updated = await setAccountActive(account.id, !account.active);
+      setAccounts(list => list ? list.map(a => a.id === updated.id ? updated : a) : list);
+    } finally {
+      setAccountBusy(b => ({ ...b, [account.id]: false }));
     }
   };
 
@@ -150,6 +168,43 @@ export default function Security() {
             </form>
           )}
         </JPanel>
+
+        {session?.mode === 'accounts' && session.user?.isAdmin && accounts && (
+          <JPanel title="TEAM ACCOUNTS" icon={<Users size={13}/>}>
+            <table className="j-table">
+              <thead className="j-table-header">
+                <tr><th>ACCOUNT</th><th>STATUS</th><th>ACTION</th></tr>
+              </thead>
+              <tbody>
+                {accounts.map(a => (
+                  <tr key={a.id}>
+                    <td style={{ fontSize:10 }}>
+                      <div style={{ color:'var(--j-text)' }}>{a.displayName || a.email}{a.isAdmin ? ' · admin' : ''}</div>
+                      <div className="j-mono" style={{ color:'var(--j-text-muted)', fontSize:9 }}>{a.email}</div>
+                    </td>
+                    <td>
+                      <span className={`j-badge ${a.active ? 'j-badge-green' : 'j-badge-red'}`}>
+                        {a.active ? '● ACTIVE' : '✕ DEACTIVATED'}
+                      </span>
+                    </td>
+                    <td>
+                      {a.id !== session.user?.id && (
+                        <button
+                          className="j-btn-ghost"
+                          disabled={!!accountBusy[a.id]}
+                          onClick={() => toggleActive(a)}
+                          style={{ height:22, padding:'0 8px', fontSize:9, display:'flex', alignItems:'center', gap:4, opacity: accountBusy[a.id] ? 0.5 : 1 }}
+                        >
+                          <Power size={10} />{a.active ? 'DEACTIVATE' : 'REACTIVATE'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </JPanel>
+        )}
 
         <JPanel title="CREDENTIAL VAULT STATUS" icon={<Lock size={13}/>}>
           <table className="j-table">
