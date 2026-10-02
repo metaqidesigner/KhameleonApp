@@ -151,7 +151,6 @@ export function CommandWall() {
   const [focusAnnouncement, setFocusAnnouncement] = useState<string | null>(null);
   const promotedIdsRef = useRef<Set<number>>(new Set());
 
-  const orbRef = useRef<HTMLDivElement>(null);
   const streamBufRef = useRef("");
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
 
@@ -376,35 +375,6 @@ export function CommandWall() {
     handleSend(chatDraft);
   }
 
-  useEffect(() => {
-    const orb = orbRef.current;
-    const texture = orb?.querySelector<HTMLElement>(".orb-texture");
-    const lightOne = orb?.querySelector<HTMLElement>(".orb-light-one");
-    const lightTwo = orb?.querySelector<HTMLElement>(".orb-light-two");
-    if (!isLive || wallState !== "idle" || !texture || !lightOne || !lightTwo) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let timer: number | undefined;
-    const moveToWaypoint = () => {
-      texture.style.setProperty("--shimmer-x", `${Math.round((Math.random() * 2 - 1) * 4)}px`);
-      texture.style.setProperty("--shimmer-y", `${Math.round((Math.random() * 2 - 1) * 4)}px`);
-      texture.style.setProperty("--shimmer-scale", (1 + Math.random() * 0.024).toFixed(3));
-      texture.style.setProperty("--shimmer-rotate", `${((Math.random() * 2 - 1) * 1.2).toFixed(2)}deg`);
-      texture.style.setProperty("--shimmer-position", `${48 + Math.round(Math.random() * 7)}% ${47 + Math.round(Math.random() * 7)}%`);
-      const setLight = (element: HTMLElement, hue: "teal" | "violet") => {
-        element.style.setProperty("--light-x", `${Math.round((Math.random() * 2 - 1) * 12)}px`);
-        element.style.setProperty("--light-y", `${Math.round((Math.random() * 2 - 1) * 12)}px`);
-        element.style.setProperty("--light-scale", (0.84 + Math.random() * 0.34).toFixed(2));
-        element.style.setProperty("--light-opacity", (0.16 + Math.random() * 0.25).toFixed(2));
-        element.style.setProperty("--light-hue", hue === "teal" ? "99,225,211" : "169,153,255");
-      };
-      setLight(lightOne, "teal");
-      setLight(lightTwo, "violet");
-      timer = window.setTimeout(moveToWaypoint, 1400 + Math.random() * 2200);
-    };
-    moveToWaypoint();
-    return () => { if (timer !== undefined) window.clearTimeout(timer); };
-  }, [isLive, wallState]);
-
   return (
     <main className="wall-shell">
       <style>{`
@@ -500,43 +470,41 @@ export function CommandWall() {
       `}</style>
       <style>{`
         .left-cluster,.right-cluster{transform:none!important}
-        .orb-window{position:absolute;right:22px;bottom:18px;width:min(380px,calc(100% - 36px));height:322px;z-index:20;padding:15px 17px 13px;border-radius:17px;background:linear-gradient(140deg,rgba(26,57,69,.93),rgba(10,27,40,.95));border:1px solid rgba(209,255,246,.34);box-shadow:0 20px 44px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.3),0 0 40px rgba(99,225,211,.08);backdrop-filter:blur(16px);overflow:hidden}
+        .orb-window{position:absolute;right:22px;bottom:18px;width:min(380px,calc(100% - 36px));height:322px;z-index:20;padding:15px 17px 13px;border-radius:17px;background:linear-gradient(140deg,rgba(26,57,69,.93),rgba(10,27,40,.95));border:none;box-shadow:0 20px 44px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.3),0 0 40px rgba(99,225,211,.08);backdrop-filter:blur(16px);overflow:hidden}
         .wall-plane{z-index:4}
         .orb-window:before{content:"";position:absolute;inset:-35%;pointer-events:none;background:radial-gradient(circle at 50% 58%,rgba(99,225,211,.12),transparent 28%),radial-gradient(circle at 66% 42%,rgba(169,153,255,.12),transparent 32%);filter:blur(4px)}
         .orb-window-head{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:flex-start}.orb-window-title{font-size:12px;color:#e8f3f0}.orb-window-sub{display:block;margin-top:3px;color:#78908f;font-size:8px}.orb-window-live{color:var(--teal);font-size:8px;border:1px solid rgba(99,225,211,.25);padding:5px 7px;border-radius:7px}
-        .orb-stage{position:absolute;left:50%;top:42%;width:126px;height:126px;transform:translate(-50%,-50%);display:grid;place-items:center}.orb-stage:before{content:"";position:absolute;inset:-32px;border-radius:50%;background:radial-gradient(circle,rgba(99,225,211,.16),transparent 61%);filter:blur(6px)}
-        /* .orb-core collides with the unrelated global .orb-core rule in
-           components/orb/orb.css (the persistent floating-orb widget uses
-           the same class name) - that rule sets top/left/transform for its
-           own 54px orb, and since this rule never declared those three
-           properties, they leaked straight through the cascade and dragged
-           this 100px orb ~26px toward the bottom-right of its rings.
-           !important pins these three regardless of stylesheet load order,
-           since two unrelated bare .orb-core selectors have equal
-           specificity and would otherwise depend on it. */
-        .orb-core{position:relative;top:auto!important;left:auto!important;transform:none!important;width:100px;height:100px;border-radius:50%;overflow:hidden;background:#7f8b90;box-shadow:inset -15px -18px 23px rgba(0,0,0,.65),inset 10px 8px 18px rgba(255,255,255,.16),0 0 36px rgba(99,225,211,.28),0 0 60px rgba(169,153,255,.16);transition:box-shadow .35s ease,filter .35s ease}
-        .orb-texture{position:absolute;inset:-10%;background-image:url("/khameleon-command/nebula-core.png");background-size:118% 118%;background-position:var(--shimmer-position,center);filter:grayscale(1) contrast(1.1) brightness(1.15);transition:transform 2.8s cubic-bezier(.22,.72,.28,1),background-position 3.2s cubic-bezier(.22,.72,.28,1),filter .6s ease;transform:translate3d(var(--shimmer-x,0px),var(--shimmer-y,0px),0) scale(var(--shimmer-scale,1)) rotate(var(--shimmer-rotate,0deg));animation:none}.orb-core.idle.wall-paused .orb-texture{transition:none}
-        .orb-light{position:absolute;z-index:1;inset:-18%;pointer-events:none;mix-blend-mode:screen;opacity:var(--light-opacity,.22);transform:translate3d(var(--light-x,0px),var(--light-y,0px),0) scale(var(--light-scale,1));transition:transform 2.2s cubic-bezier(.22,.72,.28,1),opacity 2.2s ease;filter:blur(8px)}.orb-light-one{background:radial-gradient(circle at 35% 30%,rgba(99,225,211,.95) 0%,rgba(99,225,211,.42) 18%,transparent 58%)}.orb-light-two{background:radial-gradient(circle at 70% 68%,rgba(169,153,255,.82) 0%,rgba(169,153,255,.28) 22%,transparent 62%);filter:blur(10px)}
-        .orb-core:before{content:"";position:absolute;inset:0;z-index:2;background-image:radial-gradient(1px 1px at 30% 40%,rgba(255,255,255,.9),transparent 1.7px),radial-gradient(1px 1px at 60% 25%,rgba(255,255,255,.7),transparent 1.7px),radial-gradient(1.5px 1.5px at 45% 65%,rgba(255,255,255,.8),transparent 2px),radial-gradient(1px 1px at 72% 55%,rgba(255,255,255,.75),transparent 1.7px),radial-gradient(1px 1px at 20% 60%,rgba(255,255,255,.5),transparent 1.7px),radial-gradient(1px 1px at 82% 40%,rgba(255,255,255,.6),transparent 1.7px),radial-gradient(1px 1px at 40% 80%,rgba(255,255,255,.55),transparent 1.7px),radial-gradient(1px 1px at 15% 30%,rgba(255,255,255,.5),transparent 1.7px),radial-gradient(1px 1px at 55% 15%,rgba(255,255,255,.5),transparent 1.7px),radial-gradient(1px 1px at 88% 70%,rgba(255,255,255,.5),transparent 1.7px);opacity:.65;pointer-events:none}
-        .orb-core:after{content:"";position:absolute;inset:0;z-index:3;border-radius:50%;background:radial-gradient(circle at 32% 24%,rgba(255,255,255,.55),transparent 10%),radial-gradient(circle at 68% 78%,rgba(0,0,0,.52),transparent 40%);pointer-events:none}
-        .orb-core.idle{filter:saturate(.65)}.orb-core.listening{box-shadow:inset -20px -24px 30px rgba(0,0,0,.65),inset 14px 10px 24px rgba(255,255,255,.16),0 0 55px rgba(99,225,211,.52),0 0 90px rgba(99,225,211,.2)}.orb-core.listening .orb-texture{animation:orb-voice 1.1s ease-in-out infinite alternate}.orb-core.thinking{box-shadow:inset -20px -24px 30px rgba(0,0,0,.65),inset 14px 10px 24px rgba(255,255,255,.16),0 0 55px rgba(169,153,255,.52),0 0 90px rgba(169,153,255,.2)}.orb-core.thinking .orb-texture{animation:orb-think 3s linear infinite}.orb-core.researching{box-shadow:inset -20px -24px 30px rgba(0,0,0,.65),inset 14px 10px 24px rgba(255,255,255,.16),0 0 55px rgba(233,184,114,.52),0 0 90px rgba(233,184,114,.18)}.orb-core.researching .orb-texture{animation:orb-think 6s linear infinite}.orb-core.speaking{box-shadow:inset -20px -24px 30px rgba(0,0,0,.65),inset 14px 10px 24px rgba(255,255,255,.16),0 0 42px rgba(99,225,211,.5),0 0 90px rgba(169,153,255,.34);animation:orb-breathe 1.5s ease-in-out infinite}.orb-core.speaking .orb-texture{animation:orb-voice .7s ease-in-out infinite alternate}.orb-core.error{box-shadow:inset -20px -24px 30px rgba(0,0,0,.65),inset 14px 10px 24px rgba(255,255,255,.16),0 0 55px rgba(246,142,123,.58)}.orb-core.muted{filter:grayscale(1) brightness(.58);opacity:.72}
-        .orb-tint{position:absolute;inset:0;z-index:1;border-radius:50%;mix-blend-mode:color;opacity:0;transition:background .3s ease,opacity .3s ease}.orb-core.listening .orb-tint{background:var(--teal);opacity:1}.orb-core.thinking .orb-tint{background:var(--violet);opacity:1}.orb-core.researching .orb-tint{background:var(--amber);opacity:1}.orb-core.speaking .orb-tint{background:linear-gradient(135deg,var(--teal),var(--violet));opacity:1}.orb-core.error .orb-tint{background:var(--coral);opacity:1}
-        .orb-ring{position:absolute;border-radius:50%;border:1px solid rgba(231,255,251,.52);box-shadow:0 0 10px rgba(231,255,251,.3),inset 0 0 10px rgba(231,255,251,.1)}.orb-ring.one{inset:10px;animation:orb-spin 10s linear infinite}.orb-ring.two{inset:-3px;border-color:rgba(188,222,255,.28);animation:orb-spin-reverse 16s linear infinite}.orb-ring.three{inset:-16px;border-color:rgba(169,153,255,.18);border-left-color:transparent;border-bottom-color:transparent;animation:orb-spin 22s linear infinite}.orb-ring.one:after,.orb-ring.two:after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:#ecfffb;box-shadow:0 0 8px 3px rgba(231,255,251,.72);top:-3px;left:50%;transform:translateX(-50%)}.orb-ring.two:after{right:-3px;left:auto;top:46%;transform:none;width:7px;height:7px}
-        .orb-trail{position:absolute;left:-16px;right:-16px;bottom:-18px;height:50px;border-bottom:1px solid rgba(99,225,211,.4);border-radius:50%;transform:rotate(-12deg);opacity:.7;filter:blur(.2px)}.orb-trail:after{content:"";position:absolute;right:18%;bottom:5px;width:4px;height:4px;border-radius:50%;background:var(--teal);box-shadow:0 0 9px 3px var(--teal)}
+        /* Spacious dark stage for the real animated head asset (2026-10-02,
+           replacing the old synthetic sphere) - sized to the available room
+           above the chat input/state-row/footer, not the orb-window's own
+           380x322 footprint, which is unchanged. Glow colour now carries the
+           state signal the old .orb-tint used to (see .orb-stage.<state>
+           below) - tinting the head image itself would look unnatural. */
+        .orb-stage{position:absolute;left:50%;top:48px;width:200px;height:144px;transform:translateX(-50%);display:grid;place-items:center}
+        .orb-stage:before{content:"";position:absolute;inset:-40px;border-radius:50%;background:radial-gradient(circle,rgba(99,225,211,.16),transparent 61%);filter:blur(10px);transition:background .6s ease}
+        .orb-stage.listening:before{background:radial-gradient(circle,rgba(99,225,211,.34),transparent 61%)}
+        .orb-stage.thinking:before{background:radial-gradient(circle,rgba(169,153,255,.34),transparent 61%)}
+        .orb-stage.researching:before{background:radial-gradient(circle,rgba(233,184,114,.3),transparent 61%)}
+        .orb-stage.speaking:before{background:radial-gradient(circle,rgba(99,225,211,.3),transparent 61%)}
+        .orb-stage.error:before{background:radial-gradient(circle,rgba(246,142,123,.34),transparent 61%)}
+        .orb-stage.muted:before{background:radial-gradient(circle,rgba(140,150,150,.1),transparent 61%)}
+        /* khameleon-head.webp (726x524, 72-frame animated loop) carries its
+           own complete idle/blink/tilt motion - no CSS animation layered on
+           top. object-fit:contain preserves aspect ratio with no stretch or
+           crop. The translate corrects for the asset's own uneven
+           transparent padding (measured across the full loop: ~80px empty
+           above the head, ~15px below, roughly centred horizontally) so the
+           visible head - not the padded canvas - sits optically centred. */
+        .orb-head{width:100%;height:100%;object-fit:contain;transform:translate(1%,-6%);pointer-events:none;user-select:none}
         .orb-state-row{position:absolute;z-index:3;left:15px;right:15px;bottom:77px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}.orb-state{min-width:0;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.035);color:#849e9a;border-radius:7px;padding:5px 2px;font-size:7px;line-height:1;cursor:pointer;white-space:nowrap}.orb-state.active{color:var(--teal);border-color:rgba(99,225,211,.42);background:rgba(99,225,211,.09)}.orb-state[data-state="thinking"].active{color:var(--violet);border-color:rgba(169,153,255,.42);background:rgba(169,153,255,.09)}.orb-state[data-state="researching"].active{color:var(--amber);border-color:rgba(233,184,114,.42);background:rgba(233,184,114,.09)}.orb-state[data-state="error"].active{color:var(--coral);border-color:rgba(246,142,123,.42);background:rgba(246,142,123,.09)}
         .orb-chat{position:absolute;z-index:4;left:15px;right:15px;bottom:39px;height:29px;display:flex;align-items:center;gap:7px;padding:3px 4px 3px 10px;border:1px solid rgba(161,255,241,.2);border-radius:9px;background:rgba(4,19,28,.62);box-shadow:inset 0 1px rgba(255,255,255,.1)}
         .orb-chat input{min-width:0;flex:1;border:0;outline:0;background:transparent;color:#d9f4ee;font:9px ui-sans-serif,system-ui,sans-serif}.orb-chat input::placeholder{color:#718b89}.orb-chat button{width:22px;height:22px;display:grid;place-items:center;border:1px solid rgba(99,225,211,.32);border-radius:6px;background:rgba(99,225,211,.1);color:var(--teal);cursor:pointer}.orb-chat button:disabled{opacity:.4;cursor:not-allowed}.orb-chat svg{width:11px;height:11px}
-        .orb-window-footer{position:absolute;left:15px;right:15px;bottom:13px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;color:#78908f;font:7px ui-monospace,monospace;letter-spacing:.03em}.orb-window-footer span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.orb-window-footer b{color:var(--teal);font-weight:500;white-space:nowrap}@keyframes orb-spin{to{transform:rotate(360deg)}}@keyframes orb-spin-reverse{to{transform:rotate(-360deg)}}@keyframes orb-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}@keyframes orb-think{0%{transform:scale(1.03) rotate(0deg);background-position:46% 52%}50%{transform:scale(1.12) rotate(180deg);background-position:58% 44%}100%{transform:scale(1.03) rotate(360deg);background-position:46% 52%}}@keyframes orb-voice{0%{transform:scale(1.02) translateY(1px)}25%{transform:scale(1.07) translateY(-2px)}50%{transform:scale(1.12) translateY(1px)}75%{transform:scale(1.05) translateY(-1px)}100%{transform:scale(1.14) translateY(1px)}}
+        .orb-window-footer{position:absolute;left:15px;right:15px;bottom:13px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;color:#78908f;font:7px ui-monospace,monospace;letter-spacing:.03em}.orb-window-footer span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.orb-window-footer b{color:var(--teal);font-weight:500;white-space:nowrap}
         @media (min-width:901px){
           .left-cluster{left:0;width:calc(24% - 10px)}
           .center-cluster{left:calc(24% + 10px);width:calc(52% - 20px)}
           .right-cluster{right:0;left:auto;width:calc(24% - 10px)}
         }
-        .orb-core.speaking{animation:none}
-        .orb-core.speaking .orb-texture{animation:none;transform:translate(var(--voice-shift-x,0px),var(--voice-shift-y,0px)) scale(var(--voice-scale,1.015)) rotate(var(--voice-angle,0deg));transition:transform .09s ease-out}
-        .orb-core.speaking:before{opacity:var(--voice-dust-opacity,.4)}
-        .orb-core.wall-paused .orb-texture,.orb-core.wall-paused .orb-light{animation:none!important;transition:none!important}
-        @media(prefers-reduced-motion:reduce){.orb-ring,.orb-texture,.orb-core{animation:none!important}}
       `}</style>
       <div className="space-field" aria-hidden="true"/><div className="reflection-plane" aria-hidden="true"/>
       <header className="topbar glass">
@@ -770,10 +738,7 @@ export function CommandWall() {
       <article className="orb-window">
         <div className="orb-window-head"><div><div className="eyebrow">Orb window / assistant state</div><div className="orb-window-title">Khameleon <span style={{ color: "#63e1d3" }}>presence</span></div><span className="orb-window-sub">One continuous agent · state drives the atmosphere</span></div><span className="orb-window-live">{wallState.toUpperCase()}</span></div>
         <div className={`orb-stage ${wallState}`}>
-          <div className="orb-ring three"/><div className="orb-ring two"/><div className="orb-ring one"/><div className="orb-trail"/>
-          <div ref={orbRef} className={`orb-core ${wallState} ${isLive ? "wall-live" : "wall-paused"}`}>
-            <span className="orb-texture"/><span className="orb-light orb-light-one"/><span className="orb-light orb-light-two"/><span className="orb-tint"/>
-          </div>
+          <img className="orb-head" src="/khameleon-head.webp" alt="Khameleon" />
         </div>
         <form className="orb-chat" onSubmit={submitChat}>
           <input value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} placeholder={chatSent ? "Ask another question…" : "Ask Khameleon anything…"} aria-label="Chat with Khameleon" disabled={streaming}/>
