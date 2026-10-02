@@ -15,6 +15,11 @@ import { z } from "zod/v4";
 
 export const vaultAccessLogTable = pgTable("vault_access_log", {
   id: serial("id").primaryKey(),
+  // Hosted/managed mode, Phase 3 - recorded at write time, same reasoning
+  // as itemName below: the log must stay readable (and correctly scoped to
+  // the right account) even after the vault item itself is gone, so this
+  // can't be a join against vault_items.userId.
+  userId: integer("user_id"),
   vaultItemId: integer("vault_item_id").notNull(),
   itemName: text("item_name").notNull(),
   action: text("action").notNull(), // 'created' | 'viewed' | 'updated' | 'deleted'
