@@ -3,7 +3,7 @@ import Background from './Background';
 import TopBar from './TopBar';
 import NewsTicker from './NewsTicker';
 import CommandPalette from './CommandPalette';
-import ChatPanel from './ChatPanel';
+import ChatWindow from './chatWindow/ChatWindow';
 import { LeftSidebar } from './LeftSidebar';
 import { JarvisOrbPortal } from './orb/JarvisOrbPortal';
 import { VoiceController } from './orb/VoiceController';
@@ -79,7 +79,7 @@ export function AppShell() {
       </div>
 
       <CommandPalette />
-      <ChatPanel />
+      <ChatWindow />
 
       {/* Floating orb — always present */}
       <JarvisOrbPortal />

@@ -50,7 +50,18 @@ export default function CommandPalette() {
   }, [commandPaletteOpen]);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setCommandPaletteOpen(false); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCommandPaletteOpen(false);
+      // Cmd/Ctrl+K - the Chat Window spec (2026-10-02) assumed this already
+      // existed ("don't break it"); ground-truth check found it didn't -
+      // only the topbar Search button opened the palette. Added for real
+      // rather than faking a shortcut that wasn't there. See
+      // khameleon-decisions-log.md, 2026-10-02 for the full keybinding list.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen(true);
+      }
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [setCommandPaletteOpen]);
