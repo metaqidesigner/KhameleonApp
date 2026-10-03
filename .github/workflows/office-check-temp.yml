@@ -1,0 +1,18 @@
+name: Check for Office on windows-2022
+on: workflow_dispatch
+jobs:
+  check:
+    runs-on: windows-2022
+    steps:
+      - name: Probe for Microsoft Office / Excel
+        shell: pwsh
+        run: |
+          Write-Host "--- Program Files ---"
+          Get-ChildItem "C:\Program Files" -ErrorAction SilentlyContinue | Select-Object Name
+          Write-Host "--- Program Files (x86) ---"
+          Get-ChildItem "C:\Program Files (x86)" -ErrorAction SilentlyContinue | Select-Object Name
+          Write-Host "--- Searching for excel.exe / winword.exe anywhere reasonable ---"
+          Get-ChildItem "C:\Program Files*" -Recurse -Filter "excel.exe" -ErrorAction SilentlyContinue | Select-Object FullName
+          Get-ChildItem "C:\Program Files*" -Recurse -Filter "winword.exe" -ErrorAction SilentlyContinue | Select-Object FullName
+          Write-Host "--- winget list (if available) ---"
+          winget list 2>$null | Select-String -Pattern "office|excel" -SimpleMatch
