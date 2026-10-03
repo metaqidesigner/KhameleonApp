@@ -70,8 +70,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile=false
 
-      - name: Build khameleon-shell
-        run: pnpm --filter @khameleon/shell build
+      # "..." includes @khameleon/shell's workspace dependencies in build
+      # order too (khameleon-window-agent, @khameleon/integrations, etc.) -
+      # their dist/ output doesn't exist on a fresh checkout, unlike local
+      # dev where it's usually already built from earlier work.
+      - name: Build khameleon-shell and its workspace dependencies
+        run: pnpm --filter "@khameleon/shell..." build
 
       - name: Typecheck khameleon-shell and khameleon-window-agent
         run: |
