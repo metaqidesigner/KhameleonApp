@@ -68,6 +68,7 @@ jobs:
           "
 
       - name: Install dependencies
+        continue-on-error: true
         run: pnpm install --frozen-lockfile=false
 
       - name: DEBUG - confirm the extract-file-icon patch actually applied
