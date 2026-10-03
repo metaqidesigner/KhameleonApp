@@ -11,6 +11,11 @@ out-tsc
 # electron-builder packaged app output (apps/khameleon-shell)
 /apps/khameleon-shell/release
 
+# Tesseract.js OCR trained-data (Cross-App Control, khameleon-decisions-log.md,
+# 2026-10-03) - cached to ~/.khameleon/ocr-cache at runtime; this only catches
+# it if cachePath is ever accidentally left at its cwd-relative default.
+*.traineddata
+
 # dependencies
 node_modules
 

@@ -21,7 +21,8 @@
     "khameleon-window-agent": "workspace:*",
     "node-llama-cpp": "^3.22.1",
     "node-window-manager": "^2.2.4",
-    "pdf-parse": "^2.4.5"
+    "pdf-parse": "^2.4.5",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",

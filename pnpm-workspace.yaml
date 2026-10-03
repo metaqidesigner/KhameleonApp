@@ -11,20 +11,21 @@ packages:
 # a true/false prompt whenever a package's build script is ignored. Keep it
 # present with explicit values; deleting it just makes it reappear as a
 # placeholder (learned the hard way, 2026-10-03, khameleon-decisions-log.md).
-# electron/extract-file-icon/node-window-manager/node-llama-cpp are only
-# needed by apps/khameleon-shell - real, local, native desktop control and
-# (node-llama-cpp) offline local document reading (Cross-App Control
-# Phase 3) - and MUST be false in committed state so Docker's Linux build
-# (a full workspace `pnpm install`, per /Dockerfile) never tries to compile/
-# fetch these desktop-only native binaries. Flip to `true` + `pnpm install`
-# only while actually working on khameleon-shell locally, then flip back to
-# `false` before committing.
+# electron/extract-file-icon/node-window-manager/node-llama-cpp/tesseract.js
+# are only needed by apps/khameleon-shell - real, local, native desktop
+# control and (node-llama-cpp, tesseract.js) offline local document reading
+# (Cross-App Control Phase 3) - and MUST be false in committed state so
+# Docker's Linux build (a full workspace `pnpm install`, per /Dockerfile)
+# never tries to compile/fetch these desktop-only binaries. Flip to `true`
+# + `pnpm install` only while actually working on khameleon-shell locally,
+# then flip back to `false` before committing.
 allowBuilds:
   electron: false
   esbuild: true
   extract-file-icon: false
   node-llama-cpp: false
   node-window-manager: false
+  tesseract.js: false
 
 autoInstallPeers: false
 

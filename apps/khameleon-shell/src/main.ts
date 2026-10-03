@@ -163,6 +163,17 @@ app.whenReady().then(() => {
     if (typeof question !== "string" || !question.trim()) throw new Error("A non-empty question is required.");
     return localDocumentAgent.answerAboutDocument(filePath, question);
   });
+
+  // Same separate-from-cloud-Claude channel family as above. Structured,
+  // not free-text, for tax/accounting use - a JSON-schema grammar
+  // constrains the local model's output so it's always valid, not just
+  // plausible-looking (Cross-App Control, khameleon-decisions-log.md,
+  // 2026-10-03, added the same day once a scanned-receipt gap turned out
+  // to block something Newton considers critical).
+  ipcMain.handle("khameleon:extract-receipt-locally", async (_event, filePath: unknown) => {
+    if (typeof filePath !== "string" || !filePath.trim()) throw new Error("A non-empty file path is required.");
+    return localDocumentAgent.extractReceiptDetails(filePath);
+  });
 });
 
 app.on("window-all-closed", () => {

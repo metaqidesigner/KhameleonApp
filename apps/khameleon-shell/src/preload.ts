@@ -6,4 +6,6 @@ contextBridge.exposeInMainWorld("khameleon", {
   // main.ts's handler comment, Cross-App Control Phase 3).
   readDocumentLocally: (filePath: string, question: string) =>
     ipcRenderer.invoke("khameleon:read-document-locally", filePath, question),
+  extractReceiptLocally: (filePath: string) =>
+    ipcRenderer.invoke("khameleon:extract-receipt-locally", filePath),
 });

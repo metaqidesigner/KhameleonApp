@@ -37,7 +37,15 @@ async function buildAll() {
       // relative to their OWN file in node_modules. Bundling just the glob
       // leaves that relative require() in place but moves the calling code
       // into dist/, breaking the path (hit this for real, 2026-10-03).
-      external: ["electron", "node-window-manager", "extract-file-icon", "node-llama-cpp", "pdf-parse", "@napi-rs/canvas"],
+      external: [
+        "electron",
+        "node-window-manager",
+        "extract-file-icon",
+        "node-llama-cpp",
+        "pdf-parse",
+        "@napi-rs/canvas",
+        "tesseract.js",
+      ],
       sourcemap: "linked",
     });
   }

@@ -4,3 +4,4 @@ export * from "./coordinator";
 export * from "./tools";
 export * from "./localAgentRunner";
 export * from "./localDocumentAgent";
+export * from "./documentImport";
