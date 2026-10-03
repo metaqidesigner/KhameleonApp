@@ -14,7 +14,9 @@ export type Command =
   | { type: "teleport-last"; preset: "docked-right" | "docked-left" | "corner" | "enlarged" }
   | { type: "close-last" }
   | { type: "observe-external"; query: string; state: IndicatorState }
-  | { type: "stop-observing-last" };
+  | { type: "stop-observing-last" }
+  | { type: "click-in"; query: string; x: number; y: number }
+  | { type: "type-in"; query: string; text: string; x?: number; y?: number };
 
 const YOUTUBE_SEARCH = (query: string) =>
   `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
@@ -60,6 +62,23 @@ export function parseCommand(text: string): Command | null {
 
   if (/stop (observing|watching|controlling)|let go/.test(t)) {
     return { type: "stop-observing-last" };
+  }
+
+  // Matched against the original (non-lowercased) text, not `t` - typed
+  // content keeps whatever case was actually asked for.
+  const typeIn = text.match(/type\s+"([^"]*)"\s+into\s+(.+?)(?:\s+at\s+(\d+)\s*,\s*(\d+))?$/i);
+  if (typeIn) {
+    return {
+      type: "type-in",
+      text: typeIn[1],
+      query: typeIn[2].trim().toLowerCase(),
+      ...(typeIn[3] && typeIn[4] ? { x: Number(typeIn[3]), y: Number(typeIn[4]) } : {}),
+    };
+  }
+
+  const clickIn = t.match(/click at\s+(\d+)\s*,\s*(\d+)\s+in\s+(.+)/);
+  if (clickIn) {
+    return { type: "click-in", x: Number(clickIn[1]), y: Number(clickIn[2]), query: clickIn[3].trim() };
   }
 
   return null;
@@ -137,6 +156,29 @@ export class CommandRunner {
         const stopped = this.lastObserved;
         this.lastObserved = null;
         return `Stopped watching ${stopped.label ?? "window"}.`;
+      }
+
+      case "click-in": {
+        const handle = await this.controller.findExternal(cmd.query);
+        if (!handle) return `Couldn't find a window matching "${cmd.query}".`;
+        try {
+          await this.controller.click(handle, { point: { x: cmd.x, y: cmd.y } });
+        } catch (e) {
+          return (e as Error).message;
+        }
+        return `Clicked at ${cmd.x}, ${cmd.y} in ${handle.label ?? cmd.query}.`;
+      }
+
+      case "type-in": {
+        const handle = await this.controller.findExternal(cmd.query);
+        if (!handle) return `Couldn't find a window matching "${cmd.query}".`;
+        const target = cmd.x !== undefined && cmd.y !== undefined ? { point: { x: cmd.x, y: cmd.y } } : null;
+        try {
+          await this.controller.type(handle, target, cmd.text);
+        } catch (e) {
+          return (e as Error).message;
+        }
+        return `Typed into ${handle.label ?? cmd.query}.`;
       }
     }
   }

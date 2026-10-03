@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CommandRunner, parseCommand } from "../src/commands";
 import { WindowController } from "../src/windowController";
-import { Bounds, IndicatorState, OverlayBackend, WidgetSpec, WindowBackend, WindowHandle } from "../src/types";
+import { Bounds, ClickTarget, IndicatorState, InputBackend, OverlayBackend, WidgetSpec, WindowBackend, WindowHandle } from "../src/types";
 
 const screen: Bounds = { x: 0, y: 0, width: 1920, height: 1080 };
 
@@ -41,7 +41,12 @@ class FakeWidgetBackend implements WindowBackend {
 class FakeExternalBackend implements WindowBackend {
   readonly kind = "external" as const;
   bounds = new Map<string, Bounds>();
+  focused: string[] = [];
   private windows = new Map<string, { id: string; title: string }>(); // lowercase title -> real title
+
+  async focus(handle: WindowHandle): Promise<void> {
+    this.focused.push(handle.id);
+  }
 
   register(title: string, bounds: Bounds): void {
     const id = `external:${title.toLowerCase().replace(/\s+/g, "-")}`;
@@ -87,20 +92,36 @@ class FakeOverlayBackend implements OverlayBackend {
   }
 }
 
+/** In-memory stand-in for the real AppleScript/PowerShell/CDP backends —
+ * records what it was asked to do instead of touching anything real. */
+class FakeInputBackend implements InputBackend {
+  clicks: { handle: WindowHandle; target: ClickTarget }[] = [];
+  typed: { handle: WindowHandle; target: ClickTarget | null; text: string }[] = [];
+
+  async click(handle: WindowHandle, target: ClickTarget): Promise<void> {
+    this.clicks.push({ handle, target });
+  }
+  async type(handle: WindowHandle, target: ClickTarget | null, text: string): Promise<void> {
+    this.typed.push({ handle, target, text });
+  }
+}
+
 function makeRunner(opts: { permission?: boolean | ((app: string, state: IndicatorState) => Promise<boolean>) } = {}) {
   const widget = new FakeWidgetBackend();
   const external = new FakeExternalBackend();
   const overlay = new FakeOverlayBackend();
+  const input = { browser: new FakeInputBackend(), native: new FakeInputBackend() };
   const controller = new WindowController(
     { widget, external },
     () => screen,
-    overlay
+    overlay,
+    input
   );
   const permission =
     typeof opts.permission === "function"
       ? opts.permission
       : async () => opts.permission ?? true;
-  return { runner: new CommandRunner(controller, permission), widget, external, overlay, controller };
+  return { runner: new CommandRunner(controller, permission), widget, external, overlay, controller, input };
 }
 
 describe("parseCommand", () => {
@@ -151,6 +172,33 @@ describe("parseCommand", () => {
   it('parses "stop observing" and "stop controlling"', () => {
     expect(parseCommand("stop observing")).toEqual({ type: "stop-observing-last" });
     expect(parseCommand("stop controlling")).toEqual({ type: "stop-observing-last" });
+  });
+
+  it('parses "click at X,Y in <app>"', () => {
+    expect(parseCommand("click at 400, 120 in Excel")).toEqual({
+      type: "click-in",
+      x: 400,
+      y: 120,
+      query: "excel",
+    });
+  });
+
+  it('parses "type "..." into <app>", preserving the exact case of the typed text', () => {
+    expect(parseCommand('type "Q3 Revenue" into Excel')).toEqual({
+      type: "type-in",
+      text: "Q3 Revenue",
+      query: "excel",
+    });
+  });
+
+  it('parses an optional "at X,Y" on a type-in command', () => {
+    expect(parseCommand('type "42" into Excel at 400, 120')).toEqual({
+      type: "type-in",
+      text: "42",
+      query: "excel",
+      x: 400,
+      y: 120,
+    });
   });
 });
 
@@ -243,5 +291,83 @@ describe("CommandRunner — observing and controlling external windows (Cross-Ap
   it("says so when asked to stop observing with nothing being watched", async () => {
     const { runner } = makeRunner();
     expect(await runner.run("stop observing")).toBe("Not observing or controlling anything.");
+  });
+});
+
+describe("CommandRunner — clicking and typing (Cross-App Control Phase 2)", () => {
+  it("refuses to click a window that's only being observed, not controlled", async () => {
+    const { runner, external } = makeRunner({ permission: true });
+    external.register("Excel", { x: 0, y: 0, width: 800, height: 600 });
+
+    await runner.run("observe Excel");
+    const result = await runner.run("click at 400, 120 in Excel");
+
+    expect(result).toMatch(/must be in "controlling" state/);
+  });
+
+  it('clicks for real once a window is "controlling" - the colored border is the consent signal', async () => {
+    const { runner, external, input } = makeRunner({ permission: true });
+    external.register("Excel", { x: 0, y: 0, width: 800, height: 600 });
+
+    await runner.run("control Excel");
+    const result = await runner.run("click at 400, 120 in Excel");
+
+    expect(result).toBe("Clicked at 400, 120 in Excel.");
+    expect(input.native.clicks).toEqual([
+      { handle: { id: "external:excel", backend: "external", label: "Excel" }, target: { point: { x: 400, y: 120 } } },
+    ]);
+  });
+
+  it("brings an external window to the front before clicking - synthetic input goes wherever focus already is, not a chosen window", async () => {
+    const { controller, external } = makeRunner({ permission: true });
+    external.register("Excel", { x: 0, y: 0, width: 800, height: 600 });
+    const handle = (await controller.findExternal("Excel"))!;
+    await controller.observe(handle, "controlling");
+
+    await controller.click(handle, { point: { x: 10, y: 10 } });
+
+    expect(external.focused).toEqual([handle.id]);
+  });
+
+  it("types exact-case text into a controlling window, optionally clicking a field first", async () => {
+    const { runner, external, input } = makeRunner({ permission: true });
+    external.register("Excel", { x: 0, y: 0, width: 800, height: 600 });
+
+    await runner.run("control Excel");
+    const result = await runner.run('type "Q3 Revenue" into Excel at 400, 120');
+
+    expect(result).toBe("Typed into Excel.");
+    expect(input.native.typed).toEqual([
+      {
+        handle: { id: "external:excel", backend: "external", label: "Excel" },
+        target: { point: { x: 400, y: 120 } },
+        text: "Q3 Revenue",
+      },
+    ]);
+  });
+
+  it("lets Khameleon click/type in its own widget window with no permission gate at all", async () => {
+    const { controller, widget, input } = makeRunner();
+    await widget.create({ url: "https://youtube.com", label: "YouTube" }, { x: 0, y: 0, width: 800, height: 600 });
+    const handle = { id: [...widget.bounds.keys()][0], backend: "widget" as const, label: "YouTube" };
+
+    // No observe()/control() call at all - a widget Khameleon spawned
+    // itself needs no separate consent to click inside its own window.
+    await controller.click(handle, { selector: "#play-button" });
+    await controller.type(handle, null, "search query");
+
+    expect(input.browser.clicks).toEqual([{ handle, target: { selector: "#play-button" } }]);
+    expect(input.browser.typed).toEqual([{ handle, target: null, text: "search query" }]);
+    expect(input.native.clicks).toHaveLength(0); // routed to browser, not native
+  });
+
+  it("refuses to click/type when no input backend was configured at all", async () => {
+    const widget = new FakeWidgetBackend();
+    const controllerWithNoInput = new WindowController({ widget, external: new FakeExternalBackend() }, () => screen);
+    const handle = await widget.create({ url: "https://x.com", label: "X" }, { x: 0, y: 0, width: 10, height: 10 });
+
+    await expect(controllerWithNoInput.click(handle, { point: { x: 1, y: 1 } })).rejects.toThrow(
+      "No input backend configured"
+    );
   });
 });

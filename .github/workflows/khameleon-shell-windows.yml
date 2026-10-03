@@ -114,6 +114,51 @@ jobs:
           "
           Stop-Process -Id $notepad.Id -Force
 
+      # Proves WindowsNativeInputBackend's real click/type (PowerShell's
+      # System.Windows.Forms cursor/SendKeys + user32.dll mouse_event, the
+      # direct Windows equivalent of the macOS backend's in-process CGEvent
+      # approach) actually lands real keystrokes in a real window - not
+      # just "no error thrown". Types into Notepad, then reads the real
+      # text back via a separate copy-to-clipboard step so the read-back
+      # doesn't depend on the same code being tested (Cross-App Control
+      # Phase 2, khameleon-decisions-log.md, 2026-10-03).
+      - name: Smoke-test real click/type on Windows
+        shell: pwsh
+        working-directory: apps/khameleon-shell
+        run: |
+          $notepad = Start-Process notepad -PassThru
+          Start-Sleep -Seconds 2
+          node -e "
+            const { windowManager } = require('node-window-manager');
+            const { WindowsNativeInputBackend } = require('khameleon-window-agent');
+            (async () => {
+              const win = windowManager.getWindows().find(w => (w.path || '').toLowerCase().includes('notepad'));
+              if (!win) { console.error('FAIL: notepad.exe not found'); process.exit(1); }
+              win.bringToTop();
+              await new Promise(r => setTimeout(r, 800));
+              const bounds = win.getBounds();
+              const point = { x: Math.round(bounds.x + bounds.width / 2), y: Math.round(bounds.y + bounds.height / 2) };
+              const backend = new WindowsNativeInputBackend();
+              const handle = { id: 'external:notepad', backend: 'external', label: 'Notepad' };
+              await backend.click(handle, { point });
+              await backend.type(handle, null, 'Real Windows click and type test');
+              console.log('OK: dispatched click+type via WindowsNativeInputBackend, point =', JSON.stringify(point));
+            })().catch((e) => { console.error('FAIL:', e); process.exit(1); });
+          "
+          Start-Sleep -Seconds 1
+          Add-Type -AssemblyName System.Windows.Forms
+          [System.Windows.Forms.SendKeys]::SendWait('^a')
+          [System.Windows.Forms.SendKeys]::SendWait('^c')
+          Start-Sleep -Milliseconds 500
+          $clipboard = Get-Clipboard
+          Write-Host "Notepad's real content after the simulated typing: '$clipboard'"
+          if ($clipboard -ne 'Real Windows click and type test') {
+            Stop-Process -Id $notepad.Id -Force
+            throw "Real Windows text did not match: got '$clipboard'"
+          }
+          Write-Host "OK: real Windows keystrokes landed correctly"
+          Stop-Process -Id $notepad.Id -Force
+
       - name: Package (unsigned - no Authenticode cert yet)
         run: pnpm --filter @khameleon/shell exec electron-builder --win --dir
 

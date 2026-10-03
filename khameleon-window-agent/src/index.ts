@@ -6,3 +6,6 @@ export * from "./commands";
 export { ElectronWidgetBackend } from "./backends/electronWidgetBackend";
 export { ExternalWindowBackend } from "./backends/externalWindowBackend";
 export { ElectronOverlayBackend } from "./backends/electronOverlayBackend";
+export { BrowserInputBackend } from "./backends/browserInputBackend";
+export { MacNativeInputBackend } from "./backends/macNativeInputBackend";
+export { WindowsNativeInputBackend } from "./backends/windowsNativeInputBackend";

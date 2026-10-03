@@ -147,6 +147,7 @@ overrides:
 
 patchedDependencies:
   extract-file-icon@0.3.2: 185ba429490437abd773c71a5bea0fdbdb0fda293b0e00dae093112509e9c44d
+  node-window-manager@2.2.4: 872f7f6125e43b497a7023a8d9e96442033564291044d595efd9768c28bd8375
 
 importers:
 
@@ -181,7 +182,7 @@ importers:
         version: link:../../khameleon-window-agent
       node-window-manager:
         specifier: ^2.2.4
-        version: 2.2.4
+        version: 2.2.4(patch_hash=872f7f6125e43b497a7023a8d9e96442033564291044d595efd9768c28bd8375)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -691,7 +692,7 @@ importers:
     dependencies:
       node-window-manager:
         specifier: ^2.2.4
-        version: 2.2.4
+        version: 2.2.4(patch_hash=872f7f6125e43b497a7023a8d9e96442033564291044d595efd9768c28bd8375)
     devDependencies:
       '@types/node':
         specifier: ^20.14.0
@@ -8274,7 +8275,7 @@ snapshots:
 
   node-releases@2.0.53: {}
 
-  node-window-manager@2.2.4:
+  node-window-manager@2.2.4(patch_hash=872f7f6125e43b497a7023a8d9e96442033564291044d595efd9768c28bd8375):
     dependencies:
       extract-file-icon: 0.3.2(patch_hash=185ba429490437abd773c71a5bea0fdbdb0fda293b0e00dae093112509e9c44d)
       node-addon-api: 2.0.0

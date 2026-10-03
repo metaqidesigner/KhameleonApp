@@ -146,3 +146,4 @@ overrides:
 
 patchedDependencies:
   extract-file-icon@0.3.2: patches/extract-file-icon@0.3.2.patch
+  node-window-manager@2.2.4: patches/node-window-manager@2.2.4.patch

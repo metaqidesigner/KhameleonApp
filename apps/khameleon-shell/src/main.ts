@@ -8,6 +8,9 @@ import {
   ElectronWidgetBackend,
   ExternalWindowBackend,
   ElectronOverlayBackend,
+  BrowserInputBackend,
+  MacNativeInputBackend,
+  WindowsNativeInputBackend,
   type Bounds,
   type IndicatorState,
 } from "khameleon-window-agent";
@@ -96,10 +99,20 @@ app.whenReady().then(() => {
   // needed; a no-op on Windows (ExternalWindowBackend's own doc comment).
   externalBackend.requestAccessibility();
 
+  const widgetBackend = new ElectronWidgetBackend();
+  // "Simulate a user" (Phase 2): one browser backend (CDP, for Khameleon's
+  // own spawned widget windows) and one native backend chosen by platform
+  // (AppleScript on macOS, PowerShell on Windows, for third-party windows).
+  const nativeInputBackend = process.platform === "win32" ? new WindowsNativeInputBackend() : new MacNativeInputBackend();
+
   const windowController = new WindowController(
-    { widget: new ElectronWidgetBackend(), external: externalBackend },
+    { widget: widgetBackend, external: externalBackend },
     currentScreenArea,
     new ElectronOverlayBackend(),
+    {
+      browser: new BrowserInputBackend((handle) => widgetBackend.getWebContents(handle)),
+      native: nativeInputBackend,
+    },
   );
   const fileRoot = process.env.KHAMELEON_FILE_ROOT ?? app.getPath("documents");
   const memory = new MemoryStore(new JsonFileStorage(path.join(app.getPath("userData"), "memory.json")));
