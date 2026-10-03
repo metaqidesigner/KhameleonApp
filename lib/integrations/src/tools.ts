@@ -22,7 +22,7 @@ export const LOCAL_TOOL_DEFINITIONS: Tool[] = [
   {
     name: "window_command",
     description:
-      "Control desktop windows and floating widgets. Can open a YouTube video (or other URL) as an enlarged floating widget, move/dock the most recently opened widget to a screen position (enlarged, docked-right, docked-left, corner), or close it. Pass ONE short natural-language instruction per call, e.g. 'open youtube https://youtube.com/watch?v=... as Focus Music', 'move it to the corner', 'dock it right', or 'close it'. Call this tool multiple times in sequence for multi-step window requests (e.g. open, then move).",
+      "Control desktop windows and floating widgets, and observe/control OTHER apps' windows already open on the user's desktop. Can open a YouTube video (or other URL) as an enlarged floating widget, move/dock the most recently opened widget to a screen position (enlarged, docked-right, docked-left, corner), or close it. Can also 'observe <app name>' (shows a colored border around that window while Khameleon watches it, e.g. to read its content) or 'control <app name>' (same border, signaling Khameleon is actively driving it) — both require the user's one-time Allow in a permission prompt, and 'stop observing' / 'stop controlling' ends it. Pass ONE short natural-language instruction per call, e.g. 'open youtube https://youtube.com/watch?v=... as Focus Music', 'move it to the corner', 'observe Notepad', 'control Excel', 'stop observing'. Call this tool multiple times in sequence for multi-step requests.",
     input_schema: {
       type: "object",
       properties: {

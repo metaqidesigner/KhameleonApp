@@ -73,6 +73,29 @@ export interface WindowHandle {
   label?: string;
 }
 
+/**
+ * What Khameleon is currently doing to an external window it's watching -
+ * the three states the colored border overlay signals (Cross-App Control,
+ * khameleon-decisions-log.md, 2026-10-03). "seeing" is a one-off glance
+ * (e.g. reading a document's content); "observing" is ongoing, passive
+ * monitoring; "controlling" is actively driving it (clicks/keystrokes).
+ */
+export type IndicatorState = "seeing" | "observing" | "controlling";
+
+/**
+ * Draws the colored, pulsating border around an external window that
+ * signals which IndicatorState Khameleon is in for it. A thin platform
+ * seam like WindowBackend above - src/backends/electronOverlayBackend.ts
+ * is the only real implementation, so tests can use a fake with no
+ * Electron dependency.
+ */
+export interface OverlayBackend {
+  show(handle: WindowHandle, bounds: Bounds, state: IndicatorState): void;
+  updateBounds(handle: WindowHandle, bounds: Bounds): void;
+  updateState(handle: WindowHandle, state: IndicatorState): void;
+  hide(handle: WindowHandle): void;
+}
+
 /** Named layout presets. Kept small and explicit on purpose for v1. */
 export type LayoutPreset =
   | "enlarged" // large, centered — the default "pop up" state

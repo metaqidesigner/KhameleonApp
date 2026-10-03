@@ -7,7 +7,9 @@ import {
   CommandRunner as WindowCommandRunner,
   ElectronWidgetBackend,
   ExternalWindowBackend,
+  ElectronOverlayBackend,
   type Bounds,
+  type IndicatorState,
 } from "khameleon-window-agent";
 import { LocalAgentRunner } from "@khameleon/integrations";
 
@@ -28,6 +30,58 @@ function currentScreenArea(): Bounds {
   return screen.getPrimaryDisplay().workArea;
 }
 
+let permissionRequestSeq = 0;
+
+/**
+ * "Khameleon would like to observe/control [App] — Allow?" (Newton's own
+ * description, Cross-App Control Phase 1). A small, fully Khameleon-
+ * controlled modal (never loads remote/user content), so relaxing
+ * sandboxing just for it to talk back over IPC is a contained trade-off,
+ * not a general precedent - every other window in this app stays sandboxed.
+ */
+function requestObservePermission(appLabel: string, state: IndicatorState): Promise<boolean> {
+  const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const verb = state === "controlling" ? "control" : "observe";
+  const channel = `khameleon:permission-reply:${permissionRequestSeq++}`;
+
+  return new Promise((resolve) => {
+    const modal = new BrowserWindow({
+      width: 380,
+      height: 180,
+      frame: false,
+      resizable: false,
+      alwaysOnTop: true,
+      webPreferences: { nodeIntegration: true, contextIsolation: false, sandbox: false },
+    });
+
+    let settled = false;
+    const finish = (allowed: boolean) => {
+      if (settled) return;
+      settled = true;
+      ipcMain.removeHandler(channel);
+      if (!modal.isDestroyed()) modal.close();
+      resolve(allowed);
+    };
+
+    ipcMain.handle(channel, (_event, allowed: boolean) => finish(allowed));
+    modal.on("closed", () => finish(false));
+
+    modal.loadURL(`data:text/html,${encodeURIComponent(`<!doctype html>
+<html><body style="margin:0;background:rgba(8,14,24,0.98);color:#e6e6e6;font-family:-apple-system,sans-serif;height:100vh;box-sizing:border-box;padding:20px;display:flex;flex-direction:column;justify-content:space-between;">
+  <div>
+    <div style="font-size:14px;font-weight:600;">Khameleon would like to ${verb}:</div>
+    <div style="font-size:15px;margin-top:6px;color:#6FE6BD;">${escape(appLabel)}</div>
+  </div>
+  <div style="display:flex;gap:10px;justify-content:flex-end;">
+    <button onclick="require('electron').ipcRenderer.invoke('${channel}', false)"
+      style="padding:8px 16px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:none;color:#e6e6e6;cursor:pointer;">Deny</button>
+    <button onclick="require('electron').ipcRenderer.invoke('${channel}', true)"
+      style="padding:8px 16px;border-radius:6px;border:none;background:#6FE6BD;color:#06110c;font-weight:600;cursor:pointer;">Allow</button>
+  </div>
+</body></html>`)}`);
+  });
+}
+
 function failureHtml(url: string, reason: string): string {
   const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
   return `<!doctype html><html><body style="background:#0b0f14;color:#e6e6e6;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px;box-sizing:border-box;">
@@ -37,9 +91,15 @@ function failureHtml(url: string, reason: string): string {
 }
 
 app.whenReady().then(() => {
+  const externalBackend = new ExternalWindowBackend();
+  // Triggers the real macOS Accessibility permission dialog on first run if
+  // needed; a no-op on Windows (ExternalWindowBackend's own doc comment).
+  externalBackend.requestAccessibility();
+
   const windowController = new WindowController(
-    { widget: new ElectronWidgetBackend(), external: new ExternalWindowBackend() },
+    { widget: new ElectronWidgetBackend(), external: externalBackend },
     currentScreenArea,
+    new ElectronOverlayBackend(),
   );
   const fileRoot = process.env.KHAMELEON_FILE_ROOT ?? app.getPath("documents");
   const memory = new MemoryStore(new JsonFileStorage(path.join(app.getPath("userData"), "memory.json")));
@@ -51,7 +111,7 @@ app.whenReady().then(() => {
   // frontend yet) as the foundation Phase 2-4's new window-control tools
   // plug into.
   const localAgent = new LocalAgentRunner({
-    window: new WindowCommandRunner(windowController),
+    window: new WindowCommandRunner(windowController, requestObservePermission),
     file: new FileCommandRunner(new FileOps(fileRoot), new MacAppLauncher()),
     memory: new MemoryCommandRunner(memory),
   });
