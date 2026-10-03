@@ -21,7 +21,12 @@ on:
 
 jobs:
   build-and-verify:
-    runs-on: windows-latest
+    # Pinned, not windows-latest: that image moved to a Visual Studio
+    # version node-gyp 9.4.1 doesn't recognize yet ("unknown version
+    # 'undefined'"), which breaks node-window-manager/extract-file-icon's
+    # native build. windows-2022 has the well-known, node-gyp-recognized
+    # VS2022 Build Tools (hit this for real, 2026-10-03).
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
