@@ -1,0 +1,16 @@
+diff --git a/binding.gyp b/binding.gyp
+index 28bdfbc5e6d8b57253542d2fcad287b3ecb9d5ce..4462c34287bd7617a178dab6ae4093f774a4273b 100644
+--- a/binding.gyp
++++ b/binding.gyp
+@@ -14,6 +14,11 @@
+           'sources': [
+             'lib/addon.cc',
+           ],
++          'msvs_settings': {
++            'VCCLCompilerTool': {
++              'ExceptionHandling': 1,
++            },
++          },
+         }],
+         ['OS=="mac"', {
+           'link_settings': {

@@ -145,6 +145,9 @@ overrides:
   rollup>@rollup/rollup-win32-x64-gnu: '-'
   rollup>@rollup/rollup-win32-x64-msvc: '-'
 
+patchedDependencies:
+  extract-file-icon@0.3.2: 185ba429490437abd773c71a5bea0fdbdb0fda293b0e00dae093112509e9c44d
+
 importers:
 
   .:
@@ -166,7 +169,7 @@ importers:
         version: link:../../lib/integrations
       extract-file-icon:
         specifier: ^0.3.2
-        version: 0.3.2
+        version: 0.3.2(patch_hash=185ba429490437abd773c71a5bea0fdbdb0fda293b0e00dae093112509e9c44d)
       khameleon-file-agent:
         specifier: workspace:*
         version: link:../../khameleon-file-agent
@@ -7480,7 +7483,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  extract-file-icon@0.3.2:
+  extract-file-icon@0.3.2(patch_hash=185ba429490437abd773c71a5bea0fdbdb0fda293b0e00dae093112509e9c44d):
     dependencies:
       node-addon-api: 1.7.1
 
@@ -8273,7 +8276,7 @@ snapshots:
 
   node-window-manager@2.2.4:
     dependencies:
-      extract-file-icon: 0.3.2
+      extract-file-icon: 0.3.2(patch_hash=185ba429490437abd773c71a5bea0fdbdb0fda293b0e00dae093112509e9c44d)
       node-addon-api: 2.0.0
       node-gyp-build: 4.8.4
 
