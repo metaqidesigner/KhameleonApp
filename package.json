@@ -13,5 +13,10 @@
     "playwright": "^1.62.1",
     "prettier": "^3.8.3",
     "typescript": "~5.9.3"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "extract-file-icon@0.3.2": "patches/extract-file-icon@0.3.2.patch"
+    }
   }
 }
