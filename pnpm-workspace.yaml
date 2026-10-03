@@ -6,13 +6,18 @@ packages:
   - lib/integrations/*
   - scripts
 
-# Resolved 2026-09-09 so `pnpm install` is non-interactive (needed for the
-# Docker build in /Dockerfile, and for any future non-Claude developer who
-# hits this same prompt). electron/extract-file-icon/node-window-manager are
-# only needed by apps/khameleon-shell - real, local, native window/desktop
-# control, never installed in the Docker image. If you're actually working on
-# khameleon-shell locally, flip these back to `true` and run
-# `pnpm approve-builds` so its native bindings/Electron binary install.
+# This `allowBuilds` block is enforced by this environment's supply-chain
+# policy wrapper around pnpm, not a native pnpm key - it auto-regenerates as
+# a true/false prompt whenever a package's build script is ignored. Keep it
+# present with explicit values; deleting it just makes it reappear as a
+# placeholder (learned the hard way, 2026-10-03, khameleon-decisions-log.md).
+# electron/extract-file-icon/node-window-manager are only needed by
+# apps/khameleon-shell - real, local, native window/desktop control - and
+# MUST be false in committed state so Docker's Linux build (a full workspace
+# `pnpm install`, per /Dockerfile) never tries to compile these macOS/
+# Windows-only native bindings. Flip to `true` + `pnpm install` only while
+# actually working on khameleon-shell locally, then flip back to `false`
+# before committing.
 allowBuilds:
   electron: false
   esbuild: true

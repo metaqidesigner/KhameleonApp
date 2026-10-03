@@ -71,9 +71,12 @@ It's built for people (and, longer-term, organisations) who already have access 
 - Provider Access Model (§18) — the single-user-scoped fix (every AI call site uses the user's own saved key) shipped 2026-09-06
 - Deployment model decided (hybrid, 2026-09-08) and the default mode packaged for self-hosting (2026-09-10) — see Architecture.
 
+**In Progress / Recently Landed (continued):**
+- Cross-App Control (2026-10-03, Phase 0 of 5) — the Electron decision is made: Khameleon becomes a real installed desktop app (mac + Windows) so it can draw a colored, pulsating border around *other* apps' windows to signal seeing/observing/controlling them, actually click/type inside those windows (browser apps, native macOS apps, and Windows/Office apps — universal "simulate a user" automation, not per-app scripting), and read documents fully offline for client-confidentiality. Full plan in `khameleon-decisions-log.md`, 2026-10-03. Phase 0 shipped: `apps/khameleon-shell` now loads the real product UI (not a toy control panel) and packages via `electron-builder`; five real first-run bugs found and fixed getting Electron to actually execute in this environment at all (see the log — Gatekeeper/AMFI ad-hoc signing, a sandbox `ELECTRON_RUN_AS_NODE` quirk, ESM/bundler-resolution incompatibility, native-addon externalization). This supersedes the old "blocked on a decision" framing below for §13.1/§13.2 — the decision is made, the build is in progress.
+
 **Planned:**
-- §13.1 web-app windows (embedding Gmail/Slack/etc. live inside Khameleon) — blocked on a decision to ship a fuller Electron build
-- §13.2 full agent browser automation (clicks, logins, JS-rendered pages) — today's web-reading tool only handles static/server-rendered pages
+- §13.1 web-app windows (embedding Gmail/Slack/etc. live inside Khameleon) — superseded by the Cross-App Control direction above (a colored-border overlay + universal input simulation on windows the user already has open, not embedding another site's session inside Khameleon's own layout)
+- §13.2 full agent browser automation (clicks, logins, JS-rendered pages) — now in scope as one of Cross-App Control's three automation backends (Phase 2), alongside macOS/Windows native-app control
 - Live-parsing an imported OpenAPI/MCP spec into real callable tools
 
 **Idea (not yet scoped):**
@@ -119,7 +122,7 @@ Most enterprise AI fails at adoption, not capability — this section is about c
 ## 8. Open Questions
 
 - **Hosted mode scope and pricing** — since §18 already rules out Khameleon metering/billing *model calls* (those are always the user's own provider account), a hosted convenience tier still needs its own answer for what Khameleon itself charges for (hosting, support, admin console?) — not addressed yet.
-- **§13.1 Electron decision** — ship a fuller Electron build (to support embedding live web-app sessions) or stay a browser SPA? `apps/khameleon-shell` gives a real head start either way, but the call hasn't been made. Related to, but distinct from, the deployment-mode decision above — an Electron wrap could serve either mode.
+- ~~**§13.1 Electron decision**~~ — decided 2026-10-03: a real cross-platform (mac + Windows) Electron app, specifically for Cross-App Control (window-overlay indicators + universal simulate-a-user automation + offline document reading). See §5 and `khameleon-decisions-log.md`, 2026-10-03.
 - **Demo/gimmick feature policy** — never explicitly ruled on.
 - **AI-provider ToS review** — whether rebranding/reselling access via others' APIs is compliant with their usage policies, before any commercial claim is made. Not yet done.
 

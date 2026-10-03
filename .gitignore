@@ -8,6 +8,9 @@ out-tsc
 .expo
 .expo-shared
 
+# electron-builder packaged app output (apps/khameleon-shell)
+/apps/khameleon-shell/release
+
 # dependencies
 node_modules
 
