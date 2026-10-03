@@ -14,7 +14,7 @@ import {
   type Bounds,
   type IndicatorState,
 } from "khameleon-window-agent";
-import { LocalAgentRunner } from "@khameleon/integrations";
+import { LocalAgentRunner, LocalDocumentAgent } from "@khameleon/integrations";
 
 // The real product UI, not a side scaffold (khameleon-decisions-log.md,
 // 2026-10-03, Cross-App Control Phase 0). Khameleon is already a working
@@ -145,6 +145,23 @@ app.whenReady().then(() => {
   ipcMain.handle("khameleon:command", async (_event, text: unknown) => {
     if (typeof text !== "string" || !text.trim()) throw new Error("A non-empty command is required.");
     return localAgent.run(text);
+  });
+
+  // Deliberately a SEPARATE channel, not a tool LocalAgentRunner can call
+  // (Cross-App Control Phase 3, khameleon-decisions-log.md, 2026-10-03).
+  // LocalAgentRunner's loop sends every tool result back to Anthropic's
+  // cloud API on the next iteration - routing a sensitive document through
+  // it as a "tool" would send the extracted content (or a close paraphrase
+  // of it) to the cloud anyway, exactly what local/sensitive mode exists to
+  // prevent. This channel never touches localAgent or the Anthropic SDK at
+  // all; the renderer calls it directly when the user has flagged a
+  // document as sensitive, bypassing cloud Claude entirely for that
+  // interaction.
+  const localDocumentAgent = new LocalDocumentAgent();
+  ipcMain.handle("khameleon:read-document-locally", async (_event, filePath: unknown, question: unknown) => {
+    if (typeof filePath !== "string" || !filePath.trim()) throw new Error("A non-empty file path is required.");
+    if (typeof question !== "string" || !question.trim()) throw new Error("A non-empty question is required.");
+    return localDocumentAgent.answerAboutDocument(filePath, question);
   });
 });
 

@@ -13,7 +13,9 @@
     "@anthropic-ai/sdk": "^0.104.2",
     "khameleon-file-agent": "workspace:*",
     "khameleon-memory": "workspace:*",
-    "khameleon-window-agent": "workspace:*"
+    "khameleon-window-agent": "workspace:*",
+    "node-llama-cpp": "^3.22.1",
+    "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
     "@types/node": "catalog:",
