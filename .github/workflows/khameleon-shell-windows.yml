@@ -30,6 +30,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The runner's default Python is 3.12, which removed `distutils` -
+      # node-gyp 9.4.1 (bundled via pnpm's node-gyp dep) still imports it
+      # and fails with ModuleNotFoundError. 3.11 is the last version with
+      # distutils built in (hit this for real, 2026-10-03).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - uses: pnpm/action-setup@v4
         with:
           version: "9"
