@@ -62,7 +62,7 @@ jobs:
             let y = fs.readFileSync(path, 'utf8');
             y = y.replace(
               /onlyBuiltDependencies:\r?\n/,
-              \"onlyBuiltDependencies:\n  - electron\n  - extract-file-icon\n  - node-window-manager\n\"
+              \"onlyBuiltDependencies:\n  - electron\n  - extract-file-icon\n  - node-llama-cpp\n  - node-window-manager\n\"
             );
             fs.writeFileSync(path, y);
           "
@@ -158,6 +158,24 @@ jobs:
           }
           Write-Host "OK: real Windows keystrokes landed correctly"
           Stop-Process -Id $notepad.Id -Force
+
+      # Proves node-llama-cpp's native binding actually loads on real
+      # Windows (the one real platform-specific risk for Phase 3's offline
+      # document reading) - deliberately NOT downloading the ~1.1GB model
+      # here too: that would make every push touching these paths slow and
+      # bandwidth-heavy, for logic (the model's actual answers) that's
+      # already verified for real on macOS and is platform-independent
+      # llama.cpp behavior, not something Windows-specific could break
+      # (Cross-App Control Phase 3, khameleon-decisions-log.md, 2026-10-03).
+      - name: Smoke-test node-llama-cpp's native binding loads on Windows
+        shell: pwsh
+        working-directory: apps/khameleon-shell
+        run: |
+          node -e "
+            require('node-llama-cpp').getLlama().then((llama) => {
+              console.log('OK: node-llama-cpp native binding loaded on real Windows, gpu =', llama.gpu);
+            }).catch((e) => { console.error('FAIL:', e); process.exit(1); });
+          "
 
       - name: Package (unsigned - no Authenticode cert yet)
         run: pnpm --filter @khameleon/shell exec electron-builder --win --dir
