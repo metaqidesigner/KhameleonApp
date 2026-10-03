@@ -93,6 +93,7 @@ jobs:
       # build on top of.
       - name: Smoke-test real window enumeration on Windows
         shell: pwsh
+        working-directory: apps/khameleon-shell
         run: |
           $notepad = Start-Process notepad -PassThru
           Start-Sleep -Seconds 2
