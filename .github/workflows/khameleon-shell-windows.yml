@@ -172,7 +172,7 @@ jobs:
         working-directory: apps/khameleon-shell
         run: |
           node -e "
-            require('node-llama-cpp').getLlama().then((llama) => {
+            import('node-llama-cpp').then((m) => m.getLlama()).then((llama) => {
               console.log('OK: node-llama-cpp native binding loaded on real Windows, gpu =', llama.gpu);
             }).catch((e) => { console.error('FAIL:', e); process.exit(1); });
           "
