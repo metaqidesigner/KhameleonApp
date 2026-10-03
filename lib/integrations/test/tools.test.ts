@@ -14,10 +14,15 @@ function fakeRunners(overrides: Partial<Runners> = {}): Runners {
 describe("LOCAL_TOOL_DEFINITIONS", () => {
   it("declares exactly the three action tools, each requiring a command string", () => {
     const names = LOCAL_TOOL_DEFINITIONS.map((t) => t.name);
-    expect(names).toEqual(["window_command", "file_command", "memory_command"]);
-    for (const tool of LOCAL_TOOL_DEFINITIONS) {
+    expect(names).toEqual(["window_command", "file_command", "memory_command", "read_document"]);
+    for (const tool of LOCAL_TOOL_DEFINITIONS.filter((t) => t.name !== "read_document")) {
       expect(tool.input_schema.required).toEqual(["command"]);
     }
+  });
+
+  it("declares read_document as requiring a filePath string", () => {
+    const tool = LOCAL_TOOL_DEFINITIONS.find((t) => t.name === "read_document");
+    expect(tool?.input_schema.required).toEqual(["filePath"]);
   });
 });
 
@@ -61,5 +66,41 @@ describe("dispatchLocalTool", () => {
   it("throws when the command is an empty/whitespace-only string", async () => {
     const runners = fakeRunners();
     await expect(dispatchLocalTool("file_command", { command: "   " }, runners)).rejects.toThrow(/non-empty/);
+  });
+
+  it("routes read_document to the injected reader and returns its text", async () => {
+    const runners = fakeRunners();
+    const reader = async (filePath: string) => `text of ${filePath}`;
+    const result = await dispatchLocalTool("read_document", { filePath: "/tmp/report.pdf" }, runners, reader);
+    expect(result).toBe("text of /tmp/report.pdf");
+  });
+
+  it("trims whitespace from the filePath before reading", async () => {
+    const runners = fakeRunners();
+    const reader = async (filePath: string) => `text of ${filePath}`;
+    const result = await dispatchLocalTool("read_document", { filePath: "  /tmp/report.pdf  " }, runners, reader);
+    expect(result).toBe("text of /tmp/report.pdf");
+  });
+
+  it("truncates an overly long document for the model", async () => {
+    const runners = fakeRunners();
+    const longText = "x".repeat(20_000);
+    const reader = async () => longText;
+    const result = await dispatchLocalTool("read_document", { filePath: "/tmp/big.pdf" }, runners, reader);
+    expect(result.length).toBeLessThan(longText.length);
+    expect(result).toMatch(/\[\.\.\.truncated/);
+  });
+
+  it("throws when read_document is called without a reader available", async () => {
+    const runners = fakeRunners();
+    await expect(
+      dispatchLocalTool("read_document", { filePath: "/tmp/report.pdf" }, runners),
+    ).rejects.toThrow(/isn't available/);
+  });
+
+  it("throws when read_document's filePath is missing", async () => {
+    const runners = fakeRunners();
+    const reader = async (filePath: string) => filePath;
+    await expect(dispatchLocalTool("read_document", {}, runners, reader)).rejects.toThrow(/non-empty/);
   });
 });

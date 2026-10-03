@@ -14,7 +14,7 @@ import {
   type Bounds,
   type IndicatorState,
 } from "khameleon-window-agent";
-import { LocalAgentRunner, LocalDocumentAgent } from "@khameleon/integrations";
+import { LocalAgentRunner, LocalDocumentAgent, extractDocumentText } from "@khameleon/integrations";
 
 // The real product UI, not a side scaffold (khameleon-decisions-log.md,
 // 2026-10-03, Cross-App Control Phase 0). Khameleon is already a working
@@ -123,11 +123,23 @@ app.whenReady().then(() => {
   // requiring two separate commands. Kept wired here (not used by the real
   // frontend yet) as the foundation Phase 2-4's new window-control tools
   // plug into.
-  const localAgent = new LocalAgentRunner({
-    window: new WindowCommandRunner(windowController, requestObservePermission),
-    file: new FileCommandRunner(new FileOps(fileRoot), new MacAppLauncher()),
-    memory: new MemoryCommandRunner(memory),
-  });
+  const localAgent = new LocalAgentRunner(
+    {
+      window: new WindowCommandRunner(windowController, requestObservePermission),
+      file: new FileCommandRunner(new FileOps(fileRoot), new MacAppLauncher()),
+      memory: new MemoryCommandRunner(memory),
+    },
+    undefined,
+    undefined,
+    undefined,
+    // read_document tool's real implementation - reuses the same
+    // extraction LocalDocumentAgent uses. Fine for non-sensitive documents:
+    // its result goes to Claude's cloud API like any other tool_result,
+    // which is exactly why LocalDocumentAgent stays a separate channel for
+    // anything flagged sensitive (Cross-App Control Phase 4,
+    // khameleon-decisions-log.md, 2026-10-04).
+    async (filePath) => (await extractDocumentText(filePath)).text,
+  );
 
   const appUrl = process.env.KHAMELEON_APP_URL ?? DEFAULT_APP_URL;
 

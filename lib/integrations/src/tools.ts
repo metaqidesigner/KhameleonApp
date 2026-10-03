@@ -1,5 +1,23 @@
 import type { Tool } from "@anthropic-ai/sdk/resources/messages";
 import type { Runners } from "./coordinator";
+import { truncateForModel } from "./localDocumentAgent.js";
+
+/**
+ * Reads real text out of a document (PDF, scanned PDF, or photo via OCR) -
+ * reusing the same documentImport.ts extraction LocalDocumentAgent uses.
+ * Kept as a plain injected function (not a Runners member) rather than
+ * extending the shared Runners interface KhameleonCoordinator also uses:
+ * this is a different shape of capability (file in, text out) than the
+ * intent-routed CommandRunner pattern, and this file is the one seam that
+ * actually needs it. Deliberately for NON-sensitive documents only: its
+ * result flows back into Claude's cloud conversation on the next turn like
+ * any other tool_result, which is exactly what LocalDocumentAgent's
+ * separate, cloud-free IPC channel exists to avoid for sensitive ones
+ * (Cross-App Control Phase 4, khameleon-decisions-log.md, 2026-10-04).
+ */
+export type DocumentTextReader = (filePath: string) => Promise<string>;
+
+const MAX_DOCUMENT_TOOL_CHARS = 12_000;
 
 /**
  * Real desktop-action tools for the local agent (apps/khameleon-shell).
@@ -55,9 +73,21 @@ export const LOCAL_TOOL_DEFINITIONS: Tool[] = [
       required: ["command"],
     },
   },
+  {
+    name: "read_document",
+    description:
+      "Reads the real text content of a local document - a PDF (including a scanned one with no text layer, via on-device OCR) or a photo (JPEG/PNG/HEIC) of a printed page or receipt. Returns the document's actual text so you can read figures, dates, names, etc. out of it. ONLY use this for documents the user hasn't flagged as sensitive/private - this tool's result is sent to Claude's cloud API like any other tool result. For a document the user wants kept fully offline (e.g. explicitly marked confidential), tell the user to use Khameleon's separate local/sensitive document mode instead of calling this tool on it.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string", description: "Absolute path to the PDF or photo file to read." },
+      },
+      required: ["filePath"],
+    },
+  },
 ];
 
-const KNOWN_TOOLS = new Set(["window_command", "file_command", "memory_command"]);
+const KNOWN_TOOLS = new Set(["window_command", "file_command", "memory_command", "read_document"]);
 
 /**
  * Execute a named local-agent tool against the real runners.
@@ -69,9 +99,20 @@ export async function dispatchLocalTool(
   name: string,
   input: Record<string, unknown>,
   runners: Runners,
+  readDocumentText?: DocumentTextReader,
 ): Promise<string> {
   if (!KNOWN_TOOLS.has(name)) {
     throw new Error(`Unknown tool: '${name}'. No handler registered.`);
+  }
+
+  if (name === "read_document") {
+    if (!readDocumentText) throw new Error("Document reading isn't available in this context.");
+    const filePath = typeof input.filePath === "string" ? input.filePath.trim() : "";
+    if (!filePath) throw new Error("Tool 'read_document' requires a non-empty 'filePath' string.");
+
+    const fullText = await readDocumentText(filePath);
+    const { text, truncated } = truncateForModel(fullText, MAX_DOCUMENT_TOOL_CHARS);
+    return truncated ? `${text}\n\n[...truncated - this document is longer than shown above...]` : text;
   }
 
   const command = typeof input.command === "string" ? input.command.trim() : "";
