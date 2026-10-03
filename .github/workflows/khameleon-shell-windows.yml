@@ -70,6 +70,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile=false
 
+      - name: DEBUG - confirm the extract-file-icon patch actually applied
+        shell: bash
+        run: |
+          find node_modules/.pnpm -maxdepth 1 -iname "extract-file-icon*"
+          echo "--- binding.gyp actually used by the workspace symlink ---"
+          cat apps/khameleon-shell/node_modules/extract-file-icon/binding.gyp 2>/dev/null || echo "NOT FOUND at that symlink path"
+
       - name: Build khameleon-shell
         run: pnpm --filter @khameleon/shell build
 
