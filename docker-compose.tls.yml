@@ -1,0 +1,29 @@
+# Optional override: puts Caddy in front of Khameleon for real TLS, instead
+# of exposing the app directly. See SELF_HOSTING.md's "Putting TLS in front
+# of it" section - apply with:
+#   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+services:
+  khameleon:
+    # Compose merges "ports" across -f files by default (it doesn't replace
+    # it), so an empty list here wouldn't actually remove the base file's
+    # published port - !reset is the documented way to clear a merged list.
+    # No longer published to the host directly - only Caddy (on the shared
+    # compose network) talks to it now. Reach the app through Caddy instead.
+    ports: !reset []
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - khameleon
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - khameleon_caddy_data:/data
+      - khameleon_caddy_config:/config
+
+volumes:
+  khameleon_caddy_data:
+  khameleon_caddy_config:

@@ -30,7 +30,11 @@ function fmtEnergy(n?: number) { return n != null ? `${n.toFixed(2)} Wh` : '0.00
 function fmtUptime(s: number)  { if (!s) return '0h 0m'; return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`; }
 
 // ── Concept pills ─────────────────────────────────────────────
-const PILLS = [
+// Exported: shared with pages/assistant-home.tsx's own mini-col, which
+// renders the exact same three concept tiles (see design-spec.md §7's
+// right-rail note and khameleon-home-implemented.html's .mini-col) — one
+// source of truth for the label/sub/color triples, not a second copy.
+export const PILLS = [
   { id: 'command', label: 'COMMAND', sub: 'You ask. I execute.',        dot: '#38cf8a' },
   { id: 'context', label: 'CONTEXT', sub: 'I understand what matters.', dot: '#F0A34C' },
   { id: 'status',  label: 'STATUS',  sub: 'I keep you in the loop.',    dot: '#8C7CF0' },
@@ -147,7 +151,10 @@ function KVRow({ icon, label, value }: { icon: React.ReactNode; label: string; v
 }
 
 // ── Today's Plan sections ─────────────────────────────────────
-const DAY_SECTIONS = [
+// Exported: assistant-home.tsx's filmstrip colors each real task's card by
+// its category, using this same id→color mapping rather than inventing a
+// second palette for the same six categories.
+export const DAY_SECTIONS = [
   { id: 'start_of_day',   label: 'Start of Day',  time: '7–9 AM',       color: '#8C7CF0', icon: <Coffee size={11} /> },
   { id: 'core_work',      label: 'Core Work',      time: '9 AM–12 PM',   color: '#F0A34C', icon: <Sparkles size={11} /> },
   { id: 'meetings',       label: 'Meetings',       time: 'As scheduled', color: '#6FE6BD', icon: <Users size={11} /> },
@@ -410,7 +417,10 @@ function TodaysPlanBody() {
 }
 
 // ── Today's Focus ring (fixed bottom-left) ────────────────────
-function FocusRing({ pct }: { pct: number }) {
+// Exported: assistant-home.tsx's focus panel uses this exact real ring
+// (same SVG, same math) rather than the mockup's static conic-gradient
+// div, which never had real percentage data behind it.
+export function FocusRing({ pct }: { pct: number }) {
   const r = 22, cx = 28, cy = 28;
   const circ = 2 * Math.PI * r;
   const dash  = circ * pct;

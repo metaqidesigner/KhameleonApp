@@ -73,6 +73,58 @@ export interface WindowHandle {
   label?: string;
 }
 
+/**
+ * What Khameleon is currently doing to an external window it's watching -
+ * the three states the colored border overlay signals (Cross-App Control,
+ * khameleon-decisions-log.md, 2026-10-03). "seeing" is a one-off glance
+ * (e.g. reading a document's content); "observing" is ongoing, passive
+ * monitoring; "controlling" is actively driving it (clicks/keystrokes).
+ */
+export type IndicatorState = "seeing" | "observing" | "controlling";
+
+/**
+ * Draws the colored, pulsating border around an external window that
+ * signals which IndicatorState Khameleon is in for it. A thin platform
+ * seam like WindowBackend above - src/backends/electronOverlayBackend.ts
+ * is the only real implementation, so tests can use a fake with no
+ * Electron dependency.
+ */
+export interface OverlayBackend {
+  show(handle: WindowHandle, bounds: Bounds, state: IndicatorState): void;
+  updateBounds(handle: WindowHandle, bounds: Bounds): void;
+  updateState(handle: WindowHandle, state: IndicatorState): void;
+  hide(handle: WindowHandle): void;
+}
+
+/**
+ * Where to click/type - a CSS selector (browser windows only, resolved to a
+ * point internally) or absolute screen coordinates (works for both browser
+ * and native windows). "Simulate a user" is deliberately coordinate-first:
+ * Khameleon decides where a button is (today: a selector; later phases:
+ * vision reading a screenshot) and this just clicks there, the same for any
+ * kind of window (Newton's own reasoning for rejecting per-app scripting -
+ * Cross-App Control Phase 2, khameleon-decisions-log.md, 2026-10-03).
+ */
+export interface ClickTarget {
+  selector?: string;
+  point?: { x: number; y: number };
+}
+
+/**
+ * Real click/type input into a window - "simulating a user," not reading a
+ * data model. One real implementation per WindowHandle.backend: browser
+ * windows (Khameleon's own spawned widgets) get Chrome DevTools Protocol;
+ * external (third-party) windows get the OS's own scripting layer
+ * (AppleScript on macOS, PowerShell on Windows) synthesizing real input,
+ * same category of mechanism as a screen reader or RPA tool uses.
+ */
+export interface InputBackend {
+  click(handle: WindowHandle, target: ClickTarget): Promise<void>;
+  type(handle: WindowHandle, target: ClickTarget | null, text: string): Promise<void>;
+  /** Browser windows only - reads rendered text via the DOM, not OCR. */
+  readText?(handle: WindowHandle, selector: string): Promise<string>;
+}
+
 /** Named layout presets. Kept small and explicit on purpose for v1. */
 export type LayoutPreset =
   | "enlarged" // large, centered — the default "pop up" state

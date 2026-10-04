@@ -16,10 +16,20 @@ const execAsync = promisify(exec);
 const WORKSPACE_ROOT = path.resolve(process.cwd(), "../..");
 
 // ── Blocked path segments (never allow reads/writes here) ─────
+// Security guardrail: File Policy (khameleon-decisions-log.md, 2026-10-01).
+// Widened from a .git/objects-only block to the whole .git/ directory
+// (write_file could previously overwrite .git/config or hooks), plus
+// common credential-file locations outside this repo's own secrets.
 const BLOCKED_SEGMENTS = [
   ".env", ".env.", "secrets", "/proc/", "/sys/", "/etc/shadow",
-  "/etc/passwd", "node_modules/.cache", ".git/objects",
+  "/etc/passwd", "node_modules/.cache", "/.git/", ".ssh/", "id_rsa",
+  ".npmrc", "/.aws/", ".docker/config.json",
 ];
+
+// Write-size cap, mirroring readFile's existing 500_000-byte read cap -
+// large writes are more likely to be a runaway/mistaken tool call than a
+// genuine source-file edit.
+const MAX_WRITE_BYTES = 1_000_000;
 
 function assertSafePath(p: string): string {
   const resolved = path.resolve(WORKSPACE_ROOT, p);
@@ -47,6 +57,9 @@ export async function readFile(p: string): Promise<string> {
 // ── write_file ────────────────────────────────────────────────
 export async function writeFile(p: string, content: string): Promise<string> {
   const abs = assertSafePath(p);
+  if (Buffer.byteLength(content, "utf8") > MAX_WRITE_BYTES) {
+    throw new Error(`Write refused: content is larger than the ${MAX_WRITE_BYTES}-byte limit for a single write_file call.`);
+  }
   fs.mkdirSync(path.dirname(abs), { recursive: true });
   fs.writeFileSync(abs, content, "utf8");
   return `OK: wrote ${content.length} bytes to ${p}`;

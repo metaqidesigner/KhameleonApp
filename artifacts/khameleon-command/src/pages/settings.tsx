@@ -13,6 +13,8 @@ import {
   getSpotifyNowPlaying, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, type SpotifyNowPlaying,
   getOnboardingStatus, saveProfile, type Profile,
 } from '@/lib/jarvisApi';
+import { getQuotaSnapshots, type QuotaSnapshots } from '@/lib/quotaApi';
+import { getTtsStatus, getElevenLabsVoices, type ElevenLabsVoice } from '@/lib/voiceApi';
 
 type Section = 'GENERAL' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED';
 const SECTIONS: Section[] = ['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MEMORY', 'TELEMETRY', 'ADVANCED'];
@@ -465,10 +467,12 @@ function WeatherLocationRow() {
 function ApiKeysSection() {
   const [statuses, setStatuses] = useState<ApiKeyStatus>({});
   const [encryptionConfigured, setEncryptionConfigured] = useState<boolean | null>(null);
+  const [quota, setQuota] = useState<QuotaSnapshots>({});
 
   const refresh = useCallback(() => {
     getApiKeyStatus().then(setStatuses);
     getOnboardingStatus().then((s) => setEncryptionConfigured(s.encryptionConfigured));
+    getQuotaSnapshots().then(setQuota).catch(() => {});
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -492,7 +496,14 @@ function ApiKeysSection() {
       )}
 
       {API_KEY_PROVIDER_DEFS.map((def) => (
-        <ApiKeyRow key={def.id} def={def} isSet={!!statuses[def.id]} onSaved={refresh} onCleared={refresh} />
+        <ApiKeyRow
+          key={def.id}
+          def={def}
+          isSet={!!statuses[def.id]}
+          onSaved={refresh}
+          onCleared={refresh}
+          quota={def.id === 'anthropic' || def.id === 'openai' ? quota[def.id] : undefined}
+        />
       ))}
     </>
   );
@@ -599,17 +610,66 @@ function AppearanceSection() {
  * on boot) and here: a real place to check status, re-open the prompt
  * after a skip/denial, and turn wake word on/off once granted.
  */
+/** Plays a short sample through the real /api/voice/tts path with the current settings, falling back to speechSynthesis exactly like useVoice.ts does - so "preview" reflects what you'll actually hear. */
+async function previewVoice(text: string, voiceId: string, modelId: string, rate: number, pitch: number, volume: number): Promise<void> {
+  try {
+    const res = await fetch('/api/voice/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice_id: voiceId, model_id: modelId, speed: rate }),
+    });
+    if (!res.ok) throw new Error(`TTS HTTP ${res.status}`);
+    const arrayBuffer = await res.arrayBuffer();
+    const ctx = new AudioContext();
+    const decoded = await ctx.decodeAudioData(arrayBuffer);
+    const gain = ctx.createGain();
+    gain.gain.value = volume;
+    const source = ctx.createBufferSource();
+    source.buffer = decoded;
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    source.start(0);
+  } catch {
+    if (!('speechSynthesis' in window)) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = rate;
+    utterance.pitch = pitch;
+    utterance.volume = volume;
+    window.speechSynthesis.speak(utterance);
+  }
+}
+
 function VoiceSection() {
   const wakeWordActive           = useJarvisStore(s => s.wakeWordActive);
   const setWakeWordActive        = useJarvisStore(s => s.setWakeWordActive);
   const wakeWordBlocked          = useJarvisStore(s => s.wakeWordBlocked);
   const setMicPermissionModalOpen = useJarvisStore(s => s.setMicPermissionModalOpen);
+  const voiceSettings            = useJarvisStore(s => s.voiceSettings);
+  const setVoiceSettings         = useJarvisStore(s => s.setVoiceSettings);
   const [micStatus, setMicStatus] = useState<'granted' | 'denied' | 'unknown'>('unknown');
+  const [ttsConfigured, setTtsConfigured] = useState<boolean | null>(null);
+  const [voices, setVoices] = useState<ElevenLabsVoice[]>([]);
+  const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(MIC_KEY);
     setMicStatus(stored === 'true' ? 'granted' : stored === 'denied' ? 'denied' : 'unknown');
+    getTtsStatus().then(s => setTtsConfigured(s.configured));
+    getElevenLabsVoices().then(setVoices);
   }, []);
+
+  const preview = async () => {
+    setPreviewing(true);
+    try {
+      await previewVoice(
+        'This is a preview of the current voice settings.',
+        voiceSettings.elevenLabsVoiceId, voiceSettings.elevenLabsModelId,
+        voiceSettings.rate, voiceSettings.pitch, voiceSettings.volume,
+      );
+    } finally {
+      setPreviewing(false);
+    }
+  };
 
   const inputAvailable = typeof window !== 'undefined' &&
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
@@ -644,7 +704,43 @@ function VoiceSection() {
           <NotYetWired>Grant microphone access above to enable wake word listening</NotYetWired>
         )}
       </Row>
-      <NotYetWired>Voice speed, pitch, and output voice aren't configurable yet</NotYetWired>
+      <Row>
+        <Label>SPEAKING RATE — {voiceSettings.rate.toFixed(2)}×</Label>
+        <input type="range" min={0.7} max={1.2} step={0.05} value={voiceSettings.rate}
+          onChange={e => setVoiceSettings({ rate: Number(e.target.value) })}
+          style={{ width: '100%', accentColor: 'var(--j-cyan)' }} />
+      </Row>
+      <Row>
+        <Label>PITCH — {voiceSettings.pitch.toFixed(2)}</Label>
+        <input type="range" min={0.5} max={2} step={0.05} value={voiceSettings.pitch}
+          onChange={e => setVoiceSettings({ pitch: Number(e.target.value) })}
+          style={{ width: '100%', accentColor: 'var(--j-cyan)' }} />
+        <NotYetWired>Only affects the browser fallback voice — ElevenLabs doesn't expose a pitch control</NotYetWired>
+      </Row>
+      <Row>
+        <Label>VOLUME — {Math.round(voiceSettings.volume * 100)}%</Label>
+        <input type="range" min={0} max={1} step={0.05} value={voiceSettings.volume}
+          onChange={e => setVoiceSettings({ volume: Number(e.target.value) })}
+          style={{ width: '100%', accentColor: 'var(--j-cyan)' }} />
+      </Row>
+      <Row>
+        <Label>OUTPUT VOICE</Label>
+        {ttsConfigured === false ? (
+          <NotYetWired>ELEVENLABS_API_KEY not configured — using the browser's built-in voice instead</NotYetWired>
+        ) : voices.length > 0 ? (
+          <select className="j-input" value={voiceSettings.elevenLabsVoiceId}
+            onChange={e => setVoiceSettings({ elevenLabsVoiceId: e.target.value })}>
+            {voices.map(v => <option key={v.voiceId} value={v.voiceId}>{v.name}</option>)}
+          </select>
+        ) : (
+          <input className="j-input" placeholder="ElevenLabs voice ID" value={voiceSettings.elevenLabsVoiceId}
+            onChange={e => setVoiceSettings({ elevenLabsVoiceId: e.target.value })} />
+        )}
+      </Row>
+      <button className="j-btn-ghost" style={{ height: 32, padding: '0 14px', fontSize: 11, opacity: previewing ? 0.5 : 1 }}
+        disabled={previewing} onClick={preview}>
+        {previewing ? 'PLAYING…' : '▶ PREVIEW VOICE'}
+      </button>
     </>
   );
 }

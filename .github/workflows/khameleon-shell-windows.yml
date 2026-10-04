@@ -1,0 +1,204 @@
+name: khameleon-shell (Windows)
+
+# Real Windows verification for apps/khameleon-shell (Cross-App Control -
+# khameleon-decisions-log.md, 2026-10-03). Newton doesn't have a Windows
+# machine; this gives the project a genuine Windows machine in the cloud to
+# build and run the Windows-specific native window-control code on, rather
+# than deferring Windows to "flagged, untested" the way Phase 0 initially
+# had to. Public repo, so these runner-minutes are free.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["design/home-implemented-glass", "main"]
+    paths:
+      - "apps/khameleon-shell/**"
+      - "khameleon-window-agent/**"
+      - "khameleon-file-agent/**"
+      - "khameleon-memory/**"
+      - "lib/integrations/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/khameleon-shell-windows.yml"
+
+jobs:
+  build-and-verify:
+    # Pinned, not windows-latest: that image moved to a Visual Studio
+    # version node-gyp 9.4.1 doesn't recognize yet ("unknown version
+    # 'undefined'"), which breaks node-window-manager/extract-file-icon's
+    # native build. windows-2022 has the well-known, node-gyp-recognized
+    # VS2022 Build Tools (hit this for real, 2026-10-03).
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runner's default Python is 3.12, which removed `distutils` -
+      # node-gyp 9.4.1 (bundled via pnpm's node-gyp dep) still imports it
+      # and fails with ModuleNotFoundError. 3.11 is the last version with
+      # distutils built in (hit this for real, 2026-10-03).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "9"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+
+      # electron/node-window-manager/extract-file-icon are deliberately kept
+      # OUT of the committed onlyBuiltDependencies (pnpm-workspace.yaml) so
+      # the Docker/Linux build never tries to compile these macOS/Windows-
+      # only native bindings. This runner needs them, so patch a local,
+      # never-committed copy before installing - same reasoning as the
+      # local-dev `allowBuilds` flip, just scoped to this ephemeral checkout.
+      - name: Allow native builds for this Windows run
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = 'pnpm-workspace.yaml';
+            let y = fs.readFileSync(path, 'utf8');
+            y = y.replace(
+              /onlyBuiltDependencies:\r?\n/,
+              \"onlyBuiltDependencies:\n  - electron\n  - extract-file-icon\n  - node-llama-cpp\n  - node-window-manager\n\"
+            );
+            fs.writeFileSync(path, y);
+          "
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      # "..." includes @khameleon/shell's workspace dependencies in build
+      # order too (khameleon-window-agent, @khameleon/integrations, etc.) -
+      # their dist/ output doesn't exist on a fresh checkout, unlike local
+      # dev where it's usually already built from earlier work.
+      - name: Build khameleon-shell and its workspace dependencies
+        run: pnpm --filter "@khameleon/shell..." build
+
+      - name: Typecheck khameleon-shell and khameleon-window-agent
+        run: |
+          pnpm --filter @khameleon/shell typecheck
+          pnpm --filter khameleon-window-agent exec tsc --noEmit
+
+      - name: Run khameleon-window-agent's test suite
+        run: pnpm --filter khameleon-window-agent test
+
+      # Proves node-window-manager's REAL Windows native addon (windows.cc,
+      # built via node-gyp above) actually works against the real Windows
+      # OS on this runner - not just "it compiled". Opens Notepad, confirms
+      # the addon can enumerate it as a real external window and read its
+      # bounds, then closes it. This is exactly the capability Phase 1/2
+      # build on top of.
+      - name: Smoke-test real window enumeration on Windows
+        shell: pwsh
+        working-directory: apps/khameleon-shell
+        run: |
+          $notepad = Start-Process notepad -PassThru
+          Start-Sleep -Seconds 2
+          node -e "
+            const { windowManager } = require('node-window-manager');
+            const windows = windowManager.getWindows();
+            const notepad = windows.find(w => (w.path || '').toLowerCase().includes('notepad'));
+            if (!notepad) {
+              console.error('FAIL: notepad.exe was not found among', windows.length, 'enumerated windows');
+              process.exit(1);
+            }
+            const bounds = notepad.getBounds();
+            console.log('OK: found notepad window, bounds =', JSON.stringify(bounds));
+            if (typeof bounds.width !== 'number' || bounds.width <= 0) {
+              console.error('FAIL: bounds did not look real');
+              process.exit(1);
+            }
+          "
+          Stop-Process -Id $notepad.Id -Force
+
+      # Proves WindowsNativeInputBackend's real click/type (PowerShell's
+      # System.Windows.Forms cursor/SendKeys + user32.dll mouse_event, the
+      # direct Windows equivalent of the macOS backend's in-process CGEvent
+      # approach) actually lands real keystrokes in a real window - not
+      # just "no error thrown". Types into Notepad, then reads the real
+      # text back via a separate copy-to-clipboard step so the read-back
+      # doesn't depend on the same code being tested (Cross-App Control
+      # Phase 2, khameleon-decisions-log.md, 2026-10-03).
+      - name: Smoke-test real click/type on Windows
+        shell: pwsh
+        working-directory: apps/khameleon-shell
+        run: |
+          $notepad = Start-Process notepad -PassThru
+          Start-Sleep -Seconds 2
+          node -e "
+            const { windowManager } = require('node-window-manager');
+            const { WindowsNativeInputBackend } = require('khameleon-window-agent');
+            (async () => {
+              const win = windowManager.getWindows().find(w => (w.path || '').toLowerCase().includes('notepad'));
+              if (!win) { console.error('FAIL: notepad.exe not found'); process.exit(1); }
+              win.bringToTop();
+              await new Promise(r => setTimeout(r, 800));
+              const bounds = win.getBounds();
+              const point = { x: Math.round(bounds.x + bounds.width / 2), y: Math.round(bounds.y + bounds.height / 2) };
+              const backend = new WindowsNativeInputBackend();
+              const handle = { id: 'external:notepad', backend: 'external', label: 'Notepad' };
+              await backend.click(handle, { point });
+              await backend.type(handle, null, 'Real Windows click and type test');
+              console.log('OK: dispatched click+type via WindowsNativeInputBackend, point =', JSON.stringify(point));
+            })().catch((e) => { console.error('FAIL:', e); process.exit(1); });
+          "
+          Start-Sleep -Seconds 1
+          Add-Type -AssemblyName System.Windows.Forms
+          [System.Windows.Forms.SendKeys]::SendWait('^a')
+          [System.Windows.Forms.SendKeys]::SendWait('^c')
+          Start-Sleep -Milliseconds 500
+          $clipboard = Get-Clipboard
+          Write-Host "Notepad's real content after the simulated typing: '$clipboard'"
+          if ($clipboard -ne 'Real Windows click and type test') {
+            Stop-Process -Id $notepad.Id -Force
+            throw "Real Windows text did not match: got '$clipboard'"
+          }
+          Write-Host "OK: real Windows keystrokes landed correctly"
+          Stop-Process -Id $notepad.Id -Force
+
+      # Proves node-llama-cpp's native binding actually loads on real
+      # Windows (the one real platform-specific risk for Phase 3's offline
+      # document reading) - deliberately NOT downloading the ~1.1GB model
+      # here too: that would make every push touching these paths slow and
+      # bandwidth-heavy, for logic (the model's actual answers) that's
+      # already verified for real on macOS and is platform-independent
+      # llama.cpp behavior, not something Windows-specific could break
+      # (Cross-App Control Phase 3, khameleon-decisions-log.md, 2026-10-03).
+      - name: Smoke-test node-llama-cpp's native binding loads on Windows
+        shell: pwsh
+        working-directory: apps/khameleon-shell
+        run: |
+          node -e "
+            import('node-llama-cpp').then((m) => m.getLlama()).then((llama) => {
+              console.log('OK: node-llama-cpp native binding loaded on real Windows, gpu =', llama.gpu);
+            }).catch((e) => { console.error('FAIL:', e); process.exit(1); });
+          "
+
+      - name: Package (unsigned - no Authenticode cert yet)
+        run: pnpm --filter @khameleon/shell exec electron-builder --win --dir
+
+      # Proves the actual packaged .exe launches for real on real Windows,
+      # same bar as the macOS verification (process alive, no crash) - not
+      # claiming full UI verification, which still wants Newton's wife's
+      # real Windows machine per their own plan.
+      - name: Launch the packaged app and confirm it stays alive
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path "apps/khameleon-shell/release" -Recurse -Filter "Khameleon.exe" | Select-Object -First 1
+          if (-not $exe) { throw "Khameleon.exe not found in release output" }
+          $proc = Start-Process -FilePath $exe.FullName -PassThru
+          Start-Sleep -Seconds 6
+          $alive = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+          if (-not $alive) { throw "Khameleon.exe exited/crashed within 6 seconds of launch" }
+          Write-Host "OK: Khameleon.exe is running, PID $($proc.Id)"
+          Stop-Process -Id $proc.Id -Force
+
+      - name: Upload unpacked Windows build for manual testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: khameleon-windows-unpacked
+          path: apps/khameleon-shell/release/win-unpacked
+          retention-days: 14

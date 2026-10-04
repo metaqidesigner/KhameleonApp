@@ -1,13 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Runners } from "./coordinator";
-import { LOCAL_TOOL_DEFINITIONS, dispatchLocalTool } from "./tools";
+import { LOCAL_TOOL_DEFINITIONS, dispatchLocalTool, type DocumentTextReader } from "./tools.js";
 
-const SYSTEM = `You are Khameleon, a local desktop assistant running on the user's own Mac. You take real actions using three tools:
-- window_command: open/move/dock/close floating widgets and windows (e.g. YouTube videos)
+const SYSTEM = `You are Khameleon, a local desktop assistant running on the user's own Mac. You take real actions using four tools:
+- window_command: open/move/dock/close floating widgets; observe/control third-party apps already open on the desktop (shows the user a colored border); once "controlling" a window, click and type into it like a real user would
 - file_command: create folders, move/trash files, sort a folder, open/quit apps
 - memory_command: remember/recall facts, save/search notes
+- read_document: read the real text of a local PDF or photo (including scanned/photographed documents via on-device OCR) - NOT for documents the user has flagged sensitive/private, see that tool's own description
 
-A single request may require several tool calls in a row — for example "open youtube enlarged, then move it aside" is two separate window_command calls: one to open, one to move. Call as many tools as the request needs, in order, before replying with text. Only reply with text once every action the user asked for has actually been taken.
+A single request may require many tool calls in a row - for example "read this PDF's revenue figure and put it in the open spreadsheet" is: read_document once, then window_command to control the spreadsheet, then window_command to click the right cell, then window_command to type the value - in order, as separate calls, before replying with text. When filling in multiple figures (e.g. several cells of a spreadsheet), click and type for each one in turn - don't guess you can do it in one call. Call as many tools as the request needs, in order, before replying with text. Only reply with text once every action the user asked for has actually been taken.
 
 After all needed actions are complete, reply with one short, plain-language confirmation of what you did. Do not repeat tool output verbatim, and do not describe actions you didn't actually take.`;
 
@@ -48,7 +49,14 @@ export class LocalAgentRunner {
     private runners: Runners,
     private client: AnthropicMessagesClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }),
     private model: string = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-20250514",
-    private maxIterations: number = 6,
+    // Was 6 - too low once real multi-cell spreadsheet-filling became a
+    // real workflow (Cross-App Control Phase 4): read a document, then
+    // click+type once per figure, easily exceeds that for 3+ figures.
+    private maxIterations: number = 12,
+    /** Reads a non-sensitive document's real text for the read_document
+     * tool. Optional so existing callers/tests that never touch it don't
+     * need to supply one. */
+    private readDocumentText?: DocumentTextReader,
   ) {}
 
   async run(text: string): Promise<LocalAgentTurnResult> {
@@ -81,7 +89,7 @@ export class LocalAgentRunner {
         const input = block.input as Record<string, unknown>;
 
         try {
-          const result = await dispatchLocalTool(block.name, input, this.runners);
+          const result = await dispatchLocalTool(block.name, input, this.runners, this.readDocumentText);
           toolCalls.push({ name: block.name, input, result });
           toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
         } catch (err) {

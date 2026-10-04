@@ -41,6 +41,7 @@ export function JarvisOrb() {
   const toggleVoice         = useJarvisStore(s => s.toggleVoice);
   const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
   const voiceEnabled        = useJarvisStore(s => s.voiceEnabled);
+  const embeddedOrbMountCount = useJarvisStore(s => s.embeddedOrbMountCount);
 
   const pos     = orbPosition ?? getDefaultPos();
   const orbSize = orbMinimized ? ORB_SIZE_MIN : ORB_SIZE;
@@ -234,6 +235,12 @@ export function JarvisOrb() {
     setOrbChatOpen(true);
   }, [orbMinimized, setOrbMinimized, setOrbStatus, setOrbChatOpen]);
 
+  // AssistantCard carries its own orb wherever it's mounted (the Assistant
+  // tab's hero, Workspace's compact panel) - this persistent one hides
+  // itself rather than showing a second orb at the same time. After every
+  // hook above, never before - hooks must still run unconditionally.
+  if (embeddedOrbMountCount > 0) return null;
+
   return (
     <>
       <div
@@ -246,9 +253,9 @@ export function JarvisOrb() {
         onClick={onClick}
         onContextMenu={onContextMenu}
       >
-        <div className={`jarvis-orb-container ${voiceEnabled ? orbStatus : 'muted'}${orbMinimized ? ' minimized' : ''}`}>
+        <div className={`jarvis-orb-container ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}${orbMinimized ? ' minimized' : ''}`}>
           {/* Ambient bloom behind everything */}
-          <div className={`orb-glow ${voiceEnabled ? orbStatus : 'muted'}`} />
+          <div className={`orb-glow ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}`} />
 
           {/* Layer 1 — outer decorative partial arcs (slow, counter-rotating) */}
           <div className="orb-arc orb-arc-1" />
@@ -265,8 +272,10 @@ export function JarvisOrb() {
           </div>
 
           {/* Layer 3 — core sphere with nebula texture */}
-          <div className="orb-core" ref={coreRef} />
-          {!voiceEnabled && !orbMinimized && <MicOff size={16} className="orb-muted-icon" />}
+          <div className="orb-core" ref={coreRef}>
+            <div className="orb-dust" />
+          </div>
+          {!voiceEnabled && orbStatus === 'online' && !orbMinimized && <MicOff size={16} className="orb-muted-icon" />}
         </div>
 
         <OutputWaveform visible={orbStatus === 'speaking'} />

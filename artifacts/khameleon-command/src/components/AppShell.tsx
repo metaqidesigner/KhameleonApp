@@ -3,14 +3,15 @@ import Background from './Background';
 import TopBar from './TopBar';
 import NewsTicker from './NewsTicker';
 import CommandPalette from './CommandPalette';
-import ChatPanel from './ChatPanel';
+import ChatWindow from './chatWindow/ChatWindow';
 import { LeftSidebar } from './LeftSidebar';
 import { JarvisOrbPortal } from './orb/JarvisOrbPortal';
 import { VoiceController } from './orb/VoiceController';
 import { OnboardingWizard } from './OnboardingWizard';
+import { NeedsInputWatcher } from './NeedsInputWatcher';
 import { useJarvisStore } from '@/store/jarvisStore';
 
-const UnifiedCanvas = lazy(() => import('@/pages/canvas'));
+const Home = lazy(() => import('@/pages/home'));
 const Agents     = lazy(() => import('@/pages/agents'));
 const Research   = lazy(() => import('@/pages/research'));
 const Memory     = lazy(() => import('@/pages/memory'));
@@ -42,7 +43,7 @@ function PageRouter() {
   const activeTab = useJarvisStore(s => s.activeTab);
   return (
     <Suspense fallback={<Fallback />}>
-      {activeTab === 'canvas'    && <UnifiedCanvas />}
+      {activeTab === 'canvas'    && <Home />}
       {activeTab === 'agents'    && <Agents />}
       {activeTab === 'research'  && <Research />}
       {activeTab === 'memory'    && <Memory />}
@@ -78,10 +79,13 @@ export function AppShell() {
       </div>
 
       <CommandPalette />
-      <ChatPanel />
+      <ChatWindow />
 
       {/* Floating orb — always present */}
       <JarvisOrbPortal />
+
+      {/* design-spec.md §6.5.1 real needs-input interrupt (2026-10-01) */}
+      <NeedsInputWatcher />
 
       <VoiceController />
       <OnboardingWizard />

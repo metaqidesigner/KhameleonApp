@@ -8,7 +8,7 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/migrate-legacy-values.test.ts src/routes/tasks-delete.test.ts src/routes/scheduler.test.ts src/agents/tools/webFetch.test.ts src/routes/weather.test.ts src/lib/apiKeys.test.ts src/lib/crypto.test.ts src/lib/vaultGuard.test.ts src/lib/skillSetScope.test.ts src/lib/skillSetSuggestionMatch.test.ts src/lib/outlookGraph.test.ts src/agents/commandClassifier.test.ts src/agents/skills/outlookSummarizeThread.test.ts src/agents/skills/outlookTriageInbox.test.ts src/agents/researchAgent.test.ts",
+    "test": "tsx --test src/migrate-legacy-values.test.ts src/routes/tasks-delete.test.ts src/routes/scheduler.test.ts src/agents/tools/webFetch.test.ts src/routes/weather.test.ts src/lib/apiKeys.test.ts src/lib/crypto.test.ts src/lib/accounts.test.ts src/lib/vaultGuard.test.ts src/lib/skillSetScope.test.ts src/lib/skillSetSuggestionMatch.test.ts src/lib/outlookGraph.test.ts src/agents/commandClassifier.test.ts src/agents/skills/outlookSummarizeThread.test.ts src/agents/skills/outlookTriageInbox.test.ts src/agents/researchAgent.test.ts",
     "test:scheduler": "tsx --test --test-force-exit src/scheduler.test.ts"
   },
   "dependencies": {

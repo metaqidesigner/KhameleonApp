@@ -2,6 +2,35 @@ import { useState } from 'react';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
 import { saveApiKey, clearApiKey } from '@/lib/jarvisApi';
 import type { ApiKeyProviderDef } from '@/lib/apiKeyProviders';
+import type { QuotaSnapshot } from '@/lib/quotaApi';
+
+function secondsAgo(iso: string): string {
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return `${s}s ago`;
+  return `${Math.round(s / 60)}m ago`;
+}
+
+/**
+ * Real per-minute rate-limit numbers Anthropic/OpenAI returned on their
+ * last actual response (quotaApi.ts/providerQuota.ts) - not a guessed
+ * "typical limit" and not overall spend/budget, which neither provider
+ * exposes via API. Only rendered when at least one real number came back.
+ */
+function QuotaLine({ quota }: { quota: QuotaSnapshot }) {
+  const parts: string[] = [];
+  if (quota.requestsRemaining !== undefined && quota.requestsLimit !== undefined) {
+    parts.push(`${quota.requestsRemaining.toLocaleString()} / ${quota.requestsLimit.toLocaleString()} requests`);
+  }
+  if (quota.tokensRemaining !== undefined && quota.tokensLimit !== undefined) {
+    parts.push(`${quota.tokensRemaining.toLocaleString()} / ${quota.tokensLimit.toLocaleString()} tokens`);
+  }
+  if (parts.length === 0) return null;
+  return (
+    <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)' }}>
+      RATE LIMIT (per-minute window) — {parts.join(' · ')} remaining, as of {secondsAgo(quota.capturedAt)}
+    </div>
+  );
+}
 
 /**
  * A single provider's API key entry row: status, input, save/clear.
@@ -9,11 +38,12 @@ import type { ApiKeyProviderDef } from '@/lib/apiKeyProviders';
  * mounted eagerly at the app root - can reuse it without pulling the
  * whole Settings page bundle into the main chunk.
  */
-export function ApiKeyRow({ def, isSet, onSaved, onCleared }: {
+export function ApiKeyRow({ def, isSet, onSaved, onCleared, quota }: {
   def: ApiKeyProviderDef;
   isSet: boolean;
   onSaved: () => void;
   onCleared: () => void;
+  quota?: QuotaSnapshot;
 }) {
   const [value, setValue] = useState('');
   const [busy, setBusy]   = useState(false);
@@ -95,6 +125,7 @@ export function ApiKeyRow({ def, isSet, onSaved, onCleared }: {
       <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)' }}>
         Get a key at {def.helpUrl}
       </div>
+      {isSet && quota && <QuotaLine quota={quota} />}
       {msg && (
         <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 11, color: msg === 'Saved.' ? 'var(--j-green)' : '#f87171' }}>
           {msg}

@@ -142,6 +142,16 @@ html, body, #root {
   content: '';
   position: absolute;
   inset: 0;
+  /* This paints behind every tab in the app, not just the Assistant page -
+     restored to the deliberately-dimmed values a past session already
+     chose (see git history: "Dim the global ambient background glow").
+     An earlier change here copied the reference mockup's background
+     straight onto this global layer, which is what was actually producing
+     the "white light radiating from the right side" complaint (the amber
+     radial sits at 88% 12% - top-right, wide falloff toward center) on
+     every single page, not something scoped to the one page it was
+     modeled on. The Assistant tab gets its own equivalent, brighter,
+     properly-scoped background below (.kh-home) instead. */
   background:
     radial-gradient(circle at 15% 10%, rgba(111,230,189,0.08) 0%, rgba(111,230,189,0) 32%),
     radial-gradient(circle at 88% 12%, rgba(240,163,76,0.065) 0%, rgba(240,163,76,0) 34%),
@@ -858,7 +868,8 @@ html.light body {
 }
 .j-main-area {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
 }
 
@@ -1551,6 +1562,34 @@ html.light body {
   z-index: 1;
 }
 
+/* AssistantCard as assistant-home.tsx's hero — a fixed overlay pinned to
+   the viewport's bottom-right corner, NOT a participant in .kh-layout's
+   grid (an earlier version sank it to the bottom of the center grid
+   track instead, which still confined its width to that column - not
+   what "overlaid, not fitted into any of the columns" asked for). Sized
+   to the mockup's .main-panel proportions rather than the compact
+   right-rail width .kc-assistant-slot above uses. */
+.kh-hero-overlay {
+  position: fixed;
+  right: 34px;
+  bottom: 34px;
+  width: 460px;
+  max-width: calc(100vw - 68px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+.kh-hero-overlay > * { pointer-events: auto; }
+.kh-hero-overlay .ac-card {
+  position: static;
+  width: 100%;
+  right: auto;
+  top: auto;
+  z-index: 1;
+}
+
 /* Light mode overrides for assistant card */
 .light .ac-card {
   background: rgba(245, 248, 255, 0.90);
@@ -1573,8 +1612,8 @@ html.light body {
    SIGNAL GLASS — shared material recipe for every panel/card
    ════════════════════════════════════════════════════════════ */
 
-/* Normal panels: task cards, metric tiles, concept cards, and standard JPanel surfaces. */
-.j-panel,
+/* Normal (small) panels: metric tiles, concept pills, mini-cards - things
+   that sit alongside a window rather than being one. */
 .j-card,
 .j-metric,
 .j-metric-box,
@@ -1584,72 +1623,107 @@ html.light body {
 .kh-mini,
 .kh-focus-panel,
   .kh-film-card {
-  --signal-rim-glow: 0 0 24px rgba(111,230,189,0.16);
-  background: rgba(255,255,255,0.055);
+  /* Darkened + softened 2026-10-01, matching the Live Wall's tuned glass
+     (khameleon-decisions-log.md): the original brighter white-wash fill and
+     a stronger highlight streak were washing out muted/eyebrow label text
+     across the app - this is one shared recipe, so the fix applies here
+     rather than as a one-off on the Live Wall alone. */
+  --signal-rim-glow: 0 0 20px rgba(111,230,189,0.12);
+  background: rgba(0,0,0,0.22);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.16);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 16px;
   box-shadow:
     0 30px 55px rgba(0,0,0,0.5),
-    inset 0 1px 0 rgba(255,255,255,0.16),
+    inset 0 1px 0 rgba(255,255,255,0.1),
     0 0 0 1px rgba(255,255,255,0.03),
     var(--signal-rim-glow);
 }
 
-/* Important panels: the main canvas windows and assistant surface. */
+/* Important panels: every actual "window" in the app - the Workspace
+   canvas windows, the assistant hero surface, AND every JPanel-rendered
+   page (My Tasks, Connections, Analytics, Integrations, Approvals, etc.)
+   via .j-panel. .j-panel used to sit in the smaller tier above, which is
+   why those tabs looked visibly flatter than the Assistant/Workspace
+   windows even though they're the same kind of element - one shared
+   "window" tier now, so every tab's panels read the same. */
+.j-panel,
 .kc-window,
 .ac-card {
-  --signal-rim-glow: 0 0 24px rgba(111,230,189,0.16);
-  background: rgba(255,255,255,0.055);
+  /* Default for any .j-panel/.kc-window without its own category override
+     below - the same bigger, softer, dual-radius bloom .ac-card carries,
+     just single-toned teal instead of the orb's teal+violet pairing.
+     Darkened + softened 2026-10-01 to match the Live Wall's tuned glass -
+     see the .j-card group's comment above for why. */
+  --signal-rim-glow: 0 0 40px rgba(111,230,189,0.1), 0 0 70px rgba(111,230,189,0.05);
+  background: rgba(10,18,20,0.5);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
-  border: 1.5px solid rgba(255,255,255,0.22);
+  border: 1px solid rgba(255,255,255,0.14);
   border-radius: 16px;
   box-shadow:
     0 40px 74px rgba(0,0,0,0.6),
-    inset 0 1px 0 rgba(255,255,255,0.16),
+    inset 0 1px 0 rgba(255,255,255,0.1),
     0 0 0 1px rgba(255,255,255,0.03),
     var(--signal-rim-glow);
 }
 
-/* Accent rims stay in the shadow only; panel borders remain neutral Signal Glass. */
-.ac-pill-command,
+/* Accent rims stay in the shadow only; panel borders remain neutral Signal
+   Glass. Dimmed proportionally with the base recipe above (2026-10-01) so
+   no category color reads brighter than the new, quieter teal default. */
+.ac-pill-command {
+  --signal-rim-glow: 0 0 20px rgba(111,230,189,0.12);
+}
+/* Workspace's windows get the same bigger, dual-radius bloom as .ac-card,
+   just tinted to each window's own category color instead of a flat
+   single-layer ring - so they read as the same tier of "window" as the
+   hero assistant surface, not a lesser variant. */
 .kc-window-khameleon,
-.kc-window-agent-activity,
+.kc-window-agent-activity {
+  --signal-rim-glow: 0 0 40px rgba(111,230,189,0.1), 0 0 70px rgba(111,230,189,0.05);
+}
+/* The hero assistant surface carries home-implemented.html's own dual-radius
+   bloom (bigger, softer, dimmer than a category rim) rather than a flat
+   single-color ring - this is what actually reads as "the hero panel"
+   in the reference, not a brighter border. */
 .ac-card {
-  --signal-rim-glow: 0 0 24px rgba(111,230,189,0.16);
+  --signal-rim-glow: 0 0 48px rgba(111,230,189,0.09), 0 0 80px rgba(140,124,240,0.06);
 }
 .ac-pill-context,
 .j-metric-box-amber,
-.j-section-pill-core_work,
+.j-section-pill-core_work {
+  --signal-rim-glow: 0 0 20px rgba(240,163,76,0.12);
+}
 .kc-window-todays-plan {
-  --signal-rim-glow: 0 0 24px rgba(240,163,76,0.16);
+  --signal-rim-glow: 0 0 40px rgba(240,163,76,0.1), 0 0 70px rgba(240,163,76,0.05);
 }
 .ac-pill-status,
 .ac-focus-card,
-.j-section-pill-start_of_day,
+.j-section-pill-start_of_day {
+  --signal-rim-glow: 0 0 20px rgba(140,124,240,0.12);
+}
 .kc-window-system-status {
-  --signal-rim-glow: 0 0 24px rgba(140,124,240,0.16);
+  --signal-rim-glow: 0 0 40px rgba(140,124,240,0.1), 0 0 70px rgba(140,124,240,0.05);
 }
 .j-section-pill-administrative {
-  --signal-rim-glow: 0 0 24px rgba(231,122,122,0.16);
+  --signal-rim-glow: 0 0 20px rgba(231,122,122,0.12);
 }
 .j-section-pill-meetings,
 .j-section-pill-communication,
 .j-section-pill-end_of_day {
-  --signal-rim-glow: 0 0 24px rgba(111,230,189,0.16);
+  --signal-rim-glow: 0 0 20px rgba(111,230,189,0.12);
 }
 .kh-mini-context {
-  --signal-rim-glow: 0 0 24px rgba(240,163,76,0.16);
+  --signal-rim-glow: 0 0 20px rgba(240,163,76,0.12);
 }
 .kh-mini-status {
-  --signal-rim-glow: 0 0 24px rgba(140,124,240,0.16);
+  --signal-rim-glow: 0 0 20px rgba(140,124,240,0.12);
 }
 /* .kh-focus-panel carries the mockup's own specific (dimmer) rim value
    rather than a flat category glow. */
 .kh-focus-panel {
-  --signal-rim-glow: 0 0 26px rgba(140,124,240,0.1);
+  --signal-rim-glow: 0 0 22px rgba(140,124,240,0.08);
 }
 
 /* One consistent directional highlight across every panel. */
@@ -1669,7 +1743,7 @@ html.light body {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(122deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 30%);
+  background: linear-gradient(122deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0) 30%);
   pointer-events: none;
   z-index: 0;
 }
@@ -1715,9 +1789,21 @@ html.light body {
   z-index: 1;
 }
 
+/* The "Khameleon" window's whole body is the three Command/Context/Status
+   tiles - each already has its own sheen (.kh-mini::before). This window's
+   OWN sheen, sized for its full tall box, was stacking a second, much
+   bigger diagonal highlight on top of that - visibly washing over
+   "I understand what matters" / "I keep you in the loop" and reading as
+   different lighting than the Assistant page's bare tiles, which have no
+   such outer window. Suppressed so this window's nested tiles read
+   exactly like the Assistant page's do - the goal, not a coincidence. */
+.kc-window-khameleon::before,
+.kc-window-khameleon::after {
+  display: none;
+}
+
 /* The normal recipe remains exact in hover and light states. */
 .ac-pill:hover,
-.light .j-panel,
 .light .j-card,
 .light .j-metric,
 .light .j-metric-box,
@@ -1736,6 +1822,7 @@ html.light body {
     var(--signal-rim-glow);
 }
 
+.light .j-panel,
 .light .kc-window,
 .light .ac-card {
   background: rgba(255,255,255,0.055);
@@ -1762,6 +1849,8 @@ html.light body {
   display: flex;
   flex-direction: column;
   gap: 30px;
+  /* No page-specific background here anymore - this page uses the same
+     restrained .j-bg-layer as every other tab, full stop. No exception. */
   /* Scoped to this page only — the shared --j-text* tokens elsewhere in the
      app (e.g. the Workspace canvas) intentionally stay untouched. These
      correct the base palette to design-spec.md §3's locked values
@@ -1796,8 +1885,18 @@ html.light body {
   filter: blur(6px);
   z-index: 0;
 }
-.kh-flare-teal { top: -20px; left: 8%; background: radial-gradient(circle, rgba(111,230,189,0.28) 0%, rgba(111,230,189,0) 70%); }
-.kh-flare-amber { top: 0; right: 4%; background: radial-gradient(circle, rgba(240,163,76,0.22) 0%, rgba(240,163,76,0) 70%); }
+/* Dimmed well below the reference's own values: the reference's mini-col
+   sits in a compact ~1150px-wide card, so this flare's fixed 260px size
+   only ever brushed its edge. Ported at full-page scale (this app has no
+   bounded "scene" card), the same 260px blob sits almost directly on top
+   of the Command/Context/Status text instead - confirmed by reading its
+   actual on-screen rect - stacking with the ambient .j-bg-layer glow
+   behind it and washing the cards' background bright enough to weaken
+   their (dark-background-calibrated) text contrast. */
+/* Removed entirely - no page gets extra glow beyond the shared, restrained
+   .j-bg-layer every other tab already uses. The elements are still in the
+   DOM (harmless, pointer-events:none, no visible background left). */
+.kh-flare-teal, .kh-flare-amber { background: none; }
 .kh-layout, .kh-filmstrip { position: relative; z-index: 1; }
 .kh-layout {
   display: grid;
@@ -1817,6 +1916,22 @@ html.light body {
   .kh-mini-col { grid-column: 1; }
   .kh-focus-panel { grid-column: 3; }
 }
+
+/* ── Center col: the hero orb/chat card ────────────────────────
+   Newton asked for the orb window to sit bottom-right (matching where
+   the persistent floating orb used to sit before it started hiding
+   itself here - see AssistantCard's mount-count effect) rather than
+   pinned to the top of its grid track. A tall min-height plus
+   justify-content:flex-end sinks it to the bottom of the center column;
+   align-items:flex-end hugs it to that column's right edge, the side
+   nearest the focus panel - as close to "bottom-right of the page" as a
+   3-column grid (mini-col | center | focus-panel) allows without moving
+   it into a different column's space entirely. */
+/* Holds only ActiveTaskWindow now - the hero moved to .kh-hero-overlay
+   (a fixed viewport overlay, not a grid participant). Plain top-aligned
+   flow is all this needs once a task is actually running and takes over
+   the center track. */
+.kh-center-col { display: flex; flex-direction: column; gap: 12px; }
 
 /* ── Mini col: Command / Context / Status ───────────────────── */
 .kh-mini-col { display: flex; flex-direction: column; gap: 16px; }
@@ -1922,6 +2037,8 @@ html.light body {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 8px;
 }
 .kh-film-check.done { background: rgba(111,230,189,0.28); color: var(--j-teal); box-shadow: 0 0 6px rgba(111,230,189,0.5); }
+.kh-film-check.progress { border: 1.5px solid var(--j-violet); box-shadow: 0 0 6px rgba(140,124,240,0.5); }
+.kh-film-check.queued { border: 1.5px solid rgba(255,255,255,0.25); }
 .kh-film-empty {
   width: 100%; padding: 24px; text-align: center;
   font-family: var(--j-font-ui); font-size: 12px; color: var(--j-text-faint);

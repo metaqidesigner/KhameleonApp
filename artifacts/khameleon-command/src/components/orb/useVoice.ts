@@ -40,6 +40,8 @@ async function playElevenLabs(
   text: string,
   voiceId: string,
   modelId: string,
+  rate: number,
+  volume: number,
   onStart: () => void,
   onEnd: () => void,
   signal: AbortSignal,
@@ -47,7 +49,7 @@ async function playElevenLabs(
   const res = await fetch('/api/voice/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice_id: voiceId, model_id: modelId }),
+    body: JSON.stringify({ text, voice_id: voiceId, model_id: modelId, speed: rate }),
     signal,
   });
 
@@ -60,9 +62,15 @@ async function playElevenLabs(
   const decoded = await ctx.decodeAudioData(arrayBuffer);
   if (signal.aborted) { ctx.close(); return; }
 
+  // Volume previously had no effect on the ElevenLabs path at all - the
+  // source connected straight to destination. A real gain node closes that.
+  const gain = ctx.createGain();
+  gain.gain.value = volume;
+
   const source = ctx.createBufferSource();
   source.buffer = decoded;
-  source.connect(ctx.destination);
+  source.connect(gain);
+  gain.connect(ctx.destination);
 
   onStart();
 
@@ -250,6 +258,8 @@ export function useVoice(
       full,
       voiceSettings.elevenLabsVoiceId,
       voiceSettings.elevenLabsModelId,
+      voiceSettings.rate,
+      voiceSettings.volume,
       onStart,
       onEnd,
       ctrl.signal,

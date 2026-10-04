@@ -12,10 +12,11 @@ router.post("/tts", async (req, res) => {
     return;
   }
 
-  const { text, voice_id, model_id } = req.body as {
+  const { text, voice_id, model_id, speed } = req.body as {
     text?: string;
     voice_id?: string;
     model_id?: string;
+    speed?: number;
   };
 
   if (!text || typeof text !== "string" || text.trim() === "") {
@@ -25,6 +26,18 @@ router.post("/tts", async (req, res) => {
 
   const voiceId = voice_id ?? VOICE_ID;
   const modelId = model_id ?? MODEL_ID;
+
+  // ElevenLabs documents a valid speed range of 0.7-1.2 - clamp rather than
+  // forward an out-of-range value and risk a 400 from the upstream API.
+  const voiceSettings: Record<string, number | boolean> = {
+    stability: 0.5,
+    similarity_boost: 0.75,
+    style: 0.0,
+    use_speaker_boost: true,
+  };
+  if (typeof speed === "number" && Number.isFinite(speed)) {
+    voiceSettings.speed = Math.min(1.2, Math.max(0.7, speed));
+  }
 
   try {
     const upstream = await fetch(
@@ -39,12 +52,7 @@ router.post("/tts", async (req, res) => {
         body: JSON.stringify({
           text: text.slice(0, 5000),
           model_id: modelId,
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
-            style: 0.0,
-            use_speaker_boost: true,
-          },
+          voice_settings: voiceSettings,
         }),
       }
     );
@@ -82,6 +90,32 @@ router.post("/tts", async (req, res) => {
 // Probe endpoint — lets the frontend check if ElevenLabs is configured
 router.get("/tts/status", (_req, res) => {
   res.json({ configured: !!process.env.ELEVENLABS_API_KEY });
+});
+
+// Real ElevenLabs voice list, for the Settings > Voice picker - lets a user
+// pick their own output voice instead of only ever hearing the one
+// hardcoded default (ELEVENLABS_VOICE_ID). Honest 503 when unconfigured,
+// same as every other provider-gated endpoint in this app.
+router.get("/voices", async (req, res) => {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
+    res.status(503).json({ error: "ELEVENLABS_API_KEY not configured" });
+    return;
+  }
+  try {
+    const upstream = await fetch("https://api.elevenlabs.io/v1/voices", {
+      headers: { "xi-api-key": apiKey },
+    });
+    if (!upstream.ok) {
+      res.status(upstream.status).json({ error: "Could not list ElevenLabs voices" });
+      return;
+    }
+    const json = (await upstream.json()) as { voices?: { voice_id: string; name: string }[] };
+    res.json((json.voices ?? []).map((v) => ({ voiceId: v.voice_id, name: v.name })));
+  } catch (err) {
+    req.log.error({ err }, "ElevenLabs voice list failed");
+    res.status(502).json({ error: "Could not list ElevenLabs voices" });
+  }
 });
 
 export default router;

@@ -1,20 +1,50 @@
 {
   "name": "@khameleon/shell",
   "version": "0.1.0",
+  "description": "Khameleon desktop app",
+  "author": "Khameleon",
   "private": true,
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "pnpm build && electron .",
+    "package:mac": "pnpm build && electron-builder --mac",
+    "package:win": "pnpm build && electron-builder --win"
   },
   "dependencies": {
     "@khameleon/integrations": "workspace:*",
+    "@napi-rs/canvas": "0.1.80",
+    "extract-file-icon": "^0.3.2",
     "khameleon-file-agent": "workspace:*",
     "khameleon-memory": "workspace:*",
-    "khameleon-window-agent": "workspace:*"
+    "khameleon-window-agent": "workspace:*",
+    "node-llama-cpp": "^3.22.1",
+    "node-window-manager": "^2.2.4",
+    "pdf-parse": "^2.4.5",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "electron": "^31.0.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "0.27.3",
     "typescript": "~5.9.3"
+  },
+  "build": {
+    "appId": "com.khameleon.app",
+    "productName": "Khameleon",
+    "npmRebuild": false,
+    "directories": { "output": "release" },
+    "files": ["dist/**/*"],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build-resources/icon.png",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "icon": "build-resources/icon.png",
+      "target": ["nsis", "portable"]
+    }
   }
 }

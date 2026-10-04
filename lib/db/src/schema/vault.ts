@@ -12,12 +12,19 @@
 // - External secrets-manager integration (HashiCorp Vault, AWS Secrets Manager)
 // Those need real infrastructure/product decisions, not just more code.
 
-import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+// Hosted/managed mode, Phase 3 (khameleon-decisions-log.md, 2026-10-03):
+// userId is null for a no-accounts instance's one shared vault (unchanged
+// default); set once an account owns this item. Every route handler in
+// routes/vault.ts scopes by this column now - a vault secret is private to
+// the account that created it, including from other accounts on the same
+// instance (not just from strangers without a session at all).
 export const vaultItemsTable = pgTable("vault_items", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   name: text("name").notNull(),
   category: text("category").notNull(),
   permissionLevel: text("permission_level").notNull().default("read"),

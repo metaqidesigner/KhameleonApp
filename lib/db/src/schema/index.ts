@@ -23,3 +23,4 @@ export * from "./skill_sets";
 export * from "./skill_set_suggestions";
 export * from "./integration_directory";
 export * from "./action_receipts";
+export * from "./users";

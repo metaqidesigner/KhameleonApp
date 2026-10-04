@@ -1,12 +1,27 @@
-export const ORB_SIZE = 90;
+// 90 -> 126 (1.4x): the persistent floating orb's core rendered at its old
+// native 54px, cover-cropped from a 1360px nebula photo, was too few real
+// pixels to show any of the reference's wispy cloud detail - it just read
+// as scattered dots. Bumped every layer (container/arcs/rings/core/moon/
+// beacon, see orb.css's ".jarvis-orb-wrapper ..." overrides) by the same
+// factor so the composition's proportions stay exactly as they were, just
+// bigger - not just a CSS transform:scale(), which would've faithfully
+// preserved the same blurry 54px raster at a larger size instead of
+// actually rendering more of the image.
+export const ORB_SIZE = 126;
 export const ORB_SIZE_MIN = 48;
 /**
- * The glow grows 35px beyond the full-size container at its breathing peak.
- * This extra buffer also covers the arcs and soft core shadows.
+ * The glow grows beyond the full-size container at its breathing peak.
+ * This extra buffer also covers the arcs and soft core shadows - scaled
+ * with ORB_SIZE's own 1.4x bump above.
  */
-export const ORB_VISUAL_OVERFLOW = 40;
-export const ORB_RIGHT_OFFSET = 44;
-export const ORB_BOTTOM_OFFSET = 40;
+export const ORB_VISUAL_OVERFLOW = 56;
+// Must be >= ORB_VISUAL_OVERFLOW, or the glow/arc bleed past the orb's own
+// box (which getDefaultOrbPosition sizes for exactly) extends past the
+// viewport edge - confirmed via screenshot: the bigger orb's glow was
+// visibly clipped at the corner with the old 44/40 offsets, which the
+// smaller orb's old overflow (40) happened to just barely clear.
+export const ORB_RIGHT_OFFSET = 60;
+export const ORB_BOTTOM_OFFSET = 56;
 export const ORB_CHAT_PANEL_WIDTH = 310;
 export const ORB_CHAT_PANEL_HEIGHT = 420;
 export const ORB_CHAT_PANEL_VIEWPORT_INSET = 16;

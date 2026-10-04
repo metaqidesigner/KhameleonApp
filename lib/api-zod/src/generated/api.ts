@@ -353,7 +353,7 @@ export const ListTasksResponse = zod.array(ListTasksResponseItem)
 export const CreateTaskBody = zod.object({
   "title":           zod.string(),
   "description":     zod.string().optional(),
-  "status":          zod.enum(["todo", "in_progress", "done", "blocked"]).optional().default("todo"),
+  "status":          zod.enum(["todo", "in_progress", "done", "blocked", "needs_input"]).optional().default("todo"),
   "priority":        zod.enum(["urgent", "high", "medium", "low"]).optional().default("medium"),
   "category":        zod.string().optional().default("deep_work"),
   "recurrence":      zod.string().optional().default("one_off"),
@@ -363,7 +363,15 @@ export const CreateTaskBody = zod.object({
   "parentTaskId":    zod.number().nullish(),
   "projectId":       zod.number().nullish(),
   "assignee":        zod.string().optional(),
-  "dueDate":         zod.string().nullish()
+  "dueDate":         zod.string().nullish(),
+  "parkedReason":    zod.enum(["external_input", "deferred", "dependency"]).nullish(),
+  "waitingOn":       zod.string().nullish(),
+  "waitingSince":    zod.string().nullish(),
+  "blockedByTaskId": zod.number().nullish(),
+  "executingAgentId": zod.string().nullish(),
+  "zdrEndpoint":      zod.boolean().nullish(),
+  "queuePosition":    zod.number().nullish(),
+  "aiRecommendation": zod.string().optional()
 })
 
 
@@ -377,7 +385,7 @@ export const UpdateTaskParams = zod.object({
 export const UpdateTaskBody = zod.object({
   "title":           zod.string().optional(),
   "description":     zod.string().optional(),
-  "status":          zod.enum(["todo", "in_progress", "done", "blocked"]).optional(),
+  "status":          zod.enum(["todo", "in_progress", "done", "blocked", "needs_input"]).optional(),
   "priority":        zod.enum(["urgent", "high", "medium", "low"]).optional(),
   "category":        zod.string().optional(),
   "recurrence":      zod.string().optional(),
@@ -385,7 +393,15 @@ export const UpdateTaskBody = zod.object({
   "calendarEventId": zod.string().nullish(),
   "threadId":        zod.string().nullish(),
   "parentTaskId":    zod.number().nullish(),
-  "dueDate":         zod.string().nullish()
+  "dueDate":         zod.string().nullish(),
+  "parkedReason":    zod.enum(["external_input", "deferred", "dependency"]).nullish(),
+  "waitingOn":       zod.string().nullish(),
+  "waitingSince":    zod.string().nullish(),
+  "blockedByTaskId": zod.number().nullish(),
+  "executingAgentId": zod.string().nullish(),
+  "zdrEndpoint":      zod.boolean().nullish(),
+  "queuePosition":    zod.number().nullish(),
+  "aiRecommendation": zod.string().optional()
 })
 
 export const UpdateTaskResponse = zod.object({
@@ -763,5 +779,20 @@ export const ListMarketplaceAgentsResponseItem = zod.object({
   "pricing": zod.string().optional()
 })
 export const ListMarketplaceAgentsResponse = zod.array(ListMarketplaceAgentsResponseItem)
+
+
+/**
+ * @summary Create an action receipt (design-spec.md §6.5.2 durable record)
+ */
+export const CreateActionReceiptBody = zod.object({
+  "description":       zod.string(),
+  "category":          zod.string(),
+  "scope":             zod.string(),
+  "outcome":           zod.enum(["success", "failure", "pending", "needs_review"]).optional().default("success"),
+  "target":            zod.string().nullish(),
+  "detail":            zod.string().nullish(),
+  "canUndo":           zod.boolean().optional().default(false),
+  "relatedApprovalId": zod.number().nullish()
+})
 
 
