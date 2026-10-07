@@ -1,5 +1,5 @@
-import { askAll, streamAgentChat, type AgentConfig, type ChatMessage as AgentChatMessage, type ToolEvent } from '@/lib/agentsApi';
-import type { RouteMode, ReasoningStep } from './types';
+import { askAll, streamAgentChat, type AgentConfig, type AgentConversationRow, type ChatMessage as AgentChatMessage, type ToolEvent } from '@/lib/agentsApi';
+import type { ChatMessage, RouteMode, ReasoningStep } from './types';
 
 /**
  * Route-mode wiring (2026-10-02). All four modes call the real backend -
@@ -31,6 +31,11 @@ export interface RouteResult {
   energyWh?: number;
   routedForReason: string;
   reasoning?: ReasoningStep[];
+  /** The real backend session id this turn was recorded under - either
+   * the one passed in (continuity) or a freshly generated one, echoed
+   * back by /api/agents/:id/ask. Undefined for multi-agent modes, which
+   * don't thread a session through askAll. */
+  sessionId?: string;
 }
 
 /** Real per-call tool-use events (name + durationMs from the agent's own tool runner) become reasoning steps - never fabricated placeholder "thinking" text. Exported for direct unit testing. */
@@ -57,6 +62,7 @@ export function routeSingleStreaming(
   onDone: (r: RouteResult) => void,
   onError: (e: string) => void,
   pinnedAgentName?: string,
+  sessionId?: string,
 ): () => void {
   const toolEvents: ToolEvent[] = [];
   return streamAgentChat(
@@ -72,9 +78,11 @@ export function routeSingleStreaming(
       energyWh: undefined,
       routedForReason: reasonForMode('single', pinnedAgentName),
       reasoning: toolEventsToReasoning(toolEvents),
+      sessionId: d.sessionId,
     }),
     onError,
     (e) => toolEvents.push(e),
+    sessionId,
   );
 }
 
@@ -101,6 +109,28 @@ export async function routeMultiAgent(
     routedForReason: reasonForMode(mode),
     reasoning: winner.toolCalls?.map(t => ({ label: t.error ? `${t.name} (failed)` : t.name, detail: t.error, elapsedMs: t.durationMs })),
   };
+}
+
+/**
+ * Turns real DB-persisted conversation rows (from GET /api/agent-conversations,
+ * newest-first) into this window's ChatMessage history, oldest-first -
+ * the real mechanics of "resume this morning's briefing" (or any other
+ * past session). tool_use/tool_result rows are dropped: ChatMessage only
+ * models the two roles this window actually renders as bubbles. Exported
+ * for direct unit testing of the ordering/filtering, since crypto.randomUUID()
+ * makes the rest of this non-trivial to assert on as a whole.
+ */
+export function rowsToResumedMessages(rows: AgentConversationRow[]): ChatMessage[] {
+  return rows
+    .filter((r): r is AgentConversationRow & { role: 'user' | 'assistant' } => r.role === 'user' || r.role === 'assistant')
+    .slice()
+    .reverse()
+    .map(r => ({
+      id: crypto.randomUUID(),
+      role: r.role,
+      content: r.content,
+      timestamp: new Date(r.createdAt).getTime(),
+    }));
 }
 
 export function pickAutoRouteAgent(roster: AgentConfig[]): AgentConfig | undefined {

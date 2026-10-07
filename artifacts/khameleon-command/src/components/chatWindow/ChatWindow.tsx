@@ -5,10 +5,10 @@ import {
 } from 'lucide-react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { useWindowDrag, fitToViewport } from './useWindowDrag';
-import { routeSingleStreaming, routeMultiAgent, pickAutoRouteAgent } from './chatWindowApi';
+import { routeSingleStreaming, routeMultiAgent, pickAutoRouteAgent, rowsToResumedMessages } from './chatWindowApi';
 import {
-  getRoster, getAgentStatus, FALLBACK_ROSTER,
-  type AgentConfig, type AgentStatus as AgentOnlineStatus,
+  getRoster, getAgentStatus, FALLBACK_ROSTER, getAgentConversations, getAgentConversationSessions,
+  type AgentConfig, type AgentStatus as AgentOnlineStatus, type AgentConversationSession,
 } from '@/lib/agentsApi';
 import { getWorkDomains, type WorkDomain } from '@/lib/workDomainsApi';
 import { getDailyTasks, getOnboardingStatus, type Task } from '@/lib/jarvisApi';
@@ -150,7 +150,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
 function EmptyState({
   domains, activeDomainId, onPickDomain, onStarter, parked, wakeWordActive, wakeWordBlocked, role,
-  isListening, voiceAvailable, onToggleVoice,
+  isListening, voiceAvailable, onToggleVoice, briefingResume, onResumeBriefing, onDismissBriefingResume,
 }: {
   domains: WorkDomain[];
   activeDomainId: number | 'all';
@@ -163,6 +163,9 @@ function EmptyState({
   isListening: boolean;
   voiceAvailable: boolean;
   onToggleVoice: () => void;
+  briefingResume: AgentConversationSession | null;
+  onResumeBriefing: () => void;
+  onDismissBriefingResume: () => void;
 }) {
   const activeDomain = domains.find(d => d.id === activeDomainId);
   const starters = useMemo(() => starterCardsForRole(role, activeDomain?.name), [activeDomain, role]);
@@ -202,6 +205,17 @@ function EmptyState({
           </button>
         ))}
       </div>
+
+      {briefingResume && (
+        <div style={{ width: '100%', maxWidth: 320, marginTop: 8, padding: '10px 12px', borderRadius: 10, background: 'rgba(95,240,216,0.07)', border: '1px solid rgba(95,240,216,0.22)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div style={{ fontSize: 9, letterSpacing: '0.08em', color: '#5ff0d8', textTransform: 'uppercase' }}>This morning's briefing</div>
+            <button type="button" onClick={onDismissBriefingResume} aria-label="Dismiss" style={{ background: 'none', border: 'none', color: '#5a7a78', fontSize: 11, cursor: 'pointer', padding: 0 }}>×</button>
+          </div>
+          <div style={{ fontSize: 12, color: '#d6efee', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{briefingResume.preview}</div>
+          <button type="button" onClick={onResumeBriefing} className="chat-resume-btn">Resume this morning's briefing</button>
+        </div>
+      )}
 
       {topParked && (
         <div style={{ width: '100%', maxWidth: 320, marginTop: 8, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,179,107,0.07)', border: '1px solid rgba(255,179,107,0.22)' }}>
@@ -404,6 +418,16 @@ export default function ChatWindow() {
   const [activeRuns, setActiveRuns] = useState<TaskRun[]>([]);
   const [focusSignal, setFocusSignal] = useState(0);
   const [draft, setDraft] = useState('');
+  // The backend session this window's messages are being recorded under -
+  // undefined/null means "no continuity yet," which is also the honest
+  // state for every conversation before this build (sessionId was always
+  // generated server-side and silently discarded). Set once a turn
+  // actually completes, or when the user resumes a past session below.
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  // A recent Mobile Briefing session worth offering to resume (the
+  // continuity gap named in KHAMELEON_SPEC.md's Mobile Morning Briefing
+  // section) - null once checked-and-none-found, or once resumed/dismissed.
+  const [briefingResume, setBriefingResume] = useState<AgentConversationSession | null>(null);
 
   const bodyRef = useRef<HTMLDivElement>(null);
   const liveRegionRef = useRef<HTMLDivElement>(null);
@@ -457,6 +481,28 @@ export default function ChatWindow() {
       setParked(all.filter(t => t.status === 'blocked' || t.parkedReason != null));
     }).catch(() => {});
     getOnboardingStatus().then(s => setProfileRole(s.profile.role)).catch(() => {});
+  }, []);
+
+  // Only offered before this window has any conversation of its own yet
+  // (messages.length === 0, checked at render) - "arrives at their desk"
+  // is specifically the FIRST interaction of the day, not something to
+  // keep nagging about afterward. 18h covers a same-morning briefing
+  // without offering to resume something from yesterday.
+  useEffect(() => {
+    getAgentConversationSessions({ agentId: 'briefing', limit: 1 }).then(sessions => {
+      const recent = sessions[0];
+      if (!recent) return;
+      const ageMs = Date.now() - new Date(recent.createdAt).getTime();
+      if (ageMs < 18 * 60 * 60 * 1000) setBriefingResume(recent);
+    }).catch(() => {});
+  }, []);
+
+  const resumeBriefing = useCallback(async (session: AgentConversationSession) => {
+    const rows = await getAgentConversations({ sessionId: session.sessionId });
+    setMessages(rowsToResumedMessages(rows));
+    setActiveSessionId(session.sessionId);
+    setBriefingResume(null);
+    if (liveRegionRef.current) liveRegionRef.current.textContent = "Resumed this morning's briefing";
   }, []);
 
   useEffect(() => {
@@ -540,6 +586,12 @@ export default function ChatWindow() {
             reasoning: result.reasoning,
             meta: { durationMs: result.durationMs, costUsd: result.costUsd, energyWh: result.energyWh },
           } : m)));
+          // Carries this window's conversation forward under one real
+          // backend session (previously generated server-side every turn
+          // and silently discarded here) - this is also what lets a
+          // resumed briefing session's follow-up messages land in the
+          // SAME session rather than starting a new, disconnected one.
+          if (result.sessionId) setActiveSessionId(result.sessionId);
           if (liveRegionRef.current) liveRegionRef.current.textContent = `${agent.name} replied`;
           setSending(false);
         },
@@ -548,6 +600,7 @@ export default function ChatWindow() {
           setSending(false);
         },
         pinnedAgent?.name,
+        activeSessionId ?? undefined,
       );
     } else {
       try {
@@ -568,7 +621,7 @@ export default function ChatWindow() {
         setSending(false);
       }
     }
-  }, [messages, roster, pinnedId, routeMode, statuses]);
+  }, [messages, roster, pinnedId, routeMode, statuses, activeSessionId]);
 
   if (!chatOpen) return null;
 
@@ -688,6 +741,9 @@ export default function ChatWindow() {
             isListening={voice.isListening}
             voiceAvailable={voice.voiceInputAvailable}
             onToggleVoice={voice.toggleListening}
+            briefingResume={briefingResume}
+            onResumeBriefing={() => { if (briefingResume) void resumeBriefing(briefingResume); }}
+            onDismissBriefingResume={() => setBriefingResume(null)}
           />
         ) : (
           <div ref={bodyRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 4px', position: 'relative' }}>

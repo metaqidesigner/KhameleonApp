@@ -50,3 +50,22 @@ export async function getMorningBriefing(): Promise<MorningBriefing> {
   }
   return response.json() as Promise<MorningBriefing>;
 }
+
+/**
+ * Records one real turn of this briefing run so the desktop Chat Window
+ * can resume it later as a real conversation (see routes/briefing.ts).
+ * Fire-and-forget by design, matching agents/store.ts's existing
+ * "persistence failure shouldn't interrupt the live interaction" pattern -
+ * a failed log call should never block narration or a send/skip action.
+ */
+export async function logBriefingTurn(sessionId: string, role: 'user' | 'assistant', content: string): Promise<void> {
+  try {
+    await fetch(`${BASE}/briefing/session/log`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, role, content }),
+    });
+  } catch {
+    // Intentionally swallowed - see docblock above.
+  }
+}

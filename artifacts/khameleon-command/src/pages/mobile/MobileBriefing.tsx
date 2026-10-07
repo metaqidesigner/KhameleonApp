@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Mic, Send, SkipForward, Wand2, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useVoice } from '@/components/orb/useVoice';
 import { ConfirmGate } from '@/components/ConfirmGate';
-import { getMorningBriefing, type MorningBriefing, type BriefingUrgentItem } from '@/lib/briefingApi';
+import { getMorningBriefing, logBriefingTurn, type MorningBriefing, type BriefingUrgentItem } from '@/lib/briefingApi';
 import { sendOutlookDraft, rejectOutlookDraft, rewriteOutlookDraft } from '@/lib/outlookSkillsApi';
 import { sendGmailDraft, rejectGmailDraft } from '@/lib/gmailSkillsApi';
 
@@ -37,6 +37,17 @@ export default function MobileBriefing() {
   const indexRef = useRef(index);
   indexRef.current = index;
 
+  // One real session per briefing run, so the desktop Chat Window can
+  // later resume this exact conversation (KHAMELEON_SPEC.md's Mobile
+  // Morning Briefing continuity gap). Generated once, when the briefing
+  // actually starts playing - not on mount, so merely opening the page
+  // without pressing play never creates an empty session.
+  const sessionIdRef = useRef<string | null>(null);
+  const log = useCallback((role: 'user' | 'assistant', content: string) => {
+    if (!sessionIdRef.current) return;
+    void logBriefingTurn(sessionIdRef.current, role, content);
+  }, []);
+
   const handleTranscript = useCallback((text: string) => {
     setLastHeard(text);
     handleVoiceCommand(text);
@@ -59,6 +70,7 @@ export default function MobileBriefing() {
   async function handleVoiceCommand(text: string) {
     const b = briefingRef.current;
     const item = b?.urgent[indexRef.current];
+    log('user', text);
     if (!item?.draft) { advanceUrgent(); return; }
 
     const lower = text.toLowerCase();
@@ -68,19 +80,25 @@ export default function MobileBriefing() {
         setBusy(true);
         if (draft.provider === 'outlook') await sendOutlookDraft(draft.approvalId);
         else await sendGmailDraft(draft.approvalId);
+        log('assistant', `Sent the reply to ${draft.to}.`);
         advanceUrgent();
       } else if (/\b(skip|no|discard|cancel)\b/.test(lower)) {
         setBusy(true);
         if (draft.provider === 'outlook') await rejectOutlookDraft(draft.approvalId);
         else await rejectGmailDraft(draft.approvalId);
+        log('assistant', `Skipped - discarded the drafted reply to ${draft.to}.`);
         advanceUrgent();
       } else if (/\b(tone|change|rewrite|different|shorter|casual|formal|friendlier)\b/.test(lower) && draft.supportsRewrite) {
         setBusy(true);
         const updated = await rewriteOutlookDraft(draft.approvalId, text);
         updateCurrentDraft(updated.body);
-        voice.speak(`Here's the new version: ${updated.body}. Say send it, skip, or change the tone again.`);
+        const reply = `Here's the new version: ${updated.body}. Say send it, skip, or change the tone again.`;
+        voice.speak(reply);
+        log('assistant', reply);
       } else {
-        voice.speak("Sorry, say send it, skip, or change the tone.");
+        const reply = "Sorry, say send it, skip, or change the tone.";
+        voice.speak(reply);
+        log('assistant', reply);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -105,18 +123,22 @@ export default function MobileBriefing() {
       setIndex(next);
       narrate(b.urgent[next]);
     } else {
+      log('assistant', "That's your briefing. Have a good one.");
       setPhase('fyi');
     }
   }
 
   function narrate(item: BriefingUrgentItem) {
     setPhase('narrating');
-    voice.speak(narrationFor(item));
+    const text = narrationFor(item);
+    voice.speak(text);
+    log('assistant', text);
   }
 
   const start = useCallback(async () => {
     setPhase('loading');
     setError(null);
+    sessionIdRef.current = crypto.randomUUID();
     try {
       const data = await getMorningBriefing();
       setBriefing(data);
@@ -124,6 +146,7 @@ export default function MobileBriefing() {
       if (data.urgent.length > 0) {
         narrate(data.urgent[0]);
       } else {
+        log('assistant', 'No urgent items this morning.');
         setPhase('fyi');
       }
     } catch (err) {
@@ -136,8 +159,10 @@ export default function MobileBriefing() {
   const handleManualSend = async (editedBody?: string) => {
     if (!currentItem?.draft) return;
     const { draft } = currentItem;
+    log('user', editedBody ? `Edited and sent: ${editedBody}` : 'Reviewed and sent as drafted.');
     if (draft.provider === 'outlook') await sendOutlookDraft(draft.approvalId, editedBody);
     else await sendGmailDraft(draft.approvalId, editedBody);
+    log('assistant', `Sent the reply to ${draft.to}.`);
     setReviewing(false);
     advanceUrgent();
   };
@@ -145,8 +170,10 @@ export default function MobileBriefing() {
   const handleManualDiscard = async () => {
     if (!currentItem?.draft) return;
     const { draft } = currentItem;
+    log('user', 'Reviewed and discarded the draft.');
     if (draft.provider === 'outlook') await rejectOutlookDraft(draft.approvalId);
     else await rejectGmailDraft(draft.approvalId);
+    log('assistant', `Skipped - discarded the drafted reply to ${draft.to}.`);
     setReviewing(false);
     advanceUrgent();
   };

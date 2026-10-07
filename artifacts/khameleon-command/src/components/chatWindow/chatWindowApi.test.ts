@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { reasonForMode, backendModeFor, pickAutoRouteAgent, toolEventsToReasoning } from './chatWindowApi';
-import type { AgentConfig, ToolEvent } from '@/lib/agentsApi';
+import { reasonForMode, backendModeFor, pickAutoRouteAgent, toolEventsToReasoning, rowsToResumedMessages } from './chatWindowApi';
+import type { AgentConfig, AgentConversationRow, ToolEvent } from '@/lib/agentsApi';
 
 function makeAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
   return {
@@ -76,5 +76,41 @@ describe('toolEventsToReasoning', () => {
 
   it('returns an empty array for no tool calls, not a fabricated reasoning step', () => {
     expect(toolEventsToReasoning([])).toEqual([]);
+  });
+});
+
+function makeRow(overrides: Partial<AgentConversationRow> = {}): AgentConversationRow {
+  return { id: 1, agentId: 'briefing', sessionId: 's1', role: 'assistant', content: 'hi', createdAt: '2026-10-06T07:00:00.000Z', ...overrides };
+}
+
+describe('rowsToResumedMessages', () => {
+  it('reverses newest-first DB rows into oldest-first chat messages', () => {
+    const rows: AgentConversationRow[] = [
+      makeRow({ id: 2, role: 'assistant', content: 'second', createdAt: '2026-10-06T07:00:10.000Z' }),
+      makeRow({ id: 1, role: 'user', content: 'first', createdAt: '2026-10-06T07:00:00.000Z' }),
+    ];
+    const messages = rowsToResumedMessages(rows);
+    expect(messages.map(m => m.content)).toEqual(['first', 'second']);
+    expect(messages.map(m => m.role)).toEqual(['user', 'assistant']);
+  });
+
+  it('drops tool_use/tool_result rows - ChatMessage only models user/assistant bubbles', () => {
+    const rows: AgentConversationRow[] = [
+      makeRow({ id: 3, role: 'assistant', content: 'reply' }),
+      makeRow({ id: 2, role: 'tool_result', content: '{}', toolName: 'send_outlook_draft' }),
+      makeRow({ id: 1, role: 'user', content: 'send it' }),
+    ];
+    expect(rowsToResumedMessages(rows).map(m => m.role)).toEqual(['user', 'assistant']);
+  });
+
+  it('carries the row content and a real timestamp from createdAt', () => {
+    const rows: AgentConversationRow[] = [makeRow({ content: 'Q3 revenue was $482,900.', createdAt: '2026-10-06T07:05:00.000Z' })];
+    const [msg] = rowsToResumedMessages(rows);
+    expect(msg.content).toBe('Q3 revenue was $482,900.');
+    expect(msg.timestamp).toBe(new Date('2026-10-06T07:05:00.000Z').getTime());
+  });
+
+  it('returns an empty array for no rows, not a fabricated placeholder message', () => {
+    expect(rowsToResumedMessages([])).toEqual([]);
   });
 });

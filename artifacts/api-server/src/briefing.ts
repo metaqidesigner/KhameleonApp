@@ -24,7 +24,7 @@
  */
 
 import { db } from "@workspace/db";
-import { tasksTable, taskRunsTable, type Task } from "@workspace/db";
+import { tasksTable, taskRunsTable, agentConversationsTable, type Task } from "@workspace/db";
 import { eq, inArray, or, and, gte, lte } from "drizzle-orm";
 import { isConnected } from "./lib/oauthTokens.js";
 import { runOutlookTriageInbox, ACTION_BY_CLASSIFICATION, type TriageItem } from "./agents/skills/outlookTriageInbox.js";
@@ -195,4 +195,23 @@ export async function assembleMorningBriefing(): Promise<MorningBriefing> {
     headsUp,
     emailConnected: { outlook: outlookOn, gmail: gmailOn },
   };
+}
+
+/** Thrown for a request shape the HTTP route should answer 400, not 500. */
+export class InvalidBriefingTurnError extends Error {}
+
+/**
+ * Records one real turn of a Mobile Briefing run into agent_conversations
+ * (agentId "briefing"), so the desktop Chat Window can later resume this
+ * exact session as a real conversation - the continuity gap this spec
+ * section itself named as still open. Extracted as a plain function
+ * (validation included) rather than left inline in the route handler, so
+ * it's directly testable without an HTTP layer - same pattern as this
+ * file's other exports.
+ */
+export async function recordBriefingTurn(sessionId: string, role: string, content: string): Promise<void> {
+  if (!sessionId.trim()) throw new InvalidBriefingTurnError("sessionId is required");
+  if (role !== "user" && role !== "assistant") throw new InvalidBriefingTurnError("role must be 'user' or 'assistant'");
+  if (!content.trim()) throw new InvalidBriefingTurnError("content is required");
+  await db.insert(agentConversationsTable).values({ agentId: "briefing", sessionId, role, content });
 }

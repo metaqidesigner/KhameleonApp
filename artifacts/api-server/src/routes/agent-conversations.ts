@@ -41,16 +41,27 @@ router.get("/sessions", async (req, res) => {
     const { agentId, limit = "50" } = req.query as Record<string, string>;
     const lim = Math.min(Math.max(1, parseInt(limit, 10) || 50), 200);
 
-    // Get the most recent row per session (for summary display)
+    // Get the most recent row per session (for summary display), most
+    // recently active session first. DISTINCT ON requires its first
+    // ORDER BY column to be session_id, which only sorts each session's
+    // OWN rows by recency - it does nothing to order different sessions
+    // against each other. Without the outer re-sort below, "most recent
+    // session" silently meant "alphabetically first session_id" instead -
+    // a real bug, caught because the Mobile Briefing resume feature was
+    // the first real caller to actually depend on this endpoint's
+    // recency ordering (khameleon-decisions-log.md, 2026-10-07).
     const rows = await db.execute(sql`
-      SELECT DISTINCT ON (session_id)
-        session_id   AS "sessionId",
-        agent_id     AS "agentId",
-        created_at   AS "createdAt",
-        content      AS "preview"
-      FROM agent_conversations
-      ${agentId ? sql`WHERE agent_id = ${agentId}` : sql``}
-      ORDER BY session_id, created_at DESC
+      SELECT * FROM (
+        SELECT DISTINCT ON (session_id)
+          session_id   AS "sessionId",
+          agent_id     AS "agentId",
+          created_at   AS "createdAt",
+          content      AS "preview"
+        FROM agent_conversations
+        ${agentId ? sql`WHERE agent_id = ${agentId}` : sql``}
+        ORDER BY session_id, created_at DESC
+      ) AS latest_per_session
+      ORDER BY "createdAt" DESC
       LIMIT ${lim}
     `);
 
