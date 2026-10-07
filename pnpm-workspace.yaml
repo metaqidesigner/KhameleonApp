@@ -6,18 +6,26 @@ packages:
   - lib/integrations/*
   - scripts
 
-# Resolved 2026-09-09 so `pnpm install` is non-interactive (needed for the
-# Docker build in /Dockerfile, and for any future non-Claude developer who
-# hits this same prompt). electron/extract-file-icon/node-window-manager are
-# only needed by apps/khameleon-shell - real, local, native window/desktop
-# control, never installed in the Docker image. If you're actually working on
-# khameleon-shell locally, flip these back to `true` and run
-# `pnpm approve-builds` so its native bindings/Electron binary install.
+# This `allowBuilds` block is enforced by this environment's supply-chain
+# policy wrapper around pnpm, not a native pnpm key - it auto-regenerates as
+# a true/false prompt whenever a package's build script is ignored. Keep it
+# present with explicit values; deleting it just makes it reappear as a
+# placeholder (learned the hard way, 2026-10-03, khameleon-decisions-log.md).
+# electron/extract-file-icon/node-window-manager/node-llama-cpp/tesseract.js
+# are only needed by apps/khameleon-shell - real, local, native desktop
+# control and (node-llama-cpp, tesseract.js) offline local document reading
+# (Cross-App Control Phase 3) - and MUST be false in committed state so
+# Docker's Linux build (a full workspace `pnpm install`, per /Dockerfile)
+# never tries to compile/fetch these desktop-only binaries. Flip to `true`
+# + `pnpm install` only while actually working on khameleon-shell locally,
+# then flip back to `false` before committing.
 allowBuilds:
   electron: false
   esbuild: true
   extract-file-icon: false
+  node-llama-cpp: false
   node-window-manager: false
+  tesseract.js: false
 
 autoInstallPeers: false
 
@@ -138,3 +146,7 @@ overrides:
   rollup>@rollup/rollup-win32-ia32-msvc: '-'
   rollup>@rollup/rollup-win32-x64-gnu: '-'
   rollup>@rollup/rollup-win32-x64-msvc: '-'
+
+patchedDependencies:
+  extract-file-icon@0.3.2: patches/extract-file-icon@0.3.2.patch
+  node-window-manager@2.2.4: patches/node-window-manager@2.2.4.patch

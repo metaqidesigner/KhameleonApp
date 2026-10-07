@@ -3,6 +3,13 @@
 // tokens) is never returned by GET / or GET /:id — only GET /:id/reveal
 // decrypts and returns it, and every reveal is logged.
 //
+// Hosted/managed mode, Phase 3 (khameleon-decisions-log.md, 2026-10-03):
+// every handler here scopes by the current request's account
+// (requestContext.ts), including the single-item routes (reveal/patch/
+// delete/access-log) — a real ownership check, not just filtering the list
+// view, since id alone would otherwise let any logged-in account reach any
+// other account's secret by guessing/incrementing an id.
+//
 // Still honestly future work, not built here — see vault.ts (schema)'s
 // docblock: HSM support, zero-trust per-request auth, external
 // secrets-manager integration all need real infrastructure decisions.
@@ -10,9 +17,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { vaultItemsTable, vaultAccessLogTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { encrypt, decrypt } from "../lib/crypto.js";
 import { assertEncryptionConfigured, validateNewVaultItem } from "../lib/vaultGuard.js";
+import { getCurrentUserId } from "../lib/requestContext.js";
 
 const router = Router();
 
@@ -29,13 +37,26 @@ const PUBLIC_COLUMNS = {
   createdAt: vaultItemsTable.createdAt,
 };
 
+/** (userId, id) match - undefined userId (no accounts, or Option-A-only session) matches the one shared vault, same as every existing single-user instance has always had. */
+function ownedItemScope(id: number, userId: number | undefined) {
+  return and(
+    eq(vaultItemsTable.id, id),
+    userId === undefined ? isNull(vaultItemsTable.userId) : eq(vaultItemsTable.userId, userId),
+  );
+}
+
+function ownedVaultScope(userId: number | undefined) {
+  return userId === undefined ? isNull(vaultItemsTable.userId) : eq(vaultItemsTable.userId, userId);
+}
+
 async function logAccess(vaultItemId: number, itemName: string, action: "created" | "viewed" | "updated" | "deleted") {
-  await db.insert(vaultAccessLogTable).values({ vaultItemId, itemName, action });
+  await db.insert(vaultAccessLogTable).values({ vaultItemId, itemName, action, userId: getCurrentUserId() ?? null });
 }
 
 router.get("/", async (req, res) => {
   try {
-    const items = await db.select(PUBLIC_COLUMNS).from(vaultItemsTable).orderBy(vaultItemsTable.category);
+    const userId = getCurrentUserId();
+    const items = await db.select(PUBLIC_COLUMNS).from(vaultItemsTable).where(ownedVaultScope(userId)).orderBy(vaultItemsTable.category);
     return res.json(items);
   } catch (err) {
     req.log.error({ err }, "Error fetching vault items");
@@ -53,6 +74,7 @@ router.post("/", async (req, res) => {
     const [item] = await db
       .insert(vaultItemsTable)
       .values({
+        userId: getCurrentUserId() ?? null,
         name: name!.trim(),
         category: category!.trim(),
         permissionLevel: permissionLevel?.trim() || "read",
@@ -76,7 +98,8 @@ router.post("/", async (req, res) => {
 router.get("/:id/reveal", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [item] = await db.select().from(vaultItemsTable).where(eq(vaultItemsTable.id, id)).limit(1);
+    const userId = getCurrentUserId();
+    const [item] = await db.select().from(vaultItemsTable).where(ownedItemScope(id, userId)).limit(1);
     if (!item) return res.status(404).json({ error: "Vault item not found" });
 
     const value = decrypt(item.encryptedValue);
@@ -95,6 +118,7 @@ router.get("/:id/reveal", async (req, res) => {
 router.patch("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const userId = getCurrentUserId();
     const { name, category, permissionLevel, owner, description, status, secretValue } = req.body as {
       name?: string; category?: string; permissionLevel?: string; owner?: string; description?: string; status?: string; secretValue?: string;
     };
@@ -114,7 +138,7 @@ router.patch("/:id", async (req, res) => {
       return res.status(400).json({ error: "No valid fields to update." });
     }
 
-    const [updated] = await db.update(vaultItemsTable).set(patch).where(eq(vaultItemsTable.id, id)).returning(PUBLIC_COLUMNS);
+    const [updated] = await db.update(vaultItemsTable).set(patch).where(ownedItemScope(id, userId)).returning(PUBLIC_COLUMNS);
     if (!updated) return res.status(404).json({ error: "Vault item not found" });
 
     await logAccess(updated.id, updated.name, "updated");
@@ -131,7 +155,8 @@ router.patch("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [item] = await db.select(PUBLIC_COLUMNS).from(vaultItemsTable).where(eq(vaultItemsTable.id, id)).limit(1);
+    const userId = getCurrentUserId();
+    const [item] = await db.select(PUBLIC_COLUMNS).from(vaultItemsTable).where(ownedItemScope(id, userId)).limit(1);
     if (!item) return res.status(404).json({ error: "Vault item not found" });
 
     // Logged before the delete — the log must outlive the row it's about.
@@ -147,6 +172,14 @@ router.delete("/:id", async (req, res) => {
 router.get("/:id/access-log", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const userId = getCurrentUserId();
+    // Confirms the requester actually owns this item before returning any
+    // log for it — vaultItemId on the log itself is deliberately not a
+    // real FK (see vault_access_log.ts's docblock), so this ownership
+    // check has to happen against the live vault_items row, not the log.
+    const [item] = await db.select({ id: vaultItemsTable.id }).from(vaultItemsTable).where(ownedItemScope(id, userId)).limit(1);
+    if (!item) return res.status(404).json({ error: "Vault item not found" });
+
     const log = await db
       .select()
       .from(vaultAccessLogTable)

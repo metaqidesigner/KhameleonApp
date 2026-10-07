@@ -1,0 +1,139 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 45f084db9977ce995d6552b5121ac87fa1ef0a34..3925c1f5d03a4640311df05d7ecf412bcd63b87b 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -7,6 +7,8 @@ declare let addon: any;
+ declare class WindowManager extends EventEmitter {
+     constructor();
+     requestAccessibility: () => any;
++    simulateClick: (x: number, y: number) => any;
++    simulateTypeText: (text: string) => any;
+     getActiveWindow: () => Window;
+     getWindows: () => Window[];
+     getMonitors: () => Monitor[];
+diff --git a/dist/index.js b/dist/index.js
+index b0f618d5d17482ec6decbb82d67c05a4bbf3cd89..2a7affba33b3abbfaf29c44c17b64132b1050dec 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -32,6 +32,16 @@ class WindowManager extends events_1.EventEmitter {
+                 return true;
+             return addon.requestAccessibility();
+         };
++        this.simulateClick = (x, y) => {
++            if (!addon || !addon.simulateClick)
++                return false;
++            return addon.simulateClick(x, y);
++        };
++        this.simulateTypeText = (text) => {
++            if (!addon || !addon.simulateTypeText)
++                return false;
++            return addon.simulateTypeText(text);
++        };
+         this.getActiveWindow = () => {
+             if (!addon)
+                 return;
+diff --git a/lib/macos.mm b/lib/macos.mm
+index 038a7b9f68d934df4deab5239760838b49d29ba4..7ce31ae432c226cec84ff6e5d7a6973c6275e480 100644
+--- a/lib/macos.mm
++++ b/lib/macos.mm
+@@ -22,6 +22,66 @@ bool _requestAccessibility(bool showDialog) {
+   return Napi::Boolean::New(env, _requestAccessibility(true));
+ }
+ 
++// Khameleon addition (Cross-App Control Phase 2, khameleon-decisions-log.md,
++// 2026-10-03): real click/type simulation in-process via Quartz Event
++// Services, reusing this addon's own already-Accessibility-trusted
++// identity. Added here (not a separate addon, not a shelled-out osascript
++// call) specifically because osascript turned out to need its own,
++// separately-granted and unreliable Accessibility trust, independent of
++// the calling app's - this runs as Khameleon itself, same trust context
++// getWindowBounds/setWindowBounds already use successfully.
++void _simulateClick(double x, double y) {
++  CGPoint point = CGPointMake(x, y);
++
++  CGEventRef move = CGEventCreateMouseEvent(NULL, kCGEventMouseMoved, point, kCGMouseButtonLeft);
++  CGEventPost(kCGHIDEventTap, move);
++  CFRelease(move);
++
++  CGEventRef down = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, point, kCGMouseButtonLeft);
++  CGEventPost(kCGHIDEventTap, down);
++  CFRelease(down);
++
++  CGEventRef up = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, point, kCGMouseButtonLeft);
++  CGEventPost(kCGHIDEventTap, up);
++  CFRelease(up);
++}
++
++Napi::Boolean simulateClick(const Napi::CallbackInfo &info) {
++  Napi::Env env{info.Env()};
++  auto x = info[0].As<Napi::Number>().DoubleValue();
++  auto y = info[1].As<Napi::Number>().DoubleValue();
++  _simulateClick(x, y);
++  return Napi::Boolean::New(env, true);
++}
++
++// Unicode-string-based key events (not virtual keycodes) so this handles
++// any character the user's keyboard layout can produce, same technique
++// System Events' own "keystroke" uses under the hood.
++void _simulateTypeText(NSString *text) {
++  NSUInteger length = [text length];
++  for (NSUInteger i = 0; i < length; i++) {
++    unichar c = [text characterAtIndex:i];
++
++    CGEventRef keyDown = CGEventCreateKeyboardEvent(NULL, 0, true);
++    CGEventKeyboardSetUnicodeString(keyDown, 1, &c);
++    CGEventPost(kCGHIDEventTap, keyDown);
++    CFRelease(keyDown);
++
++    CGEventRef keyUp = CGEventCreateKeyboardEvent(NULL, 0, false);
++    CGEventKeyboardSetUnicodeString(keyUp, 1, &c);
++    CGEventPost(kCGHIDEventTap, keyUp);
++    CFRelease(keyUp);
++  }
++}
++
++Napi::Boolean simulateTypeText(const Napi::CallbackInfo &info) {
++  Napi::Env env{info.Env()};
++  std::string text = info[0].As<Napi::String>().Utf8Value();
++  NSString *nsText = [NSString stringWithUTF8String:text.c_str()];
++  _simulateTypeText(nsText);
++  return Napi::Boolean::New(env, true);
++}
++
+ NSDictionary* getWindowInfo(int handle) {
+   CGWindowListOption listOptions = kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements;
+   CFArrayRef windowList = CGWindowListCopyWindowInfo(listOptions, kCGNullWindowID);
+@@ -324,6 +384,10 @@ AXUIElementRef getAXWindowById(int handle) {
+                 Napi::Function::New(env, setWindowMaximized));
+     exports.Set(Napi::String::New(env, "requestAccessibility"),
+                 Napi::Function::New(env, requestAccessibility));
++    exports.Set(Napi::String::New(env, "simulateClick"),
++                Napi::Function::New(env, simulateClick));
++    exports.Set(Napi::String::New(env, "simulateTypeText"),
++                Napi::Function::New(env, simulateTypeText));
+ 
+     return exports;
+ }
+diff --git a/src/index.ts b/src/index.ts
+index 974e74fd04e1e88c3dcfcb8e5239c7639676bf3e..8dfd68adc221aab404a8e8902ca4d50a586957df 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -63,6 +63,18 @@ class WindowManager extends EventEmitter {
+     return addon.requestAccessibility();
+   }
+ 
++  // Khameleon addition (Cross-App Control Phase 2): real click/type
++  // simulation, macOS only for now - see lib/macos.mm.
++  simulateClick = (x: number, y: number) => {
++    if (!addon || !addon.simulateClick) return false;
++    return addon.simulateClick(x, y);
++  }
++
++  simulateTypeText = (text: string) => {
++    if (!addon || !addon.simulateTypeText) return false;
++    return addon.simulateTypeText(text);
++  }
++
+   getActiveWindow = () => {
+     if (!addon) return;
+     return new Window(addon.getActiveWindow());

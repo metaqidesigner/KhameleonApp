@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plug } from 'lucide-react';
+import { Plug, Plus } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { WorkDomainFilterBar, useWorkDomains } from '@/components/WorkDomainFilterBar';
 import { ConnectIntegrationGate } from '@/components/ConnectIntegrationGate';
+import { ImportCustomIntegration } from '@/components/ImportCustomIntegration';
 import { getIntegrations, disconnectIntegration, type IntegrationEntry } from '@/lib/integrationsApi';
+import { getCustomIntegrations, removeCustomIntegration, type CustomIntegrationEntry } from '@/lib/customIntegrationsApi';
 import { setEntityWorkDomains } from '@/lib/workDomainsApi';
 
 /**
@@ -20,8 +22,23 @@ export default function Integrations() {
   const [selectedDomain, setSelectedDomain] = useState<number | null>(null);
   const { domains, reload: reloadDomains } = useWorkDomains();
 
+  const [customEntries, setCustomEntries] = useState<CustomIntegrationEntry[]>([]);
+  const [importing, setImporting] = useState(false);
+
   const load = () => { getIntegrations().then(d => { setEntries(d); setLoading(false); }); };
+  const loadCustom = () => { getCustomIntegrations().then(setCustomEntries); };
   useEffect(load, []);
+  useEffect(loadCustom, []);
+
+  const doRemoveCustom = async (entry: CustomIntegrationEntry) => {
+    setError(undefined);
+    try {
+      await removeCustomIntegration(entry.id);
+      loadCustom();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to disconnect');
+    }
+  };
 
   const filtered = useMemo(
     () => selectedDomain === null ? entries : entries.filter(e => e.workDomainIds.includes(selectedDomain)),
@@ -59,12 +76,18 @@ export default function Integrations() {
           earlier this session in tasks.tsx). */}
       <div style={{ flexShrink: 0 }}>
         <JPanel title="INTEGRATIONS DIRECTORY" icon={<Plug size={13} />} badge={`${entries.filter(e => e.connected).length}/${entries.length} CONNECTED`}>
-          <WorkDomainFilterBar
-            domains={domains}
-            selected={selectedDomain}
-            onSelect={setSelectedDomain}
-            onDomainsChanged={reloadDomains}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <WorkDomainFilterBar
+              domains={domains}
+              selected={selectedDomain}
+              onSelect={setSelectedDomain}
+              onDomainsChanged={reloadDomains}
+            />
+            <div style={{ flex: 1 }} />
+            <button className="j-btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 9, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} onClick={() => setImporting(true)}>
+              <Plus size={11} /> IMPORT CUSTOM
+            </button>
+          </div>
         </JPanel>
       </div>
 
@@ -126,6 +149,31 @@ export default function Integrations() {
             ))}
           </div>
         )}
+
+        {customEntries.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 9, letterSpacing: '0.08em', color: 'var(--j-text-muted)', marginBottom: 8 }}>CUSTOM (OPENAPI / MCP)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+              {customEntries.map(entry => (
+                <div key={entry.id} style={{ padding: '10px 12px', background: 'rgba(0,212,255,0.03)', border: '1px solid rgba(0,212,255,0.1)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--j-green)', boxShadow: '0 0 6px var(--j-green)' }} />
+                    <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: '#fff', flex: 1 }}>{entry.name}</span>
+                    <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{entry.sourceType.toUpperCase()}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--j-text-muted)' }}>
+                    {entry.sourceType === 'openapi'
+                      ? `${entry.operationCount} operation${entry.operationCount === 1 ? '' : 's'} · ${entry.baseUrl}`
+                      : entry.sourceUrl}
+                  </div>
+                  <button className="j-btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 9, width: '100%', borderColor: 'rgba(192,21,42,0.3)', color: 'var(--j-red)' }} onClick={() => doRemoveCustom(entry)}>
+                    DISCONNECT
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {gateFor && gateFor.providerId && (
@@ -135,6 +183,13 @@ export default function Integrations() {
           dataScope={gateFor.dataScope}
           actionScope={gateFor.actionScope}
           onCancel={() => setGateFor(null)}
+        />
+      )}
+
+      {importing && (
+        <ImportCustomIntegration
+          onImported={() => { setImporting(false); loadCustom(); }}
+          onCancel={() => setImporting(false)}
         />
       )}
     </div>

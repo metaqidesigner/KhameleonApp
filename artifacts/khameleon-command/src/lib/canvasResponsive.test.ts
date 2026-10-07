@@ -19,6 +19,7 @@ import {
   getOrbChatPanelVisualRect,
   getOrbVisualRect,
   rectsOverlap,
+  ORB_SIZE,
 } from './orbLayout';
 
 const canvasCss = readFileSync(new URL('../index.css', import.meta.url), 'utf8');
@@ -175,7 +176,7 @@ describe('canvas floating controls', () => {
     'keeps the full orb envelope clear when clamping from the %s card edge',
     (_edge, target, clearSide) => {
       const protectedRect = { left: 300, top: 300, width: 100, height: 100 };
-      const position = clampOrbPosition(target.x, target.y, 1000, 800, 90, protectedRect);
+      const position = clampOrbPosition(target.x, target.y, 1000, 800, ORB_SIZE, protectedRect);
       const visualRect = getOrbVisualRect(position.x, position.y);
 
       expect(rectsOverlap(visualRect, protectedRect)).toBe(false);

@@ -25,5 +25,9 @@ declare module "node-window-manager" {
   export const windowManager: {
     getWindows(): Window[];
     requestAccessibility?(): void;
+    /** macOS only (Cross-App Control Phase 2) - real click/type simulation
+     * in-process via the addon's own already-Accessibility-trusted identity. */
+    simulateClick?(x: number, y: number): boolean;
+    simulateTypeText?(text: string): boolean;
   };
 }

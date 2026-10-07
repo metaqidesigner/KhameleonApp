@@ -1,4 +1,5 @@
 import { db } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
   agentsTable,
   inboxItemsTable,
@@ -276,6 +277,41 @@ async function seed() {
     { title: "Review investor deck", status: "todo", priority: "medium", category: "deep_work", recurrence: "one_off", projectId: null, assignee: "Alex Morgan", dueDate: "2026-06-19", aiRecommendation: "Suggest using Research Agent for competitive benchmarks" },
     { title: "Prepare board meeting agenda", status: "todo", priority: "high", category: "planning", recurrence: "one_off", projectId: null, assignee: "Alex Morgan", dueDate: "2026-06-17", aiRecommendation: "Calendar Agent can auto-generate pre-read pack" },
   ]);
+
+  // ══════════════════════════════════════════════════════════════════════
+  // EXAMPLE DATA — Live Wall parked-reason categories (2026-09-25).
+  // One example per reason (external_input / deferred / dependency) so the
+  // left column's grouping is visible instead of empty on a fresh seed.
+  // DELETE THIS WHOLE BLOCK before shipping the initial prototype — the
+  // parked-reason feature itself (schema columns, API fields, the grouped
+  // UI in CommandWall.tsx) is real and stays; only these three rows are
+  // demo content. Nothing above or below this block depends on it.
+  // ══════════════════════════════════════════════════════════════════════
+  const [externalInputExample, , dependencyExample] = await db.insert(tasksTable).values([
+    { title: "Confirm lease renewal terms with tenant", description: "EXAMPLE DATA - remove before shipping the initial prototype.", status: "blocked", priority: "medium", category: "communication", parkedReason: "external_input", waitingOn: "tenant reply", waitingSince: "2026-09-21T09:00:00Z" },
+    { title: "Redesign onboarding email sequence", description: "EXAMPLE DATA - remove before shipping the initial prototype.", status: "todo", priority: "low", category: "deep_work", parkedReason: "deferred", waitingOn: "you paused this to focus on Q3 planning first" },
+    { title: "Publish Q3 investor update", description: "EXAMPLE DATA - remove before shipping the initial prototype.", status: "blocked", priority: "high", category: "planning", parkedReason: "dependency" },
+  ]).returning();
+  await db.update(tasksTable).set({ blockedByTaskId: externalInputExample.id }).where(eq(tasksTable.id, dependencyExample.id));
+  // ══════════════════════════════════════════════════════════════════ end
+
+  // ══════════════════════════════════════════════════════════════════════
+  // EXAMPLE DATA — Live Wall "current focus + queue" (2026-09-26).
+  // One needs-input focus example (with an executing agent and ZDR flag
+  // set, so both render) plus three plain queue examples, so the center
+  // column shows the hero/queue split instead of the empty state on a
+  // fresh seed. DELETE THIS WHOLE BLOCK before shipping the initial
+  // prototype — the feature itself (schema columns, API fields, the
+  // hero+queue UI, drag-to-reorder, auto-promotion in CommandWall.tsx) is
+  // real and stays; only these four rows are demo content.
+  // ══════════════════════════════════════════════════════════════════════
+  await db.insert(tasksTable).values([
+    { title: "Confirm counter-proposal risk allocation for Meridian term sheet", description: "EXAMPLE DATA - remove before shipping the initial prototype.", status: "needs_input", priority: "urgent", category: "deep_work", executingAgentId: "claude", zdrEndpoint: true, queuePosition: null, aiRecommendation: "Drafted three counter-proposal structures based on the term sheet's liquidation preference clause. Structure A favors faster close, Structure B protects downside better, Structure C splits the difference. Need your call on which risk allocation to lead with before I send it to their counsel." },
+    { title: "Review Q3 admin expense batch", description: "EXAMPLE DATA - remove before shipping the initial prototype.", status: "todo", priority: "low", category: "administrative", executingAgentId: null, zdrEndpoint: null, queuePosition: 0, aiRecommendation: "" },
+    { title: "Summarize competitor pricing changes this week", description: "EXAMPLE DATA - remove before shipping the initial prototype.", status: "todo", priority: "medium", category: "deep_work", executingAgentId: "gemini", zdrEndpoint: null, queuePosition: 1, aiRecommendation: "" },
+    { title: "Draft follow-up to yesterday's board Q&A", description: "EXAMPLE DATA - remove before shipping the initial prototype.", status: "todo", priority: "high", category: "communication", executingAgentId: "gpt4o", zdrEndpoint: null, queuePosition: 2, aiRecommendation: "" },
+  ] as unknown as (typeof tasksTable.$inferInsert)[]);
+  // ══════════════════════════════════════════════════════════════════ end
 
   // Calendar Events
   await db.insert(calendarEventsTable).values([

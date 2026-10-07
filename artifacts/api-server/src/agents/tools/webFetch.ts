@@ -14,6 +14,8 @@
  * limitation of this tool, not a bug.
  */
 
+import { wrapUntrustedWebContent } from "./injectionScanner.js";
+
 const MAX_RESPONSE_BYTES = 2_000_000; // 2 MB raw download cap
 const MAX_RETURNED_CHARS = 12_000; // cap what actually goes back to the model
 const FETCH_TIMEOUT_MS = 15_000;
@@ -130,12 +132,14 @@ export async function fetchUrl(rawUrl: string): Promise<string> {
   const truncated = body.length > MAX_RETURNED_CHARS;
   const clipped = truncated ? body.slice(0, MAX_RETURNED_CHARS) : body;
 
+  const pageText = clipped || "(no readable text content — page may be JavaScript-rendered)";
+
   return [
     `URL: ${url.toString()}`,
     `Content-Type: ${contentType || "unknown"}`,
     truncated ? `(truncated to ${MAX_RETURNED_CHARS} of ${body.length} characters)` : null,
     "---",
-    clipped || "(no readable text content — page may be JavaScript-rendered)",
+    wrapUntrustedWebContent(pageText),
   ]
     .filter((line): line is string => line !== null)
     .join("\n");

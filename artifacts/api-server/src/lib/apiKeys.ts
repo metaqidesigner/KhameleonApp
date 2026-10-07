@@ -13,11 +13,25 @@
  * under `apikey.*`. Values are encrypted at rest via crypto.ts (AES-256-GCM,
  * added 2026-08-27) — the row itself just looks like a longer opaque string,
  * same column as everything else in settingsTable.
+ *
+ * Hosted/managed mode, Phase 3 (khameleon-decisions-log.md, 2026-10-03): the
+ * key is now namespaced per-account too (apikey.<userId>.<provider>) once
+ * accounts mode is active - resolved automatically from the current
+ * request via requestContext.ts, same pattern as oauthTokens.ts/vault.ts, so
+ * every existing call site (gateway.ts, anthropicClient.ts, vaultGuard.ts,
+ * routes/onboarding.ts) needed zero changes. With no request active (a
+ * scheduled job, e.g. scheduler.ts's morning digest) this intentionally
+ * keeps reading the legacy global apikey.<provider> slot - the same
+ * behavior as today, not silently reassigned to whichever account happens
+ * to be admin. A scheduled job picking up one specific account's personal
+ * key is a real, separate product question (whose morning digest is it in
+ * a team?), not assumed here.
  */
 
 import { db, settingsTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { encrypt, decrypt } from "./crypto.js";
+import { getCurrentUserId } from "./requestContext.js";
 
 const KEY_PREFIX = "apikey.";
 
@@ -30,7 +44,8 @@ function isKnownProvider(provider: string): provider is ApiKeyProvider {
 }
 
 function settingsKey(provider: string): string {
-  return `${KEY_PREFIX}${provider}`;
+  const userId = getCurrentUserId();
+  return userId === undefined ? `${KEY_PREFIX}${provider}` : `${KEY_PREFIX}${userId}.${provider}`;
 }
 
 /** Returns the stored key for a provider (decrypted), or null if none is saved. */

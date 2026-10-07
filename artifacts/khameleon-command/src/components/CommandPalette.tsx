@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, LayoutDashboard, Bot, FlaskConical, BrainCircuit, Shield, BarChart2, Settings, MessageSquare, Zap, FolderKanban, Plug, CalendarDays, Inbox, Lock } from 'lucide-react';
-import { useJarvisStore, type TabId, type AgentType } from '@/store/jarvisStore';
+import { useJarvisStore, type TabId } from '@/store/jarvisStore';
 
 const MODULES: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'canvas',    label: 'CANVAS',    icon: <LayoutDashboard size={13}/> },
@@ -19,14 +19,6 @@ const MODULES: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'settings',  label: 'SETTINGS',  icon: <Settings size={13}/> },
 ];
 
-const AGENTS: { id: AgentType; label: string }[] = [
-  { id: 'simple',          label: 'SIMPLE' },
-  { id: 'orchestrator',    label: 'ORCHESTRATOR' },
-  { id: 'deep_research',   label: 'DEEP RESEARCH' },
-  { id: 'morning_digest',  label: 'MORNING DIGEST' },
-  { id: 'code_assistant',  label: 'CODE ASSISTANT' },
-];
-
 const ACTIONS = [
   { id: 'morning', label: 'RUN MORNING DIGEST' },
   { id: 'research', label: 'INITIATE DEEP RESEARCH' },
@@ -36,11 +28,10 @@ const ACTIONS = [
 
 type ResultItem =
   | { kind: 'module'; id: TabId; label: string; icon: React.ReactNode }
-  | { kind: 'agent';  id: AgentType; label: string }
   | { kind: 'action'; id: string; label: string };
 
 export default function CommandPalette() {
-  const { commandPaletteOpen, setCommandPaletteOpen, setActiveTab, setSelectedAgent, setChatOpen, selectedAgent } = useJarvisStore();
+  const { commandPaletteOpen, setCommandPaletteOpen, setActiveTab, setChatOpen } = useJarvisStore();
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +41,18 @@ export default function CommandPalette() {
   }, [commandPaletteOpen]);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setCommandPaletteOpen(false); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCommandPaletteOpen(false);
+      // Cmd/Ctrl+K - the Chat Window spec (2026-10-02) assumed this already
+      // existed ("don't break it"); ground-truth check found it didn't -
+      // only the topbar Search button opened the palette. Added for real
+      // rather than faking a shortcut that wasn't there. See
+      // khameleon-decisions-log.md, 2026-10-02 for the full keybinding list.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen(true);
+      }
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [setCommandPaletteOpen]);
@@ -58,7 +60,6 @@ export default function CommandPalette() {
   const q = query.toLowerCase();
   const results: ResultItem[] = [];
   MODULES.forEach(m => { if (!q || m.label.toLowerCase().includes(q)) results.push({ kind:'module', ...m }); });
-  AGENTS.forEach(a  => { if (!q || a.label.toLowerCase().includes(q)) results.push({ kind:'agent',  ...a }); });
   ACTIONS.forEach(a => { if (!q || a.label.toLowerCase().includes(q)) results.push({ kind:'action', ...a }); });
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -73,14 +74,13 @@ export default function CommandPalette() {
       return;
     }
     if (item.kind === 'module') { setActiveTab(item.id); }
-    if (item.kind === 'agent')  { setSelectedAgent(item.id); setChatOpen(true); }
     if (item.kind === 'action') { setActiveTab('canvas'); }
     setCommandPaletteOpen(false);
   };
 
   if (!commandPaletteOpen) return null;
 
-  const groupLabels: Record<string, string> = { module:'MODULES', agent:'AGENTS', action:'ACTIONS' };
+  const groupLabels: Record<string, string> = { module:'MODULES', action:'ACTIONS' };
   let lastKind = '';
 
   return (
@@ -140,19 +140,6 @@ export default function CommandPalette() {
               </div>
             );
           })}
-        </div>
-
-        {/* Agent pills */}
-        <div style={{ display:'flex', gap:6, padding:'10px 14px', borderTop:'1px solid rgba(0,212,255,0.12)' }}>
-          {AGENTS.map(a => (
-            <button
-              key={a.id}
-              onClick={() => { setSelectedAgent(a.id); }}
-              style={{ fontFamily:'var(--j-font-mono)', fontSize:9, padding:'3px 8px', textTransform:'uppercase', letterSpacing:'0.06em', cursor:'pointer', border:'1px solid', background: selectedAgent === a.id ? 'var(--j-red)' : 'transparent', borderColor: selectedAgent === a.id ? 'var(--j-red)' : 'rgba(0,212,255,0.25)', color: selectedAgent === a.id ? '#fff' : 'var(--j-text-muted)', transition:'all 0.15s' }}
-            >
-              {a.label}
-            </button>
-          ))}
         </div>
       </div>
     </div>

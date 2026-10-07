@@ -27,6 +27,10 @@ services:
     environment:
       DATABASE_URL: postgres://khameleon:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env - see .env.example}@postgres:5432/khameleon
       KHAMELEON_ENCRYPTION_KEY: ${KHAMELEON_ENCRYPTION_KEY:?Set KHAMELEON_ENCRYPTION_KEY in .env - see .env.example (openssl rand -base64 32)}
+      # Blank (the default) means no login required - unchanged behavior. Set
+      # KHAMELEON_APP_PASSWORD in .env to put a shared password in front of
+      # the whole app before exposing it beyond your own network.
+      KHAMELEON_APP_PASSWORD: ${KHAMELEON_APP_PASSWORD:-}
       # Optional - most providers are meant to be connected per-user via the
       # real onboarding flow (design-spec.md §18), not set here. Uncomment
       # only for a deployment-wide fallback.

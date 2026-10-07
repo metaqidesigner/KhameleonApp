@@ -18,6 +18,7 @@ export const actionReceiptsTable = pgTable("action_receipts", {
   scope:             text("scope").notNull(),
   outcome:           text("outcome").notNull().default("success"), // 'success' | 'failure' | 'pending' | 'needs_review'
   target:            text("target"),
+  detail:            text("detail"), // optional full content (e.g. the sent email body) for the expandable detail view
   canUndo:           boolean("can_undo").notNull().default(false),
   undone:            boolean("undone").notNull().default(false),
   relatedApprovalId: integer("related_approval_id"),

@@ -2,11 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { SharedWindowModel } from '../../../../khameleon-window-agent/src/types';
 
-export type AgentType =
-  | 'simple' | 'orchestrator' | 'deep_research'
-  | 'morning_digest' | 'code_assistant'
-  | 'channel_agent' | 'proactive_agent' | 'operative';
-
 export type TabId =
   | 'canvas'
   | 'agents' | 'research' | 'memory'
@@ -19,13 +14,12 @@ export type TabId =
 //              reverts to 'online' (spec §4: "single pulse, not sustained").
 // 'muted'    — visual override applied at render time when voice output
 //              is disabled, regardless of the underlying status.
-export type OrbStatus = 'online' | 'speaking' | 'listening' | 'thinking' | 'error' | 'offline' | 'muted';
+export type OrbStatus = 'online' | 'speaking' | 'listening' | 'thinking' | 'researching' | 'error' | 'offline' | 'muted';
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  agentType?: AgentType;
   timestamp: number;
   model?: string;
   latencyMs?: number;
@@ -90,7 +84,6 @@ interface JarvisStore {
   canvasWindowModels: Record<string, SharedWindowModel>;
   chatMessages: ChatMessage[];
   isStreaming: boolean;
-  selectedAgent: AgentType;
   agentHistory: AgentEvent[];
   panelLayouts: Record<string, PanelLayout[]>;
   commandPaletteOpen: boolean;
@@ -107,6 +100,14 @@ interface JarvisStore {
   orbPosition: { x: number; y: number } | null;
   orbMinimized: boolean;
   orbChatOpen: boolean;
+  /** Count of currently-mounted AssistantCard instances (its own embedded
+      orb+chat - the Assistant tab's hero, Workspace's compact panel). The
+      persistent floating orb (JarvisOrbPortal) hides itself while this is
+      >0, so there is never more than one orb on screen at once. A count
+      rather than a boolean survives two instances briefly overlapping
+      (e.g. a tab-switch transition) without one's unmount hiding the
+      other's still-mounted orb. */
+  embeddedOrbMountCount: number;
   orbActiveAgentId: string;
   voiceEnabled: boolean;
   autoSpeak: boolean;
@@ -124,10 +125,21 @@ interface JarvisStore {
   // completion flag), reopenable from Settings' "Redo setup" button.
   onboardingWizardOpen: boolean;
 
+  // Chat Window (2026-10-02) - persisted per the same convention as the
+  // canvas windows above (jarvisStore, not a new store). Position/size are
+  // only meaningful while floating; docked ignores them and uses the
+  // right-rail's own layout.
+  chatWindowBounds: { x: number; y: number; width: number; height: number };
+  chatWindowDocked: boolean;
+  chatWindowMinimized: boolean;
+  chatReasoningDefault: boolean;
+  chatRouteMode: 'single' | 'parallel' | 'vote' | 'council';
+  chatLastDomainId: number | 'all';
+  chatLastThreadId: string | null;
+
   setActiveTab: (t: TabId) => void;
   setChatOpen: (v: boolean) => void;
   setStreaming: (v: boolean) => void;
-  setSelectedAgent: (a: AgentType) => void;
   appendMessage: (msg: ChatMessage) => void;
   updateLastMessage: (patch: Partial<ChatMessage>) => void;
   clearChat: () => void;
@@ -151,6 +163,7 @@ interface JarvisStore {
   setOrbStatus: (s: OrbStatus) => void;
   setOrbPosition: (p: { x: number; y: number }) => void;
   setOrbMinimized: (v: boolean) => void;
+  adjustEmbeddedOrbMountCount: (delta: 1 | -1) => void;
   toggleOrbChat: () => void;
   setOrbChatOpen: (v: boolean) => void;
   openOrbChat: () => void;
@@ -163,6 +176,14 @@ interface JarvisStore {
   setVoiceSettings: (s: Partial<VoiceSettings>) => void;
   setMicPermissionModalOpen: (v: boolean) => void;
   setOnboardingWizardOpen: (v: boolean) => void;
+
+  setChatWindowBounds: (b: { x: number; y: number; width: number; height: number }) => void;
+  setChatWindowDocked: (v: boolean) => void;
+  setChatWindowMinimized: (v: boolean) => void;
+  setChatReasoningDefault: (v: boolean) => void;
+  setChatRouteMode: (m: 'single' | 'parallel' | 'vote' | 'council') => void;
+  setChatLastDomainId: (id: number | 'all') => void;
+  setChatLastThreadId: (id: string | null) => void;
 }
 
 export const useJarvisStore = create<JarvisStore>()(
@@ -175,7 +196,6 @@ export const useJarvisStore = create<JarvisStore>()(
       chatOpen: false,
       chatMessages: [],
       isStreaming: false,
-      selectedAgent: 'simple',
       agentHistory: [],
       panelLayouts: {},
       commandPaletteOpen: false,
@@ -189,6 +209,7 @@ export const useJarvisStore = create<JarvisStore>()(
       orbPosition: null,
       orbMinimized: false,
       orbChatOpen: false,
+      embeddedOrbMountCount: 0,
       orbActiveAgentId: 'claude',
       voiceEnabled: true,
       autoSpeak: true,
@@ -197,6 +218,14 @@ export const useJarvisStore = create<JarvisStore>()(
       pendingVoiceQuery: null,
       micPermissionModalOpen: false,
       onboardingWizardOpen: false,
+
+      chatWindowBounds: { x: 0, y: 0, width: 400, height: 600 },
+      chatWindowDocked: false,
+      chatWindowMinimized: false,
+      chatReasoningDefault: false,
+      chatRouteMode: 'single',
+      chatLastDomainId: 'all',
+      chatLastThreadId: null,
       voiceSettings: {
         voice: '',
         rate: 1.05,
@@ -213,7 +242,6 @@ export const useJarvisStore = create<JarvisStore>()(
       setActiveTab:          (t)      => set({ activeTab: t }),
       setChatOpen:           (v)      => set({ chatOpen: v }),
       setStreaming:          (v)      => set({ isStreaming: v }),
-      setSelectedAgent:      (a)      => set({ selectedAgent: a }),
       appendMessage:         (msg)    => set(s => ({ chatMessages: [...s.chatMessages, msg] })),
       updateLastMessage:     (patch)  => set(s => {
         const msgs = [...s.chatMessages];
@@ -289,6 +317,7 @@ export const useJarvisStore = create<JarvisStore>()(
       setOrbStatus:          (s)      => set({ orbStatus: s }),
       setOrbPosition:        (p)      => set({ orbPosition: p }),
       setOrbMinimized:       (v)      => set({ orbMinimized: v }),
+      adjustEmbeddedOrbMountCount: (delta) => set(s => ({ embeddedOrbMountCount: Math.max(0, s.embeddedOrbMountCount + delta) })),
       toggleOrbChat:         ()       => set(s => ({ orbChatOpen: !s.orbChatOpen })),
       setOrbChatOpen:        (v)      => set({ orbChatOpen: v }),
       openOrbChat:           ()       => set({ orbChatOpen: true }),
@@ -301,6 +330,14 @@ export const useJarvisStore = create<JarvisStore>()(
       setVoiceSettings:      (patch)  => set(s => ({ voiceSettings: { ...s.voiceSettings, ...patch } })),
       setMicPermissionModalOpen: (v)  => set({ micPermissionModalOpen: v }),
       setOnboardingWizardOpen:   (v)  => set({ onboardingWizardOpen: v }),
+
+      setChatWindowBounds:       (b)  => set({ chatWindowBounds: b }),
+      setChatWindowDocked:       (v)  => set({ chatWindowDocked: v }),
+      setChatWindowMinimized:    (v)  => set({ chatWindowMinimized: v }),
+      setChatReasoningDefault:   (v)  => set({ chatReasoningDefault: v }),
+      setChatRouteMode:          (m)  => set({ chatRouteMode: m }),
+      setChatLastDomainId:       (id) => set({ chatLastDomainId: id }),
+      setChatLastThreadId:       (id) => set({ chatLastThreadId: id }),
     }),
     {
       name: 'jarvis-ui',
@@ -313,13 +350,19 @@ export const useJarvisStore = create<JarvisStore>()(
         scanLinesEnabled: s.scanLinesEnabled,
         cornerBracketsEnabled: s.cornerBracketsEnabled,
         tickerSpeed: s.tickerSpeed,
-        selectedAgent: s.selectedAgent,
         orbPosition: s.orbPosition,
         orbMinimized: s.orbMinimized,
         orbActiveAgentId: s.orbActiveAgentId,
         voiceEnabled: s.voiceEnabled,
         autoSpeak: s.autoSpeak,
         voiceSettings: s.voiceSettings,
+        chatWindowBounds: s.chatWindowBounds,
+        chatWindowDocked: s.chatWindowDocked,
+        chatWindowMinimized: s.chatWindowMinimized,
+        chatReasoningDefault: s.chatReasoningDefault,
+        chatRouteMode: s.chatRouteMode,
+        chatLastDomainId: s.chatLastDomainId,
+        chatLastThreadId: s.chatLastThreadId,
       }),
     }
   )

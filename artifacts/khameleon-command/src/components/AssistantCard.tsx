@@ -64,6 +64,7 @@ export function AssistantCard() {
   const voiceEnabled        = useJarvisStore(s => s.voiceEnabled);
   const voiceSettings       = useJarvisStore(s => s.voiceSettings);
   const pushAgentEvent      = useJarvisStore(s => s.pushAgentEvent);
+  const adjustEmbeddedOrbMountCount = useJarvisStore(s => s.adjustEmbeddedOrbMountCount);
 
   const [roster, setRoster]     = useState<AgentConfig[]>(FALLBACK_ROSTER);
   const [messages, setMessages] = useState<AcMsg[]>([]);
@@ -84,6 +85,14 @@ export function AssistantCard() {
   useEffect(() => {
     getOnboardingStatus().then(s => setDisplayName(s.profile.displayName));
   }, []);
+
+  // This component carries its own orb (below) - while it's mounted anywhere
+  // (the Assistant tab's hero, Workspace's compact panel), the persistent
+  // floating orb hides itself so there's never more than one on screen.
+  useEffect(() => {
+    adjustEmbeddedOrbMountCount(1);
+    return () => adjustEmbeddedOrbMountCount(-1);
+  }, [adjustEmbeddedOrbMountCount]);
 
   useEffect(() => {
     getRoster().then(setRoster).catch(() => {});
@@ -155,7 +164,11 @@ export function AssistantCard() {
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setStreaming(true);
-    setOrbStatus('thinking');
+    // Researching (amber) rather than generic thinking (violet) when the
+    // active agent is actually a research-role one (e.g. Gemini) - a real
+    // distinction already in the roster data, not a fabricated state.
+    const activeAgent = roster.find(a => a.id === orbActiveAgentId);
+    setOrbStatus(activeAgent?.role === 'research' ? 'researching' : 'thinking');
     streamBufRef.current = '';
 
     const history: ChatMessage[] = [
@@ -202,20 +215,22 @@ export function AssistantCard() {
         ));
       },
     );
-  }, [streaming, messages, orbActiveAgentId, setOrbStatus, voiceSettings, pushAgentEvent, speakResponse]);
+  }, [streaming, messages, orbActiveAgentId, roster, setOrbStatus, voiceSettings, pushAgentEvent, speakResponse]);
 
   const hasMessages = messages.length > 0;
 
   const orbEl = (
     <div style={{ position: 'relative', width: 90, height: 90 }}>
-      <div className={`jarvis-orb-container ${voiceEnabled ? orbStatus : 'muted'}`}>
-        <div className={`orb-glow ${voiceEnabled ? orbStatus : 'muted'}`} />
+      <div className={`jarvis-orb-container ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}`}>
+        <div className={`orb-glow ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}`} />
         <div className="orb-arc orb-arc-1" />
         <div className="orb-arc orb-arc-2" />
         <div className="orb-ring orb-ring-outer"><div className="orb-moon" /></div>
         <div className="orb-ring orb-ring-inner"><div className="orb-beacon" /></div>
-        <div className="orb-core" ref={coreRef} />
-        {!voiceEnabled && <MicOff size={16} className="orb-muted-icon" />}
+        <div className="orb-core" ref={coreRef}>
+          <div className="orb-dust" />
+        </div>
+        {!voiceEnabled && orbStatus === 'online' && <MicOff size={16} className="orb-muted-icon" />}
       </div>
     </div>
   );

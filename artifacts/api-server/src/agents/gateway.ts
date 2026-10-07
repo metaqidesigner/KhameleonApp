@@ -3,7 +3,9 @@ import OpenAI from "openai";
 import type { AgentConfig, AgentResponse, ChatMessage, Provider, ToolCallRecord, ToolEvent } from "./types.js";
 import { TOOL_DEFINITIONS } from "./tools/definitions.js";
 import { dispatchTool } from "./tools/dispatcher.js";
+import { getCustomToolDefinitions, isCustomToolName, dispatchCustomTool, getMcpServerConfigs } from "./tools/customIntegrations.js";
 import { getApiKey } from "../lib/apiKeys.js";
+import { trackingFetch } from "../lib/providerQuota.js";
 
 // ── Cost tables (USD per 1k tokens) ──────────────────────────
 const COST_TABLE: Record<string, number> = {
@@ -88,14 +90,28 @@ async function runAgenticLoop(
   const allToolCalls: ToolCallRecord[] = [];
   const MAX_ITERATIONS = 10;
 
+  // design-spec.md §16.6: a user-imported OpenAPI spec's operations become
+  // real tools here, merged with the static, first-party TOOL_DEFINITIONS -
+  // the model sees one combined catalog, no special-casing in its prompt.
+  const [customTools, mcpServers] = await Promise.all([getCustomToolDefinitions(), getMcpServerConfigs()]);
+  const tools = [...TOOL_DEFINITIONS, ...customTools];
+  // A connected MCP server needs the beta Messages API's `mcp_servers` -
+  // Claude talks to that server directly and resolves its tool calls
+  // server-side (mcp_tool_use/mcp_tool_result content blocks come back
+  // already paired, nothing for this loop to dispatch). Decided once per
+  // loop run, not per iteration, so one run never mixes API surfaces.
+  const useBeta = mcpServers.length > 0;
+
   for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-    const response = await client.messages.create({
-      model:      agent.model,
-      max_tokens: 8192,
-      system:     systemMsg,
-      messages,
-      tools:      TOOL_DEFINITIONS,
-    });
+    // Both calls return the same fields this loop actually reads
+    // (content/stop_reason/usage) - BetaMessage adds MCP-specific content
+    // block types on top of the same shape, so one `as` boundary here
+    // keeps the rest of this function's logic identical for both paths
+    // rather than duplicating the whole loop per API surface.
+    const response = (useBeta
+      ? await client.beta.messages.create({ model: agent.model, max_tokens: 8192, system: systemMsg, messages, tools, mcp_servers: mcpServers })
+      : await client.messages.create({ model: agent.model, max_tokens: 8192, system: systemMsg, messages, tools })
+    ) as Anthropic.Messages.Message;
 
     inputTokens  += response.usage.input_tokens;
     outputTokens += response.usage.output_tokens;
@@ -133,7 +149,9 @@ async function runAgenticLoop(
         const t0 = Date.now();
 
         try {
-          const result    = await dispatchTool(toolUse.name, input);
+          const result    = isCustomToolName(toolUse.name)
+            ? await dispatchCustomTool(toolUse.name, input)
+            : await dispatchTool(toolUse.name, input);
           const durationMs = Date.now() - t0;
           onToolEvent?.({ type: "tool_result", name: toolUse.name, result: result.slice(0, 300), durationMs });
           allToolCalls.push({ name: toolUse.name, input, result, durationMs });
@@ -176,7 +194,7 @@ async function askAnthropic(
   const baseURL = resolveBaseUrl(agent);
   if (!apiKey) throw new Error("Anthropic API key not configured");
 
-  const client    = new Anthropic({ apiKey, baseURL: baseURL ?? undefined });
+  const client    = new Anthropic({ apiKey, baseURL: baseURL ?? undefined, fetch: trackingFetch("anthropic") });
   const systemMsg = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
   const chatMsgs: AnthMsgParam[] = messages
     .filter((m) => m.role !== "system")
@@ -250,7 +268,15 @@ async function askOpenAI(
   const baseURL = resolveBaseUrl(agent);
   if (!apiKey) throw new Error(`API key not configured for provider ${agent.provider}`);
 
-  const client = new OpenAI({ apiKey, baseURL: baseURL ?? undefined });
+  // Rate-limit header tracking (providerQuota.ts) only applies to the real
+  // OpenAI API - google/openrouter/minimax/ollama/custom share this same
+  // OpenAI-compatible code path via a different baseURL, but nothing
+  // confirms they send the same x-ratelimit-* headers, so they're left
+  // untracked rather than guessed at.
+  const client = new OpenAI({
+    apiKey, baseURL: baseURL ?? undefined,
+    ...(agent.provider === "openai" ? { fetch: trackingFetch("openai") } : {}),
+  });
   const msgs = messages.map((m) => ({
     role: m.role as "user" | "assistant" | "system",
     content: m.content,

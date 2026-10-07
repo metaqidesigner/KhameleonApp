@@ -42,6 +42,16 @@ export async function sendOutlookDraft(approvalId: number, editedBody?: string):
   return asJson(response, 'Send');
 }
 
+/** Re-composes the draft with a different tone, per a spoken instruction - one real re-compose pass, written back to both the Outlook draft and the approval row. */
+export async function rewriteOutlookDraft(approvalId: number, toneInstruction?: string): Promise<OutlookDraft> {
+  const response = await fetch(`${BASE}/skills/outlook-draft-email/${approvalId}/rewrite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ toneInstruction }),
+  });
+  return asJson<OutlookDraft>(response, 'Rewrite');
+}
+
 /** Discards the draft (and best-effort deletes it from Outlook) without sending. */
 export async function rejectOutlookDraft(approvalId: number): Promise<{ ok: true }> {
   const response = await fetch(`${BASE}/skills/outlook-draft-email/${approvalId}/reject`, {

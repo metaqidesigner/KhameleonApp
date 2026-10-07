@@ -16,11 +16,13 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { getApiKey } from "./apiKeys.js";
+import { trackingFetch } from "./providerQuota.js";
 
 export async function getAnthropicClient(): Promise<Anthropic> {
   const stored = await getApiKey("anthropic").catch(() => null);
   return new Anthropic({
     apiKey: stored ?? process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY,
     baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL ?? undefined,
+    fetch: trackingFetch("anthropic"),
   });
 }

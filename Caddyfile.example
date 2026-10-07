@@ -1,0 +1,7 @@
+# Copy to "Caddyfile" and replace with your real domain - see SELF_HOSTING.md's
+# "Putting TLS in front of it" section. Caddy automatically gets and renews a
+# real Let's Encrypt certificate for whatever domain you put here - no manual
+# cert handling needed.
+your-domain.com {
+    reverse_proxy khameleon:4001
+}

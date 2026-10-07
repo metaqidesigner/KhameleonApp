@@ -33,10 +33,16 @@ import outlookSkillsRouter from "./outlookSkills";
 import outlookSummarizeRouter from "./outlookSummarize";
 import outlookTriageRouter from "./outlookTriage";
 import outlookMessagesRouter from "./outlookMessages";
+import gmailSkillsRouter from "./gmailSkills";
+import gmailMessagesRouter from "./gmailMessages";
 import skillSetsRouter from "./skillSets";
 import workDomainsRouter from "./workDomains";
 import integrationsRouter from "./integrations";
+import customIntegrationsRouter from "./customIntegrations";
 import actionReceiptsRouter from "./actionReceipts";
+import quotaRouter from "./quota";
+import briefingRouter from "./briefing";
+import usersRouter from "./users";
 
 const router: IRouter = Router();
 
@@ -74,9 +80,15 @@ router.use("/skills/outlook-draft-email", outlookSkillsRouter);
 router.use("/skills/outlook-summarize-thread", outlookSummarizeRouter);
 router.use("/skills/outlook-triage-inbox", outlookTriageRouter);
 router.use("/skills/outlook-messages", outlookMessagesRouter);
+router.use("/skills/gmail-draft-email", gmailSkillsRouter);
+router.use("/skills/gmail-messages", gmailMessagesRouter);
 router.use("/skill-sets", skillSetsRouter);
 router.use("/work-domains", workDomainsRouter);
 router.use("/integrations", integrationsRouter);
+router.use("/custom-integrations", customIntegrationsRouter);
 router.use("/action-receipts", actionReceiptsRouter);
+router.use("/quota", quotaRouter);
+router.use("/briefing", briefingRouter);
+router.use("/users", usersRouter);
 
 export default router;

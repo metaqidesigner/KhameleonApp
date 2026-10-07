@@ -8,13 +8,17 @@ import { AlertCircle, Mail, Send, FileSearch, Inbox, RefreshCw } from 'lucide-re
 import { ActionReceiptList, type ActionReceiptProps } from '@/components/ActionReceipt';
 import { ConfirmGate } from '@/components/ConfirmGate';
 import { createApproval } from '@/lib/approvalsApi';
-import { getActionReceipts } from '@/lib/actionReceiptsApi';
+import { getActionReceipts, createActionReceipt } from '@/lib/actionReceiptsApi';
 import {
   runOutlookDraftEmail, sendOutlookDraft, rejectOutlookDraft,
   runOutlookSummarizeThread,
   runOutlookTriageInbox, undoOutlookTriage,
   listOutlookMessages, type OutlookDraft, type OutlookMessagePreview,
 } from '@/lib/outlookSkillsApi';
+import {
+  runGmailDraftEmail, sendGmailDraft, rejectGmailDraft,
+  listGmailMessages, type GmailDraft, type GmailMessagePreview,
+} from '@/lib/gmailSkillsApi';
 
 export default function Approvals() {
   const [showConfirmGate, setShowConfirmGate] = useState(false);
@@ -35,6 +39,7 @@ export default function Approvals() {
       outcome: r.outcome,
       timestamp: r.createdAt,
       target: r.target ?? undefined,
+      detail: r.detail ?? undefined,
       canUndo: r.canUndo && !r.undone,
     }))));
   }, []);
@@ -104,17 +109,37 @@ export default function Approvals() {
     setOutlookSendError(undefined);
     try {
       const { sentAt } = await sendOutlookDraft(outlookDraft.approvalId, editedContent);
+      const detail = `Subject: ${outlookDraft.subject}\n\n${editedContent ?? outlookDraft.body}`;
+      // Persist first (design-spec.md §6.5.2 - this must be a durable record,
+      // not just local state that vanishes on reload, per the 2026-10-01
+      // audit). Falls back to a local-only row if the write fails, so the
+      // user still sees the action happened even though it isn't saved -
+      // surfaced honestly via the console rather than silently swallowed.
+      let persistedId: string | null = null;
+      try {
+        const saved = await createActionReceipt({
+          description: `Email sent to ${outlookDraft.to}`,
+          category: 'email_sent',
+          scope: 'mail.send',
+          outcome: 'success',
+          target: outlookDraft.to,
+          detail,
+          canUndo: false, // real send, real irreversibility - no undo offered (§6.5.3)
+        });
+        persistedId = String(saved.id);
+      } catch (err) {
+        console.error('Failed to persist action receipt for sent email:', err);
+      }
       setReceipts(r => [{
-        id: `outlook-${outlookDraft.approvalId}`,
+        id: persistedId ?? `outlook-${outlookDraft.approvalId}`,
         description: `Email sent to ${outlookDraft.to}`,
         category: 'email_sent',
         scope: 'mail.send',
         outcome: 'success' as const,
         timestamp: sentAt,
         target: outlookDraft.to,
-        // Real send, real irreversibility — no undo offered (§6.5.3).
         canUndo: false,
-        detail: `Subject: ${outlookDraft.subject}\n\n${editedContent ?? outlookDraft.body}`,
+        detail,
       }, ...r]);
       setOutlookDraft(null);
       setOutlookMessageId('');
@@ -134,6 +159,87 @@ export default function Approvals() {
     }
     setOutlookDraft(null);
     setOutlookSendError(undefined);
+  };
+
+  // ── Real skill: gmail-draft-email ─────────────────────────────────────────
+  // Mirrors outlook-draft-email above exactly, against the real Gmail API
+  // (routes/gmailSkills.ts) - closes the "Gmail is read-only" gap flagged
+  // in the 2026-10-01 function audit. Requires Gmail to be connected
+  // (Settings → Connectors).
+  const [gmailMessageId, setGmailMessageId] = useState('');
+  const [gmailLoading, setGmailLoading] = useState(false);
+  const [gmailRunError, setGmailRunError] = useState<string>();
+  const [gmailDraft, setGmailDraft] = useState<GmailDraft | null>(null);
+  const [gmailSending, setGmailSending] = useState(false);
+  const [gmailSendError, setGmailSendError] = useState<string>();
+
+  const handleRunGmail = async (id?: string) => {
+    const messageId = (id ?? gmailMessageId).trim();
+    if (!messageId) return;
+    setGmailMessageId(messageId);
+    setGmailLoading(true);
+    setGmailRunError(undefined);
+    try {
+      const draft = await runGmailDraftEmail(messageId);
+      setGmailDraft(draft);
+    } catch (error) {
+      setGmailRunError(error instanceof Error ? error.message : 'Draft request failed');
+    } finally {
+      setGmailLoading(false);
+    }
+  };
+
+  const handleGmailConfirm = async (editedContent?: string) => {
+    if (!gmailDraft) return;
+    setGmailSending(true);
+    setGmailSendError(undefined);
+    try {
+      const { sentAt } = await sendGmailDraft(gmailDraft.approvalId, editedContent);
+      const detail = `Subject: ${gmailDraft.subject}\n\n${editedContent ?? gmailDraft.body}`;
+      let persistedId: string | null = null;
+      try {
+        const saved = await createActionReceipt({
+          description: `Email sent to ${gmailDraft.to}`,
+          category: 'email_sent',
+          scope: 'gmail.send',
+          outcome: 'success',
+          target: gmailDraft.to,
+          detail,
+          canUndo: false, // real send, real irreversibility - no undo offered (§6.5.3)
+        });
+        persistedId = String(saved.id);
+      } catch (err) {
+        console.error('Failed to persist action receipt for sent email:', err);
+      }
+      setReceipts(r => [{
+        id: persistedId ?? `gmail-${gmailDraft.approvalId}`,
+        description: `Email sent to ${gmailDraft.to}`,
+        category: 'email_sent',
+        scope: 'gmail.send',
+        outcome: 'success' as const,
+        timestamp: sentAt,
+        target: gmailDraft.to,
+        canUndo: false,
+        detail,
+      }, ...r]);
+      setGmailDraft(null);
+      setGmailMessageId('');
+    } catch (error) {
+      setGmailSendError(error instanceof Error ? error.message : 'Send failed');
+      throw error; // keeps ConfirmGate open so the user can retry
+    } finally {
+      setGmailSending(false);
+    }
+  };
+
+  const handleGmailCancel = () => {
+    if (gmailDraft) {
+      // Best-effort - closing the gate should discard the pending draft
+      // rather than leave an orphaned unsent draft in the user's mailbox.
+      rejectGmailDraft(gmailDraft.approvalId).catch(() => {});
+    }
+    setGmailDraft(null);
+    setGmailSendError(undefined);
   };
 
   // ── Real skill: outlook-summarize-thread (§12.2) ─────────────────────────
@@ -233,6 +339,25 @@ export default function Approvals() {
       setMessagesError(error instanceof Error ? error.message : 'Could not load inbox');
     } finally {
       setMessagesLoading(false);
+    }
+  };
+
+  // Separate Gmail inbox browser - kept parallel to Outlook's rather than
+  // merged, matching how the rest of the app treats the two as independent
+  // connectors/flows (routes/inbox.ts's fetchGmail/fetchOutlook, PROVIDER_MAP).
+  const [gmailMessages, setGmailMessages] = useState<GmailMessagePreview[] | null>(null);
+  const [gmailMessagesLoading, setGmailMessagesLoading] = useState(false);
+  const [gmailMessagesError, setGmailMessagesError] = useState<string>();
+
+  const loadGmailMessages = async () => {
+    setGmailMessagesLoading(true);
+    setGmailMessagesError(undefined);
+    try {
+      setGmailMessages(await listGmailMessages());
+    } catch (error) {
+      setGmailMessagesError(error instanceof Error ? error.message : 'Could not load inbox');
+    } finally {
+      setGmailMessagesLoading(false);
     }
   };
 
@@ -355,6 +480,71 @@ export default function Approvals() {
         </div>
       </div>
 
+      {/* Gmail inbox browser — feeds a message id into gmail-draft-email below */}
+      <div className="j-panel" style={{ height: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(120, 168, 220, 0.10)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Inbox size={14} style={{ color: '#8fa39c' }} />
+          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#fff' }}>
+            Gmail inbox browser
+          </h3>
+          <button
+            onClick={loadGmailMessages}
+            disabled={gmailMessagesLoading}
+            title="Refresh"
+            style={{
+              marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px',
+              height: '26px', padding: '0 10px', fontSize: '10px', fontWeight: 600,
+              textTransform: 'uppercase', letterSpacing: '0.06em', color: '#8fa39c',
+              background: 'none', border: '1px solid rgba(120, 168, 220, 0.18)', borderRadius: '6px',
+              cursor: gmailMessagesLoading ? 'wait' : 'pointer',
+            }}
+          >
+            <RefreshCw size={11} style={gmailMessagesLoading ? { animation: 'jarvis-spin 1s linear infinite' } : undefined} />
+            {gmailMessages === null ? 'Browse inbox' : 'Refresh'}
+          </button>
+        </div>
+        <div style={{ padding: gmailMessages && gmailMessages.length > 0 ? '4px' : '12px 16px' }}>
+          {gmailMessagesError && <div style={{ padding: '8px 12px', fontSize: '11px', color: '#E77A7A' }}>{gmailMessagesError}</div>}
+          {gmailMessages === null && !gmailMessagesLoading && !gmailMessagesError && (
+            <p style={{ margin: 0, padding: '0 12px', fontSize: '11px', color: '#8fa39c', lineHeight: 1.5 }}>
+              Loads the 15 most recent messages from the connected Gmail inbox so you can pick one to draft a reply to below, instead of pasting a raw Gmail message id.
+            </p>
+          )}
+          {gmailMessages && gmailMessages.length === 0 && (
+            <div style={{ padding: '8px 12px', fontSize: '11px', color: '#8fa39c' }}>No messages found.</div>
+          )}
+          {gmailMessages && gmailMessages.map((m) => (
+            <div key={m.id} style={{
+              display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px',
+              borderBottom: '1px solid rgba(120, 168, 220, 0.06)',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#c4d4ec', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {m.subject}
+                </div>
+                <div style={{ fontSize: '10px', color: '#8fa39c', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {m.from} — {m.preview}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                <button
+                  onClick={() => handleRunGmail(m.id)}
+                  disabled={gmailLoading}
+                  style={{
+                    height: '26px', padding: '0 10px', fontSize: '10px', fontWeight: 600,
+                    textTransform: 'uppercase', letterSpacing: '0.04em', color: '#8C7CF0',
+                    background: 'none', border: '1px solid rgba(140, 124, 240, 0.35)', borderRadius: '6px',
+                    cursor: gmailLoading ? 'wait' : 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  Draft reply
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Real skill: outlook-draft-email */}
       <div className="j-panel" style={{ height: 'auto', flexShrink: 0 }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(120, 168, 220, 0.10)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -409,6 +599,64 @@ export default function Approvals() {
           </div>
           {outlookRunError && (
             <div style={{ fontSize: '11px', color: '#E77A7A' }}>{outlookRunError}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Real skill: gmail-draft-email — closes the "Gmail is read-only" gap */}
+      <div className="j-panel" style={{ height: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(120, 168, 220, 0.10)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Send size={14} style={{ color: '#8fa39c' }} />
+          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#fff' }}>
+            Real skill: gmail-draft-email
+          </h3>
+        </div>
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: '#8fa39c', lineHeight: 1.5 }}>
+            Runs the real pipeline against the Gmail API: fetch thread → summarize → compose → create draft.
+            Pick a message from the Gmail inbox browser above, or paste an id directly. Sending only happens if you confirm below.
+          </p>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              value={gmailMessageId}
+              onChange={(e) => setGmailMessageId(e.target.value)}
+              placeholder="Gmail message id"
+              disabled={gmailLoading}
+              style={{
+                flex: 1,
+                height: '34px',
+                padding: '0 10px',
+                fontSize: '11px',
+                fontFamily: 'var(--j-font-mono)',
+                color: '#c4d4ec',
+                backgroundColor: 'rgba(8, 14, 32, 0.4)',
+                border: '1px solid rgba(120, 168, 220, 0.18)',
+                borderRadius: '6px',
+              }}
+            />
+            <button
+              onClick={() => handleRunGmail()}
+              disabled={gmailLoading || !gmailMessageId.trim()}
+              style={{
+                height: '34px',
+                padding: '0 16px',
+                fontSize: '11px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: '#fff',
+                backgroundColor: '#8C7CF022',
+                border: '1px solid rgba(140, 124, 240, 0.45)',
+                borderRadius: '6px',
+                cursor: gmailLoading ? 'wait' : 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {gmailLoading ? 'Drafting…' : 'Draft reply'}
+            </button>
+          </div>
+          {gmailRunError && (
+            <div style={{ fontSize: '11px', color: '#E77A7A' }}>{gmailRunError}</div>
           )}
         </div>
       </div>
@@ -586,6 +834,25 @@ export default function Approvals() {
           editableContent={`Subject: ${outlookDraft.subject}\n\n${outlookDraft.body}`}
           onConfirm={handleOutlookConfirm}
           onCancel={handleOutlookCancel}
+        />
+      )}
+
+      {/* ConfirmGate modal — real gmail-draft-email skill */}
+      {gmailDraft && (
+        <ConfirmGate
+          title="Send Email"
+          category="email_send"
+          target={gmailDraft.to}
+          scope="gmail.send"
+          severity="critical"
+          confirmLabel="Confirm & Send"
+          confirming={gmailSending}
+          error={gmailSendError}
+          payload={`Subject: ${gmailDraft.subject}\n\n${gmailDraft.body}`}
+          allowEdit={true}
+          editableContent={`Subject: ${gmailDraft.subject}\n\n${gmailDraft.body}`}
+          onConfirm={handleGmailConfirm}
+          onCancel={handleGmailCancel}
         />
       )}
     </div>

@@ -84,6 +84,24 @@ export interface AgentConversationRow {
   createdAt: string;
 }
 
+/** One row of /api/agent-conversations/sessions - the most recent turn of each distinct session, for "is there a recent session worth resuming" checks. */
+export interface AgentConversationSession {
+  sessionId: string;
+  agentId: string;
+  createdAt: string;
+  preview: string;
+}
+
+export async function getAgentConversationSessions(params?: {
+  agentId?: string;
+  limit?: number;
+}): Promise<AgentConversationSession[]> {
+  const qs = new URLSearchParams();
+  if (params?.agentId) qs.set('agentId', params.agentId);
+  if (params?.limit)   qs.set('limit', String(params.limit));
+  return safeFetch<AgentConversationSession[]>(`${BASE}/agent-conversations/sessions?${qs}`, undefined, []);
+}
+
 export interface ChatMessage { role: 'user'|'assistant'|'system'; content: string; }
 
 export interface AgentResponse {

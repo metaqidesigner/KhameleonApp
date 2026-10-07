@@ -66,6 +66,11 @@ export class ElectronWidgetBackend implements WindowBackend {
     else win.hide();
   }
 
+  /** Exposed for BrowserInputBackend - CDP attaches to a webContents, not a BrowserWindow. */
+  getWebContents(handle: WindowHandle): Electron.WebContents {
+    return this.require(handle).webContents;
+  }
+
   private require(handle: WindowHandle): BrowserWindow {
     const win = this.windows.get(handle.id);
     if (!win) throw new Error(`No widget window for handle ${handle.id}`);

@@ -136,4 +136,57 @@ describe("LocalAgentRunner", () => {
     expect(result.toolCalls).toHaveLength(3);
     expect(client.calls).toHaveLength(3);
   });
+
+  it("reads a document then acts on its contents across tool calls", async () => {
+    const runners = fakeRunners();
+    const client = scriptedClient([
+      {
+        stop_reason: "tool_use",
+        content: [toolUseBlock("t1", "read_document", { filePath: "/tmp/report.pdf" })],
+      },
+      {
+        stop_reason: "tool_use",
+        content: [
+          toolUseBlock("t2", "window_command", { command: 'type "Q3 revenue: 42000" into Excel at 400,120' }),
+        ],
+      },
+      {
+        stop_reason: "end_turn",
+        content: [textBlock("Read the report and entered Q3 revenue into the spreadsheet.")],
+      },
+    ]);
+
+    const readDocumentText = async (filePath: string) => `[contents of ${filePath}: Q3 revenue: 42000]`;
+    const runner = new LocalAgentRunner(runners, client, "test-model", 12, readDocumentText);
+    const result = await runner.run("read the PDF and put Q3 revenue into the spreadsheet");
+
+    expect(result.toolCalls).toHaveLength(2);
+    expect(result.toolCalls[0]).toMatchObject({
+      name: "read_document",
+      result: "[contents of /tmp/report.pdf: Q3 revenue: 42000]",
+    });
+    expect(result.toolCalls[1]).toMatchObject({ name: "window_command" });
+    expect(result.reply).toBe("Read the report and entered Q3 revenue into the spreadsheet.");
+  });
+
+  it("surfaces an error when read_document is called with no reader wired up", async () => {
+    const runners = fakeRunners();
+    const client = scriptedClient([
+      {
+        stop_reason: "tool_use",
+        content: [toolUseBlock("t1", "read_document", { filePath: "/tmp/report.pdf" })],
+      },
+      {
+        stop_reason: "end_turn",
+        content: [textBlock("I can't read documents right now.")],
+      },
+    ]);
+
+    // No readDocumentText passed - matches callers/tests that never wire it up.
+    const runner = new LocalAgentRunner(runners, client, "test-model");
+    const result = await runner.run("read the PDF");
+
+    expect(result.toolCalls[0].error).toMatch(/isn't available/);
+    expect(result.reply).toBe("I can't read documents right now.");
+  });
 });
