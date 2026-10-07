@@ -1419,5 +1419,17 @@ The one piece of the Mobile Morning Briefing left open against its own "hard req
 
 **Scope boundary, stated honestly:** this makes the briefing's own narration/outcomes resumable as real history and real forward continuity - it does not make voice itself follow the user to the desktop (the Chat Window's composer still needs its own mic click to keep talking by voice; text continuation works immediately on resume). That's consistent with the feature as originally scoped ("resume... continuing on-screen"), not a new gap.
 
+## 2026-10-07 — Closed the Gmail "change the tone" parity gap
+
+Second of Newton's "let's go in order" punch list. "Change the tone" was Outlook-only in V1 - Outlook's draft-reply pipeline had a real `/:id/rewrite` route (re-runs a Claude call to re-compose the draft per a spoken instruction, writes the new body back to both the real Outlook draft and the approval row); Gmail's equivalent route never existed, so `briefing.ts` hard-coded `supportsRewrite: false` for every Gmail draft and the Mobile Briefing's voice/button tone-change path only ever called the Outlook function.
+
+**What shipped:** a new `POST /api/skills/gmail-draft-email/:id/rewrite` (`routes/gmailSkills.ts`), mirroring Outlook's route exactly - same Claude call, same "find the pending approval, re-compose, write back" shape - adapted for the one real difference: Gmail has no partial body update, so it rebuilds the full MIME content via `gmail.getMessage()` + `gmail.updateDraftBody()`, the exact same mechanism `/send` already uses for an edited body. New `rewriteGmailDraft()` client function, and `MobileBriefing.tsx`'s tone-change handler now branches on `draft.provider` instead of always calling the Outlook function.
+
+**A real simplification found while doing this, not left as dead weight:** with both providers now supporting rewrite, `BriefingDraft.supportsRewrite` was never going to be anything but `true` again - removed the field entirely from both the server and client types, and un-gated the "Review / edit" button in `MobileBriefing.tsx` that had been conditioned on it (reviewing/editing a draft was never actually about AI-rewrite capability specifically; gating it on that flag no longer made sense once the flag couldn't vary).
+
+**Real verification, not just code review - honestly scoped to what this sandbox can actually exercise:** no live Gmail OAuth connection or Anthropic API key exists here (checked directly against the dev DB - zero rows in `oauth_tokens`, zero `apikey.*` settings), so a true send-a-real-email test isn't possible in this environment. Instead, inserted a real pending approval row directly into the DB matching the exact shape the route expects, then hit the real running route: confirmed it finds the approval, correctly rejects a nonexistent id (404) and an already-resolved one (409 "Approval already approved"), and reaches all the way to the real `getAnthropicClient()` call before failing on the expected "no API key configured" error - proving every line of the new routing/payload/status-check logic is correct, with only the Claude call and Gmail MIME rebuild themselves unexercised (both reused, already-working code paths, not new risk). Test data cleaned out afterward.
+
+**Verification:** `tsc --build` clean, 113/113 backend tests, 87/87 frontend tests (unchanged counts - no existing test referenced the removed field).
+
 ---
 *Full functional/design spec: khameleon-design-spec.md · Competitor research: khameleon-competitor-research.md*

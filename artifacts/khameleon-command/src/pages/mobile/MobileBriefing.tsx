@@ -4,7 +4,7 @@ import { useVoice } from '@/components/orb/useVoice';
 import { ConfirmGate } from '@/components/ConfirmGate';
 import { getMorningBriefing, logBriefingTurn, type MorningBriefing, type BriefingUrgentItem } from '@/lib/briefingApi';
 import { sendOutlookDraft, rejectOutlookDraft, rewriteOutlookDraft } from '@/lib/outlookSkillsApi';
-import { sendGmailDraft, rejectGmailDraft } from '@/lib/gmailSkillsApi';
+import { sendGmailDraft, rejectGmailDraft, rewriteGmailDraft } from '@/lib/gmailSkillsApi';
 
 /**
  * Mobile Morning Briefing (KHAMELEON_SPEC.md §5) - V1, PWA-only (no native
@@ -88,9 +88,11 @@ export default function MobileBriefing() {
         else await rejectGmailDraft(draft.approvalId);
         log('assistant', `Skipped - discarded the drafted reply to ${draft.to}.`);
         advanceUrgent();
-      } else if (/\b(tone|change|rewrite|different|shorter|casual|formal|friendlier)\b/.test(lower) && draft.supportsRewrite) {
+      } else if (/\b(tone|change|rewrite|different|shorter|casual|formal|friendlier)\b/.test(lower)) {
         setBusy(true);
-        const updated = await rewriteOutlookDraft(draft.approvalId, text);
+        const updated = draft.provider === 'outlook'
+          ? await rewriteOutlookDraft(draft.approvalId, text)
+          : await rewriteGmailDraft(draft.approvalId, text);
         updateCurrentDraft(updated.body);
         const reply = `Here's the new version: ${updated.body}. Say send it, skip, or change the tone again.`;
         voice.speak(reply);
@@ -246,9 +248,7 @@ export default function MobileBriefing() {
             {currentItem.draft && (
               <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button type="button" onClick={() => handleVoiceCommand('send it')} disabled={busy} style={pillBtnStyle('var(--j-green)')}><Send size={13} /> Send</button>
-                {currentItem.draft.supportsRewrite && (
-                  <button type="button" onClick={() => setReviewing(true)} disabled={busy} style={pillBtnStyle('var(--j-violet)')}><Wand2 size={13} /> Review / edit</button>
-                )}
+                <button type="button" onClick={() => setReviewing(true)} disabled={busy} style={pillBtnStyle('var(--j-violet)')}><Wand2 size={13} /> Review / edit</button>
                 <button type="button" onClick={() => handleVoiceCommand('skip')} disabled={busy} style={pillBtnStyle('var(--j-text-muted)')}><SkipForward size={13} /> Skip</button>
               </div>
             )}

@@ -38,8 +38,6 @@ export interface BriefingDraft {
   to: string;
   subject: string;
   body: string;
-  /** Only Outlook drafts support the voice "change the tone" re-compose pass in this first version. */
-  supportsRewrite: boolean;
 }
 
 export interface BriefingUrgentItem {
@@ -115,11 +113,11 @@ async function draftReplyFor(item: TriageItem, outlookOn: boolean, gmailOn: bool
   try {
     if (outlookOn) {
       const result = await runOutlookDraftEmail(item.id);
-      return { provider: "outlook", approvalId: await approvalIdFor(result.taskRunId), to: result.to, subject: result.subject, body: result.body, supportsRewrite: true };
+      return { provider: "outlook", approvalId: await approvalIdFor(result.taskRunId), to: result.to, subject: result.subject, body: result.body };
     }
     if (gmailOn) {
       const result = await runGmailDraftEmail(item.id);
-      return { provider: "gmail", approvalId: await approvalIdFor(result.taskRunId), to: result.to, subject: result.subject, body: result.body, supportsRewrite: false };
+      return { provider: "gmail", approvalId: await approvalIdFor(result.taskRunId), to: result.to, subject: result.subject, body: result.body };
     }
   } catch (err) {
     logger.warn({ err, messageId: item.id }, "Morning briefing: proactive draft failed, surfacing item without a draft");

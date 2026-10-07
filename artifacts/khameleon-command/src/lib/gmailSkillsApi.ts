@@ -43,6 +43,16 @@ export async function sendGmailDraft(approvalId: number, editedBody?: string): P
   return asJson(response, 'Send');
 }
 
+/** Re-composes the draft with a different tone, per a spoken instruction - one real re-compose pass, written back to both the Gmail draft and the approval row. */
+export async function rewriteGmailDraft(approvalId: number, toneInstruction?: string): Promise<GmailDraft> {
+  const response = await fetch(`${BASE}/skills/gmail-draft-email/${approvalId}/rewrite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ toneInstruction }),
+  });
+  return asJson<GmailDraft>(response, 'Rewrite');
+}
+
 /** Discards the draft (and best-effort deletes it from Gmail) without sending. */
 export async function rejectGmailDraft(approvalId: number): Promise<{ ok: true }> {
   const response = await fetch(`${BASE}/skills/gmail-draft-email/${approvalId}/reject`, {

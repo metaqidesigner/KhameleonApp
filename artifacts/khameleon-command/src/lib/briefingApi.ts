@@ -10,7 +10,6 @@ export interface BriefingDraft {
   to: string;
   subject: string;
   body: string;
-  supportsRewrite: boolean;
 }
 
 export interface BriefingUrgentItem {
