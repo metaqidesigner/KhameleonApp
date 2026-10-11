@@ -12,3 +12,6 @@ Scoped to the `ui-overlay-redesign` project.
 - Sample extended with live comparison toggles: top/bottom bar (Option 3), top/bottom floating icons (Option 4), bare icons with no pill/oval (Option 5), plus a stronger hover effect (~1.55× scale with overshoot, brightness boost) on every icon. Newton decided all variants become user options.
 - **Gap review complete** (`docs/gap-review.md`): all 18 questions answered, with a running list of genuinely new builds (capture, procedure comparison, automatic detection, etc.) kept separate from relocations. Outcome: no full fallback app needed; two panels (Settings, Workspace) plus Skills.
 - Old UI preserved as git tag `legacy-dashboard-ui` (local, not yet pushed).
+
+## 2026-10-11
+- **New-builds review complete** (`docs/build-review.md`): Builds 0–12 decided — one app/two layouts, Electron always-on-top overlay, small-step overlay layout, panels (Skills → Workspace → Settings), capture (full recording primary, snapshots backup, describe option), procedure comparison with quoted evidence, layered automatic detection, Vault-backed logins the AI never sees, connection checks, open-email detection, calendar + meeting prep, inbox + urgent flags (incl. Gmail triage), and the small pieces. Implementation order recorded.
