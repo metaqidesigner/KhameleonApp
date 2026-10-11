@@ -12,7 +12,15 @@ import { getSessionStatus, login, loginWithAccount, type SessionStatus } from '@
  * exists, so the form here switches from a single shared password to a
  * real email/password login the same way the server does.
  */
-export function LoginGate({ children }: { children: React.ReactNode }) {
+export function LoginGate({ children, lockedFallback }: {
+  children: React.ReactNode;
+  /**
+   * Rendered instead of the login form when locked. The Overlay layout uses
+   * this: a full-screen form in a click-through window can't be clicked, so
+   * the overlay shows just its head, which opens the Classic window to log in.
+   */
+  lockedFallback?: React.ReactNode;
+}) {
   const [status, setStatus] = useState<'checking' | 'locked' | 'open'>('checking');
   const [mode, setMode] = useState<SessionStatus['mode']>('password');
   const [email, setEmail] = useState('');
@@ -46,6 +54,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
 
   if (status === 'checking') return null;
   if (status === 'open') return <>{children}</>;
+  if (lockedFallback !== undefined) return <>{lockedFallback}</>;
 
   const canSubmit = mode === 'accounts' ? email.trim().length > 0 && password.length > 0 : password.length > 0;
 

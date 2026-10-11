@@ -8,4 +8,11 @@ contextBridge.exposeInMainWorld("khameleon", {
     ipcRenderer.invoke("khameleon:read-document-locally", filePath, question),
   extractReceiptLocally: (filePath: string) =>
     ipcRenderer.invoke("khameleon:extract-receipt-locally", filePath),
+  // Overlay layout plumbing (docs/build-review.md, Build 2 step a). Read by
+  // artifacts/khameleon-command/src/lib/desktopBridge.ts.
+  overlay: {
+    setInteractive: (interactive: boolean) => ipcRenderer.send("khameleon:overlay:set-interactive", interactive),
+    openClassicWindow: () => ipcRenderer.send("khameleon:overlay:open-classic"),
+    hide: () => ipcRenderer.send("khameleon:overlay:hide"),
+  },
 });

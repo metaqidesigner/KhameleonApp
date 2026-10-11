@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { LoginGate } from "@/components/LoginGate";
 import MobileBriefing from "@/pages/mobile/MobileBriefing";
+import { OverlayLayout } from "@/components/overlay/OverlayLayout";
+import { isOverlayLayout } from "@/lib/desktopBridge";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -19,12 +21,25 @@ const queryClient = new QueryClient({
  */
 const isMobileBriefing = window.location.pathname.startsWith("/briefing");
 
+/**
+ * Same reasoning for the Overlay layout (docs/build-review.md, Builds 0-2):
+ * /overlay inside the desktop app's see-through window. In a plain browser
+ * isOverlayLayout() is false and Classic renders instead.
+ */
+const isOverlay = isOverlayLayout();
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <LoginGate>
-        {isMobileBriefing ? <MobileBriefing /> : <AppShell />}
-      </LoginGate>
+      {isOverlay ? (
+        <LoginGate lockedFallback={<OverlayLayout locked />}>
+          <OverlayLayout />
+        </LoginGate>
+      ) : (
+        <LoginGate>
+          {isMobileBriefing ? <MobileBriefing /> : <AppShell />}
+        </LoginGate>
+      )}
     </QueryClientProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
 import * as path from "node:path";
 import { FileOps, CommandRunner as FileCommandRunner, MacAppLauncher } from "khameleon-file-agent";
 import { JsonFileStorage, MemoryStore, CommandRunner as MemoryCommandRunner } from "khameleon-memory";
@@ -27,7 +27,16 @@ import { LocalAgentRunner, LocalDocumentAgent, extractDocumentText } from "@kham
 // desktop wrapper (Slack, Linear) does for its own web app.
 const DEFAULT_APP_URL = "http://localhost:4001";
 
+// Two layouts, one app (docs/build-review.md, Builds 0-2). The desktop app
+// defaults to Overlay: a full-screen, see-through, always-on-top window that
+// lets clicks through everywhere except Khameleon's own controls. Classic
+// (the dashboard) opens in a normal window on demand. KHAMELEON_LAYOUT=classic
+// starts with the Classic window only, as before; a saved in-app setting
+// replaces this env var in Build 2 step (d).
+const OVERLAY_TOGGLE_SHORTCUT = "CommandOrControl+Shift+K";
+
 let mainWindow: BrowserWindow | null = null;
+let overlayWindow: BrowserWindow | null = null;
 
 function currentScreenArea(): Bounds {
   return screen.getPrimaryDisplay().workArea;
@@ -143,16 +152,103 @@ app.whenReady().then(() => {
 
   const appUrl = process.env.KHAMELEON_APP_URL ?? DEFAULT_APP_URL;
 
-  mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    title: "Khameleon",
-    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
+  const preload = path.join(__dirname, "preload.js");
+
+  const openClassicWindow = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      return;
+    }
+    mainWindow = new BrowserWindow({
+      width: 1440,
+      height: 900,
+      title: "Khameleon",
+      webPreferences: { preload, contextIsolation: true, sandbox: true },
+    });
+    mainWindow.loadURL(appUrl);
+    mainWindow.webContents.on("did-fail-load", (_event, _code, description) => {
+      mainWindow?.loadURL(`data:text/html,${encodeURIComponent(failureHtml(appUrl, description))}`);
+    });
+    mainWindow.on("closed", () => { mainWindow = null; });
+  };
+
+  const fitOverlayToScreen = () => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.setBounds(currentScreenArea());
+  };
+
+  const createOverlayWindow = () => {
+    const overlay = new BrowserWindow({
+      ...currentScreenArea(),
+      frame: false,
+      transparent: true,
+      backgroundColor: "#00000000",
+      hasShadow: false,
+      resizable: false,
+      movable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      title: "Khameleon Overlay",
+      webPreferences: { preload, contextIsolation: true, sandbox: true },
+    });
+    overlayWindow = overlay;
+    // "floating" sits above normal app windows without covering system UI
+    // like the screen-saver level would; also follow the user across Spaces
+    // and into full-screen apps.
+    overlay.setAlwaysOnTop(true, "floating");
+    overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // Click-through by default; the page flips this while the pointer is
+    // over its own controls (useClickThrough.ts). forward:true keeps mouse
+    // movement flowing to the page so it can tell when that happens.
+    overlay.setIgnoreMouseEvents(true, { forward: true });
+    overlay.loadURL(new URL("/overlay", appUrl).toString());
+    // An unreachable server can't be shown in a click-through window -
+    // fall back to the Classic window, which shows the "can't reach" page.
+    overlay.webContents.on("did-fail-load", (_event, _code, _description, _url, isMainFrame) => {
+      if (!isMainFrame) return;
+      overlay.hide();
+      openClassicWindow();
+    });
+    overlay.on("closed", () => { overlayWindow = null; });
+  };
+
+  const toggleOverlay = () => {
+    if (!overlayWindow || overlayWindow.isDestroyed()) {
+      createOverlayWindow();
+      return;
+    }
+    if (overlayWindow.isVisible()) overlayWindow.hide();
+    else overlayWindow.showInactive();
+  };
+
+  const isFromOverlay = (event: Electron.IpcMainEvent) =>
+    !!overlayWindow && !overlayWindow.isDestroyed() && event.sender === overlayWindow.webContents;
+
+  ipcMain.on("khameleon:overlay:set-interactive", (event, interactive: unknown) => {
+    if (!isFromOverlay(event)) return;
+    overlayWindow!.setIgnoreMouseEvents(interactive !== true, { forward: true });
   });
-  mainWindow.loadURL(appUrl);
-  mainWindow.webContents.on("did-fail-load", (_event, _code, description) => {
-    mainWindow?.loadURL(`data:text/html,${encodeURIComponent(failureHtml(appUrl, description))}`);
+  ipcMain.on("khameleon:overlay:open-classic", () => openClassicWindow());
+  ipcMain.on("khameleon:overlay:hide", (event) => {
+    if (isFromOverlay(event)) overlayWindow!.hide();
   });
+
+  if (process.env.KHAMELEON_LAYOUT === "classic") {
+    openClassicWindow();
+  } else {
+    createOverlayWindow();
+    globalShortcut.register(OVERLAY_TOGGLE_SHORTCUT, toggleOverlay);
+    screen.on("display-metrics-changed", fitOverlayToScreen);
+    screen.on("display-added", fitOverlayToScreen);
+    screen.on("display-removed", fitOverlayToScreen);
+  }
+
+  // Clicking the dock icon (macOS) opens the Classic window - the overlay
+  // itself has no dock/taskbar presence.
+  app.on("activate", () => openClassicWindow());
 
   ipcMain.handle("khameleon:command", async (_event, text: unknown) => {
     if (typeof text !== "string" || !text.trim()) throw new Error("A non-empty command is required.");
@@ -187,6 +283,8 @@ app.whenReady().then(() => {
     return localDocumentAgent.extractReceiptDetails(filePath);
   });
 });
+
+app.on("will-quit", () => globalShortcut.unregisterAll());
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

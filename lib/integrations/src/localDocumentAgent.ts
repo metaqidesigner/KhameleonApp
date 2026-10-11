@@ -1,4 +1,12 @@
-import { getLlama, resolveModelFile, LlamaChatSession, type Llama, type LlamaModel, type LlamaContext } from "node-llama-cpp";
+import type { Llama, LlamaModel, LlamaContext, LlamaChatSession as LlamaChatSessionType } from "node-llama-cpp";
+
+// node-llama-cpp is ESM-only. The Electron shell bundles its main process as
+// CommonJS (apps/khameleon-shell/build.mjs), where a static import becomes a
+// require() and crashes the app at startup (ERR_REQUIRE_ESM) - even when no
+// document is ever read locally. Loading it lazily, on first use, keeps
+// startup working and only pays the cost when local reading actually runs.
+let llamaModule: Promise<typeof import("node-llama-cpp")> | null = null;
+const loadLlamaModule = () => (llamaModule ??= import("node-llama-cpp"));
 import { extractDocumentText, type DocumentTextSource } from "./documentImport.js";
 
 /**
@@ -116,6 +124,7 @@ export class LocalDocumentAgent {
   /** Downloads (first run only) and loads the local model. Safe to call
    * more than once - later calls reuse the already-loaded model. */
   private async ensureLoaded(): Promise<{ llama: Llama; context: LlamaContext }> {
+    const { getLlama, resolveModelFile } = await loadLlamaModule();
     this.llama ??= await getLlama();
     if (!this.context) {
       const modelPath = await resolveModelFile(this.modelUri);
@@ -137,7 +146,8 @@ export class LocalDocumentAgent {
     const { text: documentText, truncated } = truncateForModel(fullText, this.maxDocumentChars);
 
     const { context } = await this.ensureLoaded();
-    const session = new LlamaChatSession({ contextSequence: context.getSequence() });
+    const { LlamaChatSession } = await loadLlamaModule();
+    const session: LlamaChatSessionType = new LlamaChatSession({ contextSequence: context.getSequence() });
 
     return session.prompt(buildPrompt(documentText, truncated, question));
   }
@@ -156,7 +166,8 @@ export class LocalDocumentAgent {
 
     const { llama, context } = await this.ensureLoaded();
     const grammar = await llama.createGrammarForJsonSchema(RECEIPT_SCHEMA);
-    const session = new LlamaChatSession({ contextSequence: context.getSequence() });
+    const { LlamaChatSession } = await loadLlamaModule();
+    const session: LlamaChatSessionType = new LlamaChatSession({ contextSequence: context.getSequence() });
 
     const prompt = [
       "You are reading a receipt entirely offline to extract its details for tax/accounting records.",

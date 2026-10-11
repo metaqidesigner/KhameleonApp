@@ -138,3 +138,11 @@ Phase 2 of the `ui-overlay-redesign` project. One row per function identified in
 **Also still open from Phase 1 itself (see `OPEN_QUESTIONS.md`):**
 - Electron vs. Tauri for the real desktop overlay shell.
 - Palette: Option A (soft blue/white, matches your reference image) vs. Option B (Khameleon's existing dark teal) — both built and live-switchable in the sample.
+
+## Implementation progress (both layouts)
+
+Every implementation step records what changed in each layout, per the dual-UI rule (`DECISIONS.md`, 2026-10-10).
+
+| Step | Overlay | Classic | Notes |
+|---|---|---|---|
+| Build 2a — overlay window | New: full-screen, see-through, always-on-top window in `apps/khameleon-shell`, loading the real app at `/overlay`. Click-through everywhere except Khameleon's own controls. Small head bottom-right with a menu: *Open Classic window*, *Hide overlay* (Cmd/Ctrl+Shift+K toggles it back). If not logged in, the menu offers *Log in to Khameleon* (opens Classic) and the overlay picks up the login automatically. | Unchanged in the browser. In the desktop app it now opens on demand (head menu, or clicking the dock icon) instead of at startup; `KHAMELEON_LAYOUT=classic` starts with Classic only, as before. | Shared: `LoginGate` gained an optional `lockedFallback` (no change for Classic). `/overlay` in a plain browser renders Classic. |
