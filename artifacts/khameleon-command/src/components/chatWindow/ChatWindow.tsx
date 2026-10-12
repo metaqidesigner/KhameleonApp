@@ -22,11 +22,11 @@ import { ROUTE_MODE_LABELS, ROUTE_MODE_DESCRIPTIONS } from './types';
 const HEAD_SRC = '/khameleon-head.webp';
 const DEFAULT_FLOATING_SIZE = { width: 400, height: 600 };
 
-function newBounds() {
+function newBounds(rightInset = 0) {
   const width = DEFAULT_FLOATING_SIZE.width;
   const height = DEFAULT_FLOATING_SIZE.height;
   return {
-    x: Math.max(24, window.innerWidth - width - 32),
+    x: Math.max(24, window.innerWidth - width - 32 - rightInset),
     y: Math.max(24, window.innerHeight - height - 100),
     width,
     height,
@@ -385,11 +385,12 @@ function ChatWindowStyles() {
 // ── Main component ───────────────────────────────────────────────────────────
 
 /**
- * `bottomInset` keeps the minimized pill and the docked rail clear of
- * something pinned to the bottom-right corner - the Overlay layout's head
- * (components/overlay). Classic passes nothing and is unchanged.
+ * `bottomInset` / `rightInset` keep the window, minimized pill and docked
+ * rail clear of things pinned to the screen edge - the Overlay layout's
+ * head (bottom-right) and right-hand toolbars (components/overlay).
+ * Classic passes nothing and is unchanged.
  */
-export default function ChatWindow({ bottomInset = 0 }: { bottomInset?: number } = {}) {
+export default function ChatWindow({ bottomInset = 0, rightInset = 0 }: { bottomInset?: number; rightInset?: number } = {}) {
   const chatOpen = useJarvisStore(s => s.chatOpen);
   const setChatOpen = useJarvisStore(s => s.setChatOpen);
   const bounds = useJarvisStore(s => s.chatWindowBounds);
@@ -422,6 +423,9 @@ export default function ChatWindow({ bottomInset = 0 }: { bottomInset?: number }
   const [profileRole, setProfileRole] = useState<string | null>(null);
   const [activeRuns, setActiveRuns] = useState<TaskRun[]>([]);
   const [focusSignal, setFocusSignal] = useState(0);
+  // Opening the chat (head, toolbar "Ask Khameleon", Classic's launcher)
+  // puts the cursor straight in the message box.
+  useEffect(() => { if (chatOpen) setFocusSignal(n => n + 1); }, [chatOpen]);
   const [draft, setDraft] = useState('');
   // The backend session this window's messages are being recorded under -
   // undefined/null means "no continuity yet," which is also the honest
@@ -450,8 +454,8 @@ export default function ChatWindow({ bottomInset = 0 }: { bottomInset?: number }
   // Skipped while docked (the right-rail layout isn't bounds-driven).
   useEffect(() => {
     if (!chatOpen || docked) return;
-    const base = (bounds.width === 400 && bounds.height === 600 && bounds.x === 0 && bounds.y === 0) ? newBounds() : bounds;
-    const fitted = fitToViewport(base, window.innerWidth, window.innerHeight);
+    const base = (bounds.width === 400 && bounds.height === 600 && bounds.x === 0 && bounds.y === 0) ? newBounds(rightInset) : bounds;
+    const fitted = fitToViewport(base, window.innerWidth - rightInset, window.innerHeight);
     if (fitted.x !== bounds.x || fitted.y !== bounds.y || fitted.width !== bounds.width || fitted.height !== bounds.height) {
       setBounds(fitted);
     }
@@ -469,14 +473,14 @@ export default function ChatWindow({ bottomInset = 0 }: { bottomInset?: number }
     if (!chatOpen || docked) return;
     const onResize = () => {
       const current = boundsRef.current;
-      const fitted = fitToViewport(current, window.innerWidth, window.innerHeight);
+      const fitted = fitToViewport(current, window.innerWidth - rightInset, window.innerHeight);
       if (fitted.x !== current.x || fitted.y !== current.y || fitted.width !== current.width || fitted.height !== current.height) {
         setBounds(fitted);
       }
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, [chatOpen, docked, setBounds]);
+  }, [chatOpen, docked, setBounds, rightInset]);
 
   useEffect(() => {
     getRoster().then(setRoster).catch(() => {});
@@ -642,7 +646,7 @@ export default function ChatWindow({ bottomInset = 0 }: { bottomInset?: number }
     <>
       <div
         onPointerDown={docked ? undefined : startDrag}
-        onDoubleClick={docked ? undefined : () => setBounds(newBounds())}
+        onDoubleClick={docked ? undefined : () => setBounds(newBounds(rightInset))}
         title={docked ? undefined : 'Drag to move · double-click to reset position'}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', height: docked ? 48 : 56,
@@ -716,7 +720,7 @@ export default function ChatWindow({ bottomInset = 0 }: { bottomInset?: number }
           type="button"
           className="chat-window"
           style={{
-            position: 'fixed', zIndex: 300, right: 24, bottom: 24 + bottomInset,
+            position: 'fixed', zIndex: 300, right: 24 + rightInset, bottom: 24 + bottomInset,
             display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 999,
             background: 'linear-gradient(140deg, rgba(12,36,42,.92), rgba(5,15,20,.97))',
             border: '1px solid rgba(95,240,216,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
@@ -783,7 +787,7 @@ export default function ChatWindow({ bottomInset = 0 }: { bottomInset?: number }
       <>
         <ChatWindowStyles />
         <div className={sharedClassName} style={{
-          position: 'fixed', top: 0, right: 0, bottom: bottomInset, width: 376, zIndex: 150,
+          position: 'fixed', top: 0, right: rightInset, bottom: bottomInset, width: 376, zIndex: 150,
           display: 'flex', flexDirection: 'column',
           background: 'linear-gradient(140deg, rgba(12,36,42,.9), rgba(5,15,20,.96))',
           boxShadow: '-24px 0 70px rgba(0,0,0,0.5)',
@@ -799,7 +803,7 @@ export default function ChatWindow({ bottomInset = 0 }: { bottomInset?: number }
       <ChatWindowStyles />
       {showRailDropZone && (
         <div style={{
-          position: 'fixed', top: 0, right: 0, bottom: bottomInset, width: 376, zIndex: 149,
+          position: 'fixed', top: 0, right: rightInset, bottom: bottomInset, width: 376, zIndex: 149,
           border: '2px dashed rgba(95,240,216,0.5)', background: 'rgba(95,240,216,0.06)', pointerEvents: 'none',
         }} />
       )}

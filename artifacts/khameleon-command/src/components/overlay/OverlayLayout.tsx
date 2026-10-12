@@ -1,18 +1,23 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getSessionStatus } from "@/lib/sessionApi";
 import ChatWindow from "@/components/chatWindow/ChatWindow";
 import { KhameleonHead } from "./KhameleonHead";
 import { OVERLAY_PALETTES } from "./palettes";
 import { useClickThrough } from "./useClickThrough";
+import { Toolbars, defaultToolbarGroups } from "./Toolbars";
+import { useJarvisStore } from "@/store/jarvisStore";
 
 /**
  * The Overlay layout (docs/build-review.md, Builds 0-2): rendered inside the
  * desktop app's full-screen, see-through, always-on-top window. Everything
  * not marked `data-overlay-hit` is invisible and lets clicks through.
  *
- * So far: the window, the head, and the real chat (the same ChatWindow
- * Classic uses - one implementation, two layouts). Toolbars come next.
+ * So far: the window, the head, the real chat (the same ChatWindow Classic
+ * uses - one implementation, two layouts) and the four edge toolbars.
  */
+/** Room the right-hand toolbars take up, kept clear of the chat window. */
+const TOOLBAR_CLEARANCE = 72;
+
 export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   useClickThrough();
 
@@ -36,6 +41,11 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   }, [locked]);
 
   const palette = OVERLAY_PALETTES["brand-teal"];
+  const setChatOpen = useJarvisStore(s => s.setChatOpen);
+  const setChatMinimized = useJarvisStore(s => s.setChatWindowMinimized);
+  const toolbarGroups = useMemo(() => defaultToolbarGroups({
+    askKhameleon: () => { setChatMinimized(false); setChatOpen(true); },
+  }), [setChatOpen, setChatMinimized]);
 
   return (
     <>
@@ -50,9 +60,10 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
       {!locked && (
         // Wrapper only carries the hit marker; ChatWindow positions itself.
         <div data-overlay-hit>
-          <ChatWindow bottomInset={64} />
+          <ChatWindow bottomInset={64} rightInset={TOOLBAR_CLEARANCE} />
         </div>
       )}
+      {!locked && <Toolbars palette={palette} groups={toolbarGroups} />}
       <KhameleonHead palette={palette} locked={locked} />
     </>
   );
