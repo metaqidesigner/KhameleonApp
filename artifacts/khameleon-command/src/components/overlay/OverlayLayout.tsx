@@ -43,9 +43,11 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   const palette = OVERLAY_PALETTES["brand-teal"];
   const setChatOpen = useJarvisStore(s => s.setChatOpen);
   const setChatMinimized = useJarvisStore(s => s.setChatWindowMinimized);
+  const requestChatTool = useJarvisStore(s => s.requestChatTool);
   const toolbarGroups = useMemo(() => defaultToolbarGroups({
     askKhameleon: () => { setChatMinimized(false); setChatOpen(true); },
-  }), [setChatOpen, setChatMinimized]);
+    openTool: requestChatTool,
+  }), [setChatOpen, setChatMinimized, requestChatTool]);
 
   return (
     <>
@@ -60,7 +62,7 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
       {!locked && (
         // Wrapper only carries the hit marker; ChatWindow positions itself.
         <div data-overlay-hit>
-          <ChatWindow bottomInset={64} rightInset={TOOLBAR_CLEARANCE} />
+          <ChatWindow bottomInset={64} rightInset={TOOLBAR_CLEARANCE} showToolsMenu={false} />
         </div>
       )}
       {!locked && <Toolbars palette={palette} groups={toolbarGroups} />}

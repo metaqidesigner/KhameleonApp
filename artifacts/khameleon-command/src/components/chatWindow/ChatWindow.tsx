@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GripVertical, Mic, Paperclip, Send, X, Minus, PanelRightClose, PanelRightOpen,
-  Eye, EyeOff, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Loader2,
+  Eye, EyeOff, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Loader2, Zap,
 } from 'lucide-react';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { useWindowDrag, fitToViewport } from './useWindowDrag';
@@ -18,6 +18,8 @@ import { TaskRunCard } from '@/components/taskRun/TaskRunParts';
 import { useVoice, type UseVoiceReturn } from '@/components/orb/useVoice';
 import type { AgentRef, ChatMessage, ChatThread, RouteMode, StarterCard } from './types';
 import { ROUTE_MODE_LABELS, ROUTE_MODE_DESCRIPTIONS } from './types';
+import { ToolCard, KindBadge, TOOL_KIND, TOOL_TITLE } from './ToolCards';
+import type { ChatToolId } from '@/store/jarvisStore';
 
 const HEAD_SRC = '/khameleon-head.webp';
 const DEFAULT_FLOATING_SIZE = { width: 400, height: 600 };
@@ -117,8 +119,16 @@ function MetaLine({ meta }: { meta?: ChatMessage['meta'] }) {
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({ message, onSend }: { message: ChatMessage; onSend: (prompt: string) => void }) {
   const isUser = message.role === 'user';
+  if (message.toolCard) {
+    return (
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 14 }}>
+        <HeadAvatar size={26} />
+        <div style={{ flex: 1, minWidth: 0 }}><ToolCard tool={message.toolCard.tool} onSend={onSend} /></div>
+      </div>
+    );
+  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', marginBottom: 14 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', maxWidth: '90%', flexDirection: isUser ? 'row-reverse' : 'row' }}>
@@ -127,6 +137,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           {!isUser && message.answeredBy && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 3 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: '#d6efee' }}>{message.answeredBy.name}</span>
+              <KindBadge kind={message.kind ?? 'ask'} />
               {message.routedForReason && <span style={{ fontSize: 9, color: '#7fa3a6' }}>routed for {message.routedForReason}</span>}
             </div>
           )}
@@ -351,6 +362,7 @@ function ChatWindowStyles() {
       .chat-window{--chat-ui:'Space Grotesk',var(--j-font-ui,sans-serif);--chat-mono:'JetBrains Mono',var(--j-font-mono,monospace);font-family:var(--chat-ui)}
       .chat-window *{box-sizing:border-box}
       .chat-window button:focus-visible,.chat-window input:focus-visible,.chat-window textarea:focus-visible,.chat-window select:focus-visible,.chat-window [role="button"]:focus-visible{outline:2px solid #5ff0d8;outline-offset:2px}
+      .chat-tools-item{display:block;width:100%;text-align:left;padding:7px 9px;border-radius:7px;background:none;border:none;color:#d6efee;font-size:12px;font-family:var(--chat-ui);cursor:pointer}.chat-tools-item:hover,.chat-tools-item:focus-visible{background:rgba(95,240,216,0.1)}
       .chat-icon-btn{flex-shrink:0;width:40px;height:36px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:8px;color:#8fb4b6;cursor:pointer;flex-shrink:0}
       .chat-icon-btn:hover{background:rgba(255,255,255,0.06);color:#d6efee}
       .chat-icon-btn[data-active="true"]{color:#5ff0d8;background:rgba(95,240,216,0.1)}
@@ -390,7 +402,12 @@ function ChatWindowStyles() {
  * head (bottom-right) and right-hand toolbars (components/overlay).
  * Classic passes nothing and is unchanged.
  */
-export default function ChatWindow({ bottomInset = 0, rightInset = 0 }: { bottomInset?: number; rightInset?: number } = {}) {
+export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsMenu = true }: {
+  bottomInset?: number;
+  rightInset?: number;
+  /** Classic reaches the toolbar actions from a Tools menu in the header; the Overlay has its edge toolbars instead. */
+  showToolsMenu?: boolean;
+} = {}) {
   const chatOpen = useJarvisStore(s => s.chatOpen);
   const setChatOpen = useJarvisStore(s => s.setChatOpen);
   const bounds = useJarvisStore(s => s.chatWindowBounds);
@@ -567,12 +584,27 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0 }: { bottom
     () => setDocked(true),
   );
 
+  // Toolbar actions (Overlay) arrive as requests; each becomes a card.
+  const toolRequests = useJarvisStore(s => s.chatToolRequests);
+  const requestChatTool = useJarvisStore(s => s.requestChatTool);
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
+  const consumeToolRequest = useJarvisStore(s => s.consumeChatToolRequest);
+  useEffect(() => {
+    if (toolRequests.length === 0) return;
+    setMessages(prev => [...prev, ...toolRequests.map(r => ({
+      id: r.id, role: 'assistant' as const, content: '', timestamp: Date.now(),
+      kind: TOOL_KIND[r.tool], toolCard: { tool: r.tool },
+    }))]);
+    toolRequests.forEach(r => consumeToolRequest(r.id));
+  }, [toolRequests, consumeToolRequest]);
+
   const sendMessage = useCallback(async (text: string) => {
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
     setSending(true);
 
-    const conversation = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
+    // Tool cards are interactive UI, not conversation text - leave them out.
+    const conversation = [...messages, userMsg].filter(m => !m.toolCard).map(m => ({ role: m.role, content: m.content }));
     const pinnedAgent = roster.find(a => a.id === pinnedId);
 
     if (routeMode === 'single') {
@@ -683,6 +715,26 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0 }: { bottom
 
         <div style={{ flex: 1 }} />
 
+        {showToolsMenu && (
+          <div style={{ position: 'relative' }}>
+            <button type="button" onClick={() => setToolsMenuOpen(o => !o)} aria-expanded={toolsMenuOpen} aria-haspopup="menu" title="Tools" aria-label="Tools" className="chat-icon-btn">
+              <Zap size={14} />
+            </button>
+            {toolsMenuOpen && (
+              <div role="menu" onPointerDown={e => e.stopPropagation()} style={{
+                position: 'absolute', top: 38, right: 0, zIndex: 10, width: 200, padding: 5, borderRadius: 10,
+                background: 'rgba(8,18,24,0.98)', border: '1px solid rgba(95,240,216,0.25)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+              }}>
+                {(Object.keys(TOOL_TITLE) as ChatToolId[]).map(t => (
+                  <button key={t} type="button" role="menuitem" className="chat-tools-item"
+                    onClick={() => { setToolsMenuOpen(false); requestChatTool(t); }}>
+                    {TOOL_TITLE[t]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <button type="button" onClick={() => setReasoningDefault(!reasoningDefault)} aria-pressed={reasoningDefault} title="Default reasoning visibility" aria-label="Toggle default reasoning visibility" className="chat-icon-btn">
           {reasoningDefault ? <Eye size={14} /> : <EyeOff size={14} />}
         </button>
@@ -767,7 +819,7 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0 }: { bottom
                 <TaskRunCard run={run} onRemove={removeActiveTask} />
               </div>
             ))}
-            {messages.map(m => <MessageBubble key={m.id} message={m} />)}
+            {messages.map(m => <MessageBubble key={m.id} message={m} onSend={sendMessage} />)}
             {sending && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#7fa3a6', fontSize: 11 }}>
                 <Loader2 size={12} className="chat-spin" /> thinking…

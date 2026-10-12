@@ -63,6 +63,12 @@ export interface MessageMeta {
   zeroDataRetention?: boolean;
 }
 
+/**
+ * The kind of work a message represents (docs/build-review.md, Build 13a),
+ * shown as a small shape badge. Colour is reserved for projects (Build 13).
+ */
+export type WorkKind = 'ask' | 'action' | 'task' | 'scheduled';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -76,6 +82,10 @@ export interface ChatMessage {
   actionCard?: ActionCardData;
   taskRunId?: string;
   meta?: MessageMeta;
+  /** Set for assistant messages; plain chat answers are 'ask'. */
+  kind?: WorkKind;
+  /** A toolbar action rendered as an interactive card instead of text. */
+  toolCard?: { tool: import('@/store/jarvisStore').ChatToolId };
 }
 
 /** Minimal, honestly-scoped v1 - no backend concept of a thread exists yet (2026-10-02 ground-truth check), so this is persisted client-side per domain, not a fabricated server entity. */

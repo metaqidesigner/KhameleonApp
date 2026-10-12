@@ -4,6 +4,7 @@ import {
   MessageCircle, PenLine, RefreshCw, Search, Sparkles, Table2, ZoomIn,
 } from "lucide-react";
 import type { OverlayPalette } from "./palettes";
+import type { ChatToolId } from "@/store/jarvisStore";
 
 /**
  * The four edge toolbars (docs/build-review.md, Build 2). Left: Capture &
@@ -35,7 +36,7 @@ const IDLE_AFTER_MS = 3000;
 const WAKE_DISTANCE_PX = 110;
 const IDLE_OPACITY = 0.25;
 
-export function defaultToolbarGroups(handlers: { askKhameleon: () => void }): {
+export function defaultToolbarGroups(handlers: { askKhameleon: () => void; openTool: (tool: ChatToolId) => void }): {
   left: ToolbarGroup[];
   right: ToolbarGroup[];
 } {
@@ -52,9 +53,9 @@ export function defaultToolbarGroups(handlers: { askKhameleon: () => void }): {
       {
         title: "Create & Draft",
         actions: [
-          { id: "draft-reply", label: "Draft reply", icon: <PenLine {...ICON} />, comingWith: "Being connected next" },
+          { id: "draft-reply", label: "Draft reply", icon: <PenLine {...ICON} />, run: () => handlers.openTool("draft-reply") },
           { id: "new-doc", label: "New document", icon: <FileText {...ICON} />, comingWith: "Not built yet" },
-          { id: "summarize", label: "Summarize email thread", icon: <AlignLeft {...ICON} />, comingWith: "Being connected next" },
+          { id: "summarize", label: "Summarize email thread", icon: <AlignLeft {...ICON} />, run: () => handlers.openTool("summarize-thread") },
         ],
       },
     ],
@@ -62,17 +63,17 @@ export function defaultToolbarGroups(handlers: { askKhameleon: () => void }): {
       {
         title: "Transform & Clean",
         actions: [
-          { id: "sort-inbox", label: "Sort inbox", icon: <Filter {...ICON} />, comingWith: "Being connected next" },
+          { id: "sort-inbox", label: "Sort inbox", icon: <Filter {...ICON} />, run: () => handlers.openTool("sort-inbox") },
           { id: "reformat", label: "Reformat", icon: <RefreshCw {...ICON} />, comingWith: "Not built yet" },
-          { id: "polish", label: "Polish wording", icon: <Sparkles {...ICON} />, comingWith: "Being connected next" },
+          { id: "polish", label: "Polish wording", icon: <Sparkles {...ICON} />, run: () => handlers.openTool("polish") },
         ],
       },
       {
         title: "Ask & Find",
         actions: [
           { id: "ask", label: "Ask Khameleon", icon: <MessageCircle {...ICON} />, run: handlers.askKhameleon },
-          { id: "search-memory", label: "Search memory", icon: <Search {...ICON} />, comingWith: "Being connected next" },
-          { id: "research", label: "Research a question", icon: <BookOpen {...ICON} />, comingWith: "Being connected next" },
+          { id: "search-memory", label: "Search memory", icon: <Search {...ICON} />, run: () => handlers.openTool("search-memory") },
+          { id: "research", label: "Research a question", icon: <BookOpen {...ICON} />, run: () => handlers.openTool("research") },
         ],
       },
     ],

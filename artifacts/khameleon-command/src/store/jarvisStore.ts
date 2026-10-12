@@ -184,7 +184,19 @@ interface JarvisStore {
   setChatRouteMode: (m: 'single' | 'parallel' | 'vote' | 'council') => void;
   setChatLastDomainId: (id: number | 'all') => void;
   setChatLastThreadId: (id: string | null) => void;
+
+  /**
+   * Tool cards waiting to be shown in the chat (docs/build-review.md,
+   * Builds 2 + 13a): the overlay toolbars ask for one, ChatWindow opens and
+   * consumes it. Not persisted - a request is only meaningful right now.
+   */
+  chatToolRequests: { id: string; tool: ChatToolId }[];
+  requestChatTool: (tool: ChatToolId) => void;
+  consumeChatToolRequest: (id: string) => void;
 }
+
+/** The toolbar actions that open a card in the chat. */
+export type ChatToolId = 'search-memory' | 'research' | 'draft-reply' | 'summarize-thread' | 'sort-inbox' | 'polish';
 
 export const useJarvisStore = create<JarvisStore>()(
   persist(
@@ -226,6 +238,7 @@ export const useJarvisStore = create<JarvisStore>()(
       chatRouteMode: 'single',
       chatLastDomainId: 'all',
       chatLastThreadId: null,
+      chatToolRequests: [],
       voiceSettings: {
         voice: '',
         rate: 1.05,
@@ -338,6 +351,12 @@ export const useJarvisStore = create<JarvisStore>()(
       setChatRouteMode:          (m)  => set({ chatRouteMode: m }),
       setChatLastDomainId:       (id) => set({ chatLastDomainId: id }),
       setChatLastThreadId:       (id) => set({ chatLastThreadId: id }),
+      requestChatTool: (tool) => set(s => ({
+        chatToolRequests: [...s.chatToolRequests, { id: crypto.randomUUID(), tool }],
+        chatOpen: true,
+        chatWindowMinimized: false,
+      })),
+      consumeChatToolRequest: (id) => set(s => ({ chatToolRequests: s.chatToolRequests.filter(r => r.id !== id) })),
     }),
     {
       name: 'jarvis-ui',

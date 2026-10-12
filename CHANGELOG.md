@@ -24,3 +24,7 @@ Scoped to the `ui-overlay-redesign` project.
 - Fixed (both layouts): chat header controls were pushed off-screen at the default 400px width; pickers now take their own row when narrow.
 - **Overlay toolbars.** Left/right edge toolbars with idle fade (back on approach) and per-side hide. Ask Khameleon opens the chat ready to type. Unbuilt actions are dimmed with an honest note instead of doing nothing. Verified in the running app: awake → faded after 3s → left side wakes on approach while right stays faded → Ask opens chat with the message box focused.
 - Build 13 added to the build review: colour-coded projects across chat, window borders, head dots, tasks and skills.
+
+## 2026-10-13
+- Decided: kinds of work (Ask / Action / Task / Scheduled) as shape badges alongside project colours; toolbar results all start in the chat (Build 13a).
+- **Six toolbar actions live** as chat cards: Search memory, Research, Draft reply (Outlook/Gmail, confirm before send), Summarize thread (Outlook), Sort inbox (Outlook, Undo), Polish wording. Classic gets the same six from a Tools menu in its chat. Verified: overlay cards render and run (memory search returns honestly empty on this dev DB; Outlook shows a plain "isn't connected yet" message); Classic Tools menu → Sort inbox card renders.
