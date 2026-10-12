@@ -10,6 +10,7 @@ import { useJarvisStore } from "@/store/jarvisStore";
 import { EdgeChrome, BOTTOM_BAR_HEIGHT } from "./EdgeChrome";
 import { LookLayoutControls, useSyncAcrossWindows } from "./LookLayoutControls";
 import type { OverlayPalette } from "./palettes";
+import { SkillsPanel } from "./SkillsPanel";
 
 /**
  * The Overlay layout (docs/build-review.md, Builds 0-2): rendered inside the
@@ -60,6 +61,7 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   useSyncAcrossWindows();
   const prefs = useJarvisStore(s => s.overlayPrefs);
   const [lookOpen, setLookOpen] = useState(false);
+  const [skillsOpen, setSkillsOpen] = useState(false);
 
   // index.css paints html/body/#root with the dashboard background; the
   // overlay has to be genuinely transparent so the desktop shows through.
@@ -89,6 +91,7 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   const toolbarGroups = useMemo(() => defaultToolbarGroups({
     askKhameleon: () => { setChatMinimized(false); setChatOpen(true); },
     openTool: requestChatTool,
+    openSkills: () => setSkillsOpen(o => !o),
   }), [setChatOpen, setChatMinimized, requestChatTool]);
 
   return (
@@ -109,6 +112,7 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
       )}
       {!locked && <Toolbars palette={palette} groups={toolbarGroups} bare={bare} idleStyle={prefs.idleStyle} />}
       {!locked && <EdgeChrome mode={prefs.edgeChrome} palette={palette} bare={bare} />}
+      {skillsOpen && !locked && <SkillsPanel palette={palette} onClose={() => setSkillsOpen(false)} />}
       {lookOpen && <LookPanel palette={palette} onClose={() => setLookOpen(false)} />}
       <KhameleonHead palette={palette} locked={locked} bottom={18 + bottomBar} onOpenLook={locked ? undefined : () => setLookOpen(true)} />
     </>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AlignLeft, ChevronLeft, ChevronRight, Crosshair, FileText, Filter, BookOpen,
-  MessageCircle, PenLine, RefreshCw, Search, Sparkles, Table2, ZoomIn,
+  Library, MessageCircle, PenLine, RefreshCw, Search, Sparkles, Table2, ZoomIn,
 } from "lucide-react";
 import type { OverlayPalette } from "./palettes";
 import type { ChatToolId } from "@/store/jarvisStore";
@@ -39,7 +39,7 @@ const BARE_SHADOW = "drop-shadow(0 1px 2px rgba(0,0,0,0.45)) drop-shadow(0 1px 6
 
 export type IdleStyle = "fade" | "edge" | "always";
 
-export function defaultToolbarGroups(handlers: { askKhameleon: () => void; openTool: (tool: ChatToolId) => void }): {
+export function defaultToolbarGroups(handlers: { askKhameleon: () => void; openTool: (tool: ChatToolId) => void; openSkills: () => void }): {
   left: ToolbarGroup[];
   right: ToolbarGroup[];
 } {
@@ -51,6 +51,7 @@ export function defaultToolbarGroups(handlers: { askKhameleon: () => void; openT
           { id: "extract", label: "Extract data", icon: <Crosshair {...ICON} />, comingWith: "Arrives with Capture" },
           { id: "to-sheet", label: "To spreadsheet", icon: <Table2 {...ICON} />, comingWith: "Arrives with Capture" },
           { id: "inspect", label: "Inspect region", icon: <ZoomIn {...ICON} />, comingWith: "Arrives with Capture" },
+          { id: "my-skills", label: "My skills", icon: <Library {...ICON} />, run: handlers.openSkills },
         ],
       },
       {

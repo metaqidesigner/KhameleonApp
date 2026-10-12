@@ -85,7 +85,7 @@ export interface ChatMessage {
   /** Set for assistant messages; plain chat answers are 'ask'. */
   kind?: WorkKind;
   /** A toolbar action rendered as an interactive card instead of text. */
-  toolCard?: { tool: import('@/store/jarvisStore').ChatToolId };
+  toolCard?: { tool: import('@/store/jarvisStore').ChatToolId; payload?: import('@/store/jarvisStore').ChatToolPayload };
 }
 
 /** Minimal, honestly-scoped v1 - no backend concept of a thread exists yet (2026-10-02 ground-truth check), so this is persisted client-side per domain, not a fabricated server entity. */

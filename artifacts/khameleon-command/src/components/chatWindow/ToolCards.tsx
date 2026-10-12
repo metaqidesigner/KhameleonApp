@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Layers, Clock, Loader2, MessageCircle, Zap, Undo2 } from 'lucide-react';
-import type { ChatToolId } from '@/store/jarvisStore';
+import type { ChatToolId, ChatToolPayload } from '@/store/jarvisStore';
+import { runSkillPrompt } from '@/components/skills/useSkillLibrary';
 import type { WorkKind } from './types';
 import { searchMemory, runResearch, type MemorySearchResult } from '@/lib/jarvisApi';
 import {
@@ -26,6 +27,7 @@ export const TOOL_KIND: Record<ChatToolId, WorkKind> = {
   'summarize-thread': 'action',
   'sort-inbox': 'action',
   polish: 'action',
+  'run-skill': 'action',
 };
 
 export const TOOL_TITLE: Record<ChatToolId, string> = {
@@ -35,6 +37,7 @@ export const TOOL_TITLE: Record<ChatToolId, string> = {
   'summarize-thread': 'Summarize email thread',
   'sort-inbox': 'Sort inbox',
   polish: 'Polish wording',
+  'run-skill': 'Run skill',
 };
 
 const KIND_META: Record<WorkKind, { label: string; icon: ReactNode }> = {
@@ -462,9 +465,23 @@ function PolishCard({ onSend }: { onSend: (prompt: string) => void }) {
   );
 }
 
+function RunSkillCard({ skill, onSend }: { skill?: { name: string; content: string }; onSend: (prompt: string) => void }) {
+  const [task, setTask] = useState('');
+  const [sent, setSent] = useState(false);
+  if (!skill) return <ErrorLine message="This skill couldn't be loaded." />;
+  if (sent) return <div style={mutedStyle}>Running "{skill.name}" - Khameleon's reply is below.</div>;
+  return (
+    <>
+      <div style={{ fontWeight: 600 }}>{skill.name}</div>
+      <textarea autoFocus aria-label="What should the skill work on?" placeholder="What should it work on? (e.g. this month's statement, the Acme account)" value={task} onChange={e => setTask(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+      <div><Btn primary disabled={!task.trim()} onClick={() => { onSend(runSkillPrompt(skill, task)); setSent(true); }}>Run</Btn></div>
+    </>
+  );
+}
+
 // ── Card frame ───────────────────────────────────────────────────────────────
 
-export function ToolCard({ tool, onSend }: { tool: ChatToolId; onSend: (prompt: string) => void }) {
+export function ToolCard({ tool, payload, onSend }: { tool: ChatToolId; payload?: ChatToolPayload; onSend: (prompt: string) => void }) {
   const body = (() => {
     switch (tool) {
       case 'search-memory': return <SearchMemoryCard />;
@@ -473,6 +490,7 @@ export function ToolCard({ tool, onSend }: { tool: ChatToolId; onSend: (prompt: 
       case 'summarize-thread': return <SummarizeThreadCard />;
       case 'sort-inbox': return <SortInboxCard />;
       case 'polish': return <PolishCard onSend={onSend} />;
+      case 'run-skill': return <RunSkillCard skill={payload?.skill} onSend={onSend} />;
     }
   })();
   return (

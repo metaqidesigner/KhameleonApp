@@ -125,7 +125,7 @@ function MessageBubble({ message, onSend }: { message: ChatMessage; onSend: (pro
     return (
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 14 }}>
         <HeadAvatar size={26} />
-        <div style={{ flex: 1, minWidth: 0 }}><ToolCard tool={message.toolCard.tool} onSend={onSend} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}><ToolCard tool={message.toolCard.tool} payload={message.toolCard.payload} onSend={onSend} /></div>
       </div>
     );
   }
@@ -593,7 +593,7 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
     if (toolRequests.length === 0) return;
     setMessages(prev => [...prev, ...toolRequests.map(r => ({
       id: r.id, role: 'assistant' as const, content: '', timestamp: Date.now(),
-      kind: TOOL_KIND[r.tool], toolCard: { tool: r.tool },
+      kind: TOOL_KIND[r.tool], toolCard: { tool: r.tool, payload: r.payload },
     }))]);
     toolRequests.forEach(r => consumeToolRequest(r.id));
   }, [toolRequests, consumeToolRequest]);
@@ -725,7 +725,7 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
                 position: 'absolute', top: 38, right: 0, zIndex: 10, width: 200, padding: 5, borderRadius: 10,
                 background: 'rgba(8,18,24,0.98)', border: '1px solid rgba(95,240,216,0.25)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
               }}>
-                {(Object.keys(TOOL_TITLE) as ChatToolId[]).map(t => (
+                {(Object.keys(TOOL_TITLE) as ChatToolId[]).filter(t => t !== 'run-skill').map(t => (
                   <button key={t} type="button" role="menuitem" className="chat-tools-item"
                     onClick={() => { setToolsMenuOpen(false); requestChatTool(t); }}>
                     {TOOL_TITLE[t]}

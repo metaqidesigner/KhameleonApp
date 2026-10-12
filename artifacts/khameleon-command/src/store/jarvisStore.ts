@@ -190,11 +190,11 @@ interface JarvisStore {
    * Builds 2 + 13a): the overlay toolbars ask for one, ChatWindow opens and
    * consumes it. Not persisted - a request is only meaningful right now.
    */
-  chatToolRequests: { id: string; tool: ChatToolId }[];
+  chatToolRequests: { id: string; tool: ChatToolId; payload?: ChatToolPayload }[];
 
   overlayPrefs: OverlayPrefs;
   setOverlayPref: <K extends keyof OverlayPrefs>(key: K, value: OverlayPrefs[K]) => void;
-  requestChatTool: (tool: ChatToolId) => void;
+  requestChatTool: (tool: ChatToolId, payload?: ChatToolPayload) => void;
   consumeChatToolRequest: (id: string) => void;
 }
 
@@ -216,7 +216,12 @@ export const DEFAULT_OVERLAY_PREFS: OverlayPrefs = {
 };
 
 /** The toolbar actions that open a card in the chat. */
-export type ChatToolId = 'search-memory' | 'research' | 'draft-reply' | 'summarize-thread' | 'sort-inbox' | 'polish';
+export type ChatToolId = 'search-memory' | 'research' | 'draft-reply' | 'summarize-thread' | 'sort-inbox' | 'polish' | 'run-skill';
+
+/** Extra data a card needs - currently only which skill to run. */
+export interface ChatToolPayload {
+  skill?: { name: string; content: string };
+}
 
 export const useJarvisStore = create<JarvisStore>()(
   persist(
@@ -372,8 +377,8 @@ export const useJarvisStore = create<JarvisStore>()(
       setChatRouteMode:          (m)  => set({ chatRouteMode: m }),
       setChatLastDomainId:       (id) => set({ chatLastDomainId: id }),
       setChatLastThreadId:       (id) => set({ chatLastThreadId: id }),
-      requestChatTool: (tool) => set(s => ({
-        chatToolRequests: [...s.chatToolRequests, { id: crypto.randomUUID(), tool }],
+      requestChatTool: (tool, payload) => set(s => ({
+        chatToolRequests: [...s.chatToolRequests, { id: crypto.randomUUID(), tool, payload }],
         chatOpen: true,
         chatWindowMinimized: false,
       })),

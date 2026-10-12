@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Zap, Download } from 'lucide-react';
 import JPanel from '@/components/JPanel';
-import { ConfirmGate } from '@/components/ConfirmGate';
 import { WorkDomainFilterBar, useWorkDomains } from '@/components/WorkDomainFilterBar';
-import {
-  getSkillSets, createSkillSet, confirmSkillSetInstall, uninstallSkillSet,
-  type SkillSet, type CreateSkillSetInput, type SkillSetSourceType,
-} from '@/lib/skillSetsApi';
-import { setEntityWorkDomains } from '@/lib/workDomainsApi';
+import { type SkillSet, type CreateSkillSetInput, type SkillSetSourceType } from '@/lib/skillSetsApi';
+import { useSkillLibrary, SkillConfirmGate } from '@/components/skills/useSkillLibrary';
+import { useJarvisStore } from '@/store/jarvisStore';
 
 const STATUS_LABEL: Record<SkillSet['status'], string> = {
   available: 'AVAILABLE',
@@ -26,21 +23,20 @@ const STATUS_COLOR: Record<SkillSet['status'], string> = {
 const BLANK: CreateSkillSetInput = { name: '', description: '', content: '', sourceType: 'authored', requestedTools: [], requestedIntegrationIds: [] };
 
 export default function Skills() {
-  const [skillSets, setSkillSets] = useState<SkillSet[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>();
+  // Same logic as the Overlay's Skills panel (components/skills/useSkillLibrary).
+  const lib = useSkillLibrary();
+  const skillSets = lib.skills;
+  const loading = lib.loading;
+  const error = lib.error ?? undefined;
   const [selectedDomain, setSelectedDomain] = useState<number | null>(null);
   const { domains, reload: reloadDomains } = useWorkDomains();
+  const requestChatTool = useJarvisStore(s => s.requestChatTool);
 
   const [form, setForm] = useState<CreateSkillSetInput>(BLANK);
   const [importMode, setImportMode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  // A pending Skill Set + the approval it's waiting on - drives the ConfirmGate.
-  const [gateFor, setGateFor] = useState<{ skillSet: SkillSet; approvalId: number | null; fullContentGate?: boolean } | null>(null);
-
-  const load = () => { getSkillSets().then(rows => { setSkillSets(rows); setLoading(false); }); };
-  useEffect(load, []);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState('');
 
   const filtered = useMemo(
     () => (selectedDomain === null ? skillSets : skillSets.filter(s => s.workDomainIds.includes(selectedDomain)))
@@ -51,55 +47,10 @@ export default function Skills() {
   const doSubmit = async () => {
     if (!form.name.trim()) return;
     setSubmitting(true);
-    setError(undefined);
-    try {
-      const { skillSet, approvalId } = await createSkillSet(form);
-      if (approvalId) {
-        // §15.3/§15.5: scope-affecting or externally-sourced - hard gate
-        // before it counts as installed. The full content is shown for
-        // an external import, never a summary.
-        setGateFor({ skillSet, approvalId, fullContentGate: form.sourceType !== 'authored' });
-      }
-      setForm(BLANK);
-      setImportMode(false);
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create skill set');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const doConfirmInstall = async () => {
-    if (!gateFor) return;
-    try {
-      await confirmSkillSetInstall(gateFor.skillSet.id, gateFor.approvalId);
-      setGateFor(null);
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to confirm install');
-      throw err; // keeps the gate open so the user can retry, matching approvals.tsx's convention
-    }
-  };
-
-  const doUninstall = async (id: number) => {
-    setError(undefined);
-    try {
-      await uninstallSkillSet(id);
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to uninstall');
-    }
-  };
-
-  const toggleDomainTag = async (s: SkillSet, domainId: number) => {
-    const next = s.workDomainIds.includes(domainId) ? s.workDomainIds.filter(id => id !== domainId) : [...s.workDomainIds, domainId];
-    try {
-      await setEntityWorkDomains('skill_set', String(s.id), next);
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update tags');
-    }
+    await lib.create(form);
+    setForm(BLANK);
+    setImportMode(false);
+    setSubmitting(false);
   };
 
   return (
@@ -215,7 +166,7 @@ export default function Skills() {
                     {domains.map(d => (
                       <button
                         key={d.id}
-                        onClick={() => toggleDomainTag(s, d.id)}
+                        onClick={() => void lib.toggleDomain(s, d.id)}
                         className="j-badge"
                         style={{
                           fontSize: 8, cursor: 'pointer', padding: '2px 6px',
@@ -229,16 +180,45 @@ export default function Skills() {
                     ))}
                   </div>
                 )}
+                {editingId === s.id && (
+                  <textarea className="j-input" aria-label={`Steps for ${s.name}`} value={editDraft} onChange={e => setEditDraft(e.target.value)}
+                    style={{ marginTop: 8, height: 120, resize: 'vertical', fontFamily: 'var(--j-font-mono)', fontSize: 11 }} />
+                )}
                 <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                  {s.status === 'available' && (
+                    <button className="j-btn-primary" style={{ height: 26, padding: '0 10px', fontSize: 9 }} onClick={() => void lib.install(s)}>
+                      INSTALL
+                    </button>
+                  )}
                   {s.status === 'pending' && (
-                    <button className="j-btn-primary" style={{ height: 26, padding: '0 10px', fontSize: 9 }} onClick={() => setGateFor({ skillSet: s, approvalId: s.pendingApprovalId, fullContentGate: s.sourceType !== 'authored' })}>
+                    <button className="j-btn-primary" style={{ height: 26, padding: '0 10px', fontSize: 9 }} onClick={() => lib.reviewPending(s)}>
                       REVIEW & CONFIRM
                     </button>
                   )}
-                  {s.status === 'installed' && (
-                    <button className="j-btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 9, borderColor: 'rgba(192,21,42,0.3)', color: 'var(--j-red)' }} onClick={() => doUninstall(s.id)}>
-                      UNINSTALL
-                    </button>
+                  {s.status === 'installed' && editingId !== s.id && (
+                    <>
+                      <button className="j-btn-primary" style={{ height: 26, padding: '0 10px', fontSize: 9 }}
+                        onClick={() => requestChatTool('run-skill', { skill: { name: s.name, content: s.content } })}>
+                        RUN IN CHAT
+                      </button>
+                      <button className="j-btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 9 }} onClick={() => { setEditingId(s.id); setEditDraft(s.content); }}>
+                        EDIT STEPS
+                      </button>
+                      <button className="j-btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 9, borderColor: 'rgba(192,21,42,0.3)', color: 'var(--j-red)' }} onClick={() => void lib.remove(s)}>
+                        UNINSTALL
+                      </button>
+                    </>
+                  )}
+                  {editingId === s.id && (
+                    <>
+                      <button className="j-btn-primary" style={{ height: 26, padding: '0 10px', fontSize: 9 }} disabled={editDraft === s.content}
+                        onClick={() => { void lib.saveSteps(s, editDraft); setEditingId(null); }}>
+                        SAVE
+                      </button>
+                      <button className="j-btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 9 }} onClick={() => setEditingId(null)}>
+                        CANCEL
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -247,30 +227,7 @@ export default function Skills() {
         )}
       </div>
 
-      {gateFor && (
-        <ConfirmGate
-          title={`Install "${gateFor.skillSet.name}"`}
-          category="skill_set_install"
-          target={gateFor.skillSet.name}
-          scope={JSON.stringify({ tools: gateFor.skillSet.requestedTools, integrations: gateFor.skillSet.requestedIntegrationIds })}
-          severity={gateFor.fullContentGate ? 'high' : 'medium'}
-          confirmLabel="Confirm & Install"
-          warning={gateFor.fullContentGate
-            ? `Imported from ${gateFor.skillSet.sourceType}${gateFor.skillSet.sourceUrl ? ` (${gateFor.skillSet.sourceUrl})` : ''}${gateFor.skillSet.sourceAuthor ? ` by ${gateFor.skillSet.sourceAuthor}` : ''}. Review the full content below before installing.`
-            : undefined}
-          payload={
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {(gateFor.skillSet.requestedTools.length > 0 || gateFor.skillSet.requestedIntegrationIds.length > 0) && (
-                <div><strong>Requested access:</strong> {[...gateFor.skillSet.requestedTools, ...gateFor.skillSet.requestedIntegrationIds].join(', ') || 'none'}</div>
-              )}
-              <div><strong>Full content:</strong></div>
-              <div style={{ whiteSpace: 'pre-wrap' }}>{gateFor.skillSet.content || '(no content)'}</div>
-            </div>
-          }
-          onConfirm={doConfirmInstall}
-          onCancel={() => setGateFor(null)}
-        />
-      )}
+      {lib.gate && <SkillConfirmGate gate={lib.gate} onConfirm={lib.confirmGate} onCancel={lib.cancelGate} />}
     </div>
   );
 }
