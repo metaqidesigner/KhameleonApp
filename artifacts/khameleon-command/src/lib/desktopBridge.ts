@@ -14,8 +14,18 @@ export interface KhameleonOverlayBridge {
   hide(): void;
 }
 
+/** Choices the desktop app applies itself (apps/khameleon-shell/src/main.ts, DesktopPrefs). */
+export interface DesktopPrefs {
+  layout: "overlay" | "classic";
+  screen: "follow" | "primary";
+}
+
 interface KhameleonDesktopBridge {
   overlay?: KhameleonOverlayBridge;
+  prefs?: {
+    get(): Promise<DesktopPrefs>;
+    set(patch: Partial<DesktopPrefs>): Promise<DesktopPrefs>;
+  };
 }
 
 function bridge(): KhameleonDesktopBridge | undefined {
@@ -33,4 +43,9 @@ export function overlayBridge(): KhameleonOverlayBridge | undefined {
  */
 export function isOverlayLayout(): boolean {
   return window.location.pathname.startsWith("/overlay") && overlayBridge() !== undefined;
+}
+
+/** Saved desktop choices, or undefined in a plain browser. */
+export function desktopPrefsBridge(): KhameleonDesktopBridge["prefs"] {
+  return bridge()?.prefs;
 }

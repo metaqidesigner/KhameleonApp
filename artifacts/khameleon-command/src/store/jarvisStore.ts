@@ -191,9 +191,29 @@ interface JarvisStore {
    * consumes it. Not persisted - a request is only meaningful right now.
    */
   chatToolRequests: { id: string; tool: ChatToolId }[];
+
+  overlayPrefs: OverlayPrefs;
+  setOverlayPref: <K extends keyof OverlayPrefs>(key: K, value: OverlayPrefs[K]) => void;
   requestChatTool: (tool: ChatToolId) => void;
   consumeChatToolRequest: (id: string) => void;
 }
+
+/**
+ * Overlay look choices (DECISIONS.md 2026-10-10: every sample variant is a
+ * user option; docs/build-review.md Build 2 addendum for the idle styles).
+ */
+export interface OverlayPrefs {
+  palette: 'brand-teal' | 'soft-blue';
+  iconStyle: 'glass' | 'bare';
+  /** fade = dim when idle (default); edge = hidden until the pointer reaches the edge; always = always fully visible. */
+  idleStyle: 'fade' | 'edge' | 'always';
+  /** Extra chrome beyond the side toolbars. */
+  edgeChrome: 'none' | 'bars' | 'icons';
+}
+
+export const DEFAULT_OVERLAY_PREFS: OverlayPrefs = {
+  palette: 'brand-teal', iconStyle: 'glass', idleStyle: 'fade', edgeChrome: 'none',
+};
 
 /** The toolbar actions that open a card in the chat. */
 export type ChatToolId = 'search-memory' | 'research' | 'draft-reply' | 'summarize-thread' | 'sort-inbox' | 'polish';
@@ -239,6 +259,7 @@ export const useJarvisStore = create<JarvisStore>()(
       chatLastDomainId: 'all',
       chatLastThreadId: null,
       chatToolRequests: [],
+      overlayPrefs: DEFAULT_OVERLAY_PREFS,
       voiceSettings: {
         voice: '',
         rate: 1.05,
@@ -356,6 +377,7 @@ export const useJarvisStore = create<JarvisStore>()(
         chatOpen: true,
         chatWindowMinimized: false,
       })),
+      setOverlayPref: (key, value) => set(s => ({ overlayPrefs: { ...s.overlayPrefs, [key]: value } })),
       consumeChatToolRequest: (id) => set(s => ({ chatToolRequests: s.chatToolRequests.filter(r => r.id !== id) })),
     }),
     {
@@ -382,6 +404,7 @@ export const useJarvisStore = create<JarvisStore>()(
         chatRouteMode: s.chatRouteMode,
         chatLastDomainId: s.chatLastDomainId,
         chatLastThreadId: s.chatLastThreadId,
+        overlayPrefs: s.overlayPrefs,
       }),
     }
   )

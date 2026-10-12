@@ -35,6 +35,9 @@ const ICON = { size: 15, strokeWidth: 1.5 } as const;
 const IDLE_AFTER_MS = 3000;
 const WAKE_DISTANCE_PX = 110;
 const IDLE_OPACITY = 0.25;
+const BARE_SHADOW = "drop-shadow(0 1px 2px rgba(0,0,0,0.45)) drop-shadow(0 1px 6px rgba(0,0,0,0.25))";
+
+export type IdleStyle = "fade" | "edge" | "always";
 
 export function defaultToolbarGroups(handlers: { askKhameleon: () => void; openTool: (tool: ChatToolId) => void }): {
   left: ToolbarGroup[];
@@ -81,11 +84,12 @@ export function defaultToolbarGroups(handlers: { askKhameleon: () => void; openT
 }
 
 /** Fades a side out when idle and back in when the pointer nears its edge. */
-function useEdgeWake(side: "left" | "right", holdAwake: boolean): boolean {
+function useEdgeWake(side: "left" | "right", holdAwake: boolean, enabled: boolean): boolean {
   const [awake, setAwake] = useState(true);
   const timer = useRef<number | null>(null);
 
   useEffect(() => {
+    if (!enabled) { setAwake(true); return; }
     const scheduleSleep = () => {
       if (timer.current !== null) window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => setAwake(false), IDLE_AFTER_MS);
@@ -106,19 +110,22 @@ function useEdgeWake(side: "left" | "right", holdAwake: boolean): boolean {
       document.removeEventListener("mousemove", onMove);
       if (timer.current !== null) window.clearTimeout(timer.current);
     };
-  }, [side]);
+  }, [side, enabled]);
 
   return awake || holdAwake;
 }
 
-function ToolbarPill({ group, palette, side }: { group: ToolbarGroup; palette: OverlayPalette; side: "left" | "right" }) {
+function ToolbarPill({ group, palette, side, bare }: { group: ToolbarGroup; palette: OverlayPalette; side: "left" | "right"; bare: boolean }) {
   const [hovered, setHovered] = useState<number | null>(null);
   const hoveredAction = hovered !== null ? group.actions[hovered] : null;
 
   return (
     <div style={{ position: "relative" }} role="toolbar" aria-label={group.title} aria-orientation="vertical">
       <div
-        style={{
+        style={bare ? {
+          width: 36, padding: "10px 0", filter: BARE_SHADOW,
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 14,
+        } : {
           width: 36, padding: "10px 0", borderRadius: 18,
           background: palette.glass, border: `1px solid ${palette.glassBorder}`,
           backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
@@ -144,7 +151,7 @@ function ToolbarPill({ group, palette, side }: { group: ToolbarGroup; palette: O
                 background: "none", border: "none", padding: 0,
                 cursor: enabled ? "pointer" : "default",
                 width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
-                color: enabled && hovered === i ? palette.iconHover : palette.iconColor,
+                color: bare ? "#fff" : enabled && hovered === i ? palette.iconHover : palette.iconColor,
                 opacity: enabled ? 1 : 0.38,
                 transition: "color 120ms ease",
               }}
@@ -176,10 +183,14 @@ function ToolbarPill({ group, palette, side }: { group: ToolbarGroup; palette: O
   );
 }
 
-function EdgeToolbars({ groups, palette, side }: { groups: ToolbarGroup[]; palette: OverlayPalette; side: "left" | "right" }) {
+function EdgeToolbars({ groups, palette, side, bare, idleStyle }: {
+  groups: ToolbarGroup[]; palette: OverlayPalette; side: "left" | "right"; bare: boolean; idleStyle: IdleStyle;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const [pointerInside, setPointerInside] = useState(false);
-  const awake = useEdgeWake(side, pointerInside);
+  const awake = useEdgeWake(side, pointerInside, idleStyle !== "always");
+  // "edge": fully hidden (and click-through) while asleep, back on approach.
+  const hidden = !awake && idleStyle === "edge";
   const Chevron = (side === "left") !== collapsed ? ChevronLeft : ChevronRight;
 
   return (
@@ -191,14 +202,15 @@ function EdgeToolbars({ groups, palette, side }: { groups: ToolbarGroup[]; palet
         position: "fixed", [side]: collapsed ? 0 : 14, top: "50%", transform: "translateY(-50%)",
         display: "flex", alignItems: "center", gap: 6,
         flexDirection: side === "left" ? "row" : "row-reverse",
-        opacity: awake ? 1 : IDLE_OPACITY,
-        transition: "opacity 260ms ease",
+        opacity: awake ? 1 : hidden ? 0 : IDLE_OPACITY,
+        visibility: hidden ? "hidden" : "visible",
+        transition: hidden ? "opacity 260ms ease, visibility 0s linear 260ms" : "opacity 260ms ease",
         zIndex: 100,
       }}
     >
       {!collapsed && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {groups.map(g => <ToolbarPill key={g.title} group={g} palette={palette} side={side} />)}
+          {groups.map(g => <ToolbarPill key={g.title} group={g} palette={palette} side={side} bare={bare} />)}
         </div>
       )}
       <button
@@ -211,26 +223,30 @@ function EdgeToolbars({ groups, palette, side }: { groups: ToolbarGroup[]; palet
           cursor: "pointer", padding: 0,
           width: collapsed ? 14 : 22, height: collapsed ? 54 : 22,
           borderRadius: collapsed ? (side === "left" ? "0 8px 8px 0" : "8px 0 0 8px") : "50%",
-          background: palette.glass, border: `1px solid ${palette.glassBorder}`,
-          backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
-          boxShadow: palette.glassShadow,
+          ...(bare ? { background: "none", border: "none", filter: BARE_SHADOW } : {
+            background: palette.glass, border: `1px solid ${palette.glassBorder}`,
+            backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+            boxShadow: palette.glassShadow,
+          }),
           display: "flex", alignItems: "center", justifyContent: "center",
         }}
       >
-        <Chevron size={11} color={palette.iconColor} />
+        <Chevron size={bare ? 14 : 11} color={bare ? "#fff" : palette.iconColor} />
       </button>
     </div>
   );
 }
 
-export function Toolbars({ palette, groups }: {
+export function Toolbars({ palette, groups, bare, idleStyle }: {
   palette: OverlayPalette;
   groups: { left: ToolbarGroup[]; right: ToolbarGroup[] };
+  bare: boolean;
+  idleStyle: IdleStyle;
 }) {
   return (
     <>
-      <EdgeToolbars groups={groups.left} palette={palette} side="left" />
-      <EdgeToolbars groups={groups.right} palette={palette} side="right" />
+      <EdgeToolbars groups={groups.left} palette={palette} side="left" bare={bare} idleStyle={idleStyle} />
+      <EdgeToolbars groups={groups.right} palette={palette} side="right" bare={bare} idleStyle={idleStyle} />
     </>
   );
 }

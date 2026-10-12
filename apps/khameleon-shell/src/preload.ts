@@ -15,4 +15,9 @@ contextBridge.exposeInMainWorld("khameleon", {
     openClassicWindow: () => ipcRenderer.send("khameleon:overlay:open-classic"),
     hide: () => ipcRenderer.send("khameleon:overlay:hide"),
   },
+  // Saved desktop choices: which layout starts, follow-me vs main screen.
+  prefs: {
+    get: () => ipcRenderer.invoke("khameleon:prefs:get"),
+    set: (patch: Record<string, unknown>) => ipcRenderer.invoke("khameleon:prefs:set", patch),
+  },
 });

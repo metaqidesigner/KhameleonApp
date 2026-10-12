@@ -1,5 +1,6 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
 import * as path from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
 import { FileOps, CommandRunner as FileCommandRunner, MacAppLauncher } from "khameleon-file-agent";
 import { JsonFileStorage, MemoryStore, CommandRunner as MemoryCommandRunner } from "khameleon-memory";
 import {
@@ -30,22 +31,48 @@ const DEFAULT_APP_URL = "http://localhost:4001";
 // Two layouts, one app (docs/build-review.md, Builds 0-2). The desktop app
 // defaults to Overlay: a full-screen, see-through, always-on-top window that
 // lets clicks through everywhere except Khameleon's own controls. Classic
-// (the dashboard) opens in a normal window on demand. KHAMELEON_LAYOUT=classic
-// starts with the Classic window only, as before; a saved in-app setting
-// replaces this env var in Build 2 step (d).
+// (the dashboard) opens in a normal window on demand. Which layout starts is
+// a saved choice (DesktopPrefs below); KHAMELEON_LAYOUT=classic still forces
+// Classic for a single run.
 const OVERLAY_TOGGLE_SHORTCUT = "CommandOrControl+Shift+K";
 
 // Multiple screens (docs/build-review.md, Build 2 addendum): the overlay
 // follows the user to whichever screen the pointer settles on. "Settles" =
 // stays on the other screen this long, so passing through on the way to a
-// far corner doesn't drag Khameleon along. Pinning to one screen becomes a
-// saved setting in step (d); KHAMELEON_OVERLAY_DISPLAY=primary pins to the
-// main screen until then.
+// far corner doesn't drag Khameleon along. Pinning to the main screen is a
+// saved choice; KHAMELEON_OVERLAY_DISPLAY=primary forces it for a single run.
 const FOLLOW_POLL_MS = 400;
 const FOLLOW_SETTLE_MS = 1200;
 
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
+
+/**
+ * Choices the shell itself must know before any page loads. Saved in the
+ * app's own data folder, read/written by the page over IPC (preload.ts ->
+ * khameleon.prefs). Look choices (palette, icons...) live in the page.
+ */
+interface DesktopPrefs {
+  layout: "overlay" | "classic";
+  screen: "follow" | "primary";
+}
+const DEFAULT_PREFS: DesktopPrefs = { layout: "overlay", screen: "follow" };
+
+function prefsPath() {
+  return path.join(app.getPath("userData"), "khameleon-prefs.json");
+}
+
+function loadPrefs(): DesktopPrefs {
+  try {
+    const saved = JSON.parse(readFileSync(prefsPath(), "utf8")) as Partial<DesktopPrefs>;
+    return {
+      layout: saved.layout === "classic" ? "classic" : "overlay",
+      screen: saved.screen === "primary" ? "primary" : "follow",
+    };
+  } catch {
+    return { ...DEFAULT_PREFS };
+  }
+}
 
 function currentScreenArea(): Bounds {
   return screen.getPrimaryDisplay().workArea;
@@ -183,7 +210,9 @@ app.whenReady().then(() => {
     mainWindow.on("closed", () => { mainWindow = null; });
   };
 
-  const pinnedToPrimary = process.env.KHAMELEON_OVERLAY_DISPLAY === "primary";
+  const prefs = loadPrefs();
+  if (process.env.KHAMELEON_LAYOUT === "classic") prefs.layout = "classic";
+  if (process.env.KHAMELEON_OVERLAY_DISPLAY === "primary") prefs.screen = "primary";
   let overlayDisplayId = screen.getPrimaryDisplay().id;
 
   const displayArea = (id: number): Bounds =>
@@ -198,10 +227,11 @@ app.whenReady().then(() => {
 
   let followTimer: NodeJS.Timeout | null = null;
   const startFollowingPointer = () => {
-    if (pinnedToPrimary || followTimer) return;
+    if (followTimer) return;
     let candidateId: number | null = null;
     let candidateSince = 0;
     followTimer = setInterval(() => {
+      if (prefs.screen === "primary") return;
       if (!overlayWindow || overlayWindow.isDestroyed() || !overlayWindow.isVisible()) return;
       if (screen.getAllDisplays().length < 2) return;
       const under = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).id;
@@ -254,6 +284,7 @@ app.whenReady().then(() => {
   };
 
   const toggleOverlay = () => {
+    if (prefs.layout !== "overlay") return;
     if (!overlayWindow || overlayWindow.isDestroyed()) {
       createOverlayWindow();
       return;
@@ -274,16 +305,48 @@ app.whenReady().then(() => {
     if (isFromOverlay(event)) overlayWindow!.hide();
   });
 
-  if (process.env.KHAMELEON_LAYOUT === "classic") {
-    openClassicWindow();
-  } else {
-    createOverlayWindow();
-    globalShortcut.register(OVERLAY_TOGGLE_SHORTCUT, toggleOverlay);
-    screen.on("display-metrics-changed", fitOverlayToScreen);
-    screen.on("display-added", fitOverlayToScreen);
-    screen.on("display-removed", fitOverlayToScreen);
-    startFollowingPointer();
-  }
+  const applyLayout = () => {
+    if (prefs.layout === "classic") {
+      if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.close();
+      openClassicWindow();
+    } else if (!overlayWindow || overlayWindow.isDestroyed()) {
+      createOverlayWindow();
+    } else {
+      overlayWindow.showInactive();
+    }
+  };
+
+  const applyScreen = () => {
+    if (prefs.screen === "primary") {
+      overlayDisplayId = screen.getPrimaryDisplay().id;
+      fitOverlayToScreen();
+    }
+  };
+
+  ipcMain.handle("khameleon:prefs:get", () => ({ ...prefs }));
+  ipcMain.handle("khameleon:prefs:set", (_event, patch: unknown) => {
+    const p = (patch ?? {}) as Partial<DesktopPrefs>;
+    const layoutChanged = (p.layout === "overlay" || p.layout === "classic") && p.layout !== prefs.layout;
+    const screenChanged = (p.screen === "follow" || p.screen === "primary") && p.screen !== prefs.screen;
+    if (layoutChanged) prefs.layout = p.layout!;
+    if (screenChanged) prefs.screen = p.screen!;
+    try {
+      writeFileSync(prefsPath(), JSON.stringify(prefs, null, 2));
+    } catch (err) {
+      console.error("Couldn't save desktop preferences:", err);
+    }
+    if (screenChanged) applyScreen();
+    // Let the reply reach the page before its own window might close.
+    if (layoutChanged) setTimeout(applyLayout, 50);
+    return { ...prefs };
+  });
+
+  applyLayout();
+  globalShortcut.register(OVERLAY_TOGGLE_SHORTCUT, toggleOverlay);
+  screen.on("display-metrics-changed", fitOverlayToScreen);
+  screen.on("display-added", fitOverlayToScreen);
+  screen.on("display-removed", fitOverlayToScreen);
+  startFollowingPointer();
 
   // Clicking the dock icon (macOS) opens the Classic window - the overlay
   // itself has no dock/taskbar presence.

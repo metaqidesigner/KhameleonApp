@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { LookLayoutControls, useSyncAcrossWindows } from '@/components/overlay/LookLayoutControls';
 import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin, Music, Play, Pause, SkipForward, SkipBack, Mic } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
@@ -557,8 +558,16 @@ function EngineSection() {
 
 function AppearanceSection() {
   const { scanLinesEnabled, setScanLines, cornerBracketsEnabled, setCornerBrackets, tickerSpeed, setTickerSpeed } = useJarvisStore();
+  useSyncAcrossWindows();
   return (
     <>
+      {/* Same controls as the Overlay's Look & layout panel (shared component). */}
+      <Row>
+        <Label>OVERLAY &amp; LAYOUT</Label>
+        <div style={{ padding: '12px', background: 'rgba(0,4,8,0.6)', border: '1px solid rgba(0,212,255,0.15)' }}>
+          <LookLayoutControls tone="classic" />
+        </div>
+      </Row>
       <Row>
         <Label>THEME</Label>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,4,8,0.6)', border: '1px solid rgba(0,212,255,0.15)' }}>

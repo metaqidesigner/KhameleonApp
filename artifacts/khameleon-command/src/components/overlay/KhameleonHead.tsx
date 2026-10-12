@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { EyeOff, LayoutGrid, LogIn } from "lucide-react";
+import { EyeOff, LayoutGrid, LogIn, SlidersHorizontal } from "lucide-react";
 import { overlayBridge } from "@/lib/desktopBridge";
 import { useJarvisStore } from "@/store/jarvisStore";
 import type { OverlayPalette } from "./palettes";
@@ -13,7 +13,13 @@ const SHORTCUT = isMac ? "⌘⇧K" : "Ctrl+Shift+K";
  * menu, which later gains the Workspace panel (Build 3). When logged out,
  * both clicks open the menu, since chat needs a session.
  */
-export function KhameleonHead({ palette, locked = false }: { palette: OverlayPalette; locked?: boolean }) {
+export function KhameleonHead({ palette, locked = false, bottom = 18, onOpenLook }: {
+  palette: OverlayPalette;
+  locked?: boolean;
+  /** Raised when the bottom bar is showing. */
+  bottom?: number;
+  onOpenLook?: () => void;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const chatOpen = useJarvisStore(s => s.chatOpen);
   const setChatOpen = useJarvisStore(s => s.setChatOpen);
@@ -55,7 +61,7 @@ export function KhameleonHead({ palette, locked = false }: { palette: OverlayPal
   };
 
   return (
-    <div ref={rootRef} data-overlay-hit style={{ position: "fixed", bottom: 18, right: 18, zIndex: 400 }}>
+    <div ref={rootRef} data-overlay-hit style={{ position: "fixed", bottom, right: 18, zIndex: 400 }}>
       {menuOpen && (
         <div
           role="menu"
@@ -70,6 +76,12 @@ export function KhameleonHead({ palette, locked = false }: { palette: OverlayPal
             {locked ? <LogIn size={14} color={palette.iconColor} /> : <LayoutGrid size={14} color={palette.iconColor} />}
             {locked ? "Log in to Khameleon" : "Open Classic window"}
           </button>
+          {onOpenLook && (
+            <button role="menuitem" style={rowStyle} onClick={() => { setMenuOpen(false); onOpenLook(); }} {...hover}>
+              <SlidersHorizontal size={14} color={palette.iconColor} />
+              Look &amp; layout…
+            </button>
+          )}
           <button role="menuitem" style={rowStyle} onClick={hide} {...hover}>
             <EyeOff size={14} color={palette.iconColor} />
             <span style={{ flex: 1 }}>Hide overlay</span>
