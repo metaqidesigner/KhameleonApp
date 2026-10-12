@@ -351,7 +351,7 @@ function ChatWindowStyles() {
       .chat-window{--chat-ui:'Space Grotesk',var(--j-font-ui,sans-serif);--chat-mono:'JetBrains Mono',var(--j-font-mono,monospace);font-family:var(--chat-ui)}
       .chat-window *{box-sizing:border-box}
       .chat-window button:focus-visible,.chat-window input:focus-visible,.chat-window textarea:focus-visible,.chat-window select:focus-visible,.chat-window [role="button"]:focus-visible{outline:2px solid #5ff0d8;outline-offset:2px}
-      .chat-icon-btn{width:40px;height:36px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:8px;color:#8fb4b6;cursor:pointer;flex-shrink:0}
+      .chat-icon-btn{flex-shrink:0;width:40px;height:36px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:8px;color:#8fb4b6;cursor:pointer;flex-shrink:0}
       .chat-icon-btn:hover{background:rgba(255,255,255,0.06);color:#d6efee}
       .chat-icon-btn[data-active="true"]{color:#5ff0d8;background:rgba(95,240,216,0.1)}
       .chat-icon-btn:disabled{opacity:0.35;cursor:not-allowed}
@@ -384,7 +384,12 @@ function ChatWindowStyles() {
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export default function ChatWindow() {
+/**
+ * `bottomInset` keeps the minimized pill and the docked rail clear of
+ * something pinned to the bottom-right corner - the Overlay layout's head
+ * (components/overlay). Classic passes nothing and is unchanged.
+ */
+export default function ChatWindow({ bottomInset = 0 }: { bottomInset?: number } = {}) {
   const chatOpen = useJarvisStore(s => s.chatOpen);
   const setChatOpen = useJarvisStore(s => s.setChatOpen);
   const bounds = useJarvisStore(s => s.chatWindowBounds);
@@ -627,6 +632,12 @@ export default function ChatWindow() {
 
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // The domain/thread pickers need ~240px; beside the title and four window
+  // buttons they only fit in a wide window. Narrower than this (including
+  // the default 400px), they move to their own row, same as when docked -
+  // otherwise they pushed the close/minimise buttons off the edge.
+  const pickersOnOwnRow = docked || liveBounds.width < 560;
+
   const chrome = (
     <>
       <div
@@ -643,7 +654,7 @@ export default function ChatWindow() {
         <HeadAvatar size={docked ? 22 : 28} glow />
         <span style={{ fontSize: 13, fontWeight: 600, color: '#d6efee', flexShrink: 0 }}>Chat</span>
 
-        {!docked && (
+        {!pickersOnOwnRow && (
           <>
             <select
               value={lastDomainId === 'all' ? 'all' : String(lastDomainId)}
@@ -682,7 +693,7 @@ export default function ChatWindow() {
         </button>
       </div>
 
-      {docked && (
+      {pickersOnOwnRow && (
         <div style={{ display: 'flex', gap: 6, padding: '6px 10px', borderBottom: '1px solid rgba(95,240,216,0.1)', flexShrink: 0 }}>
           <select value={lastDomainId === 'all' ? 'all' : String(lastDomainId)} onChange={e => setLastDomainId(e.target.value === 'all' ? 'all' : Number(e.target.value))} aria-label="Work domain" className="chat-chip-select" style={{ flex: 1 }}>
             <option value="all">All domains</option>
@@ -705,7 +716,7 @@ export default function ChatWindow() {
           type="button"
           className="chat-window"
           style={{
-            position: 'fixed', zIndex: 300, right: 24, bottom: 24,
+            position: 'fixed', zIndex: 300, right: 24, bottom: 24 + bottomInset,
             display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 999,
             background: 'linear-gradient(140deg, rgba(12,36,42,.92), rgba(5,15,20,.97))',
             border: '1px solid rgba(95,240,216,0.3)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
@@ -772,7 +783,7 @@ export default function ChatWindow() {
       <>
         <ChatWindowStyles />
         <div className={sharedClassName} style={{
-          position: 'fixed', top: 0, right: 0, bottom: 0, width: 376, zIndex: 150,
+          position: 'fixed', top: 0, right: 0, bottom: bottomInset, width: 376, zIndex: 150,
           display: 'flex', flexDirection: 'column',
           background: 'linear-gradient(140deg, rgba(12,36,42,.9), rgba(5,15,20,.96))',
           boxShadow: '-24px 0 70px rgba(0,0,0,0.5)',
@@ -788,7 +799,7 @@ export default function ChatWindow() {
       <ChatWindowStyles />
       {showRailDropZone && (
         <div style={{
-          position: 'fixed', top: 0, right: 0, bottom: 0, width: 376, zIndex: 149,
+          position: 'fixed', top: 0, right: 0, bottom: bottomInset, width: 376, zIndex: 149,
           border: '2px dashed rgba(95,240,216,0.5)', background: 'rgba(95,240,216,0.06)', pointerEvents: 'none',
         }} />
       )}

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { getSessionStatus } from "@/lib/sessionApi";
+import ChatWindow from "@/components/chatWindow/ChatWindow";
 import { KhameleonHead } from "./KhameleonHead";
 import { OVERLAY_PALETTES } from "./palettes";
 import { useClickThrough } from "./useClickThrough";
@@ -9,8 +10,8 @@ import { useClickThrough } from "./useClickThrough";
  * desktop app's full-screen, see-through, always-on-top window. Everything
  * not marked `data-overlay-hit` is invisible and lets clicks through.
  *
- * Build 2 step (a): the window itself plus the head. Toolbars (step b) and
- * the real chat (step c) are added next.
+ * So far: the window, the head, and the real chat (the same ChatWindow
+ * Classic uses - one implementation, two layouts). Toolbars come next.
  */
 export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   useClickThrough();
@@ -46,6 +47,12 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
           .khi-icon-btn svg, .khi-icon-btn img { transition: none; }
         }
       `}</style>
+      {!locked && (
+        // Wrapper only carries the hit marker; ChatWindow positions itself.
+        <div data-overlay-hit>
+          <ChatWindow bottomInset={64} />
+        </div>
+      )}
       <KhameleonHead palette={palette} locked={locked} />
     </>
   );

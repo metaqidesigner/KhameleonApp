@@ -21,6 +21,9 @@ export function useClickThrough(): void {
     };
 
     const onMove = (e: MouseEvent) => {
+      // Mid-drag (e.g. moving the chat window fast) the pointer can outrun
+      // the element under it; keep catching until the button is released.
+      if (e.buttons !== 0 && interactive) return;
       const target = e.target instanceof Element ? e.target : null;
       set(!!target?.closest("[data-overlay-hit]"));
     };

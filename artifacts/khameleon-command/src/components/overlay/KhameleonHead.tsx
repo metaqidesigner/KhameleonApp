@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { EyeOff, LayoutGrid, LogIn } from "lucide-react";
 import { overlayBridge } from "@/lib/desktopBridge";
+import { useJarvisStore } from "@/store/jarvisStore";
 import type { OverlayPalette } from "./palettes";
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
@@ -8,12 +9,15 @@ const SHORTCUT = isMac ? "⌘⇧K" : "Ctrl+Shift+K";
 
 /**
  * The small head in the bottom-right corner (46px, so it doesn't get in the
- * way of the desktop). For now both clicks open a small menu; once the chat
- * lands (Build 2 step c) a normal click opens the chat and right-click keeps
- * the menu, which later gains the Workspace panel (Build 3).
+ * way of the desktop). Click opens/closes the chat; right-click opens a small
+ * menu, which later gains the Workspace panel (Build 3). When logged out,
+ * both clicks open the menu, since chat needs a session.
  */
 export function KhameleonHead({ palette, locked = false }: { palette: OverlayPalette; locked?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const chatOpen = useJarvisStore(s => s.chatOpen);
+  const setChatOpen = useJarvisStore(s => s.setChatOpen);
+  const setChatMinimized = useJarvisStore(s => s.setChatWindowMinimized);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,6 +36,12 @@ export function KhameleonHead({ palette, locked = false }: { palette: OverlayPal
 
   const openClassic = () => { setMenuOpen(false); overlayBridge()?.openClassicWindow(); };
   const hide = () => { setMenuOpen(false); overlayBridge()?.hide(); };
+  const toggleChat = () => {
+    setMenuOpen(false);
+    if (chatOpen) setChatOpen(false);
+    else { setChatMinimized(false); setChatOpen(true); }
+  };
+  const active = menuOpen || (!locked && chatOpen);
 
   const rowStyle: React.CSSProperties = {
     width: "100%", display: "flex", alignItems: "center", gap: 8,
@@ -45,7 +55,7 @@ export function KhameleonHead({ palette, locked = false }: { palette: OverlayPal
   };
 
   return (
-    <div ref={rootRef} data-overlay-hit style={{ position: "fixed", bottom: 18, right: 18 }}>
+    <div ref={rootRef} data-overlay-hit style={{ position: "fixed", bottom: 18, right: 18, zIndex: 400 }}>
       {menuOpen && (
         <div
           role="menu"
@@ -69,17 +79,17 @@ export function KhameleonHead({ palette, locked = false }: { palette: OverlayPal
       )}
       <button
         className="khi-icon-btn"
-        aria-label="Khameleon menu"
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen(v => !v)}
+        aria-label={locked ? "Khameleon menu" : chatOpen ? "Close Khameleon chat" : "Open Khameleon chat"}
+        aria-expanded={locked ? menuOpen : chatOpen}
+        onClick={locked ? () => setMenuOpen(v => !v) : toggleChat}
         onContextMenu={(e) => { e.preventDefault(); setMenuOpen(v => !v); }}
-        title="Khameleon"
+        title={locked ? "Khameleon" : chatOpen ? "Close chat (right-click: more)" : "Open chat (right-click: more)"}
         style={{
           cursor: "pointer", padding: 0,
           width: 46, height: 46, borderRadius: "50%",
-          background: palette.glass, border: `1.5px solid ${menuOpen ? palette.accent : palette.glassBorder}`,
+          background: palette.glass, border: `1.5px solid ${active ? palette.accent : palette.glassBorder}`,
           backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
-          boxShadow: menuOpen ? `0 0 0 3px ${palette.accentSoft}, ${palette.glassShadow}` : palette.glassShadow,
+          boxShadow: active ? `0 0 0 3px ${palette.accentSoft}, ${palette.glassShadow}` : palette.glassShadow,
           display: "flex", alignItems: "center", justifyContent: "center",
           transition: "box-shadow 150ms ease, border-color 150ms ease",
           overflow: "hidden",

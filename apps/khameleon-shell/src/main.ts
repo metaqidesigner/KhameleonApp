@@ -35,6 +35,15 @@ const DEFAULT_APP_URL = "http://localhost:4001";
 // replaces this env var in Build 2 step (d).
 const OVERLAY_TOGGLE_SHORTCUT = "CommandOrControl+Shift+K";
 
+// Multiple screens (docs/build-review.md, Build 2 addendum): the overlay
+// follows the user to whichever screen the pointer settles on. "Settles" =
+// stays on the other screen this long, so passing through on the way to a
+// far corner doesn't drag Khameleon along. Pinning to one screen becomes a
+// saved setting in step (d); KHAMELEON_OVERLAY_DISPLAY=primary pins to the
+// main screen until then.
+const FOLLOW_POLL_MS = 400;
+const FOLLOW_SETTLE_MS = 1200;
+
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 
@@ -174,13 +183,42 @@ app.whenReady().then(() => {
     mainWindow.on("closed", () => { mainWindow = null; });
   };
 
+  const pinnedToPrimary = process.env.KHAMELEON_OVERLAY_DISPLAY === "primary";
+  let overlayDisplayId = screen.getPrimaryDisplay().id;
+
+  const displayArea = (id: number): Bounds =>
+    (screen.getAllDisplays().find(d => d.id === id) ?? screen.getPrimaryDisplay()).workArea;
+
   const fitOverlayToScreen = () => {
-    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.setBounds(currentScreenArea());
+    if (!screen.getAllDisplays().some(d => d.id === overlayDisplayId)) {
+      overlayDisplayId = screen.getPrimaryDisplay().id; // its screen was unplugged
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.setBounds(displayArea(overlayDisplayId));
+  };
+
+  let followTimer: NodeJS.Timeout | null = null;
+  const startFollowingPointer = () => {
+    if (pinnedToPrimary || followTimer) return;
+    let candidateId: number | null = null;
+    let candidateSince = 0;
+    followTimer = setInterval(() => {
+      if (!overlayWindow || overlayWindow.isDestroyed() || !overlayWindow.isVisible()) return;
+      if (screen.getAllDisplays().length < 2) return;
+      const under = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).id;
+      if (under === overlayDisplayId) { candidateId = null; return; }
+      const now = Date.now();
+      if (under !== candidateId) { candidateId = under; candidateSince = now; return; }
+      if (now - candidateSince >= FOLLOW_SETTLE_MS) {
+        overlayDisplayId = under;
+        candidateId = null;
+        fitOverlayToScreen();
+      }
+    }, FOLLOW_POLL_MS);
   };
 
   const createOverlayWindow = () => {
     const overlay = new BrowserWindow({
-      ...currentScreenArea(),
+      ...displayArea(overlayDisplayId),
       frame: false,
       transparent: true,
       backgroundColor: "#00000000",
@@ -244,6 +282,7 @@ app.whenReady().then(() => {
     screen.on("display-metrics-changed", fitOverlayToScreen);
     screen.on("display-added", fitOverlayToScreen);
     screen.on("display-removed", fitOverlayToScreen);
+    startFollowingPointer();
   }
 
   // Clicking the dock icon (macOS) opens the Classic window - the overlay
