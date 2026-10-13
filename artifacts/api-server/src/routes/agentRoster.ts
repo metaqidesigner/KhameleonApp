@@ -5,6 +5,7 @@ import { getRoster, findAgent, upsertAgent, removeAgent } from "../agents/defaul
 import { recordQuery, getMetrics, getHistory, getAllMetrics } from "../agents/store.js";
 import type { AgentConfig, ChatMessage, ToolEvent } from "../agents/types.js";
 import { db, actionReceiptsTable } from "@workspace/db";
+import { readableError } from "../lib/readableError.js";
 
 /**
  * Failed chat requests go into the activity log too (gap review Q10: the
@@ -19,7 +20,7 @@ async function logChatFailure(agent: AgentConfig, error: string): Promise<void> 
       scope: `agent:${agent.id}`,
       outcome: "failure",
       target: agent.name,
-      detail: error.slice(0, 500),
+      detail: readableError(error).slice(0, 500),
       canUndo: false,
     });
   } catch {
