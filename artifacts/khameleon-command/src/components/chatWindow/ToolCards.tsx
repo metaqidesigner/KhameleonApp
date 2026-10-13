@@ -460,7 +460,7 @@ function SortInboxCard() {
   );
 }
 
-function PolishCard({ onSend }: { onSend: (prompt: string) => void }) {
+function PolishCard({ onSend }: { onSend: (prompt: string, display?: string) => void }) {
   const [text, setText] = useState('');
   const [how, setHow] = useState('');
   const [sent, setSent] = useState(false);
@@ -477,7 +477,10 @@ function PolishCard({ onSend }: { onSend: (prompt: string) => void }) {
       <div style={{ display: 'flex', gap: 6 }}>
         <Btn onClick={() => void paste()}>Paste from clipboard</Btn>
         <Btn primary disabled={!text.trim()} onClick={() => {
-          onSend(`Polish the wording of the text below${how.trim() ? ` (${how.trim()})` : ''}. Keep the meaning, return only the improved text.\n\n${text.trim()}`);
+          onSend(
+            `Polish the wording of the text below${how.trim() ? ` (${how.trim()})` : ''}. Keep the meaning, return only the improved text.\n\n${text.trim()}`,
+            `Polish${how.trim() ? ` (${how.trim()})` : ''}: ${text.trim()}`,
+          );
           setSent(true);
         }}>Polish</Btn>
       </div>
@@ -485,7 +488,7 @@ function PolishCard({ onSend }: { onSend: (prompt: string) => void }) {
   );
 }
 
-function RunSkillCard({ skill, onSend }: { skill?: { name: string; content: string }; onSend: (prompt: string) => void }) {
+function RunSkillCard({ skill, onSend }: { skill?: { name: string; content: string }; onSend: (prompt: string, display?: string) => void }) {
   const [task, setTask] = useState('');
   const [sent, setSent] = useState(false);
   if (!skill) return <ErrorLine message="This skill couldn't be loaded." />;
@@ -494,14 +497,14 @@ function RunSkillCard({ skill, onSend }: { skill?: { name: string; content: stri
     <>
       <div style={{ fontWeight: 600 }}>{skill.name}</div>
       <textarea autoFocus aria-label="What should the skill work on?" placeholder="What should it work on? (e.g. this month's statement, the Acme account)" value={task} onChange={e => setTask(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
-      <div><Btn primary disabled={!task.trim()} onClick={() => { onSend(runSkillPrompt(skill, task)); setSent(true); }}>Run</Btn></div>
+      <div><Btn primary disabled={!task.trim()} onClick={() => { onSend(runSkillPrompt(skill, task), `Run "${skill.name}": ${task.trim()}`); setSent(true); }}>Run</Btn></div>
     </>
   );
 }
 
 // ── Card frame ───────────────────────────────────────────────────────────────
 
-export function ToolCard({ tool, payload, onSend }: { tool: ChatToolId; payload?: ChatToolPayload; onSend: (prompt: string) => void }) {
+export function ToolCard({ tool, payload, onSend }: { tool: ChatToolId; payload?: ChatToolPayload; onSend: (prompt: string, display?: string) => void }) {
   const body = (() => {
     switch (tool) {
       case 'search-memory': return <SearchMemoryCard />;

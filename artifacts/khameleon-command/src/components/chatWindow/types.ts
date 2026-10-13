@@ -73,6 +73,8 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  /** What the chat shows instead of `content` - e.g. "Polish: …" while the full instruction is what's sent. */
+  displayContent?: string;
   timestamp: number;
   /** Which agent actually answered - undefined for user messages and for route modes that don't resolve to one agent (vote/council show a synthesized answer instead). */
   answeredBy?: AgentRef;

@@ -119,7 +119,7 @@ function MetaLine({ meta }: { meta?: ChatMessage['meta'] }) {
   );
 }
 
-function MessageBubble({ message, onSend }: { message: ChatMessage; onSend: (prompt: string) => void }) {
+function MessageBubble({ message, onSend }: { message: ChatMessage; onSend: (prompt: string, display?: string) => void }) {
   const isUser = message.role === 'user';
   if (message.toolCard) {
     return (
@@ -150,7 +150,7 @@ function MessageBubble({ message, onSend }: { message: ChatMessage; onSend: (pro
             background: isUser ? 'rgba(95,240,216,0.14)' : 'rgba(255,255,255,0.045)',
             border: `1px solid ${isUser ? 'rgba(95,240,216,0.3)' : 'rgba(255,255,255,0.08)'}`,
           }}>
-            {message.content}
+            {message.displayContent ?? message.content}
           </div>
           <ReasoningBlock message={message} />
           <MetaLine meta={message.meta} />
@@ -601,8 +601,8 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
     toolRequests.forEach(r => consumeToolRequest(r.id));
   }, [toolRequests, consumeToolRequest]);
 
-  const sendMessage = useCallback(async (text: string) => {
-    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: Date.now() };
+  const sendMessage = useCallback(async (text: string, display?: string) => {
+    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, displayContent: display, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
     setSending(true);
 
