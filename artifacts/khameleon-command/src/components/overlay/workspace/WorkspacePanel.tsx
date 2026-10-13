@@ -2,18 +2,22 @@ import { useEffect, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import type { OverlayPalette } from "../palettes";
 import { TasksTab } from "./TasksTab";
+import { StatusTab } from "./StatusTab";
+import { DomainsTab } from "./DomainsTab";
 import { MUTED, TEXT } from "./ui";
 
 /**
  * The Workspace panel (docs/build-review.md, Build 3; gap review Final):
  * day-to-day things, opened from the head's right-click menu. Tabs appear
- * only once they work - Tasks first, then Status and Domains & documents.
+ * only once they work: Tasks, Domains (gains documents in Build 5), Status.
  */
 
-export type WorkspaceTab = "tasks";
+export type WorkspaceTab = "tasks" | "domains" | "status";
 
 const TABS: { id: WorkspaceTab; label: string; render: () => ReactNode }[] = [
   { id: "tasks", label: "Tasks", render: () => <TasksTab /> },
+  { id: "domains", label: "Domains", render: () => <DomainsTab /> },
+  { id: "status", label: "Status", render: () => <StatusTab /> },
 ];
 
 export function WorkspacePanel({ palette, onClose }: { palette: OverlayPalette; onClose: () => void }) {

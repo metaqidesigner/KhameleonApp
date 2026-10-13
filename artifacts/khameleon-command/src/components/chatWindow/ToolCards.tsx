@@ -2,6 +2,12 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Layers, Clock, Loader2, MessageCircle, Zap, Undo2 } from 'lucide-react';
 import type { ChatToolId, ChatToolPayload } from '@/store/jarvisStore';
 import { runSkillPrompt } from '@/components/skills/useSkillLibrary';
+import { createActionReceipt } from '@/lib/actionReceiptsApi';
+
+/** Writes to the activity log; a logging failure never interrupts the action itself. */
+function logActivity(input: Parameters<typeof createActionReceipt>[0]) {
+  createActionReceipt(input).catch(() => {});
+}
 import type { WorkKind } from './types';
 import { searchMemory, runResearch, type MemorySearchResult } from '@/lib/jarvisApi';
 import {
@@ -294,10 +300,13 @@ function DraftReplyCard() {
   const send = async () => {
     if (!draft) return;
     setStage('sending');
+    const scope = provider === 'outlook' ? 'mail.send' : 'gmail.send';
     try {
       await api.send(draft.approvalId, body !== draft.body ? body : undefined);
+      logActivity({ description: `Email sent to ${draft.to}`, category: 'email_sent', scope, outcome: 'success', target: draft.to, detail: draft.subject, canUndo: false });
       setStage('sent');
     } catch (e) {
+      logActivity({ description: `Email to ${draft.to} wasn't sent`, category: 'email_sent', scope, outcome: 'failure', target: draft.to, detail: errText(e), canUndo: false });
       setError(errText(e));
       setStage('review');
     }
@@ -394,7 +403,18 @@ function SortInboxCard() {
   const sort = async () => {
     setStage('sorting');
     setError(null);
-    try { setResult(await runOutlookTriageInbox()); setStage('done'); } catch (e) { setError(errText(e)); setStage('ready'); }
+    try {
+      const r = await runOutlookTriageInbox();
+      // Undo for a sort lives on its card (it needs the per-message details);
+      // the log records that it happened.
+      logActivity({ description: `Sorted ${r.items.length} Outlook email${r.items.length === 1 ? '' : 's'}`, category: 'inbox_sorted', scope: 'mail.readwrite', outcome: 'success', target: 'Outlook', canUndo: false });
+      setResult(r);
+      setStage('done');
+    } catch (e) {
+      logActivity({ description: "Inbox sort didn't finish", category: 'inbox_sorted', scope: 'mail.readwrite', outcome: 'failure', target: 'Outlook', detail: errText(e), canUndo: false });
+      setError(errText(e));
+      setStage('ready');
+    }
   };
 
   const undo = async () => {

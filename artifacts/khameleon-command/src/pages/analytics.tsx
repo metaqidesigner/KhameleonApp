@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { BarChart2 } from 'lucide-react';
 import JPanel from '@/components/JPanel';
+import { ActivityLog } from '@/components/activity/ActivityLog';
 import { useJarvisTelemetry } from '@/hooks/useJarvis';
 import { MOCK_TELEMETRY } from '@/lib/jarvisApi';
 
@@ -49,12 +50,13 @@ export default function Analytics() {
       dayStart: d.getTime(),
       queries: 0,
       cost: 0,
+      energy: 0,
     }));
     for (const q of telemetry.queries) {
       const bucket = buckets.find((b, i) => q.ts >= b.dayStart && (i === buckets.length - 1 || q.ts < buckets[i + 1].dayStart));
-      if (bucket) { bucket.queries += 1; bucket.cost += q.cost_usd; }
+      if (bucket) { bucket.queries += 1; bucket.cost += q.cost_usd; bucket.energy += q.energy_wh; }
     }
-    return buckets.map(({ label, queries, cost }) => ({ label, queries, cost: +cost.toFixed(4) }));
+    return buckets.map(({ label, queries, cost, energy }) => ({ label, queries, cost: +cost.toFixed(4), energy: +energy.toFixed(4) }));
   })();
 
   // Latency buckets, counted from real query records rather than hardcoded.
@@ -154,7 +156,7 @@ export default function Analytics() {
           </div>
           {/* Mini charts */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:12 }}>
-            {['Cost over time','Energy over time'].map(label => (
+            {['Cost over time','Energy over time (estimate)'].map(label => (
               <div key={label}>
                 <div style={{ fontFamily:'var(--j-font-ui)', fontSize:10, color:'var(--j-text-muted)', textTransform:'uppercase', letterSpacing:'0.12em', marginBottom:4 }}>{label}</div>
                 <ResponsiveContainer width="100%" height={120}>
@@ -163,11 +165,19 @@ export default function Analytics() {
                     <XAxis dataKey="label" tick={{ ...CHART_STYLE.tick, fontSize:8 }} interval={4} />
                     <YAxis tick={{ ...CHART_STYLE.tick, fontSize:8 }} />
                     <Tooltip content={<TT />} />
-                    <Line type="monotone" dataKey="cost" stroke={label.includes('Energy') ? '#c9a84c' : '#00d4ff'} strokeWidth={1.5} dot={false} />
+                    <Line type="monotone" dataKey={label.includes('Energy') ? 'energy' : 'cost'} stroke={label.includes('Energy') ? '#c9a84c' : '#00d4ff'} strokeWidth={1.5} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             ))}
+          </div>
+        </JPanel>
+      </div>
+      {/* Same activity log as the Overlay's Workspace -> Status (shared component). */}
+      <div style={{ flex: '0 0 auto' }}>
+        <JPanel title="ACTIVITY LOG" icon={<BarChart2 size={13}/>}>
+          <div style={{ maxHeight: 320, overflowY: 'auto' }} className="scrollbar-jarvis">
+            <ActivityLog tone="classic" />
           </div>
         </JPanel>
       </div>

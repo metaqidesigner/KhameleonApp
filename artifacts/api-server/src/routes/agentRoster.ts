@@ -4,6 +4,28 @@ import { askAgent, isAgentAvailable } from "../agents/gateway.js";
 import { getRoster, findAgent, upsertAgent, removeAgent } from "../agents/defaults.js";
 import { recordQuery, getMetrics, getHistory, getAllMetrics } from "../agents/store.js";
 import type { AgentConfig, ChatMessage, ToolEvent } from "../agents/types.js";
+import { db, actionReceiptsTable } from "@workspace/db";
+
+/**
+ * Failed chat requests go into the activity log too (gap review Q10: the
+ * log records failures, not just successes). Never throws - logging a
+ * failure must not turn into a second failure.
+ */
+async function logChatFailure(agent: AgentConfig, error: string): Promise<void> {
+  try {
+    await db.insert(actionReceiptsTable).values({
+      description: `${agent.name} couldn't answer`,
+      category: "chat_failure",
+      scope: `agent:${agent.id}`,
+      outcome: "failure",
+      target: agent.name,
+      detail: error.slice(0, 500),
+      canUndo: false,
+    });
+  } catch {
+    /* non-fatal */
+  }
+}
 
 const router = Router();
 
@@ -176,6 +198,7 @@ router.post("/:id/ask", async (req, res) => {
 
     if (result.error) {
       res.write(`data: ${JSON.stringify({ error: result.error })}\n\n`);
+      void logChatFailure(agent, result.error);
     } else {
       recordQuery(
         agent.id, result.latencyMs, result.tokens, result.costUsd, result.energyWh,
@@ -202,6 +225,7 @@ router.post("/:id/ask", async (req, res) => {
 
   // Non-streaming
   const result = await askAgent(agent, messages);
+  if (result.error) void logChatFailure(agent, result.error);
   if (!result.error) {
     recordQuery(
       agent.id, result.latencyMs, result.tokens, result.costUsd, result.energyWh,

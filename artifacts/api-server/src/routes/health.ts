@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { HealthCheckResponse } from "@workspace/api-zod";
 import { getAllMetrics } from "../agents/store.js";
+import { getRoster } from "../agents/defaults.js";
 
 const router: IRouter = Router();
 
@@ -16,10 +17,15 @@ function buildHealthPayload() {
       ? Math.round(metrics.reduce((s, m) => s + m.avgLatencyMs * m.queries, 0) / totalQueries)
       : 0;
 
+  // Real configuration, not a fixed label (gap review Q2): the providers
+  // and models of the agents that are switched on.
+  const enabled = getRoster().filter((a) => a.enabled);
+  const unique = (xs: string[]) => [...new Set(xs)].join(" / ") || "none";
+
   return {
     status: "online" as const,
-    engine: "replit-ai",
-    model: "claude-3-5-sonnet / gpt-4o",
+    engine: unique(enabled.map((a) => a.provider)),
+    model: unique(enabled.map((a) => a.model)),
     uptime: Math.floor((Date.now() - startTime) / 1000),
     total_queries: totalQueries,
     total_cost_usd: totalCostUsd,

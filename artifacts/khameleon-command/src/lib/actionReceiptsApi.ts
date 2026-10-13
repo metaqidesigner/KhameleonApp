@@ -51,3 +51,13 @@ export async function createActionReceipt(input: CreateActionReceiptInput): Prom
   if (!res.ok) throw new Error('Failed to save action receipt');
   return res.json();
 }
+
+/** Undo a logged action - only accepted for actions with a real reverse (server: lib/receiptUndo.ts). */
+export async function undoActionReceipt(id: number): Promise<ActionReceiptData> {
+  const res = await fetch(`${BASE}/action-receipts/${id}/undo`, { method: 'POST' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(body.error ?? `Undo failed (HTTP ${res.status})`);
+  }
+  return res.json();
+}
