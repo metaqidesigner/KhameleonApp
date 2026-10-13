@@ -207,10 +207,9 @@ export function SkillsPanel({ palette, onClose }: { palette: OverlayPalette; onC
 
   const inFilter = (s: SkillSet) => domainFilter === "all" || s.workDomainIds.includes(domainFilter);
 
-  // Installed skills grouped by domain; a skill tagged with several domains
-  // appears under each. Untagged ones go last.
-  const installedByDomain = useMemo(() => {
-    const list = lib.groups.installed.filter(inFilter);
+  // Skills grouped by domain; a skill tagged with several domains appears
+  // under each. Untagged ones go last.
+  const groupByDomain = (list: SkillSet[]) => {
     const groups = lib.domains
       .filter(d => domainFilter === "all" || d.id === domainFilter)
       .map(d => ({ key: String(d.id), name: d.name, skills: list.filter(s => s.workDomainIds.includes(d.id)) }))
@@ -218,8 +217,17 @@ export function SkillsPanel({ palette, onClose }: { palette: OverlayPalette; onC
     const untagged = list.filter(s => s.workDomainIds.length === 0);
     if (untagged.length) groups.push({ key: "none", name: "No domain yet", skills: untagged });
     return groups;
+  };
+  const installedByDomain = useMemo(
+    () => groupByDomain(lib.groups.installed.filter(inFilter)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lib.groups.installed, lib.domains, domainFilter]);
+    [lib.groups.installed, lib.domains, domainFilter],
+  );
+  const startersByDomain = useMemo(
+    () => groupByDomain(lib.groups.available.filter(inFilter)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lib.groups.available, lib.domains, domainFilter],
+  );
 
   const run = (s: SkillSet) => requestChatTool("run-skill", { skill: { name: s.name, content: s.content } });
 
@@ -272,9 +280,14 @@ export function SkillsPanel({ palette, onClose }: { palette: OverlayPalette; onC
             </div>
           )}
 
-          <Section title="Starter skills" count={lib.groups.available.filter(inFilter).length}>
-            {lib.groups.available.filter(inFilter).map(s => <SkillRow key={s.id} skill={s} domains={lib.domains} lib={lib} onRun={run} />)}
-          </Section>
+          {startersByDomain.length > 0 && (
+            <div style={{ fontSize: 12, fontWeight: 600, color: TEXT, marginTop: 4 }}>Starter skills - install the ones you want</div>
+          )}
+          {startersByDomain.map(g => (
+            <Section key={`starter-${g.key}`} title={g.name} count={g.skills.length}>
+              {g.skills.map(s => <SkillRow key={`starter-${g.key}-${s.id}`} skill={s} domains={lib.domains} lib={lib} onRun={run} />)}
+            </Section>
+          ))}
         </div>
       </div>
       {lib.gate && (

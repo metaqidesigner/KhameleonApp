@@ -1,6 +1,6 @@
 # Starter Skills — Draft for Approval
 
-Status: **draft, awaiting Newton's approval** (2026-10-13). Nothing here is in the app yet.
+Status: **approved by Newton 2026-10-13 and shipped** — source of truth is now `artifacts/api-server/src/starterSkills.ts`.
 
 Rules every starter follows:
 - Plain-language steps a person could follow too.

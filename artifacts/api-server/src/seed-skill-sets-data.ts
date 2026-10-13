@@ -2,8 +2,8 @@
  * seed-skill-sets-data.ts — idempotent (insert-if-missing) seed data for
  * design-spec.md §15-17: the 6 illustrative Work Domains named in §17.1,
  * directory metadata for every connector already listed in
- * routes/connectors.ts's ALL_CONNECTORS, and two real, installable
- * starter Skill Sets. Follows the same "idempotent, safe on every boot"
+ * routes/connectors.ts's ALL_CONNECTORS, and the starter skills in
+ * starterSkills.ts. Follows the same "idempotent, safe on every boot"
  * pattern as migrate-legacy-values.ts / ensure-settings-table.ts, run
  * once from index.ts's bootstrap() before the server accepts traffic.
  *
@@ -21,7 +21,9 @@
  */
 
 import { db } from "@workspace/db";
-import { workDomainsTable, integrationDirectoryTable, skillSetsTable } from "@workspace/db";
+import { workDomainsTable, integrationDirectoryTable, skillSetsTable, entityWorkDomainsTable } from "@workspace/db";
+import { STARTER_SKILLS, missingStarters } from "./starterSkills";
+import { eq } from "drizzle-orm";
 import { logger } from "./lib/logger.js";
 
 const DEFAULT_WORK_DOMAINS: { name: string; description: string }[] = [
@@ -64,38 +66,6 @@ const DIRECTORY_SEED: DirectorySeed[] = [
   { id: "granola", name: "Granola", dataScope: NOT_YET_CONNECTABLE, actionScope: NOT_YET_CONNECTABLE, reversible: true, providerId: null },
 ];
 
-const STARTER_SKILL_SETS = [
-  {
-    name: "Weekly Status Update Drafting",
-    description: "Guides the agent through drafting a weekly status update from your recent task and calendar activity.",
-    content: [
-      "When asked to draft a weekly status update:",
-      "1. Review completed and in-progress tasks from the last 7 days.",
-      "2. Group them under Done / In Progress / Blocked.",
-      "3. Keep each line to one sentence, plain language, no jargon.",
-      "4. End with a one-line callout for anything that needs a decision from someone else.",
-      "5. Present the draft for review before it's used anywhere - this Skill Set never sends anything itself.",
-    ].join("\n"),
-    sourceType: "authored",
-    requestedTools: [],
-    requestedIntegrationIds: [],
-  },
-  {
-    name: "Meeting Prep Briefing",
-    description: "Builds a short pre-meeting briefing from the meeting's own details and any linked context.",
-    content: [
-      "When asked to prep for a meeting:",
-      "1. Summarize the meeting's stated purpose and attendees.",
-      "2. Note any open items from the last meeting with the same attendees, if available.",
-      "3. Suggest up to 3 questions worth raising.",
-      "4. Keep the whole briefing under 150 words.",
-    ].join("\n"),
-    sourceType: "authored",
-    requestedTools: [],
-    requestedIntegrationIds: [],
-  },
-];
-
 export async function seedSkillSetsData(): Promise<void> {
   const [domainCount] = await db.select().from(workDomainsTable).limit(1);
   if (!domainCount) {
@@ -109,11 +79,41 @@ export async function seedSkillSetsData(): Promise<void> {
     logger.info({ count: DIRECTORY_SEED.length }, "Seeded Integrations directory");
   }
 
-  const [skillSetCount] = await db.select().from(skillSetsTable).limit(1);
-  if (!skillSetCount) {
+  // Add any starter skill missing by name - not only on an empty table -
+  // so existing installs pick up new starters (starterSkills.ts). A starter
+  // the user uninstalled still has its row, so it is never re-added.
+  const existing = await db.select({ name: skillSetsTable.name }).from(skillSetsTable);
+  const toAdd = missingStarters(existing.map((r) => r.name), STARTER_SKILLS);
+  if (toAdd.length) {
     await db.insert(skillSetsTable).values(
-      STARTER_SKILL_SETS.map((s) => ({ ...s, status: "available" as const })),
+      toAdd.map((s) => ({
+        name: s.name, description: s.description, content: s.content,
+        sourceType: "authored", requestedTools: [], requestedIntegrationIds: [],
+        status: "available" as const,
+      })),
     );
-    logger.info({ count: STARTER_SKILL_SETS.length }, "Seeded starter Skill Sets catalog");
+    logger.info({ count: toAdd.length }, "Added starter skills");
+  }
+
+  // Give untouched starters (still "available", no domain yet) their
+  // domain, so they land in the right group in the Skills panel. Starters
+  // the user has installed or re-tagged are left alone.
+  const [starterRows, domains, tagged] = await Promise.all([
+    db.select({ id: skillSetsTable.id, name: skillSetsTable.name, status: skillSetsTable.status }).from(skillSetsTable),
+    db.select({ id: workDomainsTable.id, name: workDomainsTable.name }).from(workDomainsTable),
+    db.select({ entityId: entityWorkDomainsTable.entityId }).from(entityWorkDomainsTable)
+      .where(eq(entityWorkDomainsTable.entityType, "skill_set")),
+  ]);
+  const taggedIds = new Set(tagged.map((t) => t.entityId));
+  const domainId = new Map(domains.map((d) => [d.name, d.id]));
+  const starterDomain = new Map(STARTER_SKILLS.map((s) => [s.name, s.domain]));
+  const tags = starterRows.flatMap((row) => {
+    if (row.status !== "available" || taggedIds.has(String(row.id))) return [];
+    const id = domainId.get(starterDomain.get(row.name) ?? "");
+    return id ? [{ entityType: "skill_set", entityId: String(row.id), workDomainId: id }] : [];
+  });
+  if (tags.length) {
+    await db.insert(entityWorkDomainsTable).values(tags);
+    logger.info({ count: tags.length }, "Tagged starter skills with their domains");
   }
 }
