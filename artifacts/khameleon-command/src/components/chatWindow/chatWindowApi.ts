@@ -36,13 +36,31 @@ export interface RouteResult {
    * back by /api/agents/:id/ask. Undefined for multi-agent modes, which
    * don't thread a session through askAll. */
   sessionId?: string;
+  /** Installed skills the agent actually loaded this turn. */
+  skillsUsed?: string[];
 }
 
 /** Real per-call tool-use events (name + durationMs from the agent's own tool runner) become reasoning steps - never fabricated placeholder "thinking" text. Exported for direct unit testing. */
 export function toolEventsToReasoning(events: ToolEvent[]): ReasoningStep[] {
+  // use_skill's skill name only arrives on its tool_start event - remember
+  // it so the finished step can say which skill was used.
+  const pendingSkill: string[] = [];
+  const steps: ReasoningStep[] = [];
+  for (const e of events) {
+    if (e.type === 'tool_start' && e.name === 'use_skill') pendingSkill.push(String(e.input?.name ?? ''));
+    if (e.type !== 'tool_result' && e.type !== 'tool_error') continue;
+    const base = e.name === 'use_skill' ? `Used skill: ${pendingSkill.shift() || 'unknown'}` : e.name;
+    steps.push({ label: e.type === 'tool_error' ? `${base} (failed)` : base, elapsedMs: e.durationMs });
+  }
+  return steps;
+}
+
+/** Names of installed skills the agent loaded during a turn (lib/installedSkills.ts on the server). */
+export function skillsUsed(events: ToolEvent[]): string[] {
   return events
-    .filter(e => e.type === 'tool_result' || e.type === 'tool_error')
-    .map(e => ({ label: e.type === 'tool_error' ? `${e.name} (failed)` : e.name, elapsedMs: e.durationMs }));
+    .filter(e => e.type === 'tool_start' && e.name === 'use_skill')
+    .map(e => String(e.input?.name ?? ''))
+    .filter(Boolean);
 }
 
 export function reasonForMode(mode: RouteMode, pinnedAgentName?: string): string {
@@ -78,6 +96,7 @@ export function routeSingleStreaming(
       energyWh: undefined,
       routedForReason: reasonForMode('single', pinnedAgentName),
       reasoning: toolEventsToReasoning(toolEvents),
+      skillsUsed: skillsUsed(toolEvents),
       sessionId: d.sessionId,
     }),
     onError,

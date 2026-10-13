@@ -138,6 +138,9 @@ function MessageBubble({ message, onSend }: { message: ChatMessage; onSend: (pro
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 3 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: '#d6efee' }}>{message.answeredBy.name}</span>
               <KindBadge kind={message.kind ?? 'ask'} />
+              {message.skillsUsed?.map(name => (
+                <span key={name} title="Khameleon followed this installed skill" style={{ fontSize: 9.5, color: '#6FE6BD' }}>Using: {name}</span>
+              ))}
               {message.routedForReason && <span style={{ fontSize: 9, color: '#7fa3a6' }}>routed for {message.routedForReason}</span>}
             </div>
           )}
@@ -625,6 +628,7 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
             answeredBy: { id: agent.id, name: agent.name, status: statuses[agent.id] ?? 'offline', color: agent.color, initials: agent.initials },
             routedForReason: result.routedForReason,
             reasoning: result.reasoning,
+            skillsUsed: result.skillsUsed,
             meta: { durationMs: result.durationMs, costUsd: result.costUsd, energyWh: result.energyWh },
           } : m)));
           // Carries this window's conversation forward under one real

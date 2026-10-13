@@ -82,6 +82,8 @@ export interface ChatMessage {
   actionCard?: ActionCardData;
   taskRunId?: string;
   meta?: MessageMeta;
+  /** Installed skills the agent loaded for this answer - shown as "Using: …". */
+  skillsUsed?: string[];
   /** Set for assistant messages; plain chat answers are 'ask'. */
   kind?: WorkKind;
   /** A toolbar action rendered as an interactive card instead of text. */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { reasonForMode, backendModeFor, pickAutoRouteAgent, toolEventsToReasoning, rowsToResumedMessages } from './chatWindowApi';
+import { reasonForMode, backendModeFor, pickAutoRouteAgent, toolEventsToReasoning, rowsToResumedMessages, skillsUsed } from './chatWindowApi';
 import type { AgentConfig, AgentConversationRow, ToolEvent } from '@/lib/agentsApi';
 
 function makeAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
@@ -112,5 +112,20 @@ describe('rowsToResumedMessages', () => {
 
   it('returns an empty array for no rows, not a fabricated placeholder message', () => {
     expect(rowsToResumedMessages([])).toEqual([]);
+  });
+});
+
+describe('skill use in reasoning', () => {
+  it('labels a use_skill step with the skill name from its start event', () => {
+    const events: ToolEvent[] = [
+      { type: 'tool_start', name: 'use_skill', input: { name: 'Meeting Prep Briefing' } },
+      { type: 'tool_result', name: 'use_skill', durationMs: 3 },
+      { type: 'tool_result', name: 'list_tasks', durationMs: 50 },
+    ];
+    expect(toolEventsToReasoning(events)).toEqual([
+      { label: 'Used skill: Meeting Prep Briefing', elapsedMs: 3 },
+      { label: 'list_tasks', elapsedMs: 50 },
+    ]);
+    expect(skillsUsed(events)).toEqual(['Meeting Prep Briefing']);
   });
 });

@@ -4,6 +4,7 @@ import type { AgentConfig, AgentResponse, ChatMessage, Provider, ToolCallRecord,
 import { TOOL_DEFINITIONS } from "./tools/definitions.js";
 import { dispatchTool } from "./tools/dispatcher.js";
 import { getCustomToolDefinitions, isCustomToolName, dispatchCustomTool, getMcpServerConfigs } from "./tools/customIntegrations.js";
+import { loadInstalledSkills, buildSkillCatalogPrompt, useSkillResult, USE_SKILL_TOOL, USE_SKILL_TOOL_NAME, type InstalledSkill } from "../lib/installedSkills.js";
 import { getApiKey } from "../lib/apiKeys.js";
 import { trackingFetch } from "../lib/providerQuota.js";
 
@@ -93,8 +94,16 @@ async function runAgenticLoop(
   // design-spec.md §16.6: a user-imported OpenAPI spec's operations become
   // real tools here, merged with the static, first-party TOOL_DEFINITIONS -
   // the model sees one combined catalog, no special-casing in its prompt.
-  const [customTools, mcpServers] = await Promise.all([getCustomToolDefinitions(), getMcpServerConfigs()]);
-  const tools = [...TOOL_DEFINITIONS, ...customTools];
+  const [customTools, mcpServers, installedSkills] = await Promise.all([
+    getCustomToolDefinitions(),
+    getMcpServerConfigs(),
+    // A skills lookup failure must never break chat - just run without them.
+    loadInstalledSkills().catch((): InstalledSkill[] => []),
+  ]);
+  // Installed skills: names/descriptions in the system prompt, full steps
+  // on demand via use_skill (lib/installedSkills.ts).
+  const tools = [...TOOL_DEFINITIONS, ...customTools, ...(installedSkills.length ? [USE_SKILL_TOOL] : [])];
+  systemMsg = systemMsg + buildSkillCatalogPrompt(installedSkills);
   // A connected MCP server needs the beta Messages API's `mcp_servers` -
   // Claude talks to that server directly and resolves its tool calls
   // server-side (mcp_tool_use/mcp_tool_result content blocks come back
@@ -149,7 +158,9 @@ async function runAgenticLoop(
         const t0 = Date.now();
 
         try {
-          const result    = isCustomToolName(toolUse.name)
+          const result    = toolUse.name === USE_SKILL_TOOL_NAME
+            ? useSkillResult(installedSkills, String(input.name ?? ""))
+            : isCustomToolName(toolUse.name)
             ? await dispatchCustomTool(toolUse.name, input)
             : await dispatchTool(toolUse.name, input);
           const durationMs = Date.now() - t0;
