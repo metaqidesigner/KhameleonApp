@@ -302,6 +302,8 @@ export interface UpdateTaskInput {
   recurrence?:      TaskRecurrence;
   dueDate?:         string | null;
   parentTaskId?:    number | null;
+  /** Move a task into (or out of, with null) a project - gap review Q15. */
+  projectId?:       number | null;
   parkedReason?:    'external_input' | 'deferred' | 'dependency' | null;
   waitingOn?:       string | null;
   waitingSince?:    string | null;

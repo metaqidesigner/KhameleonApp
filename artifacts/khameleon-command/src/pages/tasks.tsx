@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { groupTasksByProject } from '@/lib/taskProjects';
 import {
   Send, Mic, MicOff, RefreshCw, ChevronDown, ChevronRight,
   X, RotateCcw, CheckCircle2, AlertTriangle, AlertCircle, Loader2,
@@ -522,9 +523,15 @@ function CreateTaskForm({ onSave, onCancel, defaultCategory, availableTasks }: C
 
 // ── Task list view ────────────────────────────────────────────
 
-type GroupByKey = 'category' | 'priority' | 'recurrence' | 'status';
+type GroupByKey = 'category' | 'priority' | 'recurrence' | 'status' | 'project';
 
 function groupTasks(tasks: Task[], by: GroupByKey): { key: string; label: string; color: string; tasks: Task[] }[] {
+  if (by === 'project') {
+    // Shared with the Overlay's Workspace panel (lib/taskProjects.ts).
+    return groupTasksByProject(tasks).map(g => ({
+      key: g.key, label: `${g.name} · ${g.done}/${g.total} done`, color: 'var(--j-text-muted)', tasks: g.tasks,
+    }));
+  }
   if (by === 'category') {
     return CATEGORIES.map(c => ({
       key: c.value, label: c.label, color: c.color,
@@ -1089,6 +1096,7 @@ function MyTasksPanel() {
             <option value="priority">Group: Priority</option>
             <option value="recurrence">Group: Recurrence</option>
             <option value="status">Group: Status</option>
+            <option value="project">Group: Project</option>
           </select>
         )}
 

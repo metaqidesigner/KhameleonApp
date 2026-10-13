@@ -11,6 +11,7 @@ import { EdgeChrome, BOTTOM_BAR_HEIGHT } from "./EdgeChrome";
 import { LookLayoutControls, useSyncAcrossWindows } from "./LookLayoutControls";
 import type { OverlayPalette } from "./palettes";
 import { SkillsPanel } from "./SkillsPanel";
+import { WorkspacePanel } from "./workspace/WorkspacePanel";
 
 /**
  * The Overlay layout (docs/build-review.md, Builds 0-2): rendered inside the
@@ -62,6 +63,7 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   const prefs = useJarvisStore(s => s.overlayPrefs);
   const [lookOpen, setLookOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
 
   // index.css paints html/body/#root with the dashboard background; the
   // overlay has to be genuinely transparent so the desktop shows through.
@@ -113,8 +115,10 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
       {!locked && <Toolbars palette={palette} groups={toolbarGroups} bare={bare} idleStyle={prefs.idleStyle} />}
       {!locked && <EdgeChrome mode={prefs.edgeChrome} palette={palette} bare={bare} />}
       {skillsOpen && !locked && <SkillsPanel palette={palette} onClose={() => setSkillsOpen(false)} />}
+      {workspaceOpen && !locked && <WorkspacePanel palette={palette} onClose={() => setWorkspaceOpen(false)} />}
       {lookOpen && <LookPanel palette={palette} onClose={() => setLookOpen(false)} />}
-      <KhameleonHead palette={palette} locked={locked} bottom={18 + bottomBar} onOpenLook={locked ? undefined : () => setLookOpen(true)} />
+      <KhameleonHead palette={palette} locked={locked} bottom={18 + bottomBar} onOpenLook={locked ? undefined : () => { setWorkspaceOpen(false); setLookOpen(true); }}
+        onOpenWorkspace={locked ? undefined : () => { setLookOpen(false); setWorkspaceOpen(true); }} />
     </>
   );
 }
