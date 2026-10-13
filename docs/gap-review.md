@@ -49,6 +49,9 @@ Everything the decisions above need that doesn't exist today. Kept separate so P
 - **Chat can check the inbox** — "anything urgent?" answered via the existing triage skill. (Q17)
 - **Proactive urgent flags** — genuinely urgent mail surfaced in the suggestion slot; needs a real "urgent enough to interrupt" threshold so it stays rare. First real use of the suggestion slot. (Q17)
 
+**Later (recorded 2026-10-13, not yet scheduled):**
+- **Company skill library** — skills shared across an organisation, manager-approved before publishing, matched to company procedure documents. Needs hosted accounts + Build 5. See `docs/build-review.md`, Build 14.
+
 **Smaller new pieces:**
 - Action history Undo carried into the merged activity log. (Q14)
 - Task manager: group by project and show per-project progress. (Q15)
