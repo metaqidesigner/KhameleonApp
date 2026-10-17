@@ -4,7 +4,7 @@ import JPanel from '@/components/JPanel';
 import { getRoster, upsertAgent, deleteAgent, FALLBACK_ROSTER, PROVIDER_LABELS, type AgentConfig, type Provider, type AgentRole } from '@/lib/agentsApi';
 
 // Khami first; removed providers (OpenRouter, MiniMax, Ollama) aren't offered (docs/khami-design.md).
-const PROVIDERS: Provider[] = ['khami','anthropic','openai','google','custom'];
+const PROVIDERS: Provider[] = ['copilot','khami','anthropic','openai','google','custom'];
 const ROLES: AgentRole[] = ['general','research','code','analysis','creative'];
 const COLORS = ['#c9a84c','#00d4ff','#3fb950','#a78bfa','#f97316','#ec4899','#14b8a6','#c0152a','#60a5fa','#fbbf24'];
 

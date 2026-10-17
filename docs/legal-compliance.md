@@ -27,6 +27,7 @@ This document is the technical record of what Khameleon uses from third parties 
 | pdf-parse | Reads text from PDFs | Apache 2.0 | Include licence and notice |
 | Electron | Desktop app | MIT (plus bundled Chromium notices) | Ship Electron's own licence files |
 | React, Vite, Express, Drizzle, Zustand and other npm packages | App and server | Mostly MIT/ISC/Apache — full list to be generated | Generate full list from `pnpm licenses` at clean-up |
+| Microsoft 365 Copilot Chat API (Microsoft Graph, preview) | Copilot as the main agent when an organisation provides it | Microsoft APIs Terms of Use / Graph terms (not an open licence) | Preview: Microsoft says not supported for production - confirm status before launch; each user needs a Copilot licence; respect Microsoft's API terms and Copilot data handling; name "Microsoft 365 Copilot" only to describe what Khameleon connects to, no logos |
 | Anthropic SDK (`@anthropic-ai/sdk`) | Talking to Claude when an organisation has it | MIT | Include copyright and licence |
 
 **Not used, by decision:** Anthropic's Word/PDF/PowerPoint/Excel skills (restricted licence); Anthropic's doc-coauthoring skill (no licence - Khameleon's own **Document co-writing** was written from scratch); Llama models (licence conditions); Ollama (not needed); MiniMax and OpenRouter (removed).
@@ -40,4 +41,5 @@ This document is the technical record of what Khameleon uses from third parties 
 - [ ] Search the product for third-party names and branding; remove any outside the allowed cases above.
 - [ ] Check the skills shipped with Khameleon: adapted ones keep their notice and "modified" statement; new ones contain no copied text.
 - [ ] Review terms of service for every AI provider Khameleon can connect to (Anthropic, OpenAI, Google, Microsoft Azure) for anything affecting how Khameleon may use or present them.
+- [ ] Check whether Microsoft's Copilot Chat API has left preview and what its production terms require (licensing, data handling, branding) before relying on it for paying customers.
 - [ ] Legal review of this document and the licences page.

@@ -152,8 +152,15 @@ export function rowsToResumedMessages(rows: AgentConversationRow[]): ChatMessage
     }));
 }
 
-export function pickAutoRouteAgent(roster: AgentConfig[]): AgentConfig | undefined {
-  // Honest, simple default - the first enabled agent - not a fabricated
-  // "smart" router. A real task-type-based router is future work.
-  return roster.find(a => a.enabled);
+export function pickAutoRouteAgent(roster: AgentConfig[], statuses?: Record<string, string>): AgentConfig | undefined {
+  // Copilot when the organisation has connected it (the main AI then), else
+  // Khami on this computer, else the first enabled agent. With no status
+  // information yet, fall back to the first enabled agent.
+  const enabled = roster.filter(a => a.enabled);
+  if (!statuses) return enabled[0];
+  const ready = (a: AgentConfig) => statuses[a.id] === 'online';
+  return enabled.find(a => a.provider === 'copilot' && ready(a))
+    ?? enabled.find(a => a.provider === 'khami')
+    ?? enabled.find(ready)
+    ?? enabled[0];
 }

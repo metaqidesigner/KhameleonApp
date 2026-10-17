@@ -35,6 +35,18 @@ describe('backendModeFor', () => {
   });
 });
 
+describe('pickAutoRouteAgent with live statuses', () => {
+  const copilot = makeAgent({ id: 'copilot', provider: 'copilot' });
+  const khami = makeAgent({ id: 'khami', provider: 'khami' });
+  const claude = makeAgent({ id: 'claude', provider: 'anthropic' });
+  it('prefers Copilot when it is connected', () => {
+    expect(pickAutoRouteAgent([copilot, khami, claude], { copilot: 'online', khami: 'online', claude: 'online' })?.id).toBe('copilot');
+  });
+  it('falls back to Khami when Copilot is not connected', () => {
+    expect(pickAutoRouteAgent([copilot, khami, claude], { copilot: 'standby', khami: 'online', claude: 'online' })?.id).toBe('khami');
+  });
+});
+
 describe('pickAutoRouteAgent', () => {
   it('picks the first enabled agent', () => {
     const roster = [makeAgent({ id: 'a', enabled: false }), makeAgent({ id: 'b', enabled: true }), makeAgent({ id: 'c', enabled: true })];

@@ -1,6 +1,20 @@
 import type { AgentConfig } from './types.js';
 
 export const DEFAULT_AGENTS: AgentConfig[] = [
+  // Microsoft 365 Copilot - the most common AI in organisations, so it's the
+  // main agent whenever it's connected (docs/khami-design.md). Only offered in
+  // the chat once a work account with a Copilot licence has signed in.
+  {
+    id:           'copilot',
+    name:         'COPILOT',
+    provider:     'copilot',
+    model:        'microsoft-365-copilot',
+    enabled:      true,
+    role:         'general',
+    systemPrompt: "You are helping inside Khameleon, a work assistant. Answer clearly and practically, in plain language. Never sign anything on the user's behalf; emails end with [Your name].",
+    color:        '#4f83e6',
+    initials:     'CP',
+  },
   // Khami - Khameleon's own AI, running on this computer (docs/khami-design.md).
   // First in the list, so it's the default when the chat auto-routes.
   {

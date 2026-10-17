@@ -51,6 +51,15 @@ export const PROVIDERS: ProviderDef[] = [
     credentials: 'MICROSOFT_CLIENT_ID + MICROSOFT_CLIENT_SECRET',
   },
   {
+    id: 'copilot',
+    label: 'Microsoft 365 Copilot',
+    covers: 'Copilot as your main AI in Khameleon',
+    dataScope: 'Copilot answers using your work email, calendar, Teams chats and files - read only. Needs a work account with a Microsoft 365 Copilot licence; your IT admin may need to approve.',
+    actionScope: 'None - Copilot only answers; it can\'t send, change or delete anything.',
+    startPath: '/api/auth/oauth/copilot/start',
+    credentials: 'MICROSOFT_CLIENT_ID + MICROSOFT_CLIENT_SECRET',
+  },
+  {
     id: 'spotify',
     label: 'Spotify',
     covers: 'Now playing + playback control',

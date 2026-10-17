@@ -19,6 +19,7 @@
  */
 
 import { Router, type Request, type Response } from "express";
+import { COPILOT_SCOPES, COPILOT_TENANT } from "../lib/copilotChat.js";
 import { saveToken, deleteToken, isConnected } from "../lib/oauthTokens.js";
 import {
   isAppAuthConfigured, verifyPassword, createSession, isValidSession, destroySession, currentUserId, SESSION_COOKIE,
@@ -248,6 +249,49 @@ async function exchangeMicrosoftCode(req: Request, code: string): Promise<void> 
   });
 }
 
+// ── Microsoft 365 Copilot (lib/copilotChat.ts) ───────────────────────────────
+// A separate sign-in from Outlook: work accounts only, a Copilot licence, and
+// the read permissions Microsoft's Copilot Chat API requires (admin approval).
+
+router.get("/oauth/copilot/start", (req: Request, res: Response) => {
+  const clientId = process.env.MICROSOFT_CLIENT_ID;
+  if (!clientId) {
+    res.status(503).json({ error: "MICROSOFT_CLIENT_ID not configured" });
+    return;
+  }
+  const url = new URL(`https://login.microsoftonline.com/${COPILOT_TENANT}/oauth2/v2.0/authorize`);
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", getRedirectUri(req));
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", COPILOT_SCOPES);
+  url.searchParams.set("response_mode", "query");
+  url.searchParams.set("state", makeState("copilot"));
+  res.redirect(url.toString());
+});
+
+async function exchangeCopilotCode(req: Request, code: string): Promise<void> {
+  const res = await fetch(`https://login.microsoftonline.com/${COPILOT_TENANT}/oauth2/v2.0/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id:     process.env.MICROSOFT_CLIENT_ID!,
+      client_secret: process.env.MICROSOFT_CLIENT_SECRET!,
+      redirect_uri:  getRedirectUri(req),
+      grant_type:    "authorization_code",
+      scope:         COPILOT_SCOPES,
+    }),
+  });
+  if (!res.ok) throw new Error(`Copilot sign-in failed: ${res.status} ${await res.text()}`);
+  const json = await res.json() as { access_token: string; refresh_token?: string; expires_in: number; scope: string };
+  await saveToken("copilot", {
+    accessToken:   json.access_token,
+    refreshToken:  json.refresh_token ?? null,
+    expiresInSecs: json.expires_in,
+    scope:         json.scope,
+  });
+}
+
 // ── Spotify ───────────────────────────────────────────────────────────────────
 
 const SPOTIFY_SCOPES = [
@@ -317,6 +361,7 @@ router.get("/oauth/callback", async (req: Request, res: Response) => {
   try {
     if (provider === "google")    await exchangeGoogleCode(req, code);
     else if (provider === "microsoft") await exchangeMicrosoftCode(req, code);
+    else if (provider === "copilot")   await exchangeCopilotCode(req, code);
     else if (provider === "spotify")   await exchangeSpotifyCode(req, code);
     else throw new Error(`Unknown provider: ${provider}`);
 

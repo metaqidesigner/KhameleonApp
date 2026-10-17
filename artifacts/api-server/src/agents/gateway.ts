@@ -6,6 +6,8 @@ import { dispatchTool } from "./tools/dispatcher.js";
 import { getCustomToolDefinitions, isCustomToolName, dispatchCustomTool, getMcpServerConfigs } from "./tools/customIntegrations.js";
 import { askKhami, khamiStatus } from "../engines/khami.js";
 import { toolsForAnyAi } from "./tools/anyAiTools.js";
+import { askCopilot } from "../lib/copilotChat.js";
+import { getToken } from "../lib/oauthTokens.js";
 import { pickSkill, skillInstructions } from "../lib/skillPicker.js";
 import { loadInstalledSkills, buildSkillCatalogPrompt, useSkillResult, USE_SKILL_TOOL, USE_SKILL_TOOL_NAME, type InstalledSkill } from "../lib/installedSkills.js";
 import { getApiKey } from "../lib/apiKeys.js";
@@ -366,6 +368,13 @@ export async function askAgent(
     if (!(agent.provider === "anthropic" && agent.useTools)) {
       messages = await withPickedSkill(agent, messages, onToolEvent);
     }
+    if (agent.provider === "copilot") {
+      // Copilot takes no tools; the picked skill travels in its instructions.
+      const systemMsg = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
+      const r = await askCopilot(systemMsg, messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
+      onToken?.(r.content); // Copilot's API answers in one piece here
+      return { agentId: agent.id, content: r.content, model: "Microsoft 365 Copilot", latencyMs: r.latencyMs, tokens: Math.ceil(r.content.length / 4), costUsd: 0, energyWh: 0 };
+    }
     if (agent.provider === "khami") {
       const systemMsg = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
       const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
@@ -396,5 +405,6 @@ export async function askAgent(
 export async function isAgentAvailable(agent: AgentConfig): Promise<boolean> {
   if (!agent.enabled) return false;
   if (agent.provider === "khami") return (await khamiStatus()).available;
+  if (agent.provider === "copilot") return !!(await getToken("copilot").catch(() => null));
   return !!(await resolveKey(agent));
 }

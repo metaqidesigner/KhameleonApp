@@ -1,6 +1,6 @@
 const BASE = import.meta.env.VITE_API_URL || '/api';
 
-export type Provider = 'khami'|'anthropic'|'openai'|'google'|'openrouter'|'ollama'|'minimax'|'custom';
+export type Provider = 'copilot'|'khami'|'anthropic'|'openai'|'google'|'openrouter'|'ollama'|'minimax'|'custom';
 export type AgentStatus = 'online'|'standby'|'offline'|'busy';
 export type AgentRole = 'general'|'research'|'code'|'analysis'|'creative';
 
@@ -124,6 +124,7 @@ export interface CompareResult {
 
 // ── Fallback roster shown when backend is offline ─────────
 export const FALLBACK_ROSTER: AgentConfig[] = [
+  { id:'copilot',    name:'COPILOT',    provider:'copilot',   model:'microsoft-365-copilot', enabled:true, role:'general', systemPrompt:'', color:'#4f83e6', initials:'CP' },
   { id:'khami',      name:'KHAMI',      provider:'khami',     model:'khami',             enabled:true, role:'general',  systemPrompt:'', color:'#6FE6BD', initials:'KH' },
   { id:'claude',     name:'CLAUDE',     provider:'anthropic', model:'claude-sonnet-4-6', enabled:true, role:'general',  systemPrompt:'', color:'#c9a84c', initials:'CL', useTools:true },
   { id:'gpt4o',      name:'GPT-4o',     provider:'openai',    model:'gpt-4o',            enabled:true, role:'general',  systemPrompt:'', color:'#00d4ff', initials:'GP' },
@@ -303,7 +304,7 @@ export async function askAll(
 
 // Provider display helpers
 export const PROVIDER_LABELS: Record<Provider, string> = {
-  khami:'Khami (on this computer)', anthropic:'Anthropic', openai:'OpenAI', google:'Google',
+  copilot:'Microsoft 365 Copilot', khami:'Khami (on this computer)', anthropic:'Anthropic', openai:'OpenAI', google:'Google',
   openrouter:'OpenRouter', ollama:'Ollama', minimax:'MiniMax', custom:'Custom',
 };
 

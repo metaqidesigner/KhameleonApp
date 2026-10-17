@@ -1,6 +1,7 @@
 import type { EngineStatus } from "./types.js";
 import { khamiStatus } from "./khami.js";
 import { getApiKey } from "../lib/apiKeys.js";
+import { getToken } from "../lib/oauthTokens.js";
 
 export * from "./types.js";
 export { askKhami, khamiStatus } from "./khami.js";
@@ -20,5 +21,11 @@ export async function engineStatuses(): Promise<EngineStatus[]> {
     const hasKey = !!(await getApiKey(c.id).catch(() => null)) || c.envKeys.some(k => !!process.env[k]);
     return { id: c.id, name: c.name, available: hasKey, note: hasKey ? undefined : "No API key added", onThisComputer: false };
   }));
-  return [await khamiStatus(), ...cloud];
+  const copilotConnected = !!(await getToken("copilot").catch(() => null));
+  const copilot: EngineStatus = {
+    id: "copilot", name: "Microsoft 365 Copilot", available: copilotConnected,
+    note: copilotConnected ? undefined : "Not connected - needs a work account with a Copilot licence", onThisComputer: false,
+  };
+  // Copilot first: the main AI whenever the organisation provides it.
+  return [copilot, await khamiStatus(), ...cloud];
 }

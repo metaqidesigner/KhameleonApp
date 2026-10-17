@@ -158,6 +158,33 @@ async function refreshMicrosoft(token: TokenRecord): Promise<TokenRecord> {
   return (await getToken("microsoft"))!;
 }
 
+async function refreshCopilot(token: TokenRecord): Promise<TokenRecord> {
+  if (!token.refreshToken) throw new Error("No refresh token for Copilot");
+  const clientId     = process.env.MICROSOFT_CLIENT_ID;
+  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("MICROSOFT_CLIENT_ID/SECRET not set");
+  // Same scopes and tenant as the sign-in (lib/copilotChat.ts) - kept literal
+  // here to avoid a circular import.
+  const res = await fetch("https://login.microsoftonline.com/organizations/oauth2/v2.0/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId, client_secret: clientSecret,
+      refresh_token: token.refreshToken, grant_type: "refresh_token",
+      scope: token.scope ?? "offline_access",
+    }),
+  });
+  if (!res.ok) throw new Error(`Copilot refresh failed: ${res.status} ${await res.text()}`);
+  const json = await res.json() as { access_token: string; refresh_token?: string; expires_in: number; scope?: string };
+  await saveToken("copilot", {
+    accessToken: json.access_token,
+    refreshToken: json.refresh_token ?? token.refreshToken,
+    expiresInSecs: json.expires_in,
+    scope: json.scope ?? token.scope,
+  });
+  return (await getToken("copilot"))!;
+}
+
 async function refreshSpotify(token: TokenRecord): Promise<TokenRecord> {
   if (!token.refreshToken) throw new Error("No refresh token for Spotify");
   const clientId     = process.env.SPOTIFY_CLIENT_ID;
@@ -186,6 +213,7 @@ async function refreshSpotify(token: TokenRecord): Promise<TokenRecord> {
 const REFRESHERS: Record<string, (t: TokenRecord) => Promise<TokenRecord>> = {
   google:    refreshGoogle,
   microsoft: refreshMicrosoft,
+  copilot:   refreshCopilot,
   spotify:   refreshSpotify,
 };
 

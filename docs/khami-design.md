@@ -18,6 +18,12 @@ Khami is Khameleon's own AI agent and **the main AI in Khameleon** — not a fal
 
 **On each person's computer by default, with an option to run it on the organisation's own Khameleon server.** Individuals get a fully offline Khami on their laptop; organisations can run one powerful copy on their Khameleon server for everyone - work still never leaves the company, and staff with older laptops get the stronger brain. Rejected: computer-only (limited by each laptop); server-only (no longer offline away from the office).
 
+## Microsoft 365 Copilot is the main agent when available (decided 2026-10-17)
+
+Newton: Copilot is the AI most organisations give their staff, so when a user has connected it, **Copilot is the main agent** - first in the chat's agent row and the default for ordinary chat. **Khami takes over** when Copilot isn't connected, when there's no internet, and for anything confidential (which never leaves the computer). Khami also does exact work (figures, sums, replaying steps) by code either way.
+
+How it connects: Microsoft's **Copilot Chat API** (Microsoft Graph, `/beta/copilot/conversations`) - currently a preview that Microsoft says isn't supported for production. Needs a work account with a Microsoft 365 Copilot licence, and the admin-approved read permissions Microsoft lists (Sites.Read.All, Mail.Read, People.Read.All, OnlineMeetingTranscript.Read.All, Chat.Read, ChannelMessage.Read.All, ExternalItem.Read.All). Copilot answers using the user's own Microsoft 365 data. It can't use Khameleon's tools or integrations; skills are passed to it as instructions. Each Khameleon turn starts a fresh Copilot conversation with earlier turns passed as context.
+
 ## How work flows
 
 1. **Khami does everything first, offline.**
