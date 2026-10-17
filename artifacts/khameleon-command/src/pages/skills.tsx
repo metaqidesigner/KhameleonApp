@@ -5,6 +5,7 @@ import { WorkDomainFilterBar, useWorkDomains } from '@/components/WorkDomainFilt
 import { type SkillSet, type CreateSkillSetInput, type SkillSetSourceType } from '@/lib/skillSetsApi';
 import { useSkillLibrary, SkillConfirmGate } from '@/components/skills/useSkillLibrary';
 import { GetSkills } from '@/components/skills/GetSkills';
+import { SkillGuide } from '@/components/skills/SkillGuide';
 import { useJarvisStore } from '@/store/jarvisStore';
 
 const STATUS_LABEL: Record<SkillSet['status'], string> = {
@@ -37,6 +38,7 @@ export default function Skills() {
   const [importMode, setImportMode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [guiding, setGuiding] = useState(false);
   const [editDraft, setEditDraft] = useState('');
 
   const filtered = useMemo(
@@ -128,6 +130,16 @@ export default function Skills() {
               </div>
             )}
           </div>
+        </JPanel>
+      </div>
+
+      {/* GUIDED - same skill maker as the Overlay's Skills panel (components/skills/SkillGuide). */}
+      <div style={{ flexShrink: 0 }}>
+        <JPanel title="MAKE YOUR OWN SKILL" icon={<Plus size={13} />}
+          action={<button className="j-btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 9 }} onClick={() => setGuiding(g => !g)}>{guiding ? 'CLOSE' : 'START GUIDE'}</button>}>
+          {guiding
+            ? <SkillGuide tone="classic" onCancel={() => setGuiding(false)} onSave={async input => { await lib.create(input); setGuiding(false); }} />
+            : <div style={{ fontSize: 11, color: 'var(--j-text-muted)' }}>A step-by-step guide: name it, write or draft the steps, check Khameleon would use it, save.</div>}
         </JPanel>
       </div>
 

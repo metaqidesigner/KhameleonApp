@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Download, Play, Plus, X } from "lucide-react
 import { useJarvisStore } from "@/store/jarvisStore";
 import { useSkillLibrary, SkillConfirmGate } from "@/components/skills/useSkillLibrary";
 import { GetSkills } from "@/components/skills/GetSkills";
+import { SkillGuide } from "@/components/skills/SkillGuide";
 import type { SkillSet, CreateSkillSetInput, SkillSetSourceType } from "@/lib/skillSetsApi";
 import type { WorkDomain } from "@/lib/workDomainsApi";
 import type { OverlayPalette } from "./palettes";
@@ -199,6 +200,7 @@ export function SkillsPanel({ palette, onClose }: { palette: OverlayPalette; onC
   const requestChatTool = useJarvisStore(s => s.requestChatTool);
   const [adding, setAdding] = useState(false);
   const [getting, setGetting] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const [domainFilter, setDomainFilter] = useState<number | "all">("all");
 
   useEffect(() => {
@@ -266,7 +268,16 @@ export function SkillsPanel({ palette, onClose }: { palette: OverlayPalette; onC
           {getting && <GetSkills tone="overlay" onInstall={lib.installFromGithub} />}
           {getting && lib.error && <div role="alert" style={{ fontSize: 12, color: "#ffb0b0" }}>{lib.error}</div>}
           {!getting && <>
-          {adding && <NewSkillForm onCreate={lib.create} onClose={() => setAdding(false)} />}
+          {/* New: the guided skill maker; "paste one" keeps the quick form for skills from elsewhere. */}
+          {adding && !pasting && (
+            <>
+              <SkillGuide tone="overlay" onCancel={() => setAdding(false)} onSave={async input => { await lib.create(input); setAdding(false); }} />
+              <button type="button" onClick={() => setPasting(true)} style={{ background: "none", border: "none", color: MUTED, fontSize: 11.5, cursor: "pointer", textAlign: "left", padding: 0, fontFamily: "inherit" }}>
+                Already have a skill written somewhere? Paste it instead
+              </button>
+            </>
+          )}
+          {adding && pasting && <NewSkillForm onCreate={lib.create} onClose={() => { setAdding(false); setPasting(false); }} />}
           {lib.error && <div role="alert" style={{ fontSize: 12, color: "#ffb0b0" }}>{lib.error}</div>}
           {lib.loading && <div style={{ fontSize: 12, color: MUTED }}>Loading skills…</div>}
 

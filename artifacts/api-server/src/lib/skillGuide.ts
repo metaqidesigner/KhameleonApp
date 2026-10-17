@@ -1,0 +1,51 @@
+/**
+ * The guided "make your own skill" helper (docs/build-review.md, Build 3
+ * follow-up). Two server-side helpers:
+ * - draftSkillSteps: asks the user's first available AI - Khami first,
+ *   then Copilot, then others - to turn a plain description of a task into
+ *   numbered steps, following Khameleon's own Skill writer skill.
+ * - testSkillMatch: tells the user whether a typical request would pick
+ *   their skill (lib/skillPicker.ts), and which words to add if not. Pure.
+ */
+import { pickSkill, words } from "./skillPicker.js";
+import type { InstalledSkill } from "./installedSkills.js";
+
+export interface MatchResult {
+  /** Name of the skill Khameleon would use for this request, or null. */
+  picked: string | null;
+  isThisSkill: boolean;
+  /** Words from the request the description could include to be picked. */
+  suggestWords: string[];
+}
+
+export function testSkillMatch(draft: { name: string; description: string }, request: string, installed: InstalledSkill[]): MatchResult {
+  const others = installed.filter(s => s.name.trim().toLowerCase() !== draft.name.trim().toLowerCase());
+  const pick = pickSkill(request, [...others, { name: draft.name, description: draft.description, content: "" }]);
+  const isThis = pick?.skill.name === draft.name;
+  const have = new Set([...words(draft.name), ...words(draft.description)]);
+  // Original wording of request words the skill doesn't mention yet.
+  const original = request.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  const suggestWords = isThis ? [] : [...new Set(original.filter(w => {
+    const stem = words(w)[0];
+    return stem && !have.has(stem);
+  }))].slice(0, 6);
+  return { picked: pick?.skill.name ?? null, isThisSkill: isThis, suggestWords };
+}
+
+export function draftStepsPrompt(skillWriterSteps: string, draft: { name: string; description: string; task: string; result?: string }): string {
+  return [
+    "Follow these guidelines for writing a Khameleon skill:",
+    "---", skillWriterSteps.trim(), "---",
+    `Skill name: ${draft.name || "(not named yet)"}`,
+    `What it's for: ${draft.description || "(not described yet)"}`,
+    `The task, in the user's words: ${draft.task}`,
+    draft.result ? `What the result should look like: ${draft.result}` : "",
+    "Write ONLY the numbered steps for this skill (5 to 10 steps), plain language, imperative. No title, no introduction, no closing remarks.",
+  ].filter(Boolean).join("\n");
+}
+
+/** Keeps just the numbered steps from an AI reply. Pure. */
+export function extractSteps(reply: string): string {
+  const lines = reply.split(/\r?\n/).map(l => l.trim()).filter(l => /^\d+[.)]\s+\S/.test(l));
+  return (lines.length ? lines : reply.split(/\r?\n/).filter(l => l.trim())).join("\n").trim();
+}

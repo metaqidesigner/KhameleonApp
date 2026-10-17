@@ -1,4 +1,10 @@
 import { Router } from "express";
+import { STARTER_SKILLS } from "../starterSkills.js";
+import { draftStepsPrompt, extractSteps, testSkillMatch } from "../lib/skillGuide.js";
+import { loadInstalledSkills } from "../lib/installedSkills.js";
+import { askAgent, isAgentAvailable } from "../agents/gateway.js";
+import { findAgent } from "../agents/defaults.js";
+import type { AgentConfig } from "../agents/types.js";
 import { db } from "@workspace/db";
 import {
   skillSetsTable, approvalsTable, actionReceiptsTable, entityWorkDomainsTable,
@@ -143,6 +149,39 @@ export async function createSkillSetRecord(body: CreateSkillSetBody): Promise<{ 
     .returning();
   return { skillSet, approvalId: approval.id };
 }
+
+// ── Guided skill making (lib/skillGuide.ts) ─────────────────────────────────
+
+/** Drafts numbered steps from a plain description, using the first available AI (Khami first). */
+router.post("/guide/draft-steps", async (req, res) => {
+  const { name, description, task, result } = req.body as { name?: string; description?: string; task?: string; result?: string };
+  if (!task?.trim()) { res.status(400).json({ error: "Describe the task first." }); return; }
+  try {
+    const writer = STARTER_SKILLS.find((s) => s.name === "Skill writer");
+    const order = ["khami", "copilot", "claude", "gpt4o", "gemini"];
+    let agent: AgentConfig | undefined;
+    for (const id of order) {
+      const a = findAgent(id);
+      if (a && (await isAgentAvailable(a))) { agent = a; break; }
+    }
+    if (!agent) { res.status(503).json({ error: "No AI is available - set up Khami first (head menu > Khami setup)." }); return; }
+    const prompt = draftStepsPrompt(writer?.content ?? "", { name: name ?? "", description: description ?? "", task, result });
+    const reply = await askAgent(agent, [{ role: "user", content: prompt }]);
+    if (reply.error) { res.status(502).json({ error: reply.error }); return; }
+    res.json({ steps: extractSteps(reply.content), by: agent.name });
+  } catch (err) {
+    req.log.error({ err }, "Error drafting skill steps");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/** Would a typical request pick this (not yet saved) skill? */
+router.post("/guide/test-match", async (req, res) => {
+  const { name, description, request } = req.body as { name?: string; description?: string; request?: string };
+  if (!request?.trim()) { res.status(400).json({ error: "Type a request to try." }); return; }
+  const installed = await loadInstalledSkills().catch(() => []);
+  res.json(testSkillMatch({ name: name ?? "", description: description ?? "" }, request, installed));
+});
 
 router.post("/", async (req, res) => {
   const body = req.body as CreateSkillSetBody;
