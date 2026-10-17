@@ -13,6 +13,10 @@ test("picks the matching starter skill for typical requests", () => {
   assert.equal(pick("Check this invoice before I pay it"), "Invoice check");
   assert.equal(pick("Help me put together my expense report from these receipts"), "Expense report preparation");
   assert.equal(pick("Write up the incident from this morning's outage"), "Incident write-up");
+  assert.equal(pick("Write a 3P update for the finance team for this week"), "Internal communications");
+  assert.equal(pick("Help me turn this task into a skill"), "Skill writer");
+  assert.equal(pick("Let's write a proposal document together for the new office"), "Document co-writing");
+  assert.equal(pick("Check this email follows our brand style rules"), "Brand style check");
 });
 
 test("uses no skill for unrelated questions", () => {

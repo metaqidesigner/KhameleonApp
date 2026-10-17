@@ -19,8 +19,6 @@ export const API_KEY_PROVIDER_DEFS: ApiKeyProviderDef[] = [
   { id: 'anthropic',  label: 'Anthropic (Claude)', placeholder: 'sk-ant-...',    helpUrl: 'console.anthropic.com/settings/keys' },
   { id: 'openai',     label: 'OpenAI (GPT)',       placeholder: 'sk-...',        helpUrl: 'platform.openai.com/api-keys' },
   { id: 'google',     label: 'Google (Gemini)',    placeholder: 'AIza...',       helpUrl: 'aistudio.google.com/apikey' },
-  { id: 'openrouter', label: 'OpenRouter',         placeholder: 'sk-or-...',     helpUrl: 'openrouter.ai/keys' },
-  { id: 'minimax',    label: 'Minimax',            placeholder: 'API key',       helpUrl: 'platform.minimax.chat' },
 ];
 
 export interface ProviderDef {

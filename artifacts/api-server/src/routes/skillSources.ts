@@ -14,7 +14,9 @@ import { createSkillSetRecord } from "./skillSets.js";
 const router = Router();
 
 const SOURCES_KEY = "skill_sources";
-const DEFAULT_SOURCES = [{ url: "https://github.com/anthropics/skills", label: "Anthropic - public skills" }];
+// No third-party source by default (docs/legal-compliance.md, rule 1): users
+// and organisations add the collections they choose to follow.
+const DEFAULT_SOURCES: { url: string; label: string }[] = [];
 
 type Source = { url: string; label: string };
 

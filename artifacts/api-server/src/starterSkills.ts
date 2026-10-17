@@ -11,6 +11,13 @@
 export interface StarterSkill {
   name: string;
   description: string;
+  /**
+   * Set when the skill was adapted from someone else's openly licensed
+   * work - the licence notice and "modified" statement then live on the
+   * About -> Licences page (docs/legal-compliance.md). Never shown in the
+   * skill itself.
+   */
+  adaptedFrom?: string;
   /** Name of a built-in work domain (seed-skill-sets-data.ts DEFAULT_WORK_DOMAINS). */
   domain: string;
   content: string;
@@ -187,6 +194,86 @@ export const STARTER_SKILLS: StarterSkill[] = [
       "Risks or concerns raised.",
       "Questions a board member is likely to ask.",
       "Never add figures that aren't in the report.",
+    ]),
+  },
+  // ── Added 2026-10-17 (docs/legal-compliance.md) ────────────────────────
+  {
+    name: "Internal communications",
+    description: "Writes internal communications in clear, consistent formats: weekly 3P updates (Progress, Plans, Problems), company newsletters, FAQ answers, and general announcements to staff.",
+    domain: "Administration",
+    adaptedFrom: "Anthropic internal-comms skill (Apache 2.0), modified for Khameleon",
+    content: [
+      "When asked to write an internal communication:",
+      "1. Work out which kind it is: a 3P update, a newsletter, FAQ answers, or a general message. If it isn't clear, ask.",
+      "2. Use only what the user has given you or what's in the conversation. If something important is missing (team name, dates, the actual news), ask for it rather than inventing it.",
+      "3. Write it in the matching format below, then offer to adjust tone or length.",
+      "",
+      "=== 3P update (Progress, Plans, Problems) ===",
+      "For leaders and teammates who have some context but not a lot. Readable in under a minute. Covers one team over one period, usually a week. The bigger the team, the less detail per item.",
+      "Format - keep exactly this shape:",
+      "[an emoji that suits the update] [Team name] ([dates covered])",
+      "Progress: [1-3 sentences - what was finished or achieved, with numbers where possible]",
+      "Plans: [1-3 sentences - the top priorities for the next period]",
+      "Problems: [1-3 sentences - what's slowing the team down: blockers, missing people or information]",
+      "Matter-of-fact tone. If the team name or dates are missing, ask.",
+      "",
+      "=== Company newsletter ===",
+      "For everyone in the organisation, covering the past week or month. About 15-25 short bullet points, each 1-2 sentences. Write as \"we\" - you're part of the organisation.",
+      "Group bullets under a few headed sections that fit the news, for example: Announcements, Progress on priorities, People and hiring, Customers and partners, Coming up.",
+      "Focus on things that affect most people: leadership announcements, big milestones, organisation-wide changes, external recognition. Leave out small team details (those belong in 3P updates) and anything already widely announced. Include links when the user provides them.",
+      "",
+      "=== FAQ answers ===",
+      "For questions many people are asking. Format each one as:",
+      "Question: [one sentence]",
+      "Answer: [one or two sentences]",
+      "Base answers on official information the user gives you. If something is uncertain, say so. Point out any question that needs an official answer from leadership.",
+      "",
+      "=== General message ===",
+      "For anything that doesn't fit the formats above. First confirm the audience, the purpose, the tone (formal, friendly, urgent, informational) and any format requirements. Then: most important information first, short sentences, active voice, clear next steps or links.",
+    ].join("\n"),
+  },
+  {
+    name: "Skill writer",
+    description: "Helps write or improve a Khameleon skill: turns a task you describe or have just done into clear, reusable steps with a good name and description, then tests and refines it.",
+    domain: "Change",
+    adaptedFrom: "Anthropic skill-creator skill (Apache 2.0), instructions only, modified for Khameleon",
+    content: steps("When asked to create or improve a skill:", [
+      "Understand the task first. If it was just done in this conversation, take the steps, the order, any corrections the user made, and the inputs and outputs from there. Otherwise ask: what should the skill achieve, when should it be used, and what should the result look like? Ask about edge cases and examples before writing anything.",
+      "Write a short, plain name for the skill (e.g. \"Supplier invoice check\").",
+      "Write a one- or two-sentence description that says what the skill does AND when to use it, using the words people actually say when they need it (e.g. \"invoice\", \"supplier\", \"check before paying\"). Khameleon picks skills by matching requests against names and descriptions, so this is what makes the skill get used.",
+      "Write the steps as numbered, plain instructions in the imperative (\"Check that...\", \"List...\"). Explain why a step matters when it isn't obvious - that helps the skill handle situations the steps didn't foresee. Avoid shouting rules in capitals.",
+      "Say exactly what the finished result should look like (sections, headings, a table, a short summary). Tell the skill to ask for missing information instead of guessing, and to mark anything uncertain.",
+      "Keep it lean: remove steps that don't change the result. If it's getting long, split it into a main workflow plus clearly named reference sections.",
+      "Never write a skill whose real purpose would surprise the person using it, or that tries to get around security, permissions or the organisation's rules.",
+      "Suggest two or three realistic requests to try the skill with, the way a real person would phrase them. After trying them, improve the skill by fixing the underlying cause, not by patching one example.",
+      "Show the finished skill (name, description, steps) for the user to review before they save it.",
+    ]),
+  },
+  {
+    name: "Document co-writing",
+    description: "Works through writing a structured document together - a proposal, plan, specification, decision paper or report - from purpose and outline to a finished draft.",
+    domain: "Change",
+    content: steps("When asked to help write a document together:", [
+      "Agree the basics before writing: what the document is for, who will read it, what decision or action it should lead to, roughly how long it should be, and the deadline. Ask about anything you don't know.",
+      "Gather the material: ask the user for their notes, facts, figures and any previous versions. Note what's still missing.",
+      "Propose an outline: the sections in order, with one line on what each will cover. Get the user's agreement or changes before drafting.",
+      "Draft one section at a time, starting with the one that matters most to the reader. After each, ask whether it's right before moving on.",
+      "Keep the reader in mind: lead with the main point or recommendation, use plain language, put detail in later sections or an appendix, and mark any figure or claim you couldn't confirm.",
+      "When all sections are drafted, read the whole document as the reader would. Point out gaps, repetition and anything unclear, and suggest fixes.",
+      "Finish with a short summary at the top (three to five sentences) and a list of open questions or decisions still needed.",
+    ]),
+  },
+  {
+    name: "Brand style check",
+    description: "Checks a document, email or presentation text against your organisation's brand and writing rules - name usage, tone, terminology, formatting - and suggests corrections.",
+    domain: "Governance",
+    content: steps("When asked to check something against the organisation's brand or style:", [
+      "Find the rules to check against. Use the rules below if they've been filled in; otherwise ask the user for their brand or style guide, or the key rules (how the organisation's name is written, tone of voice, words to use and avoid, formatting conventions).",
+      "Go through the text and list each place it doesn't follow a rule: quote the text, say which rule it breaks, and give a corrected version.",
+      "Check consistency too: the same terms, spellings, capitalisation, date and number formats throughout.",
+      "Separate definite problems from suggestions, so the user knows what must change and what's optional.",
+      "Finish with a corrected version of the full text if the user wants one.",
+      "Our brand rules (edit this skill to fill these in): Organisation name written as: [ ]. Tone of voice: [ ]. Words to use: [ ]. Words to avoid: [ ]. Formatting conventions: [ ].",
     ]),
   },
 ];

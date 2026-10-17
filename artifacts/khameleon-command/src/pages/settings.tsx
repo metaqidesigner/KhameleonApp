@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { LookLayoutControls, useSyncAcrossWindows } from '@/components/overlay/LookLayoutControls';
 import { KhamiSetup } from '@/components/khami/KhamiSetup';
+import { AboutLicences } from '@/components/about/AboutLicences';
 import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin, Music, Play, Pause, SkipForward, SkipBack, Mic } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
@@ -18,8 +19,8 @@ import {
 import { getQuotaSnapshots, type QuotaSnapshots } from '@/lib/quotaApi';
 import { getTtsStatus, getElevenLabsVoices, type ElevenLabsVoice } from '@/lib/voiceApi';
 
-type Section = 'GENERAL' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED';
-const SECTIONS: Section[] = ['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MEMORY', 'TELEMETRY', 'ADVANCED'];
+type Section = 'GENERAL' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED' | 'ABOUT';
+const SECTIONS: Section[] = ['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MEMORY', 'TELEMETRY', 'ADVANCED', 'ABOUT'];
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -995,7 +996,8 @@ export default function Settings() {
           {active === 'APPEARANCE' && <AppearanceSection />}
           {active === 'VOICE'      && <VoiceSection />}
           {active === 'CONNECTORS' && <ConnectorsSection />}
-          {!['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS'].includes(active) && <GenericSection section={active} />}
+          {active === 'ABOUT'      && <AboutLicences tone="classic" />}
+          {!['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'ABOUT'].includes(active) && <GenericSection section={active} />}
         </div>
       </JPanel>
     </div>

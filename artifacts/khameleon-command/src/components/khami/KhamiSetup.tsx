@@ -109,7 +109,7 @@ export function KhamiSetup({ tone, onReady }: { tone: Tone; onReady?: () => void
           </button>
         </div>
       )}
-      <div style={{ fontSize: 10.5, color: t.muted }}>Khami's brain is {choice.modelName}, an open model licensed for commercial use (Apache 2.0).</div>
+      <div style={{ fontSize: 10.5, color: t.muted }}>Licences for the parts Khami is built on are listed under About Khameleon → Licences.</div>
     </div>
   );
 }

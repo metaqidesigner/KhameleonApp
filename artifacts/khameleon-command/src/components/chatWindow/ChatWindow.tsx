@@ -260,7 +260,9 @@ function AgentStrip({ roster, statuses, pinnedId, onPin, zdrKnown }: {
       <button type="button" onClick={() => onPin(null)} className="chat-agent-pill" data-active={pinnedId === null} title="Let Khameleon choose the agent">
         Auto-route
       </button>
-      {roster.map(a => (
+      {/* Khami is always offered (it's the main AI); other AIs only appear once the
+          organisation has added a key for them (docs/legal-compliance.md, rule 1). */}
+      {roster.filter(a => a.provider === 'khami' || statuses[a.id] === 'online').map(a => (
         <button key={a.id} type="button" onClick={() => onPin(a.id)} className="chat-agent-pill" data-active={pinnedId === a.id} title={`${a.name} - ${statuses[a.id] ?? 'offline'}`}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_DOT_COLOR[statuses[a.id] ?? 'offline'], display: 'inline-block', marginRight: 5 }} />
           {a.name}

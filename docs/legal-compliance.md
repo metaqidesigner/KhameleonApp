@@ -24,7 +24,7 @@ This document is the technical record of what Khameleon uses from third parties 
 | Anthropic "skill-creator" skill | Adapted (instructions only) into Khameleon's **Skill writer** skill | Apache 2.0 | Include licence and notice; state that it was modified |
 | Model Context Protocol SDK | Khameleon's own Integrations client | MIT | Include copyright and licence |
 | tesseract.js | Reads text from scanned documents | Apache 2.0 | Include licence and notice |
-| pdf-parse | Reads text from PDFs | Check at clean-up | — |
+| pdf-parse | Reads text from PDFs | Apache 2.0 | Include licence and notice |
 | Electron | Desktop app | MIT (plus bundled Chromium notices) | Ship Electron's own licence files |
 | React, Vite, Express, Drizzle, Zustand and other npm packages | App and server | Mostly MIT/ISC/Apache — full list to be generated | Generate full list from `pnpm licenses` at clean-up |
 | Anthropic SDK (`@anthropic-ai/sdk`) | Talking to Claude when an organisation has it | MIT | Include copyright and licence |

@@ -380,7 +380,8 @@ export async function askAgent(
         onToolEvent: onToolEvent as ((e: import("../engines/types.js").EngineToolEvent) => void) | undefined,
       });
       // On this computer: no per-use cost, and energy isn't estimated for local runs.
-      return { agentId: agent.id, content: r.content, model: `Khami (${r.model})`, latencyMs: r.latencyMs, tokens: r.tokens, costUsd: 0, energyWh: 0 };
+      // The brain's own name stays on the Licences page, not in the product.
+      return { agentId: agent.id, content: r.content, model: "Khami", latencyMs: r.latencyMs, tokens: r.tokens, costUsd: 0, energyWh: 0 };
     }
     if (agent.provider === "anthropic") {
       return await askAnthropic(agent, messages, onToken, onToolEvent);
