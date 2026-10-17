@@ -12,6 +12,7 @@ This document is the technical record of what Khameleon uses from third parties 
 4. **No third-party trademarks in branding.** Licences like Apache 2.0 don't grant trademark rights. Naming a provider only to say Khameleon works with it (e.g. "your organisation's Claude key") is generally acceptable; logos and anything implying endorsement are not.
 5. **Changed third-party material is marked as changed** where its licence requires it (Apache 2.0 §4(b)).
 6. **Skills users install from outside sources** (Get skills) show their licence before install; restricted licences are refused; skills with no stated licence carry a warning. Programs inside such skills are never run.
+7. **Integrations users connect** (Get integrations) are third-party services under their own terms. Khameleon shows who publishes each one and where it runs, never claims a listing is "official", and the user chooses what to connect. Data the AI sends to a connected integration is governed by that service's terms - say so in Khameleon's terms of use.
 
 ## What Khameleon uses today (to be completed in the clean-up)
 
@@ -42,4 +43,6 @@ This document is the technical record of what Khameleon uses from third parties 
 - [ ] Check the skills shipped with Khameleon: adapted ones keep their notice and "modified" statement; new ones contain no copied text.
 - [ ] Review terms of service for every AI provider Khameleon can connect to (Anthropic, OpenAI, Google, Microsoft Azure) for anything affecting how Khameleon may use or present them.
 - [ ] Check whether Microsoft's Copilot Chat API has left preview and what its production terms require (licensing, data handling, branding) before relying on it for paying customers.
+- [ ] Khameleon's own terms of use: users are responsible for the skills they install and the integrations they connect; connected services' own terms apply to data sent to them.
+- [ ] Public MCP directory (registry.modelcontextprotocol.io): check its terms of use for listing/showing its entries in a commercial product.
 - [ ] Legal review of this document and the licences page.

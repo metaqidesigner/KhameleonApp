@@ -24,6 +24,12 @@ export interface ConfirmGateProps {
   /** Action category: 'email_send', 'post_public', 'submit_form', etc. */
   category: string;
 
+  /** Heading over `target` - defaults to "Recipient" (email sends). */
+  targetLabel?: string;
+  /** Heading over the payload - defaults to "Content to be sent". */
+  payloadLabel?: string;
+  /** Heading over `scope` - defaults to "Permission scope". */
+  scopeLabel?: string;
   /** Recipient or target being acted upon */
   target: string;
 
@@ -92,6 +98,9 @@ export function ConfirmGate({
   error,
   severity = 'medium',
   warning,
+  targetLabel = 'Recipient',
+  payloadLabel = 'Content to be sent',
+  scopeLabel = 'Permission scope',
 }: ConfirmGateProps) {
   const [editingContent, setEditingContent] = useState(editableContent || '');
   const [isEditing, setIsEditing] = useState(allowEdit && editableContent ? false : false);
@@ -202,7 +211,7 @@ export function ConfirmGate({
         <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div>
             <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: '#8fa39c', letterSpacing: '0.08em', marginBottom: '4px' }}>
-              Recipient
+              {targetLabel}
             </div>
             <div
               style={{
@@ -223,7 +232,7 @@ export function ConfirmGate({
           <div>
             <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: '#8fa39c', letterSpacing: '0.08em', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Lock size={10} />
-              Permission Scope
+              {scopeLabel}
             </div>
             <div
               style={{
@@ -252,7 +261,7 @@ export function ConfirmGate({
             }}
           >
             <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: '#8fa39c', letterSpacing: '0.08em' }}>
-              Content to be sent
+              {payloadLabel}
             </div>
             {!isEditing && (
               <button

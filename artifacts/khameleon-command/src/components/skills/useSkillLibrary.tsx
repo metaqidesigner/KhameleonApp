@@ -115,22 +115,19 @@ export function SkillConfirmGate({ gate, onConfirm, onCancel }: { gate: SkillGat
   return (
     <ConfirmGate
       title={gate.kind === 'install' ? `Install "${s.name}"` : `Save changes to "${s.name}"`}
-      category={gate.kind === 'install' ? 'skill_set_install' : 'skill_set_update'}
+      category={gate.kind === 'install' ? (external ? 'Install a skill from outside Khameleon' : 'Install a skill') : 'Change a skill'}
       target={s.name}
-      scope={JSON.stringify({ tools, integrations })}
+      targetLabel="Skill"
+      scope={tools.length || integrations.length ? [...tools, ...integrations].join(', ') : 'No extra tools or integrations - instructions only'}
+      scopeLabel="Access it asks for"
+      payloadLabel="What it will do (full instructions)"
       severity={external ? 'high' : 'medium'}
       confirmLabel={gate.kind === 'install' ? 'Confirm & Install' : 'Confirm & Save'}
       warning={external
-        ? `Imported from ${s.sourceType}${s.sourceUrl ? ` (${s.sourceUrl})` : ''}${s.sourceAuthor ? ` by ${s.sourceAuthor}` : ''}. Review the full content below before installing.`
+        ? `From ${s.sourceUrl ?? s.sourceType}${s.sourceAuthor ? `, by ${s.sourceAuthor}` : ''}. Read the instructions below before installing - they'll guide the AI whenever this skill is used.`
         : gate.kind === 'update' ? 'This change gives the skill access it did not have before.' : undefined}
       payload={
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {(tools.length > 0 || integrations.length > 0) && (
-            <div><strong>Requested access:</strong> {[...tools, ...integrations].join(', ')}</div>
-          )}
-          <div><strong>Full content:</strong></div>
-          <div style={{ whiteSpace: 'pre-wrap' }}>{s.content || '(no content)'}</div>
-        </div>
+        <div style={{ whiteSpace: 'pre-wrap' }}>{s.content || '(no content)'}</div>
       }
       onConfirm={onConfirm}
       onCancel={onCancel}

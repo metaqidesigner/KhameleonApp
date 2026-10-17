@@ -14,6 +14,7 @@
  */
 
 import { Router } from "express";
+import { forgetMcpSignIn } from "../lib/mcpAuth.js";
 import { db } from "@workspace/db";
 import { customIntegrationsTable } from "@workspace/db";
 import { and, eq, isNull } from "drizzle-orm";
@@ -208,12 +209,14 @@ router.delete("/:id", async (req, res) => {
     const deleted = await db
       .delete(customIntegrationsTable)
       .where(and(eq(customIntegrationsTable.id, id), ownedScope(customIntegrationsTable.userId)))
-      .returning({ id: customIntegrationsTable.id });
+      .returning({ id: customIntegrationsTable.id, sourceUrl: customIntegrationsTable.sourceUrl });
 
     if (deleted.length === 0) {
       res.status(404).json({ error: "Integration not found" });
       return;
     }
+    // Removing an integration also forgets its sign-in details.
+    if (deleted[0].sourceUrl) await forgetMcpSignIn(deleted[0].sourceUrl).catch(() => undefined);
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "Error deleting custom integration");

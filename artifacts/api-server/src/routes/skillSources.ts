@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq, inArray } from "drizzle-orm";
-import { db, settingsTable, skillSetsTable } from "@workspace/db";
+import { and, eq, inArray, ne } from "drizzle-orm";
+import { db, settingsTable, skillSetsTable, actionReceiptsTable } from "@workspace/db";
 import { listGithubSkills, previewGithubSkill } from "../lib/githubSkills.js";
 import { parseGithubUrl } from "../lib/skillMd.js";
 import { createSkillSetRecord } from "./skillSets.js";
@@ -98,6 +98,34 @@ router.post("/install", async (req, res) => {
       sourceUpdatedAt: p.version,
     });
     return res.status(201).json({ ...result, licence: p.licence, programs: p.programs });
+  } catch (err) {
+    return fail(res, err);
+  }
+});
+
+/**
+ * Apply the creator's latest version of an installed GitHub skill, after the
+ * user has reviewed it (the app shows the new content first). Licence is
+ * re-checked; a skill that became restricted isn't updated.
+ */
+router.post("/update", async (req, res) => {
+  const { url } = req.body as { url?: string };
+  try {
+    const p = await previewGithubSkill(url ?? "");
+    if (p.licence.kind === "restricted") {
+      return res.status(403).json({ error: `The new version of "${p.name}" has a restricted licence, so Khameleon won't update to it.` });
+    }
+    const [row] = await db.select().from(skillSetsTable)
+      .where(and(eq(skillSetsTable.sourceUrl, p.url), ne(skillSetsTable.status, "uninstalled"))).limit(1);
+    if (!row) return res.status(404).json({ error: "That skill isn't installed." });
+    const [updated] = await db.update(skillSetsTable)
+      .set({ content: p.content, description: p.description, sourceUpdatedAt: p.version })
+      .where(eq(skillSetsTable.id, row.id)).returning();
+    await db.insert(actionReceiptsTable).values({
+      description: `Updated skill "${updated.name}" to its creator's latest version`,
+      category: "skill_set_update", scope: "local", outcome: "success", target: updated.name, canUndo: false,
+    });
+    return res.json(updated);
   } catch (err) {
     return fail(res, err);
   }

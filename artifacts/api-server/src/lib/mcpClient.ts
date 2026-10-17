@@ -7,10 +7,13 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { mcpAuthProvider } from "./mcpAuth.js";
 
 export interface McpServer {
   url: string;
   token?: string;
+  /** Signed in through the service (lib/mcpAuth.ts) rather than a pasted key. */
+  signedIn?: boolean;
 }
 
 export interface McpTool {
@@ -24,12 +27,14 @@ const clients = new Map<string, { client: Promise<Client>; timer: NodeJS.Timeout
 
 async function connect(server: McpServer): Promise<Client> {
   const headers = server.token ? { Authorization: `Bearer ${server.token}` } : undefined;
+  const authProvider = server.signedIn ? mcpAuthProvider(server.url) : undefined;
   const url = new URL(server.url);
   const client = new Client({ name: "khameleon", version: "1.0.0" });
   try {
-    await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers } }));
+    await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers }, authProvider }));
     return client;
-  } catch {
+  } catch (err) {
+    if (authProvider) throw err; // sign-in problems shouldn't fall through to the older transport
     // Older servers only speak the SSE transport.
     const fallback = new Client({ name: "khameleon", version: "1.0.0" });
     await fallback.connect(new SSEClientTransport(url, { requestInit: { headers } }));
@@ -38,7 +43,7 @@ async function connect(server: McpServer): Promise<Client> {
 }
 
 function clientFor(server: McpServer): Promise<Client> {
-  const key = `${server.url}|${server.token ?? ""}`;
+  const key = `${server.url}|${server.token ?? ""}|${server.signedIn ? "signed-in" : ""}`;
   const existing = clients.get(key);
   if (existing) {
     existing.timer.refresh();

@@ -43,3 +43,4 @@ export const previewSkill = (url: string) => fetch(`${BASE}/skill-sources/previe
 export const installSkillFromGithub = (url: string) =>
   fetch(`${BASE}/skill-sources/install`, send('POST', { url }))
     .then(r => json<{ skillSet: import('./skillSetsApi').SkillSet; approvalId: number | null }>(r));
+export const updateSkillFromGithub = (url: string) => fetch(`${BASE}/skill-sources/update`, send('POST', { url })).then(r => json<import('./skillSetsApi').SkillSet>(r));

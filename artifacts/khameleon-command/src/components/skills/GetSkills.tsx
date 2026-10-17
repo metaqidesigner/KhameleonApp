@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getSkillSources, addSkillSource, removeSkillSource, browseSkills, previewSkill, type SkillSource, type RemoteSkill, type RemoteSkillPreview } from '@/lib/skillSourcesApi';
+import { getSkillSources, addSkillSource, removeSkillSource, browseSkills, previewSkill, updateSkillFromGithub, type SkillSource, type RemoteSkill, type RemoteSkillPreview } from '@/lib/skillSourcesApi';
 
 /**
  * Get skills (docs/build-review.md, Build 16): browse followed GitHub
@@ -29,6 +29,7 @@ export function GetSkills({ tone, onInstall }: { tone: Tone; onInstall: (url: st
   const [open, setOpen] = useState<string | null>(null);
   const [preview, setPreview] = useState<RemoteSkillPreview | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [reviewingUpdate, setReviewingUpdate] = useState<string | null>(null);
 
   const browse = useCallback(async (url: string) => {
     setCurrent(url);
@@ -49,6 +50,19 @@ export function GetSkills({ tone, onInstall }: { tone: Tone; onInstall: (url: st
     setOpen(s.url);
     setPreview(null);
     try { setPreview(await previewSkill(s.url)); } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong'); }
+  };
+
+  /** Shows the creator's new version; "Apply update" replaces the installed one. */
+  const reviewUpdate = async (s: RemoteSkill) => {
+    setReviewingUpdate(s.url);
+    if (open !== s.url) await toggle(s);
+  };
+  const applyUpdate = async (s: RemoteSkill) => {
+    setBusy(s.url);
+    setError(null);
+    try { await updateSkillFromGithub(s.url); setReviewingUpdate(null); if (current) await browse(current); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong'); }
+    setBusy(null);
   };
 
   const install = async (s: RemoteSkill) => {
@@ -129,7 +143,19 @@ export function GetSkills({ tone, onInstall }: { tone: Tone; onInstall: (url: st
             <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
               {s.installedStatus === 'installed' && !s.updateAvailable && <span style={{ fontSize: 11.5, color: t.good }}>Installed</span>}
               {s.installedStatus === 'pending' && <span style={{ fontSize: 11.5, color: t.warn }}>Waiting for your confirmation in My skills</span>}
-              {s.updateAvailable && <span style={{ fontSize: 11.5, color: t.warn }}>The creator has updated this skill</span>}
+              {s.updateAvailable && reviewingUpdate !== s.url && (
+                <>
+                  <span style={{ fontSize: 11.5, color: t.warn }}>The creator has updated this skill</span>
+                  <button type="button" style={btn(true)} onClick={() => void reviewUpdate(s)}>Review update</button>
+                </>
+              )}
+              {s.updateAvailable && reviewingUpdate === s.url && (
+                <>
+                  <span style={{ fontSize: 11.5, color: t.muted }}>The new version is shown above.</span>
+                  <button type="button" style={btn(true)} disabled={busy === s.url} onClick={() => void applyUpdate(s)}>{busy === s.url ? 'Updating…' : 'Apply update'}</button>
+                  <button type="button" style={btn()} onClick={() => setReviewingUpdate(null)}>Not now</button>
+                </>
+              )}
               {!s.installedStatus && (restricted
                 ? <span style={{ fontSize: 11.5, color: t.bad }}>Can't be installed - restricted licence</span>
                 : <button type="button" style={btn(true)} disabled={busy === s.url} onClick={() => void install(s)}>{busy === s.url ? 'Installing…' : 'Install…'}</button>)}

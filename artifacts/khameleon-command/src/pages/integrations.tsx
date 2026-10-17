@@ -4,6 +4,7 @@ import JPanel from '@/components/JPanel';
 import { WorkDomainFilterBar, useWorkDomains } from '@/components/WorkDomainFilterBar';
 import { ConnectIntegrationGate } from '@/components/ConnectIntegrationGate';
 import { ImportCustomIntegration } from '@/components/ImportCustomIntegration';
+import { GetIntegrations } from '@/components/integrations/GetIntegrations';
 import { getIntegrations, disconnectIntegration, type IntegrationEntry } from '@/lib/integrationsApi';
 import { getCustomIntegrations, removeCustomIntegration, type CustomIntegrationEntry } from '@/lib/customIntegrationsApi';
 import { setEntityWorkDomains } from '@/lib/workDomainsApi';
@@ -70,6 +71,14 @@ export default function Integrations() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%', padding: 8 }}>
+      {/* Same module as the Overlay's Integrations panel (components/integrations/GetIntegrations). */}
+      <div style={{ flexShrink: 0 }}>
+        <JPanel title="GET INTEGRATIONS" icon={<Plug size={13} />}>
+          <div style={{ maxHeight: 360, overflowY: 'auto' }} className="scrollbar-jarvis">
+            <GetIntegrations tone="classic" />
+          </div>
+        </JPanel>
+      </div>
       {/* .j-panel hardcodes height:100% - without flexShrink:0 here this
           panel inflates to fill the flex column and starves the
           scrollable list below to 0 height (documented gotcha, hit
