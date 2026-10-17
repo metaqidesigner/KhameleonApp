@@ -6,6 +6,7 @@ import {
   type SkillSet, type CreateSkillSetInput,
 } from '@/lib/skillSetsApi';
 import { getWorkDomains, setEntityWorkDomains, type WorkDomain } from '@/lib/workDomainsApi';
+import { installSkillFromGithub } from '@/lib/skillSourcesApi';
 
 /**
  * Skills logic shared by the Overlay's Skills panel and Classic's Skills
@@ -56,6 +57,14 @@ export function useSkillLibrary() {
     install: (s: SkillSet) => attempt(async () => {
       const { skillSet, approvalId } = await installSkillSetFromCatalog(s.id);
       if (approvalId) setGate({ kind: 'install', skillSet, approvalId, fullContent: skillSet.sourceType !== 'authored' });
+      reload();
+    }, "Couldn't install the skill"),
+
+    /** Get skills: install from a GitHub link - always shows the full-content gate (outside source). */
+    installFromGithub: (url: string) => attempt(async () => {
+      const { skillSet, approvalId } = await installSkillFromGithub(url);
+      const row = { ...skillSet, workDomainIds: skillSet.workDomainIds ?? [], pendingApprovalId: approvalId };
+      if (approvalId) setGate({ kind: 'install', skillSet: row, approvalId, fullContent: true });
       reload();
     }, "Couldn't install the skill"),
 

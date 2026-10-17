@@ -52,7 +52,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-interface CreateSkillSetBody {
+export interface CreateSkillSetBody {
   name: string;
   description?: string;
   content?: string;
@@ -71,77 +71,84 @@ interface CreateSkillSetBody {
  * and the requested scope, decided by requiresHardGate() (unit-tested,
  * lib/skillSetScope.ts) - never by a client-supplied flag.
  */
-router.post("/", async (req, res) => {
-  const body = req.body as CreateSkillSetBody;
-  if (!body?.name) { res.status(400).json({ error: "name is required" }); return; }
-
+/**
+ * Creates a skill and decides - from source and scope, never a client flag -
+ * whether it installs immediately or waits behind the hard gate. Shared by
+ * POST / and Get skills (routes/skillSources.ts) so every route into the
+ * catalogue goes through the same check.
+ */
+export async function createSkillSetRecord(body: CreateSkillSetBody): Promise<{ skillSet: typeof skillSetsTable.$inferSelect; approvalId: number | null }> {
   const sourceType = body.sourceType ?? "authored";
   const requestedTools = parseJsonArray(body.requestedTools);
   const requestedIntegrationIds = parseJsonArray(body.requestedIntegrationIds);
   const gated = requiresHardGate({ sourceType, requestedTools, requestedIntegrationIds });
 
-  try {
-    const [skillSet] = await db
-      .insert(skillSetsTable)
-      .values({
-        name: body.name,
-        description: body.description ?? "",
-        content: body.content ?? "",
-        sourceType,
-        sourceUrl: body.sourceUrl ?? null,
-        sourceAuthor: body.sourceAuthor ?? null,
-        sourceUpdatedAt: body.sourceUpdatedAt ?? null,
-        requestedTools,
-        requestedIntegrationIds,
-        status: gated ? "pending" : "installed",
-        installedAt: gated ? null : new Date(),
-      })
-      .returning();
-
-    for (const domainId of body.workDomainIds ?? []) {
-      await db.insert(entityWorkDomainsTable).values({ entityType: "skill_set", entityId: String(skillSet.id), workDomainId: domainId });
-    }
-
-    if (!gated) {
-      await db.insert(actionReceiptsTable).values({
-        description: `Installed Skill Set "${skillSet.name}"`,
-        category: "skill_set_install",
-        scope: "local, no new tool/data access",
-        outcome: "success",
-        target: skillSet.name,
-        canUndo: true,
-      });
-      res.status(201).json({ skillSet, approvalId: null });
-      return;
-    }
-
-    // Externally-sourced or scope-affecting: a hard gate, backed by the
-    // existing approvals table. dataInvolved carries the FULL real scope
-    // (and, for external sources, the full content) - never a summary,
-    // per §15.5.
-    const reason = sourceType === "authored"
-      ? `Requests ${requestedTools.length} tool(s) and ${requestedIntegrationIds.length} Integration dependency(ies).`
-      : `Imported from ${sourceType}${body.sourceUrl ? ` (${body.sourceUrl})` : ""}.`;
-    const dataInvolved = JSON.stringify({
-      requestedTools,
-      requestedIntegrationIds,
+  const [skillSet] = await db
+    .insert(skillSetsTable)
+    .values({
+      name: body.name,
+      description: body.description ?? "",
+      content: body.content ?? "",
       sourceType,
       sourceUrl: body.sourceUrl ?? null,
       sourceAuthor: body.sourceAuthor ?? null,
-      content: sourceType === "authored" ? undefined : body.content ?? "",
-    });
-    const [approval] = await db
-      .insert(approvalsTable)
-      .values({
-        action: `skill_set_install:${skillSet.id}`,
-        requestingAgent: "user",
-        reason,
-        riskLevel: sourceType === "authored" ? "medium" : "high",
-        dataInvolved,
-      })
-      .returning();
+      sourceUpdatedAt: body.sourceUpdatedAt ?? null,
+      requestedTools,
+      requestedIntegrationIds,
+      status: gated ? "pending" : "installed",
+      installedAt: gated ? null : new Date(),
+    })
+    .returning();
 
-    res.status(201).json({ skillSet, approvalId: approval.id });
+  for (const domainId of body.workDomainIds ?? []) {
+    await db.insert(entityWorkDomainsTable).values({ entityType: "skill_set", entityId: String(skillSet.id), workDomainId: domainId });
+  }
+
+  if (!gated) {
+    await db.insert(actionReceiptsTable).values({
+      description: `Installed Skill Set "${skillSet.name}"`,
+      category: "skill_set_install",
+      scope: "local, no new tool/data access",
+      outcome: "success",
+      target: skillSet.name,
+      canUndo: true,
+    });
+    return { skillSet, approvalId: null };
+  }
+
+  // Externally-sourced or scope-affecting: a hard gate, backed by the
+  // existing approvals table. dataInvolved carries the FULL real scope
+  // (and, for external sources, the full content) - never a summary,
+  // per §15.5.
+  const reason = sourceType === "authored"
+    ? `Requests ${requestedTools.length} tool(s) and ${requestedIntegrationIds.length} Integration dependency(ies).`
+    : `Imported from ${sourceType}${body.sourceUrl ? ` (${body.sourceUrl})` : ""}.`;
+  const dataInvolved = JSON.stringify({
+    requestedTools,
+    requestedIntegrationIds,
+    sourceType,
+    sourceUrl: body.sourceUrl ?? null,
+    sourceAuthor: body.sourceAuthor ?? null,
+    content: sourceType === "authored" ? undefined : body.content ?? "",
+  });
+  const [approval] = await db
+    .insert(approvalsTable)
+    .values({
+      action: `skill_set_install:${skillSet.id}`,
+      requestingAgent: "user",
+      reason,
+      riskLevel: sourceType === "authored" ? "medium" : "high",
+      dataInvolved,
+    })
+    .returning();
+  return { skillSet, approvalId: approval.id };
+}
+
+router.post("/", async (req, res) => {
+  const body = req.body as CreateSkillSetBody;
+  if (!body?.name) { res.status(400).json({ error: "name is required" }); return; }
+  try {
+    res.status(201).json(await createSkillSetRecord(body));
   } catch (err) {
     req.log.error({ err }, "Error creating skill set");
     res.status(500).json({ error: "Internal server error" });

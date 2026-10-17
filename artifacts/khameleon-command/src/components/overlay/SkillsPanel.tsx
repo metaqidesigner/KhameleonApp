@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Download, Play, Plus, X } from "lucide-react";
 import { useJarvisStore } from "@/store/jarvisStore";
 import { useSkillLibrary, SkillConfirmGate } from "@/components/skills/useSkillLibrary";
+import { GetSkills } from "@/components/skills/GetSkills";
 import type { SkillSet, CreateSkillSetInput, SkillSetSourceType } from "@/lib/skillSetsApi";
 import type { WorkDomain } from "@/lib/workDomainsApi";
 import type { OverlayPalette } from "./palettes";
@@ -153,7 +154,7 @@ function NewSkillForm({ onCreate, onClose }: { onCreate: (i: CreateSkillSetInput
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 7, padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.035)", border: "1px solid rgba(111,230,189,0.2)" }}>
       <div role="radiogroup" aria-label="New skill source" style={{ display: "flex", gap: 6 }}>
-        {[{ v: false, l: "Write one" }, { v: true, l: "Import" }].map(o => (
+        {[{ v: false, l: "Write one" }, { v: true, l: "Paste one from elsewhere" }].map(o => (
           <Chip key={o.l} active={importing === o.v}
             onClick={() => { setImporting(o.v); set({ sourceType: o.v ? "github" : "authored" }); }}>{o.l}</Chip>
         ))}
@@ -197,6 +198,7 @@ export function SkillsPanel({ palette, onClose }: { palette: OverlayPalette; onC
   const lib = useSkillLibrary();
   const requestChatTool = useJarvisStore(s => s.requestChatTool);
   const [adding, setAdding] = useState(false);
+  const [getting, setGetting] = useState(false);
   const [domainFilter, setDomainFilter] = useState<number | "all">("all");
 
   useEffect(() => {
@@ -243,15 +245,16 @@ export function SkillsPanel({ palette, onClose }: { palette: OverlayPalette; onC
           fontFamily: "var(--j-font-ui)", color: TEXT,
         }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 16px 10px" }}>
-          <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>My skills</span>
-          <Btn onClick={() => setAdding(a => !a)} label="New skill"><Plus size={12} />New</Btn>
+          <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{getting ? "Get skills" : "My skills"}</span>
+          <Btn primary={getting} onClick={() => { setGetting(g => !g); setAdding(false); }}>{getting ? "Back to my skills" : <><Download size={12} />Get skills</>}</Btn>
+          {!getting && <Btn onClick={() => setAdding(a => !a)} label="New skill"><Plus size={12} />New</Btn>}
           <button type="button" className="khi-icon-btn" onClick={onClose} aria-label="Close"
             style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex" }}>
             <X size={15} color={MUTED} />
           </button>
         </div>
 
-        {lib.domains.length > 0 && (
+        {!getting && lib.domains.length > 0 && (
           <div role="radiogroup" aria-label="Filter by domain" style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: "0 16px 10px" }}>
             {[{ id: "all" as const, name: "All" }, ...lib.domains].map(d => (
               <Chip key={d.id} active={domainFilter === d.id} onClick={() => setDomainFilter(d.id)}>{d.name}</Chip>
@@ -260,6 +263,9 @@ export function SkillsPanel({ palette, onClose }: { palette: OverlayPalette; onC
         )}
 
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+          {getting && <GetSkills tone="overlay" onInstall={lib.installFromGithub} />}
+          {getting && lib.error && <div role="alert" style={{ fontSize: 12, color: "#ffb0b0" }}>{lib.error}</div>}
+          {!getting && <>
           {adding && <NewSkillForm onCreate={lib.create} onClose={() => setAdding(false)} />}
           {lib.error && <div role="alert" style={{ fontSize: 12, color: "#ffb0b0" }}>{lib.error}</div>}
           {lib.loading && <div style={{ fontSize: 12, color: MUTED }}>Loading skills…</div>}
@@ -288,6 +294,7 @@ export function SkillsPanel({ palette, onClose }: { palette: OverlayPalette; onC
               {g.skills.map(s => <SkillRow key={`starter-${g.key}-${s.id}`} skill={s} domains={lib.domains} lib={lib} onRun={run} />)}
             </Section>
           ))}
+          </>}
         </div>
       </div>
       {lib.gate && (

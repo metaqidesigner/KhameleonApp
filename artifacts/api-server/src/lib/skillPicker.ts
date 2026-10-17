@@ -9,7 +9,9 @@ import type { InstalledSkill } from "./installedSkills.js";
 
 const STOP = new Set(("a an and are as at be but by can could do does for from get give go have help how i if in into is it its just "
   + "let me my need of on or our please so some that the their them then there these they this those to up us want was we what when "
-  + "which who will with would you your yours tell show make about any all also out over than too very via").split(" "));
+  + "which who will with would you your yours tell show make about any all also out over than too very via "
+  // Filler common in published skill descriptions - shouldn't count as a match.
+  + "claude skill skills use used using uses should whenever etc kind kinds sort set resources asked like likes").split(" "));
 
 /** Words that point at a skill but appear in the user's request in another form. */
 const SYNONYMS: Record<string, string> = {
@@ -22,10 +24,16 @@ const SYNONYMS: Record<string, string> = {
   summarise: "summar", summarize: "summar", summary: "summar", summarising: "summar",
 };
 
+/** Same word, different endings: "update"/"updates", "invoice"/"invoices" -> one stem. */
+function stem(w: string): string {
+  return w.replace(/(ings?|ed|es|s)$/, "").replace(/e$/, "");
+}
+
 export function words(text: string): string[] {
-  return text.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").split(/\s+/)
+  // Hyphens split words too, so "internal-comms" matches "internal comms".
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/)
     .filter(w => w.length > 1 && !STOP.has(w))
-    .map(w => SYNONYMS[w] ?? w.replace(/(ings?|ed|es|s)$/, ""))
+    .map(w => stem(SYNONYMS[w] ?? w))
     .filter(w => w.length > 1);
 }
 
@@ -37,8 +45,8 @@ export interface SkillPick {
 /**
  * Best-matching installed skill for a request, or null when nothing fits
  * well. Name words count three times as much as description words; a skill
- * needs either a name match plus some support, or strong description
- * support, to be picked - so unrelated questions use no skill.
+ * needs a name match plus some support, or two distinctive description
+ * words in common - so unrelated questions use no skill.
  */
 export function pickSkill(request: string, skills: InstalledSkill[]): SkillPick | null {
   const req = new Set(words(request));
@@ -48,7 +56,7 @@ export function pickSkill(request: string, skills: InstalledSkill[]): SkillPick 
     const nameHits = new Set(words(skill.name).filter(w => req.has(w))).size;
     const descHits = new Set(words(skill.description).filter(w => req.has(w))).size;
     const score = nameHits * 3 + descHits;
-    const qualifies = (nameHits >= 1 && score >= 4) || nameHits >= 2 || descHits >= 3;
+    const qualifies = (nameHits >= 1 && score >= 4) || nameHits >= 2 || descHits >= 2;
     if (qualifies && (!best || score > best.score)) best = { skill, score };
   }
   return best;

@@ -19,4 +19,20 @@ test("uses no skill for unrelated questions", () => {
   assert.equal(pick("What is the capital of Australia?"), null);
   assert.equal(pick("Polish the wording of this email"), null);
   assert.equal(pick("hi"), null);
+  assert.equal(pick("What's the weather like in Sydney today?"), null);
+  assert.equal(pick("Tell me a joke"), null);
+  assert.equal(pick("How do I reset my password?"), null);
+  assert.equal(pick("Translate this sentence into French"), null);
+  assert.equal(pick("Who won the football last night?"), null);
+});
+
+test("matches skills installed from GitHub (hyphenated names, plural/singular)", () => {
+  const github = [{
+    name: "internal-comms",
+    description: "A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use. Claude should use this skill whenever asked to write some sort of internal communications (status reports, leadership updates, 3P updates, company newsletters, FAQs, incident reports, project updates, etc.).",
+    content: "",
+  }];
+  assert.equal(pickSkill("Write a 3P update for my team. Progress: finished the Q3 reconciliation.", github)?.skill.name, "internal-comms");
+  assert.equal(pickSkill("Draft our company newsletter for October", github)?.skill.name, "internal-comms");
+  assert.equal(pickSkill("What is the capital of Australia?", github), null);
 });

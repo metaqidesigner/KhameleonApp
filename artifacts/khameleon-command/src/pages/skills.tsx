@@ -4,6 +4,7 @@ import JPanel from '@/components/JPanel';
 import { WorkDomainFilterBar, useWorkDomains } from '@/components/WorkDomainFilterBar';
 import { type SkillSet, type CreateSkillSetInput, type SkillSetSourceType } from '@/lib/skillSetsApi';
 import { useSkillLibrary, SkillConfirmGate } from '@/components/skills/useSkillLibrary';
+import { GetSkills } from '@/components/skills/GetSkills';
 import { useJarvisStore } from '@/store/jarvisStore';
 
 const STATUS_LABEL: Record<SkillSet['status'], string> = {
@@ -77,7 +78,7 @@ export default function Skills() {
                 setForm(nowImporting ? { ...BLANK, sourceType: 'github' } : BLANK);
               }}
             >
-              {importMode ? 'AUTHOR INSTEAD' : 'IMPORT FROM GITHUB/URL INSTEAD'}
+              {importMode ? 'AUTHOR INSTEAD' : 'PASTE ONE FROM ELSEWHERE INSTEAD'}
             </button>
           }
         >
@@ -126,6 +127,15 @@ export default function Skills() {
                 Imported Skill Sets always require your confirmation, regardless of requested scope (design-spec.md §15.5) — untrusted content can't be pre-verified against what it claims to need.
               </div>
             )}
+          </div>
+        </JPanel>
+      </div>
+
+      {/* GET SKILLS - same module as the Overlay's Skills panel (components/skills/GetSkills). */}
+      <div style={{ flexShrink: 0 }}>
+        <JPanel title="GET SKILLS FROM GITHUB" icon={<Download size={13} />}>
+          <div style={{ maxHeight: 360, overflowY: 'auto' }} className="scrollbar-jarvis">
+            <GetSkills tone="classic" onInstall={lib.installFromGithub} />
           </div>
         </JPanel>
       </div>
