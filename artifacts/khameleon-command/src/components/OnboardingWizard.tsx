@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { KhamiSetup } from '@/components/khami/KhamiSetup';
 import { useJarvisStore } from '@/store/jarvisStore';
 import {
   getOnboardingStatus, saveProfile, completeOnboarding,
@@ -23,7 +24,8 @@ import { ConnectIntegrationGate } from './ConnectIntegrationGate';
  * complete server-side (§14's setup state isn't a per-browser thing).
  */
 
-const STEPS = ['NAME', 'API KEY', 'OUTLOOK', 'DIGEST', 'DONE'] as const;
+// KHAMI comes before API KEY: Khami is the main AI and needs no key (docs/khami-design.md).
+const STEPS = ['NAME', 'KHAMI', 'API KEY', 'OUTLOOK', 'DIGEST', 'DONE'] as const;
 type Step = typeof STEPS[number];
 
 const ANTHROPIC_DEF = API_KEY_PROVIDER_DEFS.find(d => d.id === 'anthropic')!;
@@ -180,10 +182,18 @@ export function OnboardingWizard() {
           </StepShell>
         )}
 
+        {step === 'KHAMI' && (
+          <StepShell title="SET UP KHAMI" onSkip={goNext} onNext={goNext} nextLabel="NEXT">
+            <div style={{ marginBottom: 6 }}>
+              <KhamiSetup tone="classic" />
+            </div>
+          </StepShell>
+        )}
+
         {step === 'API KEY' && (
-          <StepShell title="CONNECT A MODEL PROVIDER" onSkip={goNext} onNext={goNext} nextLabel="NEXT">
+          <StepShell title="OPTIONAL: ADD ANOTHER AI" onSkip={goNext} onNext={goNext} nextLabel="NEXT">
             <p style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: '#b8d4e8', lineHeight: 1.6, marginBottom: 14 }}>
-              Khameleon's agents need at least one model API key to respond. Anthropic (Claude) is the default.
+              Khami handles your work on this computer. If your organisation gives you access to Claude, add its key so Khami can hand over the trickiest tasks. Skip this if you don't have one.
             </p>
             <ApiKeyRow
               def={ANTHROPIC_DEF}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Briefcase, EyeOff, LayoutGrid, LogIn, SlidersHorizontal } from "lucide-react";
+import { Briefcase, Cpu, EyeOff, LayoutGrid, LogIn, SlidersHorizontal } from "lucide-react";
 import { overlayBridge } from "@/lib/desktopBridge";
 import { useJarvisStore } from "@/store/jarvisStore";
 import type { OverlayPalette } from "./palettes";
@@ -13,13 +13,14 @@ const SHORTCUT = isMac ? "⌘⇧K" : "Ctrl+Shift+K";
  * menu, which later gains the Workspace panel (Build 3). When logged out,
  * both clicks open the menu, since chat needs a session.
  */
-export function KhameleonHead({ palette, locked = false, bottom = 18, onOpenLook, onOpenWorkspace }: {
+export function KhameleonHead({ palette, locked = false, bottom = 18, onOpenLook, onOpenWorkspace, onOpenKhami }: {
   palette: OverlayPalette;
   locked?: boolean;
   /** Raised when the bottom bar is showing. */
   bottom?: number;
   onOpenLook?: () => void;
   onOpenWorkspace?: () => void;
+  onOpenKhami?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const chatOpen = useJarvisStore(s => s.chatOpen);
@@ -81,6 +82,12 @@ export function KhameleonHead({ palette, locked = false, bottom = 18, onOpenLook
             <button role="menuitem" style={rowStyle} onClick={() => { setMenuOpen(false); onOpenWorkspace(); }} {...hover}>
               <Briefcase size={14} color={palette.iconColor} />
               Workspace
+            </button>
+          )}
+          {onOpenKhami && (
+            <button role="menuitem" style={rowStyle} onClick={() => { setMenuOpen(false); onOpenKhami(); }} {...hover}>
+              <Cpu size={14} color={palette.iconColor} />
+              Khami setup
             </button>
           )}
           {onOpenLook && (

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { LookLayoutControls, useSyncAcrossWindows } from '@/components/overlay/LookLayoutControls';
+import { KhamiSetup } from '@/components/khami/KhamiSetup';
 import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin, Music, Play, Pause, SkipForward, SkipBack, Mic } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
@@ -533,6 +534,13 @@ function EngineSection() {
   };
   return (
     <>
+      {/* Same Khami setup as the Overlay's head menu and the first-run wizard. */}
+      <Row>
+        <Label>KHAMI — KHAMELEON'S OWN AI</Label>
+        <div style={{ padding: 12, background: 'rgba(0,4,8,0.6)', border: '1px solid rgba(0,212,255,0.15)' }}>
+          <KhamiSetup tone="classic" />
+        </div>
+      </Row>
       <div style={{
         marginBottom: 16, padding: '10px 12px', fontFamily: 'var(--j-font-ui)', fontSize: 11,
         color: 'var(--j-text-muted)', lineHeight: 1.6,
