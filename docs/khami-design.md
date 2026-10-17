@@ -14,6 +14,10 @@ Khami is Khameleon's own AI agent and **the main AI in Khameleon** — not a fal
 - **Later (option 2):** train Khami's own brain on top of the open model using Khameleon's real work tasks (reconciliations, invoices, minutes, procedures), so it becomes better at our jobs than the original. Cost in the thousands, not millions; worth doing once real users and examples exist.
 - **Rejected:** training a brain from scratch (millions, and still weaker); no brain at all (can't understand requests or write).
 
+## Where Khami's brain runs (decided 2026-10-17)
+
+**On each person's computer by default, with an option to run it on the organisation's own Khameleon server.** Individuals get a fully offline Khami on their laptop; organisations can run one powerful copy on their Khameleon server for everyone - work still never leaves the company, and staff with older laptops get the stronger brain. Rejected: computer-only (limited by each laptop); server-only (no longer offline away from the office).
+
 ## How work flows
 
 1. **Khami does everything first, offline.**
