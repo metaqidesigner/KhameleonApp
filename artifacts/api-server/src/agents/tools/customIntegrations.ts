@@ -85,3 +85,11 @@ export async function getMcpServerConfigs(): Promise<BetaRequestMCPServerURLDefi
       authorization_token: r.encryptedAuthToken ? decrypt(r.encryptedAuthToken) : undefined,
     }));
 }
+
+/** MCP integrations for Khameleon's own MCP client (lib/mcpClient.ts) - so they work with any AI, not only Claude. */
+export async function getMcpIntegrations(): Promise<{ id: number; name: string; url: string; token?: string }[]> {
+  const rows = await enabledIntegrationsOfType("mcp");
+  return rows
+    .filter((r) => !!r.sourceUrl)
+    .map((r) => ({ id: r.id, name: r.name, url: r.sourceUrl as string, token: r.encryptedAuthToken ? decrypt(r.encryptedAuthToken) : undefined }));
+}

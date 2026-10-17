@@ -5,6 +5,7 @@ import { TOOL_DEFINITIONS } from "./tools/definitions.js";
 import { dispatchTool } from "./tools/dispatcher.js";
 import { getCustomToolDefinitions, isCustomToolName, dispatchCustomTool, getMcpServerConfigs } from "./tools/customIntegrations.js";
 import { askKhami, khamiStatus } from "../engines/khami.js";
+import { toolsForAnyAi } from "./tools/anyAiTools.js";
 import { pickSkill, skillInstructions } from "../lib/skillPicker.js";
 import { loadInstalledSkills, buildSkillCatalogPrompt, useSkillResult, USE_SKILL_TOOL, USE_SKILL_TOOL_NAME, type InstalledSkill } from "../lib/installedSkills.js";
 import { getApiKey } from "../lib/apiKeys.js";
@@ -367,10 +368,16 @@ export async function askAgent(
     }
     if (agent.provider === "khami") {
       const systemMsg = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
+      const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+      const tools = await toolsForAnyAi(lastUser).catch(() => []);
       const r = await askKhami({
-        system: systemMsg,
+        system: tools.length
+          ? systemMsg + "\n\nYou can use the tools provided when they help. Afterwards, tell the user the outcome in a sentence or two. Don't narrate attempts; if something can't be done, say so once, plainly."
+          : systemMsg,
         messages: messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
         onToken,
+        tools,
+        onToolEvent: onToolEvent as ((e: import("../engines/types.js").EngineToolEvent) => void) | undefined,
       });
       // On this computer: no per-use cost, and energy isn't estimated for local runs.
       return { agentId: agent.id, content: r.content, model: `Khami (${r.model})`, latencyMs: r.latencyMs, tokens: r.tokens, costUsd: 0, energyWh: 0 };

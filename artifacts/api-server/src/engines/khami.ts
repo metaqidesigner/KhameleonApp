@@ -4,6 +4,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import type { EngineRequest, EngineResult, EngineStatus } from "./types.js";
 import { toKhamiTurns } from "./khamiHistory.js";
 import { BRAINS, recommendBrain, pickActiveBrain, type BrainId } from "./khamiBrains.js";
+import { toKhamiParams, stripNulls } from "../lib/toolSchema.js";
+
+const MAX_TOOL_RESULT = 4000;
 
 /**
  * Khami's engine - Khameleon's own AI, running on this computer with no
@@ -180,6 +183,34 @@ export async function khamiBrainLabel(): Promise<string> {
   return brain ? BRAINS[brain].modelName : "not set up";
 }
 
+/** Integrations and tools Khami may call - Khameleon runs them and hands back the result. */
+async function khamiFunctions(req: EngineRequest) {
+  const { defineChatSessionFunction } = await loadModule();
+  const fns: Record<string, ReturnType<typeof defineChatSessionFunction>> = {};
+  for (const tool of req.tools ?? []) {
+    fns[tool.name] = defineChatSessionFunction({
+      description: tool.description,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      params: toKhamiParams(tool.parameters) as any,
+      handler: async (input: unknown) => {
+        const args = stripNulls((input && typeof input === "object" ? input : {}) as Record<string, unknown>);
+        req.onToolEvent?.({ type: "tool_start", name: tool.name, input: args });
+        const t0 = Date.now();
+        try {
+          const result = (await tool.run(args)).slice(0, MAX_TOOL_RESULT);
+          req.onToolEvent?.({ type: "tool_result", name: tool.name, result: result.slice(0, 300), durationMs: Date.now() - t0 });
+          return result;
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          req.onToolEvent?.({ type: "tool_error", name: tool.name, error, durationMs: Date.now() - t0 });
+          return `That didn't work: ${error}`;
+        }
+      },
+    });
+  }
+  return fns;
+}
+
 export async function askKhami(req: EngineRequest): Promise<EngineResult> {
   return oneAtATime(async () => {
     const t0 = Date.now();
@@ -198,7 +229,12 @@ export async function askKhami(req: EngineRequest): Promise<EngineResult> {
     const session = new parts.LlamaChatSession({ contextSequence: sequence, systemPrompt: req.system });
     try {
       if (history.length) session.setChatHistory([{ type: "system", text: req.system }, ...history]);
-      const content = await session.prompt(prompt, { maxTokens: req.maxTokens ?? 1024, onTextChunk: req.onToken });
+      const functions = req.tools?.length ? await khamiFunctions(req) : undefined;
+      const content = await session.prompt(prompt, {
+        maxTokens: req.maxTokens ?? 1024,
+        onTextChunk: req.onToken,
+        ...(functions ? { functions, maxParallelFunctionCalls: 1 } : {}),
+      });
       return {
         content,
         engine: "khami",

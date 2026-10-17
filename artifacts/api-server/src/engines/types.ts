@@ -10,11 +10,26 @@ export interface EngineMessage {
   content: string;
 }
 
+/** A tool the AI may call; Khameleon runs it (agents/tools/anyAiTools.ts). */
+export interface EngineTool {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  run: (input: Record<string, unknown>) => Promise<string>;
+}
+
+export type EngineToolEvent =
+  | { type: "tool_start"; name: string; input?: Record<string, unknown> }
+  | { type: "tool_result"; name: string; result?: string; durationMs?: number }
+  | { type: "tool_error"; name: string; error?: string; durationMs?: number };
+
 export interface EngineRequest {
   system: string;
   messages: EngineMessage[];
   maxTokens?: number;
   onToken?: (text: string) => void;
+  tools?: EngineTool[];
+  onToolEvent?: (e: EngineToolEvent) => void;
 }
 
 export interface EngineResult {
