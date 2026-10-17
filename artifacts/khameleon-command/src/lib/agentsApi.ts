@@ -1,6 +1,6 @@
 const BASE = import.meta.env.VITE_API_URL || '/api';
 
-export type Provider = 'anthropic'|'openai'|'google'|'openrouter'|'ollama'|'minimax'|'custom';
+export type Provider = 'khami'|'anthropic'|'openai'|'google'|'openrouter'|'ollama'|'minimax'|'custom';
 export type AgentStatus = 'online'|'standby'|'offline'|'busy';
 export type AgentRole = 'general'|'research'|'code'|'analysis'|'creative';
 
@@ -124,12 +124,10 @@ export interface CompareResult {
 
 // ── Fallback roster shown when backend is offline ─────────
 export const FALLBACK_ROSTER: AgentConfig[] = [
+  { id:'khami',      name:'KHAMI',      provider:'khami',     model:'khami',             enabled:true, role:'general',  systemPrompt:'', color:'#6FE6BD', initials:'KH' },
   { id:'claude',     name:'CLAUDE',     provider:'anthropic', model:'claude-sonnet-4-6', enabled:true, role:'general',  systemPrompt:'', color:'#c9a84c', initials:'CL', useTools:true },
   { id:'gpt4o',      name:'GPT-4o',     provider:'openai',    model:'gpt-4o',            enabled:true, role:'general',  systemPrompt:'', color:'#00d4ff', initials:'GP' },
   { id:'gemini',     name:'GEMINI',     provider:'google',    model:'gemini-2.0-flash',  enabled:true, role:'research', systemPrompt:'', color:'#3fb950', initials:'GM' },
-  { id:'openrouter', name:'OPENROUTER', provider:'openrouter',model:'mistral-7b-instruct',enabled:true,role:'general',  systemPrompt:'', color:'#a78bfa', initials:'OR' },
-  { id:'local',      name:'LOCAL',      provider:'ollama',    model:'llama3.2',           enabled:true, role:'code',     systemPrompt:'', color:'#f97316', initials:'LC' },
-  { id:'minimax',    name:'MINIMAX',    provider:'minimax',   model:'abab6.5s-chat',      enabled:true, role:'creative', systemPrompt:'', color:'#ec4899', initials:'MM' },
 ];
 
 async function safeFetch<T>(url: string, opts?: RequestInit, fallback?: T): Promise<T> {
@@ -305,7 +303,7 @@ export async function askAll(
 
 // Provider display helpers
 export const PROVIDER_LABELS: Record<Provider, string> = {
-  anthropic:'Anthropic', openai:'OpenAI', google:'Google',
+  khami:'Khami (on this computer)', anthropic:'Anthropic', openai:'OpenAI', google:'Google',
   openrouter:'OpenRouter', ollama:'Ollama', minimax:'MiniMax', custom:'Custom',
 };
 

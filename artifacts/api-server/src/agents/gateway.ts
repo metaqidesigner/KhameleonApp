@@ -4,6 +4,7 @@ import type { AgentConfig, AgentResponse, ChatMessage, Provider, ToolCallRecord,
 import { TOOL_DEFINITIONS } from "./tools/definitions.js";
 import { dispatchTool } from "./tools/dispatcher.js";
 import { getCustomToolDefinitions, isCustomToolName, dispatchCustomTool, getMcpServerConfigs } from "./tools/customIntegrations.js";
+import { askKhami, khamiStatus, KHAMI_BRAIN_LABEL } from "../engines/khami.js";
 import { loadInstalledSkills, buildSkillCatalogPrompt, useSkillResult, USE_SKILL_TOOL, USE_SKILL_TOOL_NAME, type InstalledSkill } from "../lib/installedSkills.js";
 import { getApiKey } from "../lib/apiKeys.js";
 import { trackingFetch } from "../lib/providerQuota.js";
@@ -337,6 +338,16 @@ export async function askAgent(
   onToolEvent?: (e: ToolEvent) => void,
 ): Promise<AgentResponse> {
   try {
+    if (agent.provider === "khami") {
+      const systemMsg = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
+      const r = await askKhami({
+        system: systemMsg,
+        messages: messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        onToken,
+      });
+      // On this computer: no per-use cost, and energy isn't estimated for local runs.
+      return { agentId: agent.id, content: r.content, model: `Khami (${KHAMI_BRAIN_LABEL})`, latencyMs: r.latencyMs, tokens: r.tokens, costUsd: 0, energyWh: 0 };
+    }
     if (agent.provider === "anthropic") {
       return await askAnthropic(agent, messages, onToken, onToolEvent);
     }
@@ -349,5 +360,6 @@ export async function askAgent(
 
 export async function isAgentAvailable(agent: AgentConfig): Promise<boolean> {
   if (!agent.enabled) return false;
+  if (agent.provider === "khami") return (await khamiStatus()).available;
   return !!(await resolveKey(agent));
 }

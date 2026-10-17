@@ -29,6 +29,8 @@ async function buildAll() {
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
     external: [
       "*.node",
+      // Khami's engine (src/engines/khami.ts): native, loads its own binaries.
+      "node-llama-cpp",
       "sharp",
       "better-sqlite3",
       "sqlite3",

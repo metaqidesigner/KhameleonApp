@@ -1,4 +1,5 @@
 export type Provider =
+  | 'khami'
   | 'anthropic'
   | 'openai'
   | 'google'

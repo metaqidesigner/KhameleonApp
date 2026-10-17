@@ -1,6 +1,19 @@
 import type { AgentConfig } from './types.js';
 
 export const DEFAULT_AGENTS: AgentConfig[] = [
+  // Khami - Khameleon's own AI, running on this computer (docs/khami-design.md).
+  // First in the list, so it's the default when the chat auto-routes.
+  {
+    id:           'khami',
+    name:         'KHAMI',
+    provider:     'khami',
+    model:        'khami',
+    enabled:      true,
+    role:         'general',
+    systemPrompt: "You are Khami, Khameleon's own assistant, running privately on the user's computer. Help with everyday work tasks. Use everything the user has told you earlier in this conversation - if they told you something about themselves or their work, rely on it. Be clear, practical and concise, in plain language. Only say you don't know when the answer isn't in the conversation and you genuinely can't work it out.",
+    color:        '#6FE6BD',
+    initials:     'KH',
+  },
   {
     id:           'claude',
     name:         'CLAUDE',
@@ -112,39 +125,6 @@ Always think about the full lifecycle: planning → execution → review → sig
     systemPrompt: 'You are Gemini, an AI assistant by Google. Focus on research and factual accuracy.',
     color:        '#3fb950',
     initials:     'GM',
-  },
-  {
-    id:           'openrouter',
-    name:         'OPENROUTER',
-    provider:     'openrouter',
-    model:        'mistralai/mistral-7b-instruct',
-    enabled:      true,
-    role:         'general',
-    systemPrompt: 'You are a helpful AI assistant accessible via OpenRouter.',
-    color:        '#a78bfa',
-    initials:     'OR',
-  },
-  {
-    id:           'local',
-    name:         'LOCAL',
-    provider:     'ollama',
-    model:        'llama3.2',
-    enabled:      true,
-    role:         'code',
-    systemPrompt: 'You are a local AI assistant running via Ollama. Be helpful and efficient.',
-    color:        '#f97316',
-    initials:     'LC',
-  },
-  {
-    id:           'minimax',
-    name:         'MINIMAX',
-    provider:     'minimax',
-    model:        'abab6.5s-chat',
-    enabled:      true,
-    role:         'creative',
-    systemPrompt: 'You are a creative AI assistant by MiniMax. Focus on imaginative and engaging responses.',
-    color:        '#ec4899',
-    initials:     'MM',
   },
 ];
 
