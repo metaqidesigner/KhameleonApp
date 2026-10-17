@@ -124,8 +124,8 @@ export interface CompareResult {
 
 // ── Fallback roster shown when backend is offline ─────────
 export const FALLBACK_ROSTER: AgentConfig[] = [
-  { id:'copilot',    name:'COPILOT',    provider:'copilot',   model:'microsoft-365-copilot', enabled:true, role:'general', systemPrompt:'', color:'#4f83e6', initials:'CP' },
   { id:'khami',      name:'KHAMI',      provider:'khami',     model:'khami',             enabled:true, role:'general',  systemPrompt:'', color:'#6FE6BD', initials:'KH' },
+  { id:'copilot',    name:'COPILOT',    provider:'copilot',   model:'microsoft-365-copilot', enabled:true, role:'general', systemPrompt:'', color:'#4f83e6', initials:'CP' },
   { id:'claude',     name:'CLAUDE',     provider:'anthropic', model:'claude-sonnet-4-6', enabled:true, role:'general',  systemPrompt:'', color:'#c9a84c', initials:'CL', useTools:true },
   { id:'gpt4o',      name:'GPT-4o',     provider:'openai',    model:'gpt-4o',            enabled:true, role:'general',  systemPrompt:'', color:'#00d4ff', initials:'GP' },
   { id:'gemini',     name:'GEMINI',     provider:'google',    model:'gemini-2.0-flash',  enabled:true, role:'research', systemPrompt:'', color:'#3fb950', initials:'GM' },

@@ -1,22 +1,8 @@
 import type { AgentConfig } from './types.js';
 
 export const DEFAULT_AGENTS: AgentConfig[] = [
-  // Microsoft 365 Copilot - the most common AI in organisations, so it's the
-  // main agent whenever it's connected (docs/khami-design.md). Only offered in
-  // the chat once a work account with a Copilot licence has signed in.
-  {
-    id:           'copilot',
-    name:         'COPILOT',
-    provider:     'copilot',
-    model:        'microsoft-365-copilot',
-    enabled:      true,
-    role:         'general',
-    systemPrompt: "You are helping inside Khameleon, a work assistant. Answer clearly and practically, in plain language. Never sign anything on the user's behalf; emails end with [Your name].",
-    color:        '#4f83e6',
-    initials:     'CP',
-  },
   // Khami - Khameleon's own AI, running on this computer (docs/khami-design.md).
-  // First in the list, so it's the default when the chat auto-routes.
+  // First in the list: Khameleon's own AI comes first, outside AIs second.
   {
     id:           'khami',
     name:         'KHAMI',
@@ -27,6 +13,20 @@ export const DEFAULT_AGENTS: AgentConfig[] = [
     systemPrompt: "You are Khami, Khameleon's own assistant, running privately on the user's computer. Help with everyday work tasks. Use everything the user has told you earlier in this conversation - if they told you something about themselves or their work, rely on it. Be clear, practical and concise, in plain language. Only say you don't know when the answer isn't in the conversation and you genuinely can't work it out. Never sign anything as Khami. Only emails and letters get a sign-off, written in the user's voice and ending with [Your name]; minutes, summaries, checks and lists get no sign-off at all.",
     color:        '#6FE6BD',
     initials:     'KH',
+  },
+  // Microsoft 365 Copilot - the first outside AI Khameleon reaches for when a
+  // task needs more than Khami (docs/khami-design.md): it's what most
+  // organisations provide. Only offered once a Copilot work account signs in.
+  {
+    id:           'copilot',
+    name:         'COPILOT',
+    provider:     'copilot',
+    model:        'microsoft-365-copilot',
+    enabled:      true,
+    role:         'general',
+    systemPrompt: "You are helping inside Khameleon, a work assistant. Answer clearly and practically, in plain language. Never sign anything on the user's behalf; emails end with [Your name].",
+    color:        '#4f83e6',
+    initials:     'CP',
   },
   {
     id:           'claude',

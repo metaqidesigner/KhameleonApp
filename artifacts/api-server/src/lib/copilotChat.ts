@@ -62,22 +62,29 @@ export function extractCopilotReply(conversation: { messages?: { text?: string }
   return cleanCopilotText(reply?.text ?? "");
 }
 
-export async function askCopilot(system: string, messages: CopilotTurn[]): Promise<{ content: string; latencyMs: number }> {
+export interface CopilotOptions {
+  /** For tests: a stand-in that behaves like Microsoft's API (lib/copilotChat.test.ts). */
+  baseUrl?: string;
+  getToken?: () => Promise<string>;
+}
+
+export async function askCopilot(system: string, messages: CopilotTurn[], opts: CopilotOptions = {}): Promise<{ content: string; latencyMs: number }> {
   const t0 = Date.now();
+  const GRAPH_URL = opts.baseUrl ?? GRAPH;
   let token: string;
   try {
-    token = await getFreshToken("copilot");
+    token = await (opts.getToken ?? (() => getFreshToken("copilot")))();
   } catch {
     throw new Error("Microsoft 365 Copilot isn't connected. Connect it from Integrations with a work account that has a Copilot licence.");
   }
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-  const created = await fetch(GRAPH, { method: "POST", headers, body: "{}" });
+  const created = await fetch(GRAPH_URL, { method: "POST", headers, body: "{}" });
   if (created.status === 403) throw new Error("Microsoft says this account can't use Copilot here - it needs a Microsoft 365 Copilot licence and your IT admin's approval.");
   if (!created.ok) throw new Error(`Copilot couldn't start a conversation (HTTP ${created.status}).`);
   const { id } = await created.json() as { id: string };
 
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  const res = await fetch(`${GRAPH}/${encodeURIComponent(id)}/chat`, {
+  const res = await fetch(`${GRAPH_URL}/${encodeURIComponent(id)}/chat`, {
     method: "POST", headers, body: JSON.stringify(buildCopilotChatBody(system, messages, timeZone)),
   });
   if (!res.ok) throw new Error(`Copilot didn't answer (HTTP ${res.status}).`);

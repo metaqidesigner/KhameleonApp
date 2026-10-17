@@ -153,14 +153,14 @@ export function rowsToResumedMessages(rows: AgentConversationRow[]): ChatMessage
 }
 
 export function pickAutoRouteAgent(roster: AgentConfig[], statuses?: Record<string, string>): AgentConfig | undefined {
-  // Copilot when the organisation has connected it (the main AI then), else
-  // Khami on this computer, else the first enabled agent. With no status
-  // information yet, fall back to the first enabled agent.
+  // Khameleon first: Khami whenever it's set up; otherwise the first outside
+  // AI that's ready, Copilot before the others (docs/khami-design.md). With
+  // no status information yet, fall back to the first enabled agent.
   const enabled = roster.filter(a => a.enabled);
   if (!statuses) return enabled[0];
   const ready = (a: AgentConfig) => statuses[a.id] === 'online';
-  return enabled.find(a => a.provider === 'copilot' && ready(a))
-    ?? enabled.find(a => a.provider === 'khami')
+  return enabled.find(a => a.provider === 'khami' && ready(a))
+    ?? enabled.find(a => a.provider === 'copilot' && ready(a))
     ?? enabled.find(ready)
     ?? enabled[0];
 }

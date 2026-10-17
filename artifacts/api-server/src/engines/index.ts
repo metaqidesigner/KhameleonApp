@@ -26,6 +26,6 @@ export async function engineStatuses(): Promise<EngineStatus[]> {
     id: "copilot", name: "Microsoft 365 Copilot", available: copilotConnected,
     note: copilotConnected ? undefined : "Not connected - needs a work account with a Copilot licence", onThisComputer: false,
   };
-  // Copilot first: the main AI whenever the organisation provides it.
-  return [copilot, await khamiStatus(), ...cloud];
+  // Khami first (Khameleon's own AI); Copilot leads the outside AIs.
+  return [await khamiStatus(), copilot, ...cloud];
 }

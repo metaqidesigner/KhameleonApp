@@ -248,6 +248,8 @@ const STATUS_DOT_COLOR: Record<AgentOnlineStatus, string> = {
   online: '#4ee0a0', busy: '#ffb36b', standby: '#ffb36b', offline: '#5a6a6a',
 };
 
+const rank = (a: AgentConfig) => (a.provider === 'khami' ? 0 : a.provider === 'copilot' ? 1 : 2);
+
 function AgentStrip({ roster, statuses, pinnedId, onPin, zdrKnown }: {
   roster: AgentConfig[];
   statuses: Record<string, AgentOnlineStatus>;
@@ -263,8 +265,8 @@ function AgentStrip({ roster, statuses, pinnedId, onPin, zdrKnown }: {
       {/* Khami is always offered (it's the main AI); other AIs only appear once the
           organisation has added a key for them (docs/legal-compliance.md, rule 1). */}
       {roster.filter(a => a.provider === 'khami' || statuses[a.id] === 'online')
-        // Copilot leads when connected - the main AI in most organisations.
-        .sort((a, b) => Number(b.provider === 'copilot') - Number(a.provider === 'copilot'))
+        // Khameleon's own Khami first, then Copilot ahead of other outside AIs.
+        .sort((a, b) => rank(a) - rank(b))
         .map(a => (
         <button key={a.id} type="button" onClick={() => onPin(a.id)} className="chat-agent-pill" data-active={pinnedId === a.id} title={`${a.name} - ${statuses[a.id] ?? 'offline'}`}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_DOT_COLOR[statuses[a.id] ?? 'offline'], display: 'inline-block', marginRight: 5 }} />

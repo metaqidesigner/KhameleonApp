@@ -39,11 +39,11 @@ describe('pickAutoRouteAgent with live statuses', () => {
   const copilot = makeAgent({ id: 'copilot', provider: 'copilot' });
   const khami = makeAgent({ id: 'khami', provider: 'khami' });
   const claude = makeAgent({ id: 'claude', provider: 'anthropic' });
-  it('prefers Copilot when it is connected', () => {
-    expect(pickAutoRouteAgent([copilot, khami, claude], { copilot: 'online', khami: 'online', claude: 'online' })?.id).toBe('copilot');
+  it('puts Khami first when it is set up, even if Copilot is connected', () => {
+    expect(pickAutoRouteAgent([khami, copilot, claude], { copilot: 'online', khami: 'online', claude: 'online' })?.id).toBe('khami');
   });
-  it('falls back to Khami when Copilot is not connected', () => {
-    expect(pickAutoRouteAgent([copilot, khami, claude], { copilot: 'standby', khami: 'online', claude: 'online' })?.id).toBe('khami');
+  it('uses Copilot before other outside AIs when Khami is not set up', () => {
+    expect(pickAutoRouteAgent([khami, claude, copilot], { copilot: 'online', khami: 'standby', claude: 'online' })?.id).toBe('copilot');
   });
 });
 
