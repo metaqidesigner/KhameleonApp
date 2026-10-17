@@ -43,3 +43,24 @@ Almost every AI feature built so far is hard-wired to Claude (chat, planning, re
 - Khami's built-in brain is much smaller than Claude. Good at structured, well-defined work (especially with a skill to follow); weaker at long, subtle writing and complex reasoning — which is exactly where escalation comes in.
 - Running the brain needs a reasonably modern machine; Standard runs on most, Better needs 16 GB memory.
 - Licences: every model offered is checked for commercial use when added; notices shipped; legal review before selling (see pre-launch checklist).
+
+## Brain comparison (2026-10-17, this Mac: ~9 GB memory)
+
+Same six tasks on each brain, via Khami in the running app.
+
+| Task | Standard (1.5B) | Better (7B) |
+|---|---|---|
+| Load time | 3 s | 12 s |
+| Quick fact (bank reconciliation) | 2 s, correct | 8 s, correct |
+| Meeting minutes, no skill | 11 s, repetitive | 34 s, cleaner |
+| Meeting minutes, following a skill | 43 s, repeated sections | 29 s, clean and well structured |
+| "What team do I work in?" after "I work in finance" | wrong | wrong |
+| Reconcile two invoice lists | 3 s, **wrong items and wrong difference** | 21 s, found INV-102 (−$45) and INV-105, **missed INV-103** |
+| Polish an email | 2 s, kept "ASAP", signed "Khami" | 13 s, polite and professional, signed "Khami" |
+
+Takeaways:
+- Better is clearly better at writing and structure; 4–8× slower on a 9 GB machine (8–34 s per answer).
+- **Neither brain can be trusted with exact matching or sums** — confirms the code-first rule: reconciliation and invoice checks must be done by code, with the brain only explaining the result.
+- Skills help structure (cleaner minutes with Better).
+- Both miss simple inferences ("finance" → "team") — escalation is needed for nuanced questions.
+- Fix: Khami signs emails as "Khami" — instructions must say never to sign on the user's behalf as Khami.
