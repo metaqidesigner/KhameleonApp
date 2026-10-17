@@ -5,6 +5,7 @@ import { TOOL_DEFINITIONS } from "./tools/definitions.js";
 import { dispatchTool } from "./tools/dispatcher.js";
 import { getCustomToolDefinitions, isCustomToolName, dispatchCustomTool, getMcpServerConfigs } from "./tools/customIntegrations.js";
 import { askKhami, khamiStatus } from "../engines/khami.js";
+import { pickSkill, skillInstructions } from "../lib/skillPicker.js";
 import { loadInstalledSkills, buildSkillCatalogPrompt, useSkillResult, USE_SKILL_TOOL, USE_SKILL_TOOL_NAME, type InstalledSkill } from "../lib/installedSkills.js";
 import { getApiKey } from "../lib/apiKeys.js";
 import { trackingFetch } from "../lib/providerQuota.js";
@@ -330,6 +331,25 @@ async function askOpenAI(
   };
 }
 
+// ── Skills for any AI ─────────────────────────────────────────
+async function withPickedSkill(
+  agent: AgentConfig,
+  messages: ChatMessage[],
+  onToolEvent?: (e: ToolEvent) => void,
+): Promise<ChatMessage[]> {
+  const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+  const skills = await loadInstalledSkills().catch((): InstalledSkill[] => []);
+  const pick = pickSkill(lastUser, skills);
+  if (!pick) return messages;
+  onToolEvent?.({ type: "tool_start", name: USE_SKILL_TOOL_NAME, input: { name: pick.skill.name } });
+  onToolEvent?.({ type: "tool_result", name: USE_SKILL_TOOL_NAME, result: `Using ${pick.skill.name}`, durationMs: 0 });
+  const system = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
+  return [
+    { role: "system", content: system + skillInstructions(pick.skill) },
+    ...messages.filter((m) => m.role !== "system"),
+  ];
+}
+
 // ── Public gateway ────────────────────────────────────────────
 export async function askAgent(
   agent: AgentConfig,
@@ -338,6 +358,13 @@ export async function askAgent(
   onToolEvent?: (e: ToolEvent) => void,
 ): Promise<AgentResponse> {
   try {
+    // Claude with tools fetches skills itself (use_skill). Every other AI -
+    // Khami, GPT, Gemini - gets the matching skill picked by Khameleon and
+    // handed over in its instructions (lib/skillPicker.ts). Reported as a
+    // use_skill event so the chat shows "Using: <skill>" either way.
+    if (!(agent.provider === "anthropic" && agent.useTools)) {
+      messages = await withPickedSkill(agent, messages, onToolEvent);
+    }
     if (agent.provider === "khami") {
       const systemMsg = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
       const r = await askKhami({
