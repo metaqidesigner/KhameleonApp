@@ -27,6 +27,7 @@ import {
 import { accountsEnabled, createUser, verifyLogin, getUserById } from "../lib/accounts.js";
 import { db } from "@workspace/db";
 import { actionReceiptsTable } from "@workspace/db";
+import { safeReturnTo } from "../lib/returnTo.js";
 import crypto from "node:crypto";
 
 const router = Router();
@@ -123,7 +124,7 @@ router.post("/session/logout", (req: Request, res: Response) => {
 });
 
 // ── CSRF state store (in-memory; single-user, short-lived) ───────────────────
-interface PendingState { provider: string; createdAt: number; }
+interface PendingState { provider: string; createdAt: number; returnTo: string; }
 const pendingStates = new Map<string, PendingState>();
 setInterval(() => {
   const cutoff = Date.now() - 10 * 60 * 1000;
@@ -132,14 +133,16 @@ setInterval(() => {
 
 function getRedirectUri(req: Request): string {
   if (process.env.OAUTH_REDIRECT_URI) return process.env.OAUTH_REDIRECT_URI;
-  const proto = req.headers["x-forwarded-proto"] ?? "https";
+  const proto = req.headers["x-forwarded-proto"] ?? req.protocol;
   const host  = req.headers["x-forwarded-host"] ?? req.headers.host;
   return `${proto}://${host}/api/auth/oauth/callback`;
 }
 
-function makeState(provider: string): string {
+function makeState(provider: string, req: Request): string {
   const state = crypto.randomBytes(16).toString("hex");
-  pendingStates.set(state, { provider, createdAt: Date.now() });
+  const asked = typeof req.query.returnTo === "string" ? req.query.returnTo : req.get("referer");
+  const host = (req.headers["x-forwarded-host"] as string | undefined) ?? req.headers.host;
+  pendingStates.set(state, { provider, createdAt: Date.now(), returnTo: safeReturnTo(asked, host) });
   return state;
 }
 
@@ -165,7 +168,7 @@ router.get("/oauth/google/start", (req: Request, res: Response) => {
   url.searchParams.set("scope", GOOGLE_SCOPES);
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("prompt", "consent");
-  url.searchParams.set("state", makeState("google"));
+  url.searchParams.set("state", makeState("google", req));
   res.redirect(url.toString());
 });
 
@@ -217,7 +220,7 @@ router.get("/oauth/microsoft/start", (req: Request, res: Response) => {
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", MICROSOFT_SCOPES);
   url.searchParams.set("response_mode", "query");
-  url.searchParams.set("state", makeState("microsoft"));
+  url.searchParams.set("state", makeState("microsoft", req));
   res.redirect(url.toString());
 });
 
@@ -265,7 +268,7 @@ router.get("/oauth/copilot/start", (req: Request, res: Response) => {
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", COPILOT_SCOPES);
   url.searchParams.set("response_mode", "query");
-  url.searchParams.set("state", makeState("copilot"));
+  url.searchParams.set("state", makeState("copilot", req));
   res.redirect(url.toString());
 });
 
@@ -311,7 +314,7 @@ router.get("/oauth/spotify/start", (req: Request, res: Response) => {
   url.searchParams.set("redirect_uri", getRedirectUri(req));
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", SPOTIFY_SCOPES);
-  url.searchParams.set("state", makeState("spotify"));
+  url.searchParams.set("state", makeState("spotify", req));
   res.redirect(url.toString());
 });
 
@@ -346,7 +349,8 @@ router.get("/oauth/callback", async (req: Request, res: Response) => {
 
   if (error) {
     req.log.warn({ error }, "OAuth callback error from provider");
-    res.redirect(`/?oauth_error=${encodeURIComponent(error)}`);
+    const back = pendingStates.get(state ?? "")?.returnTo ?? "";
+    res.redirect(`${back}/?oauth_error=${encodeURIComponent(error)}`);
     return;
   }
 
@@ -356,7 +360,7 @@ router.get("/oauth/callback", async (req: Request, res: Response) => {
     return;
   }
   pendingStates.delete(state);
-  const { provider } = pending;
+  const { provider, returnTo } = pending;
 
   try {
     if (provider === "google")    await exchangeGoogleCode(req, code);
@@ -382,10 +386,10 @@ router.get("/oauth/callback", async (req: Request, res: Response) => {
       req.log.warn({ receiptErr, provider }, "Failed to write connect receipt (non-fatal)");
     }
 
-    res.redirect(`/?oauth_success=${provider}`);
+    res.redirect(`${returnTo}/?oauth_success=${provider}`);
   } catch (err) {
     req.log.error({ err, provider }, "OAuth exchange failed");
-    res.redirect(`/?oauth_error=exchange_failed`);
+    res.redirect(`${returnTo}/?oauth_error=exchange_failed`);
   }
 });
 
