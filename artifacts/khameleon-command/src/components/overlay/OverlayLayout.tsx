@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { getSessionStatus } from "@/lib/sessionApi";
 import ChatWindow from "@/components/chatWindow/ChatWindow";
@@ -11,6 +11,7 @@ import { EdgeChrome, BOTTOM_BAR_HEIGHT } from "./EdgeChrome";
 import { LookLayoutControls, useSyncAcrossWindows } from "./LookLayoutControls";
 import type { OverlayPalette } from "./palettes";
 import { SkillsPanel } from "./SkillsPanel";
+import { CaptureBar, useCaptureTask, type CaptureDraft } from "@/components/skills/CaptureTask";
 import { WorkspacePanel } from "./workspace/WorkspacePanel";
 import { KhamiSetup } from "@/components/khami/KhamiSetup";
 import { AboutLicences } from "@/components/about/AboutLicences";
@@ -176,6 +177,8 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const [khamiPrompt, setKhamiPrompt] = useState(false);
+  const [captureDraft, setCaptureDraft] = useState<CaptureDraft | null>(null);
+  const capture = useCaptureTask(useCallback((d: CaptureDraft) => { setCaptureDraft(d); setSkillsOpen(true); }, []));
 
   // Offer Khami setup once if it isn't set up and the user hasn't said "Later".
   useEffect(() => {
@@ -215,7 +218,8 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
     askKhameleon: () => { setChatMinimized(false); setChatOpen(true); },
     openTool: requestChatTool,
     openSkills: () => setSkillsOpen(o => !o),
-  }), [setChatOpen, setChatMinimized, requestChatTool]);
+    captureTask: capture.available ? capture.open : undefined,
+  }), [setChatOpen, setChatMinimized, requestChatTool, capture.available, capture.open]);
 
   return (
     <>
@@ -235,7 +239,8 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
       )}
       {!locked && <Toolbars palette={palette} groups={toolbarGroups} bare={bare} idleStyle={prefs.idleStyle} />}
       {!locked && <EdgeChrome mode={prefs.edgeChrome} palette={palette} bare={bare} />}
-      {skillsOpen && !locked && <SkillsPanel palette={palette} onClose={() => setSkillsOpen(false)} />}
+      {skillsOpen && !locked && <SkillsPanel palette={palette} draft={captureDraft} onDraftDone={() => setCaptureDraft(null)} onClose={() => { setSkillsOpen(false); setCaptureDraft(null); }} />}
+      {!locked && <CaptureBar capture={capture} tone="overlay" onDescribeInstead={() => { setCaptureDraft({ name: '', description: '', steps: '', source: '' }); setSkillsOpen(true); }} />}
       {workspaceOpen && !locked && <WorkspacePanel palette={palette} onClose={() => setWorkspaceOpen(false)} />}
       {integrationsOpen && !locked && <IntegrationsPanel palette={palette} onClose={() => setIntegrationsOpen(false)} />}
       {aboutOpen && <AboutPanel palette={palette} onClose={() => setAboutOpen(false)} />}

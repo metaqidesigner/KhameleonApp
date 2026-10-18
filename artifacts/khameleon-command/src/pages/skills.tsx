@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Zap, Download } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { WorkDomainFilterBar, useWorkDomains } from '@/components/WorkDomainFilterBar';
@@ -6,6 +6,7 @@ import { type SkillSet, type CreateSkillSetInput, type SkillSetSourceType } from
 import { useSkillLibrary, SkillConfirmGate } from '@/components/skills/useSkillLibrary';
 import { GetSkills } from '@/components/skills/GetSkills';
 import { SkillGuide } from '@/components/skills/SkillGuide';
+import { CaptureBar, useCaptureTask, type CaptureDraft } from '@/components/skills/CaptureTask';
 import { useJarvisStore } from '@/store/jarvisStore';
 
 const STATUS_LABEL: Record<SkillSet['status'], string> = {
@@ -39,6 +40,8 @@ export default function Skills() {
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [guiding, setGuiding] = useState(false);
+  const [captureDraft, setCaptureDraft] = useState<CaptureDraft | null>(null);
+  const capture = useCaptureTask(useCallback((d: CaptureDraft) => { setCaptureDraft(d); setGuiding(true); }, []));
   const [editDraft, setEditDraft] = useState('');
 
   const filtered = useMemo(
@@ -136,10 +139,19 @@ export default function Skills() {
       {/* GUIDED - same skill maker as the Overlay's Skills panel (components/skills/SkillGuide). */}
       <div style={{ flexShrink: 0 }}>
         <JPanel title="MAKE YOUR OWN SKILL" icon={<Plus size={13} />}
-          action={<button className="j-btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 9 }} onClick={() => setGuiding(g => !g)}>{guiding ? 'CLOSE' : 'START GUIDE'}</button>}>
+          action={<div style={{ display: 'flex', gap: 6 }}>
+            {capture.available && !guiding && <button className="j-btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 9 }} onClick={capture.open}>CAPTURE A TASK</button>}
+            <button className="j-btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 9 }} onClick={() => { setGuiding(g => !g); setCaptureDraft(null); }}>{guiding ? 'CLOSE' : 'START GUIDE'}</button>
+          </div>}>
           {guiding
-            ? <SkillGuide tone="classic" onCancel={() => setGuiding(false)} onSave={async input => { await lib.create(input); setGuiding(false); }} />
-            : <div style={{ fontSize: 11, color: 'var(--j-text-muted)' }}>A step-by-step guide: name it, write or draft the steps, check Khameleon would use it, save.</div>}
+            ? <SkillGuide key={captureDraft ? `draft-${captureDraft.name}` : 'new'} tone="classic" initial={captureDraft ?? undefined}
+                onCancel={() => { setGuiding(false); setCaptureDraft(null); }}
+                onSave={async input => { await lib.create(input); setGuiding(false); setCaptureDraft(null); }} />
+            : <div style={{ fontSize: 11, color: 'var(--j-text-muted)' }}>
+                A step-by-step guide: name it, write or draft the steps, check Khameleon would use it, save.
+                {capture.available && ' Or capture a task: do it once while Khameleon notes the steps, and it writes the skill up for you.'}
+              </div>}
+          <CaptureBar capture={capture} tone="classic" onDescribeInstead={() => { setCaptureDraft(null); setGuiding(true); }} />
         </JPanel>
       </div>
 

@@ -49,3 +49,31 @@ export function isOverlayLayout(): boolean {
 export function desktopPrefsBridge(): KhameleonDesktopBridge["prefs"] {
   return bridge()?.prefs;
 }
+
+/** Capture (apps/khameleon-shell/src/capture.ts): record a task to turn into a skill. */
+export interface CaptureStatus {
+  state: "idle" | "recording" | "paused" | "processing";
+  steps: number;
+  currentApp?: string;
+  currentTitle?: string;
+  snapshotsAllowed: boolean;
+}
+
+export interface CaptureStep { at: number; app: string; title: string; text?: string; note?: string }
+
+export interface KhameleonCaptureBridge {
+  status(): Promise<CaptureStatus>;
+  start(): Promise<CaptureStatus>;
+  pause(): Promise<CaptureStatus>;
+  resume(): Promise<CaptureStatus>;
+  note(text: string): Promise<CaptureStatus>;
+  stop(): Promise<CaptureStep[]>;
+  discard(): Promise<void>;
+  openSnapshotSettings(): Promise<void>;
+  onUpdate(listener: (status: CaptureStatus) => void): () => void;
+}
+
+/** Capture is only possible inside the desktop app. */
+export function captureBridge(): KhameleonCaptureBridge | undefined {
+  return (window as unknown as { khameleon?: { capture?: KhameleonCaptureBridge } }).khameleon?.capture;
+}

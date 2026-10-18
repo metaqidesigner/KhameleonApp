@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  AlignLeft, ChevronLeft, ChevronRight, Crosshair, FileText, Filter, BookOpen,
+  AlignLeft, ChevronLeft, ChevronRight, CircleDot, Crosshair, FileText, Filter, BookOpen,
   Library, MessageCircle, PenLine, RefreshCw, Search, Sparkles, Table2, ZoomIn,
 } from "lucide-react";
 import type { OverlayPalette } from "./palettes";
@@ -39,7 +39,7 @@ const BARE_SHADOW = "drop-shadow(0 1px 2px rgba(0,0,0,0.45)) drop-shadow(0 1px 6
 
 export type IdleStyle = "fade" | "edge" | "always";
 
-export function defaultToolbarGroups(handlers: { askKhameleon: () => void; openTool: (tool: ChatToolId) => void; openSkills: () => void }): {
+export function defaultToolbarGroups(handlers: { askKhameleon: () => void; openTool: (tool: ChatToolId) => void; openSkills: () => void; captureTask?: () => void }): {
   left: ToolbarGroup[];
   right: ToolbarGroup[];
 } {
@@ -48,6 +48,7 @@ export function defaultToolbarGroups(handlers: { askKhameleon: () => void; openT
       {
         title: "Capture & Extract",
         actions: [
+          { id: "capture-task", label: "Capture a task", icon: <CircleDot {...ICON} />, run: handlers.captureTask, comingWith: "Needs the desktop app" },
           { id: "extract", label: "Extract data", icon: <Crosshair {...ICON} />, comingWith: "Arrives with Capture" },
           { id: "to-sheet", label: "To spreadsheet", icon: <Table2 {...ICON} />, comingWith: "Arrives with Capture" },
           { id: "inspect", label: "Inspect region", icon: <ZoomIn {...ICON} />, comingWith: "Arrives with Capture" },

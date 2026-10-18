@@ -162,6 +162,7 @@ export class CaptureSession {
     if (!win || isOwnWindow(win.path)) return;
     const title = win.getTitle() || "";
     const appLabel = appName(win.path);
+    if (!appLabel && !title) return; // e.g. the desktop itself - nothing worth a step
     const bounds = win.getBounds() as Bounds;
     const now = Date.now();
     const changed = !this.last || this.last.app !== appLabel || this.last.title !== title;

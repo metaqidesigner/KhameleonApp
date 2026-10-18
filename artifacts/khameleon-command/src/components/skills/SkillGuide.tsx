@@ -27,13 +27,19 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 const STEPS = ['What it is', 'The steps', 'The result', 'Try it', 'Save'] as const;
 
-export function SkillGuide({ tone, onSave, onCancel }: { tone: Tone; onSave: (input: CreateSkillSetInput) => Promise<void>; onCancel: () => void }) {
+export function SkillGuide({ tone, onSave, onCancel, initial }: {
+  tone: Tone;
+  onSave: (input: CreateSkillSetInput) => Promise<void>;
+  onCancel: () => void;
+  /** A draft to start from - e.g. one written up from a Capture recording. */
+  initial?: { name: string; description: string; steps: string; source?: string };
+}) {
   const t = TONES[tone];
   const [step, setStep] = useState(0);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState(initial?.name ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
   const [task, setTask] = useState('');
-  const [steps, setSteps] = useState('');
+  const [steps, setSteps] = useState(initial?.steps ?? '');
   const [result, setResult] = useState('');
   const [tryRequest, setTryRequest] = useState('');
   const [match, setMatch] = useState<{ picked: string | null; isThisSkill: boolean; suggestWords: string[] } | null>(null);
@@ -91,6 +97,7 @@ export function SkillGuide({ tone, onSave, onCancel }: { tone: Tone; onSave: (in
 
       {step === 0 && (
         <>
+          {initial?.source && <div style={{ fontSize: 11.5, color: t.good }}>{initial.source} Check each step - anything marked "(check this)" wasn't clear from the recording.</div>}
           {label('Name your skill')}
           <input aria-label="Skill name" placeholder="e.g. Supplier statement reconciliation" value={name} onChange={e => setName(e.target.value)} style={input} />
           {label('What is it for, and when should it be used?')}

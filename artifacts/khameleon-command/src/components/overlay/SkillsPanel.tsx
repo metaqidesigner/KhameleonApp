@@ -4,6 +4,7 @@ import { useJarvisStore } from "@/store/jarvisStore";
 import { useSkillLibrary, SkillConfirmGate } from "@/components/skills/useSkillLibrary";
 import { GetSkills } from "@/components/skills/GetSkills";
 import { SkillGuide } from "@/components/skills/SkillGuide";
+import type { CaptureDraft } from "@/components/skills/CaptureTask";
 import type { SkillSet, CreateSkillSetInput, SkillSetSourceType } from "@/lib/skillSetsApi";
 import type { WorkDomain } from "@/lib/workDomainsApi";
 import type { OverlayPalette } from "./palettes";
@@ -195,12 +196,19 @@ function Section({ title, count, children }: { title: string; count: number; chi
   );
 }
 
-export function SkillsPanel({ palette, onClose }: { palette: OverlayPalette; onClose: () => void }) {
+export function SkillsPanel({ palette, onClose, draft, onDraftDone }: {
+  palette: OverlayPalette;
+  onClose: () => void;
+  /** A skill written up from a Capture recording, opened straight in the guided maker. */
+  draft?: CaptureDraft | null;
+  onDraftDone?: () => void;
+}) {
   const lib = useSkillLibrary();
   const requestChatTool = useJarvisStore(s => s.requestChatTool);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(!!draft);
   const [getting, setGetting] = useState(false);
   const [pasting, setPasting] = useState(false);
+  useEffect(() => { if (draft) { setAdding(true); setGetting(false); setPasting(false); } }, [draft]);
   const [domainFilter, setDomainFilter] = useState<number | "all">("all");
 
   useEffect(() => {
@@ -271,7 +279,9 @@ export function SkillsPanel({ palette, onClose }: { palette: OverlayPalette; onC
           {/* New: the guided skill maker; "paste one" keeps the quick form for skills from elsewhere. */}
           {adding && !pasting && (
             <>
-              <SkillGuide tone="overlay" onCancel={() => setAdding(false)} onSave={async input => { await lib.create(input); setAdding(false); }} />
+              <SkillGuide key={draft ? `draft-${draft.name}` : 'new'} tone="overlay" initial={draft ?? undefined}
+                onCancel={() => { setAdding(false); onDraftDone?.(); }}
+                onSave={async input => { await lib.create(input); setAdding(false); onDraftDone?.(); }} />
               <button type="button" onClick={() => setPasting(true)} style={{ background: "none", border: "none", color: MUTED, fontSize: 11.5, cursor: "pointer", textAlign: "left", padding: 0, fontFamily: "inherit" }}>
                 Already have a skill written somewhere? Paste it instead
               </button>
