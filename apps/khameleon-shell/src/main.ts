@@ -89,7 +89,7 @@ let permissionRequestSeq = 0;
  */
 function requestObservePermission(appLabel: string, state: IndicatorState): Promise<boolean> {
   const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  const verb = state === "controlling" ? "control" : "observe";
+  const verb = state === "working" ? "work in" : "observe";
   const channel = `khameleon:permission-reply:${permissionRequestSeq++}`;
 
   return new Promise((resolve) => {

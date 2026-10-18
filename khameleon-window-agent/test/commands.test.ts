@@ -161,11 +161,11 @@ describe("parseCommand", () => {
     });
   });
 
-  it('parses "control Excel" as controlling', () => {
+  it('parses "control Excel" as working', () => {
     expect(parseCommand("control Excel")).toEqual({
       type: "observe-external",
       query: "excel",
-      state: "controlling",
+      state: "working",
     });
   });
 
@@ -258,7 +258,7 @@ describe("CommandRunner — observing and controlling external windows (Cross-Ap
     expect(await runner.run("observe Notepad")).toBe('Couldn\'t find a window matching "notepad".');
   });
 
-  it("switches an already-observed window straight to controlling, with no second prompt", async () => {
+  it("switches an already-observed window straight to working, with no second prompt", async () => {
     let promptCount = 0;
     const { runner, external, overlay } = makeRunner({
       permission: async () => {
@@ -271,9 +271,9 @@ describe("CommandRunner — observing and controlling external windows (Cross-Ap
     await runner.run("observe Excel");
     const result = await runner.run("control Excel");
 
-    expect(result).toBe("Now controlling Excel.");
+    expect(result).toBe("Now working in Excel.");
     expect(promptCount).toBe(1); // not re-prompted for the same window
-    expect(overlay.stateChanges).toEqual([{ handle: overlay.shown[0].handle, state: "controlling" }]);
+    expect(overlay.stateChanges).toEqual([{ handle: overlay.shown[0].handle, state: "working" }]);
   });
 
   it("stops watching and hides the border on request", async () => {
@@ -302,10 +302,10 @@ describe("CommandRunner — clicking and typing (Cross-App Control Phase 2)", ()
     await runner.run("observe Excel");
     const result = await runner.run("click at 400, 120 in Excel");
 
-    expect(result).toMatch(/must be in "controlling" state/);
+    expect(result).toMatch(/must be in "working" state/);
   });
 
-  it('clicks for real once a window is "controlling" - the colored border is the consent signal', async () => {
+  it('clicks for real once a window is "working" - the colored border is the consent signal', async () => {
     const { runner, external, input } = makeRunner({ permission: true });
     external.register("Excel", { x: 0, y: 0, width: 800, height: 600 });
 
@@ -322,7 +322,7 @@ describe("CommandRunner — clicking and typing (Cross-App Control Phase 2)", ()
     const { controller, external } = makeRunner({ permission: true });
     external.register("Excel", { x: 0, y: 0, width: 800, height: 600 });
     const handle = (await controller.findExternal("Excel"))!;
-    await controller.observe(handle, "controlling");
+    await controller.observe(handle, "working");
 
     await controller.click(handle, { point: { x: 10, y: 10 } });
 

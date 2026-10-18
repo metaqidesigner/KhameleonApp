@@ -52,7 +52,7 @@ export function parseCommand(text: string): Command | null {
 
   const control = t.match(/(?:take control of|control)\s+(.+)/);
   if (control) {
-    return { type: "observe-external", query: control[1].trim(), state: "controlling" };
+    return { type: "observe-external", query: control[1].trim(), state: "working" };
   }
 
   const observe = t.match(/(?:observe|watch|keep an eye on)\s+(.+)/);
@@ -93,6 +93,11 @@ export function parseCommand(text: string): Command | null {
  * and resolves to the user's choice. Injected (not called directly by
  * WindowController) so this stays testable without real UI - the real
  * implementation is Electron-specific, wired in apps/khameleon-shell. */
+/** "Now working in Excel." / "Now observing Excel." */
+function nowDoing(state: IndicatorState): string {
+  return state === "working" ? "Now working in" : `Now ${state.replace("-", " ")}`;
+}
+
 export type PermissionPrompt = (appLabel: string, state: IndicatorState) => Promise<boolean>;
 
 export class CommandRunner {
@@ -136,18 +141,18 @@ export class CommandRunner {
         if (!handle) return `Couldn't find a window matching "${cmd.query}".`;
 
         // Already observing this exact window - just change its state
-        // (e.g. observing → controlling) without re-prompting.
+        // (e.g. observing → working) without re-prompting.
         if (this.lastObserved?.id === handle.id && this.controller.isObserving(handle)) {
           this.controller.setObserveState(handle, cmd.state);
-          return `Now ${cmd.state} ${handle.label ?? cmd.query}.`;
+          return `${nowDoing(cmd.state)} ${handle.label ?? cmd.query}.`;
         }
 
         const allowed = await this.requestPermission(handle.label ?? cmd.query, cmd.state);
-        if (!allowed) return `Not allowed to ${cmd.state === "controlling" ? "control" : "observe"} ${handle.label ?? cmd.query}.`;
+        if (!allowed) return `Not allowed to ${cmd.state === "working" ? "control" : "observe"} ${handle.label ?? cmd.query}.`;
 
         await this.controller.observe(handle, cmd.state);
         this.lastObserved = handle;
-        return `Now ${cmd.state} ${handle.label ?? cmd.query}.`;
+        return `${nowDoing(cmd.state)} ${handle.label ?? cmd.query}.`;
       }
 
       case "stop-observing-last": {

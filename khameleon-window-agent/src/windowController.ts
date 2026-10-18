@@ -137,7 +137,7 @@ export class WindowController {
     this.observations.set(handle.id, { interval, state });
   }
 
-  /** Switch an already-observed window's indicator (e.g. observing → controlling). */
+  /** Switch an already-observed window's indicator (e.g. observing → working). */
   setObserveState(handle: WindowHandle, state: IndicatorState): void {
     const entry = this.observations.get(handle.id);
     if (!entry) throw new Error(`Not currently observing ${handle.id}`);
@@ -160,7 +160,7 @@ export class WindowController {
   /**
    * Real click, simulating a user - not reading/writing a data model. For
    * an external (third-party) window, requires it already be in
-   * "controlling" state (observe() called with state "controlling"): the
+   * "working" state (observe() called with state "working"): the
    * colored border is the user-visible signal that this is about to
    * happen, so clicking without it showing would be silent and
    * un-consented. Khameleon's own spawned widget windows skip this gate -
@@ -218,9 +218,9 @@ export class WindowController {
     if (handle.backend === "widget") return this.input.browser; // Khameleon already owns this window - no extra gate.
 
     const entry = this.observations.get(handle.id);
-    if (!entry || entry.state !== "controlling") {
+    if (!entry || entry.state !== "working") {
       throw new Error(
-        `Not allowed to click/type in ${handle.label ?? handle.id} - it must be in "controlling" state first (the colored border is the user-visible consent signal).`
+        `Not allowed to click/type in ${handle.label ?? handle.id} - it must be in "working" state first (the colored border is the user-visible consent signal).`
       );
     }
     return this.input.native;

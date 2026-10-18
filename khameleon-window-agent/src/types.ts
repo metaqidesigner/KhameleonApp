@@ -74,13 +74,16 @@ export interface WindowHandle {
 }
 
 /**
- * What Khameleon is currently doing to an external window it's watching -
- * the three states the colored border overlay signals (Cross-App Control,
- * khameleon-decisions-log.md, 2026-10-03). "seeing" is a one-off glance
- * (e.g. reading a document's content); "observing" is ongoing, passive
- * monitoring; "controlling" is actively driving it (clicks/keystrokes).
+ * What Khameleon is doing with a window - shown as a thin glass glow around
+ * it (docs/build-review.md, Build 4 expanded, 2026-10-18):
+ * - "visible":   Khameleon can see it (several windows may be visible) - white, steady
+ * - "reading":   pulling text or figures out of it - light blue
+ * - "observing": watching this window in particular - white, gently pulsing
+ * - "working":   clicking/typing in it - light green with a travelling shimmer
+ * - "needs-you": waiting on the user (a decision, a login, a confirmation) - light red
+ * - "recording": Capture is recording the user's task - light blue + "Recording"
  */
-export type IndicatorState = "seeing" | "observing" | "controlling";
+export type IndicatorState = "visible" | "reading" | "observing" | "working" | "needs-you" | "recording";
 
 /**
  * Draws the colored, pulsating border around an external window that
