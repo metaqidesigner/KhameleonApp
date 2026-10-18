@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { LookLayoutControls, useSyncAcrossWindows } from '@/components/overlay/LookLayoutControls';
 import { KhamiSetup } from '@/components/khami/KhamiSetup';
 import { AboutLicences } from '@/components/about/AboutLicences';
+import { MicrosoftSignIn } from '@/components/settings/MicrosoftSignIn';
 import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin, Music, Play, Pause, SkipForward, SkipBack, Mic } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
@@ -17,10 +18,10 @@ import {
   getOnboardingStatus, saveProfile, type Profile,
 } from '@/lib/jarvisApi';
 import { getQuotaSnapshots, type QuotaSnapshots } from '@/lib/quotaApi';
-import { getTtsStatus, getElevenLabsVoices, type ElevenLabsVoice } from '@/lib/voiceApi';
+import { getTtsStatus, getElevenLabsVoices, previewVoice, type ElevenLabsVoice } from '@/lib/voiceApi';
 
-type Section = 'GENERAL' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED' | 'ABOUT';
-const SECTIONS: Section[] = ['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MEMORY', 'TELEMETRY', 'ADVANCED', 'ABOUT'];
+type Section = 'GENERAL' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MICROSOFT SIGN-IN' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED' | 'ABOUT';
+const SECTIONS: Section[] = ['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MICROSOFT SIGN-IN', 'MEMORY', 'TELEMETRY', 'ADVANCED', 'ABOUT'];
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -628,34 +629,6 @@ function AppearanceSection() {
  * on boot) and here: a real place to check status, re-open the prompt
  * after a skip/denial, and turn wake word on/off once granted.
  */
-/** Plays a short sample through the real /api/voice/tts path with the current settings, falling back to speechSynthesis exactly like useVoice.ts does - so "preview" reflects what you'll actually hear. */
-async function previewVoice(text: string, voiceId: string, modelId: string, rate: number, pitch: number, volume: number): Promise<void> {
-  try {
-    const res = await fetch('/api/voice/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice_id: voiceId, model_id: modelId, speed: rate }),
-    });
-    if (!res.ok) throw new Error(`TTS HTTP ${res.status}`);
-    const arrayBuffer = await res.arrayBuffer();
-    const ctx = new AudioContext();
-    const decoded = await ctx.decodeAudioData(arrayBuffer);
-    const gain = ctx.createGain();
-    gain.gain.value = volume;
-    const source = ctx.createBufferSource();
-    source.buffer = decoded;
-    source.connect(gain);
-    gain.connect(ctx.destination);
-    source.start(0);
-  } catch {
-    if (!('speechSynthesis' in window)) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = rate;
-    utterance.pitch = pitch;
-    utterance.volume = volume;
-    window.speechSynthesis.speak(utterance);
-  }
-}
 
 function VoiceSection() {
   const wakeWordActive           = useJarvisStore(s => s.wakeWordActive);
@@ -996,8 +969,10 @@ export default function Settings() {
           {active === 'APPEARANCE' && <AppearanceSection />}
           {active === 'VOICE'      && <VoiceSection />}
           {active === 'CONNECTORS' && <ConnectorsSection />}
+          {/* Same section as the Overlay's Settings > Microsoft sign-in (components/settings). */}
+          {active === 'MICROSOFT SIGN-IN' && <MicrosoftSignIn tone="classic" />}
           {active === 'ABOUT'      && <AboutLicences tone="classic" />}
-          {!['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'ABOUT'].includes(active) && <GenericSection section={active} />}
+          {!['GENERAL', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MICROSOFT SIGN-IN', 'ABOUT'].includes(active) && <GenericSection section={active} />}
         </div>
       </JPanel>
     </div>

@@ -28,6 +28,7 @@ import { accountsEnabled, createUser, verifyLogin, getUserById } from "../lib/ac
 import { db } from "@workspace/db";
 import { actionReceiptsTable } from "@workspace/db";
 import { safeReturnTo } from "../lib/returnTo.js";
+import { getMicrosoftApp } from "../lib/microsoftApp.js";
 import crypto from "node:crypto";
 
 const router = Router();
@@ -131,7 +132,7 @@ setInterval(() => {
   for (const [k, v] of pendingStates) if (v.createdAt < cutoff) pendingStates.delete(k);
 }, 60_000);
 
-function getRedirectUri(req: Request): string {
+export function getRedirectUri(req: Request): string {
   if (process.env.OAUTH_REDIRECT_URI) return process.env.OAUTH_REDIRECT_URI;
   const proto = req.headers["x-forwarded-proto"] ?? req.protocol;
   const host  = req.headers["x-forwarded-host"] ?? req.headers.host;
@@ -208,12 +209,13 @@ const MICROSOFT_SCOPES = [
   "offline_access",
 ].join(" ");
 
-router.get("/oauth/microsoft/start", (req: Request, res: Response) => {
-  const clientId = process.env.MICROSOFT_CLIENT_ID;
-  if (!clientId) {
-    res.status(503).json({ error: "MICROSOFT_CLIENT_ID not configured" });
+router.get("/oauth/microsoft/start", async (req: Request, res: Response) => {
+  const msApp = await getMicrosoftApp();
+  if (!msApp) {
+    res.status(503).json({ error: "Microsoft sign-in isn't set up yet - an admin adds the app details in Settings > Microsoft sign-in." });
     return;
   }
+  const clientId = msApp.clientId;
   const url = new URL(`https://login.microsoftonline.com/${MICROSOFT_TENANT}/oauth2/v2.0/authorize`);
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("redirect_uri", getRedirectUri(req));
@@ -225,6 +227,8 @@ router.get("/oauth/microsoft/start", (req: Request, res: Response) => {
 });
 
 async function exchangeMicrosoftCode(req: Request, code: string): Promise<void> {
+  const msApp = await getMicrosoftApp();
+  if (!msApp) throw new Error("Microsoft sign-in isn't set up");
   const res = await fetch(
     `https://login.microsoftonline.com/${MICROSOFT_TENANT}/oauth2/v2.0/token`,
     {
@@ -232,8 +236,8 @@ async function exchangeMicrosoftCode(req: Request, code: string): Promise<void> 
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code,
-        client_id:     process.env.MICROSOFT_CLIENT_ID!,
-        client_secret: process.env.MICROSOFT_CLIENT_SECRET!,
+        client_id:     msApp.clientId,
+        client_secret: msApp.clientSecret,
         redirect_uri:  getRedirectUri(req),
         grant_type:    "authorization_code",
         scope:         MICROSOFT_SCOPES,
@@ -256,12 +260,13 @@ async function exchangeMicrosoftCode(req: Request, code: string): Promise<void> 
 // A separate sign-in from Outlook: work accounts only, a Copilot licence, and
 // the read permissions Microsoft's Copilot Chat API requires (admin approval).
 
-router.get("/oauth/copilot/start", (req: Request, res: Response) => {
-  const clientId = process.env.MICROSOFT_CLIENT_ID;
-  if (!clientId) {
-    res.status(503).json({ error: "MICROSOFT_CLIENT_ID not configured" });
+router.get("/oauth/copilot/start", async (req: Request, res: Response) => {
+  const msApp = await getMicrosoftApp();
+  if (!msApp) {
+    res.status(503).json({ error: "Microsoft sign-in isn't set up yet - an admin adds the app details in Settings > Microsoft sign-in." });
     return;
   }
+  const clientId = msApp.clientId;
   const url = new URL(`https://login.microsoftonline.com/${COPILOT_TENANT}/oauth2/v2.0/authorize`);
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("redirect_uri", getRedirectUri(req));
@@ -273,13 +278,15 @@ router.get("/oauth/copilot/start", (req: Request, res: Response) => {
 });
 
 async function exchangeCopilotCode(req: Request, code: string): Promise<void> {
+  const msApp = await getMicrosoftApp();
+  if (!msApp) throw new Error("Microsoft sign-in isn't set up");
   const res = await fetch(`https://login.microsoftonline.com/${COPILOT_TENANT}/oauth2/v2.0/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code,
-      client_id:     process.env.MICROSOFT_CLIENT_ID!,
-      client_secret: process.env.MICROSOFT_CLIENT_SECRET!,
+      client_id:     msApp.clientId,
+      client_secret: msApp.clientSecret,
       redirect_uri:  getRedirectUri(req),
       grant_type:    "authorization_code",
       scope:         COPILOT_SCOPES,

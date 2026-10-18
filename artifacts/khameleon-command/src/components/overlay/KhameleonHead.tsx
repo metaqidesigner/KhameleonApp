@@ -101,7 +101,7 @@ export function KhameleonHead({ palette, locked = false, bottom = 18, onOpenLook
           {onOpenLook && (
             <button role="menuitem" style={rowStyle} onClick={() => { setMenuOpen(false); onOpenLook(); }} {...hover}>
               <SlidersHorizontal size={14} color={palette.iconColor} />
-              Look &amp; layout…
+              Settings…
             </button>
           )}
           {onOpenAbout && (

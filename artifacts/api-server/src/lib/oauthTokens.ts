@@ -3,6 +3,7 @@
  * Add new provider refresh flows in REFRESHERS as connectors are added.
  */
 
+import { getMicrosoftApp } from "./microsoftApp.js";
 import { db } from "@workspace/db";
 import { oauthTokensTable } from "@workspace/db";
 import { and, eq, isNull } from "drizzle-orm";
@@ -131,9 +132,9 @@ async function refreshGoogle(token: TokenRecord): Promise<TokenRecord> {
 
 async function refreshMicrosoft(token: TokenRecord): Promise<TokenRecord> {
   if (!token.refreshToken) throw new Error("No refresh token for Microsoft");
-  const clientId     = process.env.MICROSOFT_CLIENT_ID;
-  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
-  if (!clientId || !clientSecret) throw new Error("MICROSOFT_CLIENT_ID/SECRET not set");
+  const msApp = await getMicrosoftApp();
+  if (!msApp) throw new Error("Microsoft sign-in isn't set up - add the app details in Settings > Microsoft sign-in.");
+  const { clientId, clientSecret } = msApp;
 
   const res = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
     method: "POST",
@@ -160,9 +161,9 @@ async function refreshMicrosoft(token: TokenRecord): Promise<TokenRecord> {
 
 async function refreshCopilot(token: TokenRecord): Promise<TokenRecord> {
   if (!token.refreshToken) throw new Error("No refresh token for Copilot");
-  const clientId     = process.env.MICROSOFT_CLIENT_ID;
-  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
-  if (!clientId || !clientSecret) throw new Error("MICROSOFT_CLIENT_ID/SECRET not set");
+  const msApp = await getMicrosoftApp();
+  if (!msApp) throw new Error("Microsoft sign-in isn't set up - add the app details in Settings > Microsoft sign-in.");
+  const { clientId, clientSecret } = msApp;
   // Same scopes and tenant as the sign-in (lib/copilotChat.ts) - kept literal
   // here to avoid a circular import.
   const res = await fetch("https://login.microsoftonline.com/organizations/oauth2/v2.0/token", {

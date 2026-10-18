@@ -3,6 +3,7 @@ import { Lock, Plus, Eye, EyeOff, Trash2, History, ShieldOff } from 'lucide-reac
 import JPanel from '@/components/JPanel';
 import { getOnboardingStatus } from '@/lib/jarvisApi';
 import {
+  updateVaultItem,
   getVaultItems, createVaultItem, revealVaultItem, deleteVaultItem, getVaultAccessLog,
   type VaultItem, type VaultAccessLogEntry, type CreateVaultItemInput,
 } from '@/lib/vaultApi';
@@ -25,6 +26,8 @@ export default function Vault() {
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [logFor, setLogFor] = useState<number | null>(null);
   const [logEntries, setLogEntries] = useState<VaultAccessLogEntry[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState({ name: '', category: '', description: '', secretValue: '' });
 
   const load = () => { getVaultItems().then(rows => { setItems(rows); setLoading(false); }); };
   useEffect(() => {
@@ -180,6 +183,24 @@ export default function Vault() {
                   </div>
                 )}
 
+                {/* Edit (gap review Q11) - same fields as the Overlay's Settings > Credentials. */}
+                {editingId === item.id && (
+                  <form style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}
+                    onSubmit={async e => {
+                      e.preventDefault();
+                      try {
+                        await updateVaultItem(item.id, { name: editDraft.name.trim(), category: editDraft.category.trim(), description: editDraft.description.trim(), ...(editDraft.secretValue ? { secretValue: editDraft.secretValue } : {}) });
+                        setEditingId(null); load();
+                      } catch (err) { setError(err instanceof Error ? err.message : 'Failed to update'); }
+                    }}>
+                    <input className="j-input" aria-label="Name" value={editDraft.name} onChange={e => setEditDraft(d => ({ ...d, name: e.target.value }))} />
+                    <input className="j-input" aria-label="Category" value={editDraft.category} onChange={e => setEditDraft(d => ({ ...d, category: e.target.value }))} />
+                    <input className="j-input" aria-label="Description" placeholder="Description" value={editDraft.description} onChange={e => setEditDraft(d => ({ ...d, description: e.target.value }))} />
+                    <input className="j-input" aria-label="New secret" type="password" autoComplete="new-password" placeholder="New secret (leave empty to keep the current one)" value={editDraft.secretValue} onChange={e => setEditDraft(d => ({ ...d, secretValue: e.target.value }))} />
+                    <div><button type="submit" className="j-btn-primary" style={{ height: 28, padding: '0 12px', fontSize: 10 }} disabled={!editDraft.name.trim()}>SAVE CHANGES</button></div>
+                  </form>
+                )}
+
                 {logFor === item.id && (
                   <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {logEntries.length === 0 ? (
@@ -199,6 +220,10 @@ export default function Vault() {
                   </button>
                   <button className="j-btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 9, display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => toggleLog(item.id)}>
                     <History size={11} /> {logFor === item.id ? 'HIDE LOG' : 'ACCESS LOG'}
+                  </button>
+                  <button className="j-btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 9 }}
+                    onClick={() => { setEditingId(editingId === item.id ? null : item.id); setEditDraft({ name: item.name, category: item.category, description: item.description ?? '', secretValue: '' }); }}>
+                    {editingId === item.id ? 'CANCEL EDIT' : 'EDIT'}
                   </button>
                   <button
                     className="j-btn-ghost"

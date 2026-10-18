@@ -11,6 +11,7 @@ import { EdgeChrome, BOTTOM_BAR_HEIGHT } from "./EdgeChrome";
 import { LookLayoutControls, useSyncAcrossWindows } from "./LookLayoutControls";
 import type { OverlayPalette } from "./palettes";
 import { SkillsPanel } from "./SkillsPanel";
+import { SettingsPanel } from "./SettingsPanel";
 import { EmailAssistant } from "./EmailAssistant";
 import { CaptureBar, useCaptureTask, type CaptureDraft } from "@/components/skills/CaptureTask";
 import { WorkspacePanel } from "./workspace/WorkspacePanel";
@@ -33,37 +34,6 @@ const KHAMI_LATER_KEY = "khami-setup-later";
  */
 /** Room the right-hand toolbars take up, kept clear of the chat window. */
 const TOOLBAR_CLEARANCE = 72;
-
-function LookPanel({ palette, onClose }: { palette: OverlayPalette; onClose: () => void }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return (
-    <div
-      data-overlay-hit
-      role="dialog"
-      aria-label="Look and layout"
-      style={{
-        position: "fixed", bottom: 80, right: 84, width: 340, maxHeight: "calc(100vh - 120px)", overflowY: "auto",
-        zIndex: 450, padding: 16, borderRadius: 16,
-        background: "rgba(8, 14, 28, 0.9)", border: `1px solid ${palette.chatBorder}`,
-        backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)", boxShadow: palette.glassShadow,
-        fontFamily: "var(--j-font-ui)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
-        <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#d6efee" }}>Look &amp; layout</span>
-        <button type="button" className="khi-icon-btn" onClick={onClose} aria-label="Close"
-          style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex" }}>
-          <X size={15} color="#8fb4b6" />
-        </button>
-      </div>
-      <LookLayoutControls tone="overlay" />
-    </div>
-  );
-}
 
 function IntegrationsPanel({ palette, onClose }: { palette: OverlayPalette; onClose: () => void }) {
   useEffect(() => {
@@ -252,7 +222,7 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
           onSetUp={() => { setKhamiPrompt(false); setLookOpen(false); setWorkspaceOpen(false); setKhamiOpen(true); }}
           onLater={() => { setKhamiPrompt(false); try { localStorage.setItem(KHAMI_LATER_KEY, "1"); } catch { /* storage blocked */ } }} />
       )}
-      {lookOpen && <LookPanel palette={palette} onClose={() => setLookOpen(false)} />}
+      {lookOpen && <SettingsPanel palette={palette} onClose={() => setLookOpen(false)} onOpenIntegrations={() => { setLookOpen(false); setIntegrationsOpen(true); }} />}
       <KhameleonHead palette={palette} locked={locked} bottom={18 + bottomBar} onOpenLook={locked ? undefined : () => { setWorkspaceOpen(false); setKhamiOpen(false); setLookOpen(true); }}
         onOpenWorkspace={locked ? undefined : () => { setLookOpen(false); setKhamiOpen(false); setWorkspaceOpen(true); }}
         onOpenKhami={locked ? undefined : () => { setLookOpen(false); setWorkspaceOpen(false); setKhamiPrompt(false); setKhamiOpen(true); }}
