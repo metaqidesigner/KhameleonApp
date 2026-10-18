@@ -115,6 +115,22 @@ export function LookLayoutControls({ tone }: { tone: Tone }) {
             options={[{ value: "follow", label: "Follow me" }, { value: "primary", label: "Main screen only" }]}
             hint="With more than one screen, Follow me moves Khameleon to whichever screen you're working on."
           />
+          <Choice
+            tone={tone}
+            label="Email assistant"
+            value={desktopPrefs.emailAssistant ? "on" : "off"}
+            onChange={v => setDesktop({ emailAssistant: v === "on" })}
+            options={[{ value: "on", label: "On" }, { value: "off", label: "Off" }]}
+            hint="When you open an email, Khami offers a summary, a suggested reply and things to do beside it - a card for new mail from people, a button for the rest. Khameleon never sends anything."
+          />
+          <Choice
+            tone={tone}
+            label="Words on window glows"
+            value={desktopPrefs.glowLabels ? "on" : "off"}
+            onChange={v => setDesktop({ glowLabels: v === "on" })}
+            options={[{ value: "on", label: "Show" }, { value: "off", label: "Hide" }]}
+            hint="The glow around a window shows what Khameleon is doing by colour; the small label says it in words too (Reading, Working, Needs you…). Glows stop moving when Reduce motion is on in your computer's settings."
+          />
         </>
       )}
       <Choice

@@ -31,6 +31,18 @@ contextBridge.exposeInMainWorld("khameleon", {
       return () => { ipcRenderer.removeListener("khameleon:capture:update", handler); };
     },
   },
+  // Email assistant (src/emailWatch.ts): the open email window, its glow, and reading it.
+  email: {
+    get: () => ipcRenderer.invoke("khameleon:email:get"),
+    setGlow: (state: string | null) => ipcRenderer.invoke("khameleon:email:glow", state),
+    readOpenEmail: () => ipcRenderer.invoke("khameleon:email:read"),
+    copyText: (text: string) => ipcRenderer.invoke("khameleon:clipboard:write", text),
+    onUpdate: (listener: (email: unknown) => void) => {
+      const handler = (_e: unknown, email: unknown) => listener(email);
+      ipcRenderer.on("khameleon:email:update", handler);
+      return () => { ipcRenderer.removeListener("khameleon:email:update", handler); };
+    },
+  },
   // Saved desktop choices: which layout starts, follow-me vs main screen.
   prefs: {
     get: () => ipcRenderer.invoke("khameleon:prefs:get"),

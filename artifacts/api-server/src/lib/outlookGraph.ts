@@ -27,10 +27,11 @@ export interface GraphMessage {
   categories?: string[];
   flag?: { flagStatus: string };
   parentFolderId?: string;
+  isRead?: boolean;
 }
 
 const MESSAGE_FIELDS = "id,conversationId,subject,from,toRecipients,bodyPreview,body,receivedDateTime";
-const TRIAGE_MESSAGE_FIELDS = "id,conversationId,subject,from,toRecipients,bodyPreview,receivedDateTime,categories,flag,parentFolderId";
+const TRIAGE_MESSAGE_FIELDS = "id,conversationId,subject,from,toRecipients,bodyPreview,receivedDateTime,categories,flag,parentFolderId,isRead";
 
 async function graphFetch(path: string, init: RequestInit = {}): Promise<globalThis.Response> {
   const token = await getFreshToken("microsoft");
@@ -94,10 +95,11 @@ export async function listRecentInboxMessages(top = 15): Promise<GraphMessage[]>
 // ── Writes ────────────────────────────────────────────────────────────────────
 
 /** Creates a draft reply to `messageId` (Mail.ReadWrite) — never sends it. */
-export async function createReplyDraft(messageId: string): Promise<GraphMessage> {
+export async function createReplyDraft(messageId: string, comment?: string): Promise<GraphMessage> {
+  // `comment` goes above the quoted original, the way a person's reply would.
   const res = await graphFetch(`/me/messages/${encodeURIComponent(messageId)}/createReply`, {
     method: "POST",
-    body: "{}",
+    body: comment ? JSON.stringify({ comment }) : "{}",
   });
   await assertOk(res, "create reply draft");
   return res.json() as Promise<GraphMessage>;

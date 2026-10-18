@@ -111,7 +111,7 @@ export async function getThreadMessages(threadId: string): Promise<GmailMessage[
 }
 
 /** The N most recent inbox messages, newest first - lets a user pick a real message id instead of finding one via an external tool. */
-export async function listRecentInboxMessages(max = 15): Promise<{ id: string; subject: string; from: string; preview: string; internalDate: string }[]> {
+export async function listRecentInboxMessages(max = 15): Promise<{ id: string; subject: string; from: string; preview: string; internalDate: string; unread: boolean; labelIds: string[] }[]> {
   const listRes = await gmailFetch(`/messages?labelIds=INBOX&maxResults=${max}`);
   await assertOk(listRes, "list inbox messages");
   const listJson = (await listRes.json()) as { messages?: { id: string }[] };
@@ -121,7 +121,7 @@ export async function listRecentInboxMessages(max = 15): Promise<{ id: string; s
     ids.map(async (id) => {
       const res = await gmailFetch(`/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`);
       await assertOk(res, "get message metadata");
-      return res.json() as Promise<{ id: string; snippet: string; internalDate: string; payload: GmailPayload }>;
+      return res.json() as Promise<{ id: string; snippet: string; internalDate: string; labelIds?: string[]; payload: GmailPayload }>;
     })
   );
 
@@ -131,6 +131,8 @@ export async function listRecentInboxMessages(max = 15): Promise<{ id: string; s
     from: headerValue(m.payload.headers, "From") || "(unknown sender)",
     preview: (m.snippet ?? "").slice(0, 140),
     internalDate: m.internalDate,
+    unread: (m.labelIds ?? []).includes("UNREAD"),
+    labelIds: m.labelIds ?? [],
   }));
 }
 

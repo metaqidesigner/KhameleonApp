@@ -18,6 +18,10 @@ export interface KhameleonOverlayBridge {
 export interface DesktopPrefs {
   layout: "overlay" | "classic";
   screen: "follow" | "primary";
+  /** The small words on each window glow ("Reading", "Working"...). */
+  glowLabels: boolean;
+  /** Offer help beside an open email. */
+  emailAssistant: boolean;
 }
 
 interface KhameleonDesktopBridge {
@@ -76,4 +80,31 @@ export interface KhameleonCaptureBridge {
 /** Capture is only possible inside the desktop app. */
 export function captureBridge(): KhameleonCaptureBridge | undefined {
   return (window as unknown as { khameleon?: { capture?: KhameleonCaptureBridge } }).khameleon?.capture;
+}
+
+/** Email assistant (apps/khameleon-shell/src/emailWatch.ts): the email window in front, if any. */
+export interface OpenEmail {
+  client: "outlook" | "mail" | "gmail-web" | "outlook-web";
+  app: string;
+  /** The email window, in the overlay's own coordinates. */
+  bounds: { x: number; y: number; width: number; height: number };
+  subject: string | null;
+  sender?: string;
+  unread?: boolean;
+  receivedAt?: string;
+}
+
+export type GlowState = "visible" | "reading" | "observing" | "working" | "needs-you";
+
+export interface KhameleonEmailBridge {
+  get(): Promise<OpenEmail | null>;
+  setGlow(state: GlowState | null): Promise<void>;
+  /** The selected email's text, from Apple Mail/Outlook on a Mac; null where that isn't possible. */
+  readOpenEmail(): Promise<{ subject: string; from: string; body: string } | null>;
+  copyText(text: string): Promise<void>;
+  onUpdate(listener: (email: OpenEmail | null) => void): () => void;
+}
+
+export function emailBridge(): KhameleonEmailBridge | undefined {
+  return (window as unknown as { khameleon?: { email?: KhameleonEmailBridge } }).khameleon?.email;
 }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
+import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen } from "electron";
 import * as path from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
 import { FileOps, CommandRunner as FileCommandRunner, MacAppLauncher } from "khameleon-file-agent";
@@ -19,6 +19,7 @@ import {
 } from "khameleon-window-agent";
 import { LocalAgentRunner, LocalDocumentAgent, extractDocumentText } from "@khameleon/integrations";
 import { CaptureSession } from "./capture";
+import { EmailWatcher } from "./emailWatch";
 
 // The real product UI, not a side scaffold (khameleon-decisions-log.md,
 // 2026-10-03, Cross-App Control Phase 0). Khameleon is already a working
@@ -58,8 +59,12 @@ let overlayWindow: BrowserWindow | null = null;
 interface DesktopPrefs {
   layout: "overlay" | "classic";
   screen: "follow" | "primary";
+  /** The small words on each window glow ("Reading", "Working"...). */
+  glowLabels: boolean;
+  /** Offer help beside an open email (docs/build-review.md, Build 4 answers). */
+  emailAssistant: boolean;
 }
-const DEFAULT_PREFS: DesktopPrefs = { layout: "overlay", screen: "follow" };
+const DEFAULT_PREFS: DesktopPrefs = { layout: "overlay", screen: "follow", glowLabels: true, emailAssistant: true };
 
 function prefsPath() {
   return path.join(app.getPath("userData"), "khameleon-prefs.json");
@@ -71,6 +76,8 @@ function loadPrefs(): DesktopPrefs {
     return {
       layout: saved.layout === "classic" ? "classic" : "overlay",
       screen: saved.screen === "primary" ? "primary" : "follow",
+      glowLabels: saved.glowLabels !== false,
+      emailAssistant: saved.emailAssistant !== false,
     };
   } catch {
     return { ...DEFAULT_PREFS };
@@ -153,10 +160,14 @@ app.whenReady().then(() => {
   // (AppleScript on macOS, PowerShell on Windows, for third-party windows).
   const nativeInputBackend = process.platform === "win32" ? new WindowsNativeInputBackend() : new MacNativeInputBackend();
 
+  // Every window glow (Khameleon working, Capture recording, the open email)
+  // follows the "labels on glows" choice.
+  const glowBackends = [new ElectronOverlayBackend(), new ElectronOverlayBackend(), new ElectronOverlayBackend()];
+  const [controlGlowBackend, captureGlowBackend, emailGlowBackend] = glowBackends;
   const windowController = new WindowController(
     { widget: widgetBackend, external: externalBackend },
     currentScreenArea,
-    new ElectronOverlayBackend(),
+    controlGlowBackend,
     {
       browser: new BrowserInputBackend((handle) => widgetBackend.getWebContents(handle)),
       native: nativeInputBackend,
@@ -336,6 +347,14 @@ app.whenReady().then(() => {
     const screenChanged = (p.screen === "follow" || p.screen === "primary") && p.screen !== prefs.screen;
     if (layoutChanged) prefs.layout = p.layout!;
     if (screenChanged) prefs.screen = p.screen!;
+    if (typeof p.glowLabels === "boolean" && p.glowLabels !== prefs.glowLabels) {
+      prefs.glowLabels = p.glowLabels;
+      for (const g of glowBackends) g.setShowLabels(p.glowLabels);
+    }
+    if (typeof p.emailAssistant === "boolean" && p.emailAssistant !== prefs.emailAssistant) {
+      prefs.emailAssistant = p.emailAssistant;
+      if (p.emailAssistant) emailWatcher.start(); else emailWatcher.stop();
+    }
     try {
       writeFileSync(prefsPath(), JSON.stringify(prefs, null, 2));
     } catch (err) {
@@ -359,7 +378,6 @@ app.whenReady().then(() => {
   app.on("activate", () => openClassicWindow());
 
   // ── Capture (src/capture.ts; docs/build-review.md, Build 4) ─────────────
-  const captureGlowBackend = new ElectronOverlayBackend();
   const captureHandle = { id: "capture", backend: "external" as const, label: "Recording" };
   let captureGlowShown = false;
   const captureGlow = {
@@ -382,6 +400,28 @@ app.whenReady().then(() => {
   ipcMain.handle("khameleon:capture:stop", () => capture.stop());
   ipcMain.handle("khameleon:capture:discard", () => capture.discard());
   ipcMain.handle("khameleon:capture:open-settings", () => capture.openSnapshotSettings());
+
+  // ── Email assistant (src/emailWatch.ts; docs/build-review.md, Build 4 answers) ──
+  const emailHandle = { id: "email", backend: "external" as const, label: "Email" };
+  const emailWatcher = new EmailWatcher(
+    (email) => { if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.webContents.send("khameleon:email:update", email); },
+    () => (overlayWindow && !overlayWindow.isDestroyed() ? overlayWindow.getBounds() : { x: 0, y: 0 }),
+    {
+      show: (b, state) => emailGlowBackend.show(emailHandle, b, state),
+      update: (b) => emailGlowBackend.updateBounds(emailHandle, b),
+      setState: (state) => emailGlowBackend.updateState(emailHandle, state),
+      hide: () => emailGlowBackend.hide(emailHandle),
+    },
+  );
+  ipcMain.handle("khameleon:email:get", () => emailWatcher.get());
+  ipcMain.handle("khameleon:email:glow", (_e, state: unknown) => {
+    const ok: IndicatorState[] = ["visible", "reading", "observing", "working", "needs-you"];
+    emailWatcher.setGlow(ok.includes(state as IndicatorState) ? (state as IndicatorState) : null);
+  });
+  ipcMain.handle("khameleon:email:read", () => emailWatcher.readOpenEmail());
+  ipcMain.handle("khameleon:clipboard:write", (_e, text: unknown) => { if (typeof text === "string") clipboard.writeText(text); });
+  for (const g of glowBackends) g.setShowLabels(prefs.glowLabels);
+  if (prefs.emailAssistant) emailWatcher.start();
 
   ipcMain.handle("khameleon:command", async (_event, text: unknown) => {
     if (typeof text !== "string" || !text.trim()) throw new Error("A non-empty command is required.");

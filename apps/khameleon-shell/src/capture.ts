@@ -2,6 +2,7 @@ import { app, desktopCapturer, shell, systemPreferences } from "electron";
 import * as path from "node:path";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { windowManager } from "node-window-manager";
+import { frontWindowTitle, needsTitleFallback } from "./windowTitle";
 import { extractDocumentText } from "@khameleon/integrations";
 import type { Bounds } from "khameleon-window-agent";
 
@@ -84,7 +85,12 @@ export class CaptureSession {
     this.dir = path.join(app.getPath("temp"), `khameleon-capture-${Date.now()}`);
     await mkdir(this.dir, { recursive: true });
     this.state = "recording";
-    this.timer = setInterval(() => void this.sample(), POLL_MS);
+    let sampling = false; // reading a window title or snapshot can take most of a second
+    this.timer = setInterval(() => {
+      if (sampling) return;
+      sampling = true;
+      void this.sample().finally(() => { sampling = false; });
+    }, POLL_MS);
     this.emit();
     return this.status();
   }
@@ -160,8 +166,9 @@ export class CaptureSession {
     let win;
     try { win = windowManager.getActiveWindow(); } catch { return; }
     if (!win || isOwnWindow(win.path)) return;
-    const title = win.getTitle() || "";
     const appLabel = appName(win.path);
+    let title = win.getTitle() || "";
+    if (needsTitleFallback(appLabel, title)) title = (await frontWindowTitle()) || title;
     if (!appLabel && !title) return; // e.g. the desktop itself - nothing worth a step
     const bounds = win.getBounds() as Bounds;
     const now = Date.now();

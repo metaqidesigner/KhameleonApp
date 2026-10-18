@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Inbox as InboxIcon, Mail, MailOpen } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { getInbox, updateInboxItem, type InboxItem } from '@/lib/inboxApi';
+import { getEmailAssistStatus, type EmailRef } from '@/lib/emailAssistApi';
+import { EmailCard } from '@/components/email/EmailCard';
 
 const PRIORITY_COLOR: Record<string, string> = {
   high: 'var(--j-red)', urgent: 'var(--j-red)',
@@ -26,6 +28,14 @@ export default function Inbox() {
   const [source, setSource] = useState<'gmail' | 'outlook' | 'local'>('local');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
+  // Email assistant (same card as the Overlay's, components/email/EmailCard).
+  const [helping, setHelping] = useState<InboxItem | null>(null);
+  const [copilot, setCopilot] = useState(false);
+  useEffect(() => { getEmailAssistStatus().then(s => setCopilot(s.copilot)).catch(() => {}); }, []);
+  const helpRef = useMemo<EmailRef | null>(
+    () => (helping && (source === 'gmail' || source === 'outlook') ? { source, id: String(helping.id) } : null),
+    [helping, source],
+  );
 
   const load = () => {
     getInbox().then(r => { setItems(r.items); setSource(r.source); setLoading(false); });
@@ -45,7 +55,8 @@ export default function Inbox() {
   const unreadCount = items.filter(i => !i.isRead).length;
 
   return (
-    <div style={{ height: '100%', padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ height: '100%', padding: 8, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <JPanel title="INBOX" icon={<InboxIcon size={13} />} badge={loading ? 'LOADING' : `${unreadCount} UNREAD`}>
         {source !== 'local' && !loading && items.length > 0 && (
           <div style={{ marginBottom: 10, fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)' }}>
@@ -100,6 +111,11 @@ export default function Inbox() {
                       {item.priority.toUpperCase()}
                     </span>
                     <span className="j-badge" style={{ fontSize: 8, color: 'var(--j-text-faint)' }}>{item.source.toUpperCase()}</span>
+                    {source !== 'local' && (
+                      <button className="j-btn-ghost" style={{ height: 20, padding: '0 8px', fontSize: 8, marginLeft: 'auto' }} onClick={() => setHelping(item)}>
+                        HELP WITH THIS EMAIL
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -107,6 +123,11 @@ export default function Inbox() {
           </div>
         )}
       </JPanel>
+      </div>
+      {helping && helpRef && (
+        <EmailCard key={String(helping.id)} tone="classic" emailRef={helpRef} subject={helping.subject} fromName={helping.sender}
+          copilotAvailable={copilot} onClose={() => setHelping(null)} style={{ width: 340, flexShrink: 0, maxHeight: '100%' }} />
+      )}
     </div>
   );
 }
