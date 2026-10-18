@@ -11,14 +11,14 @@
  * not a hard gate.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
 import { taskRunsTable, tasksTable, type TaskStep } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { emitTaskEvent } from "../taskEvents.js";
 import { logger } from "../../lib/logger.js";
 import * as graph from "../../lib/outlookGraph.js";
-import { getAnthropicClient } from "../../lib/anthropicClient.js";
+import { askAI } from "../../lib/askAI.js";
+import { looksLikeAPerson } from "../../lib/emailAssist.js";
 
 const STEP_LABELS = [
   "Fetch unread mail",
@@ -59,7 +59,8 @@ export function classifyByRule(message: Pick<graph.GraphMessage, "subject" | "fr
   const fromAddress = message.from?.emailAddress?.address ?? "";
 
   if (URGENT_PATTERN.test(subject)) return "urgent";
-  if (AUTOMATED_SENDER_PATTERN.test(fromAddress) || FYI_PATTERN.test(subject)) return "fyi";
+  // Newsletters, notifications and other automated mail (lib/emailAssist.ts's check) need no judgment.
+  if (AUTOMATED_SENDER_PATTERN.test(fromAddress) || FYI_PATTERN.test(subject) || (fromAddress && !looksLikeAPerson(fromAddress))) return "fyi";
   if (ACTION_PATTERN.test(subject)) return "action_needed";
   return null;
 }
@@ -68,9 +69,8 @@ function isTriageClassification(value: unknown): value is TriageClassification {
   return value === "urgent" || value === "action_needed" || value === "fyi" || value === "low_priority";
 }
 
-function textOf(res: Anthropic.Messages.Message): string {
-  const block = res.content.find((b): b is Anthropic.Messages.TextBlock => b.type === "text");
-  return block?.text?.trim() ?? "";
+function textOf(text: string): string {
+  return text.trim();
 }
 
 function parseJsonArray(text: string): unknown[] {
@@ -187,22 +187,19 @@ export async function runOutlookTriageInbox(): Promise<TriageResult> {
     // Step 3 — instructional: for unclassified items, classify using judgment
     await setStep(taskRunId, steps, 2, { status: "running", startedAt: new Date().toISOString() });
     if (unclassified.length > 0) {
-      const client = await getAnthropicClient();
       const listing = unclassified
         .map((m, i) => `${i}. From: ${m.from?.emailAddress?.address ?? "unknown"} | Subject: ${m.subject} | Preview: ${m.bodyPreview}`)
         .join("\n");
       const response = textOf(
-        await client.messages.create({
-          model: "claude-sonnet-4-6",
-          max_tokens: 800,
+        await askAI({
           system: [
             "Classify each numbered email into exactly one of: urgent, action_needed, fyi, low_priority.",
             "urgent = needs attention very soon. action_needed = a decision or reply is expected, not urgent.",
             "fyi = informational, no action expected. low_priority = safe to defer or ignore.",
             'Reply with ONLY a JSON array like [{"index": 0, "classification": "fyi"}, ...] - one entry per email, same order.',
           ].join("\n"),
-          messages: [{ role: "user", content: listing }],
-        })
+          prompt: listing,
+        }).then((r) => r.text)
       );
       const parsed = parseJsonArray(response) as { index?: number; classification?: string }[];
       for (const entry of parsed) {
@@ -272,17 +269,14 @@ export async function runOutlookTriageInbox(): Promise<TriageResult> {
     const needsAction = classified.filter((c) => c.classification === "urgent" || c.classification === "action_needed");
     const actionItems: TriageActionItem[] = [];
     if (needsAction.length > 0) {
-      const client = await getAnthropicClient();
       const listing = needsAction
         .map((c) => `From: ${c.message.from?.emailAddress?.address ?? "unknown"} | Subject: ${c.message.subject} | Preview: ${c.message.bodyPreview}`)
         .join("\n");
       const response = textOf(
-        await client.messages.create({
-          model: "claude-sonnet-4-6",
-          max_tokens: 500,
+        await askAI({
           system: 'Extract one short, plain-language action item per email below. Reply with ONLY a JSON array of strings, same order.',
-          messages: [{ role: "user", content: listing }],
-        })
+          prompt: listing,
+        }).then((r) => r.text)
       );
       const parsed = parseJsonArray(response).filter((s): s is string => typeof s === "string");
 

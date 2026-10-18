@@ -13,14 +13,13 @@
  * skill executes on its own."
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
 import { taskRunsTable, type TaskStep } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { emitTaskEvent } from "../taskEvents.js";
 import { logger } from "../../lib/logger.js";
 import * as graph from "../../lib/outlookGraph.js";
-import { getAnthropicClient } from "../../lib/anthropicClient.js";
+import { askAI } from "../../lib/askAI.js";
 
 const STEP_LABELS = [
   "Fetch thread",
@@ -29,9 +28,8 @@ const STEP_LABELS = [
   "Create Outlook draft",
 ] as const;
 
-function textOf(res: Anthropic.Messages.Message): string {
-  const block = res.content.find((b): b is Anthropic.Messages.TextBlock => b.type === "text");
-  return block?.text?.trim() ?? "";
+function textOf(text: string): string {
+  return text.trim();
 }
 
 export interface DraftEmailResult {
@@ -97,32 +95,26 @@ export async function runOutlookDraftEmail(messageId: string): Promise<DraftEmai
     // Step 2 — pipeline: summarize thread context
     await setStep(taskRunId, steps, 1, { status: "running", startedAt: new Date().toISOString() });
     const threadText = graph.threadToPlainText(thread);
-    const client = await getAnthropicClient();
     const contextSummary = textOf(
-      await client.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 400,
-        system:
-          "Summarize this email thread in 2-4 sentences: what's being asked, and the prior tone/context. Reply with only the summary.",
-        messages: [{ role: "user", content: threadText }],
-      })
+      await askAI({
+        system: "Summarize this email thread in 2-4 sentences: what's being asked, and the prior tone/context. Reply with only the summary.",
+        prompt: threadText,
+      }).then((r) => r.text)
     );
     await setStep(taskRunId, steps, 1, { status: "done", output: contextSummary, completedAt: new Date().toISOString() });
 
     // Step 3 — instructional: compose reply using context_summary and tone, per the router agent's judgment
     await setStep(taskRunId, steps, 2, { status: "running", startedAt: new Date().toISOString() });
     const draftText = textOf(
-      await client.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 600,
+      await askAI({
         system: [
           "Draft a reply to this email thread on the user's behalf.",
           `Context summary: ${contextSummary}`,
           "Match a professional, courteous tone consistent with the thread.",
           "Reply with ONLY the email body text - no subject line, no markdown, no commentary.",
         ].join("\n"),
-        messages: [{ role: "user", content: threadText }],
-      })
+        prompt: threadText,
+      }).then((r) => r.text)
     );
     await setStep(taskRunId, steps, 2, { status: "done", output: "Draft composed", completedAt: new Date().toISOString() });
     await db.update(taskRunsTable).set({ previewContent: draftText, updatedAt: new Date() }).where(eq(taskRunsTable.id, taskRunId));

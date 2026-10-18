@@ -54,3 +54,11 @@ test("ACTION_BY_CLASSIFICATION maps every classification to a real action", () =
   assert.equal(ACTION_BY_CLASSIFICATION.fyi.archive, true);
   assert.equal(ACTION_BY_CLASSIFICATION.low_priority.archive, true);
 });
+
+test("classifyByRule: newsletters and system mail are FYI without asking the AI", async () => {
+  const { classifyByRule } = await import("./outlookTriageInbox.js");
+  const from = (address: string) => ({ emailAddress: { name: "", address } });
+  assert.equal(classifyByRule({ subject: "Your October statement", from: from("billing@bank.co.uk") }), "fyi");
+  assert.equal(classifyByRule({ subject: "This week's deals", from: from("hi@news.shop.com") }), "fyi");
+  assert.equal(classifyByRule({ subject: "Budget for Q4", from: from("jane.smith@acme.co.uk") }), null);
+});

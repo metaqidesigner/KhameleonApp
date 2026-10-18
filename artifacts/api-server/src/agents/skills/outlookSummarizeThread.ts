@@ -10,20 +10,18 @@
  * ConfirmGate, unlike outlook-draft-email's send step.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
 import { taskRunsTable, type TaskStep } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { emitTaskEvent } from "../taskEvents.js";
 import { logger } from "../../lib/logger.js";
 import * as graph from "../../lib/outlookGraph.js";
-import { getAnthropicClient } from "../../lib/anthropicClient.js";
+import { askAI } from "../../lib/askAI.js";
 
 const STEP_LABELS = ["Fetch thread", "Summarize into plain language"] as const;
 
-function textOf(res: Anthropic.Messages.Message): string {
-  const block = res.content.find((b): b is Anthropic.Messages.TextBlock => b.type === "text");
-  return block?.text?.trim() ?? "";
+function textOf(text: string): string {
+  return text.trim();
 }
 
 export interface SummarizeThreadResult {
@@ -96,18 +94,15 @@ export async function runOutlookSummarizeThread(messageId: string): Promise<Summ
     // Step 2 — pipeline: summarize into plain language (participants, ask, current status)
     await setStep(taskRunId, steps, 1, { status: "running", startedAt: new Date().toISOString() });
     const threadText = graph.threadToPlainText(thread);
-    const client = await getAnthropicClient();
     const summary = textOf(
-      await client.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 500,
+      await askAI({
         system: [
           "Summarize this email thread in plain language for someone who hasn't read it.",
           "Cover: who's involved, what's being asked, and the current status.",
           "Reply with ONLY the summary - no markdown, no commentary.",
         ].join("\n"),
-        messages: [{ role: "user", content: threadText }],
-      })
+        prompt: threadText,
+      }).then((r) => r.text)
     );
     await setStep(taskRunId, steps, 1, { status: "done", output: "Summary produced", completedAt: new Date().toISOString() });
 

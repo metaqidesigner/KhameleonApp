@@ -20,12 +20,10 @@ import { isConnected } from "../lib/oauthTokens.js";
 import { runOutlookDraftEmail } from "../agents/skills/outlookDraftEmail.js";
 import * as graph from "../lib/outlookGraph.js";
 import { emitTaskEvent, taskEvents } from "../agents/taskEvents.js";
-import { getAnthropicClient } from "../lib/anthropicClient.js";
-import type Anthropic from "@anthropic-ai/sdk";
+import { askAI } from "../lib/askAI.js";
 
-function textOf(res: Anthropic.Messages.Message): string {
-  const block = res.content.find((b): b is Anthropic.Messages.TextBlock => b.type === "text");
-  return block?.text?.trim() ?? "";
+function textOf(text: string): string {
+  return text.trim();
 }
 
 const router = Router();
@@ -152,12 +150,8 @@ router.post("/:id/rewrite", async (req: Request, res: Response) => {
 
     const payload = parsePayload(approval.dataInvolved);
     const { toneInstruction } = req.body as { toneInstruction?: string };
-
-    const client = await getAnthropicClient();
     const newBody = textOf(
-      await client.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 600,
+      await askAI({
         system: [
           "Rewrite this email reply with a different tone, per the user's spoken instruction.",
           toneInstruction?.trim()
@@ -165,8 +159,8 @@ router.post("/:id/rewrite", async (req: Request, res: Response) => {
             : "No specific instruction was understood - make it noticeably warmer and more casual than the current draft.",
           "Reply with ONLY the new email body text - no subject line, no markdown, no commentary.",
         ].join("\n"),
-        messages: [{ role: "user", content: payload.body }],
-      })
+        prompt: payload.body,
+      }).then((r) => r.text)
     );
 
     await graph.updateDraftBody(payload.draftId, newBody);

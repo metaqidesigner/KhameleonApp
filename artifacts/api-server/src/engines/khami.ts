@@ -2,7 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import type { EngineRequest, EngineResult, EngineStatus } from "./types.js";
-import { toKhamiTurns } from "./khamiHistory.js";
+import { toKhamiTurns, dateContext } from "./khamiHistory.js";
 import { BRAINS, recommendBrain, pickActiveBrain, type BrainId } from "./khamiBrains.js";
 import { toKhamiParams, stripNulls } from "../lib/toolSchema.js";
 
@@ -224,6 +224,7 @@ export async function askKhami(req: EngineRequest): Promise<EngineResult> {
     }
     const { history, prompt } = toKhamiTurns(req.messages);
     if (!prompt) throw new Error("There's no question for Khami to answer.");
+    req = { ...req, system: `${req.system}\n\n${dateContext()}` };
 
     const sequence = parts.context.getSequence();
     const session = new parts.LlamaChatSession({ contextSequence: sequence, systemPrompt: req.system });

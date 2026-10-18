@@ -359,13 +359,16 @@ export async function askAgent(
   messages: ChatMessage[],
   onToken?: (t: string) => void,
   onToolEvent?: (e: ToolEvent) => void,
+  /** plain: an internal job (lib/askAI.ts) - no skill picking and no tools, just the answer. */
+  opts: { plain?: boolean } = {},
 ): Promise<AgentResponse> {
   try {
+    if (opts.plain) agent = { ...agent, useTools: false };
     // Claude with tools fetches skills itself (use_skill). Every other AI -
     // Khami, GPT, Gemini - gets the matching skill picked by Khameleon and
     // handed over in its instructions (lib/skillPicker.ts). Reported as a
     // use_skill event so the chat shows "Using: <skill>" either way.
-    if (!(agent.provider === "anthropic" && agent.useTools)) {
+    if (!opts.plain && !(agent.provider === "anthropic" && agent.useTools)) {
       messages = await withPickedSkill(agent, messages, onToolEvent);
     }
     if (agent.provider === "copilot") {
@@ -378,7 +381,7 @@ export async function askAgent(
     if (agent.provider === "khami") {
       const systemMsg = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
       const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
-      const tools = await toolsForAnyAi(lastUser).catch(() => []);
+      const tools = opts.plain ? [] : await toolsForAnyAi(lastUser).catch(() => []);
       const r = await askKhami({
         system: tools.length
           ? systemMsg + "\n\nYou can use the tools provided when they help. Afterwards, tell the user the outcome in a sentence or two. Don't narrate attempts; if something can't be done, say so once, plainly."

@@ -1,34 +1,29 @@
 /**
- * Task executor — orchestrates multi-step task runs using Claude with tools.
- * Each step is persisted to the DB and broadcast via taskEvents.
+ * Task executor — orchestrates multi-step task runs. Khami does the work by
+ * default (lib/askAI.ts; the first outside AI the user has when Khami isn't
+ * set up), using the same safe tools as chat. Each step is persisted to the
+ * DB and broadcast via taskEvents.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@workspace/db";
 import { taskRunsTable, type TaskStep } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { TOOL_DEFINITIONS } from "./tools/definitions.js";
-import { dispatchTool } from "./tools/dispatcher.js";
 import { emitTaskEvent } from "./taskEvents.js";
 import { logger } from "../lib/logger.js";
-import { buildClassificationRequest, parseClassification, type Complexity } from "./commandClassifier.js";
-import { getAnthropicClient } from "../lib/anthropicClient.js";
+import { classifyByCode, type Complexity } from "./commandClassifier.js";
+import { askAI } from "../lib/askAI.js";
 
 // ── Step planning ─────────────────────────────────────────────
 
 async function planSteps(command: string): Promise<string[]> {
   try {
-    const client = await getAnthropicClient();
-    const res = await client.messages.create({
-      model:      "claude-sonnet-4-6",
-      max_tokens: 512,
+    const { text } = await askAI({
       system:
-        "You plan multi-step AI tasks. Given a user command, output a JSON array of 3–6 step labels. " +
+        "You plan multi-step tasks. Given a user command, output a JSON array of 3–6 step labels. " +
         "Each label is a short action phrase (e.g. 'Reviewing context', 'Searching for relevant information', " +
         "'Drafting the response', 'Formatting result'). Reply with ONLY the JSON array, no markdown.",
-      messages: [{ role: "user", content: `Plan steps for: "${command}"` }],
+      prompt: `Plan steps for: "${command}"`,
     });
-    const text = res.content[0]?.type === "text" ? res.content[0].text : "[]";
     const match = text.match(/\[[\s\S]*\]/);
     const parsed = match ? JSON.parse(match[0]) : [];
     const steps = Array.isArray(parsed) ? parsed.filter((s) => typeof s === "string") : [];
@@ -41,87 +36,29 @@ async function planSteps(command: string): Promise<string[]> {
 
 // ── Complexity classification (design-spec.md §11.1) ───────────
 
-/**
- * §11.1: the `simple` agent type exists specifically to skip planSteps()
- * (a whole extra Claude call) for one-shot requests that need no tools.
- * This classification call is itself cheap by construction (see
- * commandClassifier.ts's tiny max_tokens) - it's meant to pay for
- * itself, not add a second expensive call in front of the first one.
- */
-async function classifyComplexity(command: string): Promise<Complexity> {
-  try {
-    const client = await getAnthropicClient();
-    const req = buildClassificationRequest(command);
-    const res = await client.messages.create({
-      model:      "claude-sonnet-4-6",
-      max_tokens: req.maxTokens,
-      system:     req.system,
-      messages:   [{ role: "user", content: req.userMessage }],
-    });
-    const text = res.content[0]?.type === "text" ? res.content[0].text : "";
-    return parseClassification(text);
-  } catch (err) {
-    logger.warn({ err }, "Complexity classification failed, defaulting to complex");
-    return "complex";
-  }
+/** §11.1, now by plain code (commandClassifier.ts classifyByCode) - no extra AI call. */
+function classifyComplexity(command: string): Complexity {
+  return classifyByCode(command);
 }
 
-// ── Shared tool-calling loop ────────────────────────────────────
+// ── Shared tool-calling run ─────────────────────────────────────
 
 /**
- * The actual Claude-with-tools loop, extracted from what used to be
- * inline in executeStep() so both the existing multi-step orchestrator
- * path and the new single-shot `simple` path (runSimple, below) share
- * one implementation instead of two copies that could drift.
+ * One AI answer with tools allowed, shared by the multi-step path and the
+ * single-shot `simple` path. Tool activity is streamed as trace events.
  */
 async function runToolLoop(systemPrompt: string, userMessage: string, taskId: string): Promise<string> {
-  const client = await getAnthropicClient();
-  let messages: Anthropic.Messages.MessageParam[] = [
-    { role: "user", content: userMessage },
-  ];
-
-  let content = "";
-  const MAX_TOOL_ITERS = 6;
-
-  for (let i = 0; i < MAX_TOOL_ITERS; i++) {
-    const res = await client.messages.create({
-      model:      "claude-sonnet-4-6",
-      max_tokens: 4096,
-      system:     systemPrompt,
-      messages,
-      tools:      TOOL_DEFINITIONS,
-    });
-
-    if (res.stop_reason === "tool_use") {
-      messages.push({ role: "assistant", content: res.content });
-      const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
-
-      for (const block of res.content) {
-        if (block.type !== "tool_use") continue;
-        const input = block.input as Record<string, unknown>;
-
-        // Emit trace event so SSE clients see live tool activity
-        emitTaskEvent(taskId, { type: "trace", toolName: block.name, phase: "start", input });
-
-        try {
-          const result = await dispatchTool(block.name, input);
-          emitTaskEvent(taskId, { type: "trace", toolName: block.name, phase: "done", preview: result.slice(0, 200) });
-          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
-        } catch (err) {
-          const error = err instanceof Error ? err.message : String(err);
-          emitTaskEvent(taskId, { type: "trace", toolName: block.name, phase: "error", error });
-          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: `Error: ${error}`, is_error: true });
-        }
-      }
-      messages.push({ role: "user", content: toolResults });
-    } else {
-      const block = res.content.find((b): b is Anthropic.Messages.TextBlock => b.type === "text");
-      content = block?.text ?? "";
-      break;
-    }
-  }
-
-  return content;
+  const { text } = await askAI({
+    system: systemPrompt,
+    prompt: userMessage,
+    withTools: true,
+    onToolEvent: (e) => {
+      if (e.type === "tool_start") emitTaskEvent(taskId, { type: "trace", toolName: e.name, phase: "start", input: e.input ?? {} });
+      else if (e.type === "tool_result") emitTaskEvent(taskId, { type: "trace", toolName: e.name, phase: "done", preview: (e.result ?? "").slice(0, 200) });
+      else emitTaskEvent(taskId, { type: "trace", toolName: e.name, phase: "error", error: e.error ?? "" });
+    },
+  });
+  return text;
 }
 
 // ── Single step execution (orchestrator path) ──────────────────
@@ -138,12 +75,14 @@ async function executeStep(
     .join("\n");
 
   const systemPrompt = [
-    `You are Khameleon, an AI assistant executing a multi-step task.`,
+    `You are Khameleon, executing a multi-step task.`,
     `Overall command: "${command}"`,
     `Current step (${step.index + 1}): "${step.label}"`,
     context ? `\nCompleted steps:\n${context}` : "",
     currentPreview ? `\nCurrent work product:\n${currentPreview}` : "",
-    `\nExecute this step. Use your tools if they help. After completing, your response MUST contain:`,
+    `\nExecute this step. Use your tools if they help. Only report what you actually did with a tool or wrote yourself -`,
+    `never claim you sent, scheduled or looked something up unless a tool did it. If a step can't be done, say so.`,
+    `After completing, your response MUST contain:`,
     `STEP_RESULT: <one or two sentences describing what was accomplished>`,
     `WORK_PRODUCT:\n<the complete current state of the work product being built — this accumulates>`,
   ].join("\n");
@@ -170,9 +109,10 @@ async function executeStep(
  */
 async function runSimple(command: string, taskId: string): Promise<{ output: string; preview: string }> {
   const systemPrompt = [
-    `You are Khameleon, an AI assistant. The user's request was classified as a simple,`,
+    `You are Khameleon. The user's request was classified as a simple,`,
     `single-shot request - answer it directly and completely in this one response.`,
-    `Use a tool only if you genuinely need to; most requests classified this way need none.`,
+    `Use your tools when the request needs them (e.g. adding a task). Then say in a sentence what you did.`,
+    `Never claim you did something a tool didn't actually do.`,
   ].join("\n");
 
   const content = await runToolLoop(systemPrompt, command, taskId);
@@ -213,7 +153,7 @@ async function runTask(taskId: string, retryFromStep: number): Promise<void> {
     let agentType: string = task.agentType ?? "orchestrator";
 
     if (steps.length === 0) {
-      const complexity = await classifyComplexity(task.commandText);
+      const complexity = classifyComplexity(task.commandText);
       agentType = complexity === "simple" ? "simple" : "orchestrator";
 
       steps = agentType === "simple"

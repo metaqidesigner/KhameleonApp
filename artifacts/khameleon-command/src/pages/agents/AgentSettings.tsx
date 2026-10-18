@@ -116,9 +116,9 @@ export default function AgentSettings() {
         </div>
         <div style={{ marginTop: 12, padding: '8px 10px', background: 'rgba(0,212,255,0.03)', border: '1px solid rgba(0,212,255,0.08)' }}>
           <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 9, color: 'var(--j-text-muted)', letterSpacing: '0.05em', lineHeight: 1.8 }}>
-            CLAUDE (Anthropic) · GPT-4o (OpenAI) — powered by Replit AI Integrations. No API key needed, billed to your credits.<br/>
-            GEMINI: set GEMINI_API_KEY · OPENROUTER: set OPENROUTER_API_KEY<br/>
-            LOCAL (Ollama): runs on localhost:11434 · MINIMAX: set MINIMAX_API_KEY
+            KHAMI: Khameleon's own AI, on this computer - set it up from Khami setup. No key, no cost.<br/>
+            MICROSOFT 365 COPILOT: connect it from Integrations (work account with a Copilot licence).<br/>
+            CLAUDE · GPT · GEMINI: optional - add your organisation's key in Settings.
           </div>
         </div>
       </JPanel>

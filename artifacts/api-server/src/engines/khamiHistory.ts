@@ -20,3 +20,18 @@ export function toKhamiTurns(messages: EngineMessage[]): KhamiTurns {
   );
   return { history, prompt: msgs[lastUser].content };
 }
+
+/**
+ * Today's date and the coming week, worked out by code and handed to Khami
+ * with every request - the brain doesn't know the date, and small brains
+ * get "next Friday" wrong. Pure (pass `now` for testing).
+ */
+export function dateContext(now = new Date()): string {
+  const day = (d: Date) => d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const week = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i + 1);
+    return `${d.toLocaleDateString("en-GB", { weekday: "long" })} ${iso(d)}`;
+  });
+  return `Today is ${day(now)} (${iso(now)}). The next seven days: ${week.join(", ")}. Use these dates for "tomorrow", "Friday", "next week" and so on.`;
+}

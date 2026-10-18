@@ -1,41 +1,30 @@
 /**
- * design-spec.md §15.2 - the real Claude call behind contextual Skill Set
- * surfacing. Pure prompt-building/parsing lives in
- * lib/skillSetSuggestionMatch.ts (unit-tested); this file is the network
- * call, same split as agents/task-executor.ts's classifyComplexity().
+ * design-spec.md §15.2 - contextual Skill Set surfacing: when a task is
+ * created, suggest the skill that fits it. Done by plain code (Khami
+ * design, "code first"): the same word matching that picks skills for chat
+ * (lib/skillPicker.ts). Instant, offline, and it never ties up Khami's
+ * brain. (Previously an extra Claude call on every new task.)
  *
  * Called fire-and-forget right after a task is created (routes/tasks.ts) -
- * never blocks or fails task creation itself. Any failure here just means
- * no suggestion shows up, same as classifyComplexity defaulting to
- * 'complex' rather than throwing.
+ * never blocks or fails task creation itself.
  */
 
-import { logger } from "../lib/logger.js";
-import {
-  buildSuggestionRequest, parseSuggestionResponse,
-  type SkillSetSuggestionCandidate, type SuggestionTask, type ParsedSuggestion,
-} from "../lib/skillSetSuggestionMatch.js";
-import { getAnthropicClient } from "../lib/anthropicClient.js";
+import { pickSkill, words } from "../lib/skillPicker.js";
+import type { SkillSetSuggestionCandidate, SuggestionTask, ParsedSuggestion } from "../lib/skillSetSuggestionMatch.js";
 
-export async function suggestSkillSetForTask(
-  task: SuggestionTask,
-  candidates: SkillSetSuggestionCandidate[],
-): Promise<ParsedSuggestion | null> {
-  const req = buildSuggestionRequest(task, candidates);
-  if (!req) return null;
+export function suggestSkillSetForTaskSync(task: SuggestionTask, candidates: SkillSetSuggestionCandidate[]): ParsedSuggestion | null {
+  if (candidates.length === 0) return null;
+  const request = `${task.title}\n${task.description ?? ""}`;
+  const pick = pickSkill(request, candidates.map((c) => ({ name: c.name, description: c.description, content: "" })));
+  if (!pick) return null;
+  const chosen = candidates.find((c) => c.name === pick.skill.name);
+  if (!chosen) return null;
+  const req = new Set(words(request));
+  const shared = [...new Set(words(`${chosen.name} ${chosen.description}`))].filter((w) => req.has(w));
+  const reason = `This task mentions ${shared.length ? shared.slice(0, 3).map((w) => `"${w}"`).join(", ") : "the same kind of work"}, which "${chosen.name}" covers.`;
+  return { skillSetId: chosen.id, reason };
+}
 
-  try {
-    const client = await getAnthropicClient();
-    const res = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: req.maxTokens,
-      system: req.system,
-      messages: [{ role: "user", content: req.userMessage }],
-    });
-    const text = res.content[0]?.type === "text" ? res.content[0].text : "";
-    return parseSuggestionResponse(text, candidates.map((c) => c.id));
-  } catch (err) {
-    logger.warn({ err }, "Skill Set suggestion matching failed — no suggestion will be shown for this task");
-    return null;
-  }
+export async function suggestSkillSetForTask(task: SuggestionTask, candidates: SkillSetSuggestionCandidate[]): Promise<ParsedSuggestion | null> {
+  return suggestSkillSetForTaskSync(task, candidates);
 }

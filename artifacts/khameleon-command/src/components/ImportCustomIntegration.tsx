@@ -82,7 +82,7 @@ export function ImportCustomIntegration({ onImported, onCancel }: { onImported: 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div><strong>MCP server:</strong> {preview.url}</div>
               <div style={{ fontSize: 10, color: preview.reachable ? 'var(--j-green)' : 'var(--j-amber)' }}>
-                {preview.reachable ? 'Server responded.' : "Couldn't confirm the server is reachable from here — it may still work once Claude connects to it directly."}
+                {preview.reachable ? 'Server responded.' : "Couldn't confirm the server is reachable from here — it may still work once Khameleon connects to it directly."}
               </div>
               <div style={{ fontSize: 10, color: 'var(--j-text-muted)' }}>{preview.note}</div>
             </div>

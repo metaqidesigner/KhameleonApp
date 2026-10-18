@@ -45,3 +45,17 @@ export type Complexity = "simple" | "complex";
 export function parseClassification(responseText: string): Complexity {
   return /^\s*SIMPLE\b/i.test(responseText) ? "simple" : "complex";
 }
+
+/**
+ * The same SIMPLE/COMPLEX decision by plain code (Khami design, "code
+ * first"): no extra AI call before the real work. COMPLEX only when the
+ * request asks for several things in turn; a single request that needs a
+ * tool ("add a task…", "summarise my emails") is SIMPLE - the one-answer
+ * path can use tools too. Planning several steps for a one-step job made
+ * Khami's small brain invent extra steps it never took.
+ */
+export function classifyByCode(command: string): Complexity {
+  const c = command.toLowerCase();
+  const severalSteps = /\b(and then|then|after that|afterwards|finally|step \d)\b|;|\n\s*(\d+[.)]|[-*•])\s/.test(c) || c.length > 240;
+  return severalSteps ? "complex" : "simple";
+}

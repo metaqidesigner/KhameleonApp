@@ -14,6 +14,10 @@
  * a canned "JARVIS is offline" fallback, in every environment, regardless
  * of configuration. Found by code inspection during the 2026-09-03
  * backend-route audit, not by running it.
+ *
+ * Khami first (docs/khami-design.md, step 4): Khami researches with the
+ * same single web-reading tool; Copilot and GPT/Gemini answer without
+ * Khameleon's tools; Claude keeps its own tool loop below.
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
@@ -21,6 +25,9 @@ import { dispatchTool } from "./tools/dispatcher.js";
 import { TOOL_DEFINITIONS } from "./tools/definitions.js";
 import { costForTokens } from "./gateway.js";
 import { getAnthropicClient } from "../lib/anthropicClient.js";
+import { firstAvailableAI, aiLabel, NoAIError } from "../lib/askAI.js";
+import { askKhami } from "../engines/khami.js";
+import { askAgent } from "./gateway.js";
 
 const FETCH_URL_TOOL = TOOL_DEFINITIONS.find((t) => t.name === "fetch_url");
 if (!FETCH_URL_TOOL) {
@@ -62,8 +69,9 @@ export async function runDeepResearch(
 ): Promise<ResearchResult> {
   const maxIterations = clampIterations(opts.maxIterations);
   const webSearch = opts.webSearch !== false;
+  const agent = await firstAvailableAI();
+  if (!agent) throw new NoAIError();
 
-  const client = await getAnthropicClient();
   const t0 = Date.now();
   const tools = webSearch ? [FETCH_URL_TOOL!] : [];
   const system = [
@@ -73,6 +81,42 @@ export async function runDeepResearch(
       : "Web access is disabled for this query - answer from your own knowledge and say so plainly if you're not confident.",
     "Format your final answer as clean markdown.",
   ].join(" ");
+
+  if (agent.id !== "claude") {
+    const toolResults: ResearchToolResult[] = [];
+    let content: string;
+    let tokens: number;
+    let cost = 0;
+    if (agent.id === "khami") {
+      const r = await askKhami({
+        system,
+        messages: [{ role: "user", content: query }],
+        tools: tools.map((t) => ({
+          name: t.name, description: t.description ?? t.name, parameters: t.input_schema as Record<string, unknown>,
+          run: async (input) => {
+            const start = Date.now();
+            try {
+              const result = await dispatchTool(t.name, input);
+              toolResults.push({ name: t.name, input, result, durationMs: Date.now() - start });
+              return result;
+            } catch (err) {
+              const error = err instanceof Error ? err.message : String(err);
+              toolResults.push({ name: t.name, input, result: `Error: ${error}`, durationMs: Date.now() - start, error });
+              return `Error: ${error}`;
+            }
+          },
+        })),
+      });
+      content = r.content; tokens = r.tokens;
+    } else {
+      const r = await askAgent(agent, [{ role: "system", content: system }, { role: "user", content: query }], undefined, undefined, { plain: true });
+      if (r.error) throw new Error(r.error);
+      content = r.content; tokens = r.tokens; cost = r.costUsd;
+    }
+    return { content: content || "_No answer was generated._", tool_results: toolResults, model: aiLabel(agent), latency_ms: Date.now() - t0, tokens, cost_usd: cost };
+  }
+
+  const client = await getAnthropicClient();
 
   let messages: Anthropic.Messages.MessageParam[] = [{ role: "user", content: query }];
   let content = "";
