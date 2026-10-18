@@ -15,6 +15,22 @@ contextBridge.exposeInMainWorld("khameleon", {
     openClassicWindow: () => ipcRenderer.send("khameleon:overlay:open-classic"),
     hide: () => ipcRenderer.send("khameleon:overlay:hide"),
   },
+  // Capture (src/capture.ts): record a task to turn into a skill.
+  capture: {
+    status: () => ipcRenderer.invoke("khameleon:capture:status"),
+    start: () => ipcRenderer.invoke("khameleon:capture:start"),
+    pause: () => ipcRenderer.invoke("khameleon:capture:pause"),
+    resume: () => ipcRenderer.invoke("khameleon:capture:resume"),
+    note: (text: string) => ipcRenderer.invoke("khameleon:capture:note", text),
+    stop: () => ipcRenderer.invoke("khameleon:capture:stop"),
+    discard: () => ipcRenderer.invoke("khameleon:capture:discard"),
+    openSnapshotSettings: () => ipcRenderer.invoke("khameleon:capture:open-settings"),
+    onUpdate: (listener: (status: unknown) => void) => {
+      const handler = (_e: unknown, status: unknown) => listener(status);
+      ipcRenderer.on("khameleon:capture:update", handler);
+      return () => { ipcRenderer.removeListener("khameleon:capture:update", handler); };
+    },
+  },
   // Saved desktop choices: which layout starts, follow-me vs main screen.
   prefs: {
     get: () => ipcRenderer.invoke("khameleon:prefs:get"),

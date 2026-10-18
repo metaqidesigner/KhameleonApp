@@ -49,3 +49,41 @@ export function extractSteps(reply: string): string {
   const lines = reply.split(/\r?\n/).map(l => l.trim()).filter(l => /^\d+[.)]\s+\S/.test(l));
   return (lines.length ? lines : reply.split(/\r?\n/).filter(l => l.trim())).join("\n").trim();
 }
+
+// ── From a Capture recording (docs/build-review.md, Build 4) ───────────────
+
+export interface CapturedStep { app: string; title: string; text?: string; note?: string }
+
+/** The recording, in words an AI can turn into a skill. Pure. */
+export function capturePrompt(skillWriterSteps: string, steps: CapturedStep[]): string {
+  const lines = steps.map((s, i) => {
+    const where = [s.app, s.title].filter(Boolean).join(" - ") || "(no window)";
+    return [
+      `${i + 1}. In ${where}`,
+      s.note ? `   The user noted: ${s.note}` : "",
+      s.text ? `   Visible on screen: ${s.text.slice(0, 600)}` : "",
+    ].filter(Boolean).join("\n");
+  }).join("\n");
+  return [
+    "Follow these guidelines for writing a Khameleon skill:",
+    "---", skillWriterSteps.trim(), "---",
+    "The user just recorded themselves doing a task. Here is what happened, in order (apps and windows they used, their notes, and text seen on screen):",
+    lines,
+    "Turn this into a reusable skill. Reply in exactly this format and nothing else:",
+    "NAME: <a short, plain name>",
+    "DESCRIPTION: <one or two sentences: what it does and when to use it, using words people would say>",
+    "STEPS:",
+    "1. <step>",
+    "2. <step>",
+    "Use 4 to 10 steps. Describe what to do and why, not mouse movements. If something wasn't clear from the recording, write the step anyway and add \"(check this)\".",
+  ].join("\n");
+}
+
+/** Reads NAME / DESCRIPTION / STEPS from the AI's reply, tolerating small slips. Pure. */
+export function parseCaptureDraft(reply: string): { name: string; description: string; steps: string } {
+  const name = reply.match(/^\s*\**NAME\**\s*:\s*(.+)$/im)?.[1].trim() ?? "";
+  const description = reply.match(/^\s*\**DESCRIPTION\**\s*:\s*(.+)$/im)?.[1].trim() ?? "";
+  const after = reply.split(/^\s*\**STEPS\**\s*:?\s*$/im)[1] ?? reply;
+  const clean = (v: string) => v.replace(/^[*_"'\s]+|[*_"'\s]+$/g, "");
+  return { name: clean(name), description: clean(description), steps: extractSteps(after) };
+}

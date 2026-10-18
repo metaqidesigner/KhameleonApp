@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { STARTER_SKILLS } from "../starterSkills.js";
-import { draftStepsPrompt, extractSteps, testSkillMatch } from "../lib/skillGuide.js";
+import { draftStepsPrompt, extractSteps, testSkillMatch, capturePrompt, parseCaptureDraft, type CapturedStep } from "../lib/skillGuide.js";
 import { loadInstalledSkills } from "../lib/installedSkills.js";
 import { askAgent, isAgentAvailable } from "../agents/gateway.js";
 import { findAgent } from "../agents/defaults.js";
@@ -171,6 +171,32 @@ router.post("/guide/draft-steps", async (req, res) => {
     res.json({ steps: extractSteps(reply.content), by: agent.name });
   } catch (err) {
     req.log.error({ err }, "Error drafting skill steps");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/** First AI available, Khameleon's own first (docs/khami-design.md). */
+async function firstAvailableAgent(): Promise<AgentConfig | undefined> {
+  for (const id of ["khami", "copilot", "claude", "gpt4o", "gemini"]) {
+    const a = findAgent(id);
+    if (a && (await isAgentAvailable(a))) return a;
+  }
+  return undefined;
+}
+
+/** Turns a Capture recording into a draft skill for the user to check (Build 4). */
+router.post("/guide/from-capture", async (req, res) => {
+  const { steps } = req.body as { steps?: CapturedStep[] };
+  if (!Array.isArray(steps) || steps.length === 0) { res.status(400).json({ error: "Nothing was recorded." }); return; }
+  try {
+    const agent = await firstAvailableAgent();
+    if (!agent) { res.status(503).json({ error: "No AI is available - set up Khami first (head menu > Khami setup)." }); return; }
+    const writer = STARTER_SKILLS.find((s) => s.name === "Skill writer");
+    const reply = await askAgent(agent, [{ role: "user", content: capturePrompt(writer?.content ?? "", steps.slice(0, 60)) }]);
+    if (reply.error) { res.status(502).json({ error: reply.error }); return; }
+    res.json({ ...parseCaptureDraft(reply.content), by: agent.name });
+  } catch (err) {
+    req.log.error({ err }, "Error writing up a capture");
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -18,6 +18,7 @@ import {
   type IndicatorState,
 } from "khameleon-window-agent";
 import { LocalAgentRunner, LocalDocumentAgent, extractDocumentText } from "@khameleon/integrations";
+import { CaptureSession } from "./capture";
 
 // The real product UI, not a side scaffold (khameleon-decisions-log.md,
 // 2026-10-03, Cross-App Control Phase 0). Khameleon is already a working
@@ -356,6 +357,31 @@ app.whenReady().then(() => {
   // Clicking the dock icon (macOS) opens the Classic window - the overlay
   // itself has no dock/taskbar presence.
   app.on("activate", () => openClassicWindow());
+
+  // ── Capture (src/capture.ts; docs/build-review.md, Build 4) ─────────────
+  const captureGlowBackend = new ElectronOverlayBackend();
+  const captureHandle = { id: "capture", backend: "external" as const, label: "Recording" };
+  let captureGlowShown = false;
+  const captureGlow = {
+    show: (bounds: Bounds) => {
+      if (captureGlowShown) captureGlowBackend.updateBounds(captureHandle, bounds);
+      else { captureGlowBackend.show(captureHandle, bounds, "recording"); captureGlowShown = true; }
+    },
+    hide: () => { captureGlowBackend.hide(captureHandle); captureGlowShown = false; },
+  };
+  const capture = new CaptureSession((status) => {
+    for (const w of [overlayWindow, mainWindow]) {
+      if (w && !w.isDestroyed()) w.webContents.send("khameleon:capture:update", status);
+    }
+  }, captureGlow);
+  ipcMain.handle("khameleon:capture:status", () => capture.status());
+  ipcMain.handle("khameleon:capture:start", () => capture.start());
+  ipcMain.handle("khameleon:capture:pause", () => capture.pause());
+  ipcMain.handle("khameleon:capture:resume", () => capture.resume());
+  ipcMain.handle("khameleon:capture:note", (_e, note: unknown) => capture.addNote(typeof note === "string" ? note : ""));
+  ipcMain.handle("khameleon:capture:stop", () => capture.stop());
+  ipcMain.handle("khameleon:capture:discard", () => capture.discard());
+  ipcMain.handle("khameleon:capture:open-settings", () => capture.openSnapshotSettings());
 
   ipcMain.handle("khameleon:command", async (_event, text: unknown) => {
     if (typeof text !== "string" || !text.trim()) throw new Error("A non-empty command is required.");

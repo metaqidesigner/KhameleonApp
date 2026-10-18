@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { testSkillMatch, draftStepsPrompt, extractSteps } from "./skillGuide.js";
+import { testSkillMatch, draftStepsPrompt, extractSteps, capturePrompt, parseCaptureDraft } from "./skillGuide.js";
 
 const installed = [{ name: "Invoice check", description: "Checks an invoice's details before it's paid or entered.", content: "" }];
 
@@ -21,4 +21,23 @@ test("draft prompt carries the guidelines and the task; steps are extracted from
   assert.match(p, /Write clear steps/);
   assert.match(p, /copy totals into the portal/);
   assert.equal(extractSteps("Sure! Here you go:\n1. Open the sheet.\n2. Copy the totals.\nHope that helps!"), "1. Open the sheet.\n2. Copy the totals.");
+});
+
+test("capture prompt lists the recorded windows, notes and screen text in order", () => {
+  const p = capturePrompt("1. Be clear.", [
+    { app: "Microsoft Excel", title: "March statement.xlsx", note: "these are the supplier totals", text: "Invoice 101 1,200.00" },
+    { app: "Google Chrome", title: "Payments - Supplier portal" },
+  ]);
+  assert.match(p, /1\. In Microsoft Excel - March statement\.xlsx\n   The user noted: these are the supplier totals\n   Visible on screen: Invoice 101/);
+  assert.match(p, /2\. In Google Chrome - Payments - Supplier portal/);
+  assert.match(p, /NAME:/);
+});
+
+test("reads the drafted name, description and steps, even with extra chatter", () => {
+  const d = parseCaptureDraft("Here's your skill!\n**NAME:** Supplier payment entry\nDESCRIPTION: Enters supplier totals from a spreadsheet into the payments portal.\nSTEPS:\n1. Open the statement.\n2. Copy the totals (check this).\nLet me know!");
+  assert.deepEqual(d, {
+    name: "Supplier payment entry",
+    description: "Enters supplier totals from a spreadsheet into the payments portal.",
+    steps: "1. Open the statement.\n2. Copy the totals (check this).",
+  });
 });
