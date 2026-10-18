@@ -169,3 +169,27 @@ export interface WindowBackend {
   close?(handle: WindowHandle): Promise<void>;
   find?(query: string): Promise<WindowHandle | null>;
 }
+
+/**
+ * The Khameleon pointer (docs/build-review.md, Build 4 expanded): a small
+ * cursor that glides to where Khameleon is about to click or type, with a
+ * short caption ("Typing the total into cell D14"). Shown on top of
+ * everything, never catches the mouse.
+ */
+export interface PointerBackend {
+  /** Glide to a screen point (or just show the caption near the last point when `point` is omitted). */
+  moveTo(point: { x: number; y: number } | undefined, caption: string): Promise<void>;
+  setCaption(caption: string, paused?: boolean): void;
+  hide(): void;
+}
+
+/**
+ * Whether the user is using the mouse or keyboard right now - Khameleon
+ * pauses its own clicking/typing while they are, so the two never fight.
+ * `ignoreOwnInputFor` tells it to disregard input Khameleon itself is about
+ * to cause.
+ */
+export interface UserActivityMonitor {
+  isUserBusy(): boolean;
+  ignoreOwnInputFor(ms: number): void;
+}

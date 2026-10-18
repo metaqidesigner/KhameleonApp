@@ -9,3 +9,5 @@ export { ElectronOverlayBackend } from "./backends/electronOverlayBackend";
 export { BrowserInputBackend } from "./backends/browserInputBackend";
 export { MacNativeInputBackend } from "./backends/macNativeInputBackend";
 export { WindowsNativeInputBackend } from "./backends/windowsNativeInputBackend";
+export { ElectronPointerBackend } from "./backends/electronPointerBackend";
+export { ElectronUserActivity } from "./backends/electronUserActivity";

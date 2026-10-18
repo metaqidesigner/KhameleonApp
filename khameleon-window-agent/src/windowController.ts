@@ -7,7 +7,9 @@ import {
   InputBackend,
   LayoutPreset,
   OverlayBackend,
+  PointerBackend,
   TeleportOptions,
+  UserActivityMonitor,
   WidgetSpec,
   WindowBackend,
   WindowHandle,
@@ -37,7 +39,10 @@ export class WindowController {
     /** Real click/type, picked by handle.backend: "widget" -> browser (CDP),
      * "external" -> native (AppleScript/PowerShell). Optional so callers
      * that never touch click()/type() don't need either. */
-    private input?: { browser: InputBackend; native: InputBackend }
+    private input?: { browser: InputBackend; native: InputBackend },
+    /** The Khameleon pointer and user-activity check (both optional, so
+     * existing callers and tests keep working without them). */
+    private assist?: { pointer?: PointerBackend; activity?: UserActivityMonitor; pauseTimeoutMs?: number }
   ) {}
 
   async createWidget(
@@ -168,17 +173,49 @@ export class WindowController {
    * the first place, so a second "may I control the thing I just opened
    * for you" prompt would be pure friction, not real consent.
    */
-  async click(handle: WindowHandle, target: ClickTarget): Promise<void> {
+  async click(handle: WindowHandle, target: ClickTarget, caption = "Clicking here"): Promise<void> {
     const backend = this.inputFor(handle);
     await this.focusAndSettle(handle);
+    await this.showAndWait(target, caption);
+    this.assist?.activity?.ignoreOwnInputFor(600);
     await backend.click(handle, target);
   }
 
   /** Real keystrokes, simulating a user typing. Same gating as click(). */
-  async type(handle: WindowHandle, target: ClickTarget | null, text: string): Promise<void> {
+  async type(handle: WindowHandle, target: ClickTarget | null, text: string, caption?: string): Promise<void> {
     const backend = this.inputFor(handle);
     if (!target) await this.focusAndSettle(handle); // click() already focuses when a target is given
+    const short = text.length > 40 ? `${text.slice(0, 37)}...` : text;
+    await this.showAndWait(target ?? undefined, caption ?? `Typing "${short}"`);
+    this.assist?.activity?.ignoreOwnInputFor(400 + text.length * 40);
     await backend.type(handle, target, text);
+  }
+
+  /** Hides the Khameleon pointer, e.g. when a task finishes. */
+  doneActing(): void {
+    this.assist?.pointer?.hide();
+  }
+
+  /**
+   * Moves the Khameleon pointer to where it's about to act, then waits while
+   * the user is using the mouse or keyboard ("Paused - you're using this
+   * window"), resuming once they've stopped for a moment. Gives up after
+   * pauseTimeoutMs (default 2 minutes) rather than waiting forever.
+   */
+  private async showAndWait(target: ClickTarget | undefined, caption: string): Promise<void> {
+    const pointer = this.assist?.pointer;
+    const activity = this.assist?.activity;
+    await pointer?.moveTo(target?.point, caption);
+    if (!activity) return;
+    const started = Date.now();
+    const timeout = this.assist?.pauseTimeoutMs ?? 120_000;
+    let paused = false;
+    while (activity.isUserBusy()) {
+      if (!paused) { pointer?.setCaption("Paused - you're using this window", true); paused = true; }
+      if (Date.now() - started > timeout) throw new Error("Paused too long while you were using the window - ask again when you're ready.");
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    if (paused) pointer?.setCaption(caption, false);
   }
 
   /**

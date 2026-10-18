@@ -12,6 +12,8 @@ import {
   BrowserInputBackend,
   MacNativeInputBackend,
   WindowsNativeInputBackend,
+  ElectronPointerBackend,
+  ElectronUserActivity,
   type Bounds,
   type IndicatorState,
 } from "khameleon-window-agent";
@@ -158,6 +160,9 @@ app.whenReady().then(() => {
       browser: new BrowserInputBackend((handle) => widgetBackend.getWebContents(handle)),
       native: nativeInputBackend,
     },
+    // The Khameleon pointer, and pausing while the user is using the mouse
+    // or keyboard (docs/build-review.md, Build 4 answers).
+    { pointer: new ElectronPointerBackend(), activity: new ElectronUserActivity() },
   );
   const fileRoot = process.env.KHAMELEON_FILE_ROOT ?? app.getPath("documents");
   const memory = new MemoryStore(new JsonFileStorage(path.join(app.getPath("userData"), "memory.json")));
