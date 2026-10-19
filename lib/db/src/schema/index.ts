@@ -25,3 +25,4 @@ export * from "./integration_directory";
 export * from "./custom_integrations";
 export * from "./action_receipts";
 export * from "./users";
+export * from "./procedures";

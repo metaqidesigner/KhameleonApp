@@ -31,6 +31,10 @@ async function buildAll() {
       "*.node",
       // Khami's engine (src/engines/khami.ts): native, loads its own binaries.
       "node-llama-cpp",
+      // Document reading (src/lib/documentText.ts): load workers/wasm by path.
+      "tesseract.js",
+      "pdf-parse",
+      "mammoth",
       "sharp",
       "better-sqlite3",
       "sqlite3",

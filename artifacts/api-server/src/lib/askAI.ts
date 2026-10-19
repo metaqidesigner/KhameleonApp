@@ -61,11 +61,13 @@ export interface AskAIOptions {
   onToolEvent?: (e: ToolEvent) => void;
   /** Use this AI instead of the usual order (e.g. "copilot" when the user picked Ask Copilot). */
   agentId?: string;
+  /** Known to be confidential (e.g. a document marked confidential): Khami only. */
+  confidential?: boolean;
 }
 
 export async function askAI(opts: AskAIOptions): Promise<{ text: string; by: string; agentId: string }> {
   // Confidential work never leaves the computer (docs/khami-design.md, step 5).
-  const confidential = detectConfidential(`${opts.system ?? ""}\n${opts.prompt}`).confidential;
+  const confidential = opts.confidential || detectConfidential(`${opts.system ?? ""}\n${opts.prompt}`).confidential;
   let agent: AgentConfig | undefined;
   if (confidential) {
     const khami = findAgent("khami");

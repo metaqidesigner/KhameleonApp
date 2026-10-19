@@ -31,7 +31,10 @@ app.use(
 );
 app.use(cors());
 app.use(cookieParser());
-app.use(express.json());
+// Procedure documents arrive as base64 files (up to 20 MB); everything else keeps the small default.
+const bigJson = express.json({ limit: "30mb" });
+const smallJson = express.json();
+app.use((req, res, next) => (req.method === "POST" && req.path === "/api/procedures/documents" ? bigJson : smallJson)(req, res, next));
 app.use(express.urlencoded({ extended: true }));
 
 // Shared-password gate (account isolation, Option A) - a no-op unless an

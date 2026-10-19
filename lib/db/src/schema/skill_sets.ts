@@ -1,4 +1,4 @@
-import { pgTable, serial, text, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, jsonb, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -27,6 +27,9 @@ export const skillSetsTable = pgTable("skill_sets", {
   version:                  text("version").notNull().default("1.0.0"),
   status:                   text("status").notNull().default("available"), // 'available' | 'pending' | 'installed' | 'uninstalled'
   installedAt:              timestamp("installed_at", { withTimezone: true }),
+  /** Build 5: a skill made from a company document stays linked to the section it came from. */
+  sourceDocumentId:         integer("source_document_id"),
+  sourceSectionId:          text("source_section_id"),
   createdAt:                timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

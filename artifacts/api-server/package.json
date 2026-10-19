@@ -8,7 +8,7 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/migrate-legacy-values.test.ts src/briefing.test.ts src/lib/openApiImport.test.ts src/routes/tasks-delete.test.ts src/routes/scheduler.test.ts src/agents/tools/webFetch.test.ts src/routes/weather.test.ts src/lib/apiKeys.test.ts src/lib/crypto.test.ts src/lib/accounts.test.ts src/lib/vaultGuard.test.ts src/lib/skillSetScope.test.ts src/lib/installedSkills.test.ts src/starterSkills.test.ts src/lib/receiptUndo.test.ts src/lib/readableError.test.ts src/engines/khamiHistory.test.ts src/engines/khamiBrains.test.ts src/lib/skillPicker.test.ts src/lib/toolSchema.test.ts src/lib/skillMd.test.ts src/lib/copilotChat.test.ts src/lib/mcpRegistry.test.ts src/lib/skillGuide.test.ts src/lib/emailAssist.test.ts src/agents/skillSetSuggester.test.ts src/lib/returnTo.test.ts src/lib/microsoftApp.test.ts src/lib/escalation.test.ts src/lib/azureOpenAI.test.ts src/agents/openAiToolLoop.test.ts src/agents/tools/anyAiTools.test.ts src/lib/skillSetSuggestionMatch.test.ts src/lib/outlookGraph.test.ts src/agents/commandClassifier.test.ts src/agents/skills/outlookSummarizeThread.test.ts src/agents/skills/outlookTriageInbox.test.ts src/agents/researchAgent.test.ts",
+    "test": "tsx --test src/migrate-legacy-values.test.ts src/briefing.test.ts src/lib/openApiImport.test.ts src/routes/tasks-delete.test.ts src/routes/scheduler.test.ts src/agents/tools/webFetch.test.ts src/routes/weather.test.ts src/lib/apiKeys.test.ts src/lib/crypto.test.ts src/lib/accounts.test.ts src/lib/vaultGuard.test.ts src/lib/skillSetScope.test.ts src/lib/installedSkills.test.ts src/starterSkills.test.ts src/lib/receiptUndo.test.ts src/lib/readableError.test.ts src/engines/khamiHistory.test.ts src/engines/khamiBrains.test.ts src/lib/skillPicker.test.ts src/lib/toolSchema.test.ts src/lib/skillMd.test.ts src/lib/copilotChat.test.ts src/lib/mcpRegistry.test.ts src/lib/skillGuide.test.ts src/lib/emailAssist.test.ts src/agents/skillSetSuggester.test.ts src/lib/returnTo.test.ts src/lib/microsoftApp.test.ts src/lib/escalation.test.ts src/lib/azureOpenAI.test.ts src/agents/openAiToolLoop.test.ts src/lib/procedures.test.ts src/agents/tools/anyAiTools.test.ts src/lib/skillSetSuggestionMatch.test.ts src/lib/outlookGraph.test.ts src/agents/commandClassifier.test.ts src/agents/skills/outlookSummarizeThread.test.ts src/agents/skills/outlookTriageInbox.test.ts src/agents/researchAgent.test.ts",
     "test:scheduler": "tsx --test --test-force-exit src/scheduler.test.ts"
   },
   "dependencies": {
@@ -20,10 +20,13 @@
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",
     "express": "^5.2.1",
+    "mammoth": "^1.13.0",
     "node-llama-cpp": "^3.22.1",
     "openai": "^6.42.0",
+    "pdf-parse": "^2.4.5",
     "pino": "^9.14.0",
-    "pino-http": "^10.5.0"
+    "pino-http": "^10.5.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

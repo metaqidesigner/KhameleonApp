@@ -79,6 +79,24 @@ export function capturePrompt(skillWriterSteps: string, steps: CapturedStep[]): 
   ].join("\n");
 }
 
+/** Build 5 addendum: a skill from a company document section, in the same reply format. Pure. */
+export function documentSkillPrompt(skillWriterSteps: string, documentName: string, section: { id: string; heading: string; text: string }): string {
+  return [
+    "Follow these guidelines for writing a Khameleon skill:",
+    "---", skillWriterSteps.trim(), "---",
+    `Turn this company procedure into a skill. Keep every step the procedure requires, in the same order, with its limits, amounts and approvals exactly as written - don't add steps it doesn't have.`,
+    `Procedure: ${section.id !== "all" ? `${section.id} ` : ""}${section.heading} (from "${documentName}")`,
+    section.text.slice(0, 6000),
+    "Reply in exactly this format and nothing else:",
+    "NAME: <a short, plain name>",
+    "DESCRIPTION: <one or two sentences: what it does and when to use it, using words people would say>",
+    "STEPS:",
+    "1. <step>",
+    "2. <step>",
+    "If something in the procedure is unclear, write the step anyway and add \"(check this)\".",
+  ].join("\n");
+}
+
 /** Reads NAME / DESCRIPTION / STEPS from the AI's reply, tolerating small slips. Pure. */
 export function parseCaptureDraft(reply: string): { name: string; description: string; steps: string } {
   const name = reply.match(/^\s*\**NAME\**\s*:\s*(.+)$/im)?.[1].trim() ?? "";

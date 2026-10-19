@@ -3,6 +3,7 @@ import { STARTER_SKILLS } from "../starterSkills.js";
 import { draftStepsPrompt, extractSteps, testSkillMatch, capturePrompt, parseCaptureDraft, type CapturedStep } from "../lib/skillGuide.js";
 import { loadInstalledSkills } from "../lib/installedSkills.js";
 import { askAI } from "../lib/askAI.js";
+import { queueCheck } from "../lib/procedureService.js";
 import { db } from "@workspace/db";
 import {
   skillSetsTable, approvalsTable, actionReceiptsTable, entityWorkDomainsTable,
@@ -67,6 +68,9 @@ export interface CreateSkillSetBody {
   requestedTools?: string[];
   requestedIntegrationIds?: string[];
   workDomainIds?: number[];
+  /** Build 5: made from a company document section. */
+  sourceDocumentId?: number;
+  sourceSectionId?: string;
 }
 
 /**
@@ -99,6 +103,8 @@ export async function createSkillSetRecord(body: CreateSkillSetBody): Promise<{ 
       sourceUpdatedAt: body.sourceUpdatedAt ?? null,
       requestedTools,
       requestedIntegrationIds,
+      sourceDocumentId: body.sourceDocumentId ?? null,
+      sourceSectionId: body.sourceSectionId ?? null,
       status: gated ? "pending" : "installed",
       installedAt: gated ? null : new Date(),
     })
@@ -107,6 +113,8 @@ export async function createSkillSetRecord(body: CreateSkillSetBody): Promise<{ 
   for (const domainId of body.workDomainIds ?? []) {
     await db.insert(entityWorkDomainsTable).values({ entityType: "skill_set", entityId: String(skillSet.id), workDomainId: domainId });
   }
+  // Build 5: check it against its work area's procedures, in the background.
+  queueCheck(skillSet.id);
 
   if (!gated) {
     await db.insert(actionReceiptsTable).values({
@@ -383,6 +391,7 @@ router.post("/:id/update", async (req, res) => {
         target: updated.name,
         canUndo: false,
       });
+      queueCheck(updated.id); // Build 5: steps changed - check again
       res.json({ skillSet: updated, approvalId: null });
       return;
     }
@@ -436,6 +445,7 @@ router.post("/:id/confirm-update", async (req, res) => {
       relatedApprovalId: approvalId ?? null,
     });
 
+    queueCheck(updated.id);
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Error confirming skill set update");
