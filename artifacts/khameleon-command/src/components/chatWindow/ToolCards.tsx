@@ -10,6 +10,8 @@ function logActivity(input: Parameters<typeof createActionReceipt>[0]) {
 }
 import type { WorkKind } from './types';
 import { searchMemory, runResearch, type MemorySearchResult } from '@/lib/jarvisApi';
+import { useOpenEmail } from './useOpenEmail';
+import type { FoundEmail } from '@/lib/emailAssistApi';
 import {
   listOutlookMessages, runOutlookDraftEmail, sendOutlookDraft, rewriteOutlookDraft, rejectOutlookDraft,
   runOutlookSummarizeThread, runOutlookTriageInbox, undoOutlookTriage,
@@ -130,7 +132,7 @@ const errText = (e: unknown) => (e instanceof Error ? e.message : 'Something wen
 type Provider = 'outlook' | 'gmail';
 type MessagePreview = OutlookMessagePreview;
 
-/** Picks a recent email. Stand-in until Khameleon can tell which email is open (Build 9). */
+/** Picks a recent email - used when Khameleon can't tell which email is open, or the user wants another (Build 9). */
 function MessagePicker({ provider, onPick }: { provider: Provider; onPick: (m: MessagePreview) => void }) {
   const [messages, setMessages] = useState<MessagePreview[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -182,6 +184,25 @@ function ProviderSwitch({ value, onChange }: { value: Provider; onChange: (p: Pr
           {p === 'outlook' ? 'Outlook' : 'Gmail'}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Build 9 safeguard: names the open email before anything is done with it,
+ * with one click to choose another instead.
+ */
+function OpenEmailChoice({ email, verb, onUse, onChoose }: { email: FoundEmail; verb: string; onUse: () => void; onChoose: () => void }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ fontSize: 12, lineHeight: 1.45 }}>
+        <span style={{ color: '#8fb4b6' }}>{verb}: </span><strong>{email.subject || '(no subject)'}</strong>
+        <span style={{ color: '#8fb4b6' }}> - {email.fromName || email.from}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button type="button" className="chat-domain-chip" data-active onClick={onUse}>{verb === 'Replying to' ? 'Draft reply to this' : 'Summarize this'}</button>
+        <button type="button" className="chat-domain-chip" onClick={onChoose}>Choose another</button>
+      </div>
     </div>
   );
 }
@@ -259,7 +280,10 @@ function ResearchCard() {
 type DraftState = { approvalId: number; to: string; subject: string; body: string };
 
 function DraftReplyCard() {
+  const open = useOpenEmail();
+  const [choosing, setChoosing] = useState(false);
   const [provider, setProvider] = useState<Provider>('outlook');
+  useEffect(() => { if (open.email) setProvider(open.email.source); }, [open.email]);
   const [stage, setStage] = useState<'pick' | 'drafting' | 'review' | 'confirm' | 'sending' | 'sent' | 'discarded'>('pick');
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [body, setBody] = useState('');
@@ -322,7 +346,12 @@ function DraftReplyCard() {
 
   return (
     <>
-      {stage === 'pick' && (
+      {stage === 'pick' && open.looking && <Busy label="Looking for the open email…" />}
+      {stage === 'pick' && !open.looking && open.email && !choosing && (
+        <OpenEmailChoice email={open.email} verb="Replying to" onChoose={() => setChoosing(true)}
+          onUse={() => void pick({ id: open.email!.id, subject: open.email!.subject, from: open.email!.from, preview: '', receivedDateTime: open.email!.receivedAt ?? '' })} />
+      )}
+      {stage === 'pick' && !open.looking && (!open.email || choosing) && (
         <>
           <ProviderSwitch value={provider} onChange={setProvider} />
           <div style={mutedStyle}>Which email are you replying to?</div>
@@ -364,6 +393,8 @@ function DraftReplyCard() {
 }
 
 function SummarizeThreadCard() {
+  const open = useOpenEmail();
+  const [choosing, setChoosing] = useState(false);
   const [summary, setSummary] = useState<OutlookThreadSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -385,8 +416,11 @@ function SummarizeThreadCard() {
   }
   return (
     <>
-      <div style={mutedStyle}>Outlook only for now. Which thread?</div>
-      {busy ? <Busy label="Summarizing…" /> : <MessagePicker provider="outlook" onPick={m => void pick(m)} />}
+      {busy ? <Busy label="Summarizing…" />
+        : open.looking ? <Busy label="Looking for the open email…" />
+        : open.email?.source === 'outlook' && !choosing
+          ? <OpenEmailChoice email={open.email} verb="Summarizing" onUse={() => void pick({ id: open.email!.id, subject: open.email!.subject, from: open.email!.from, preview: '', receivedDateTime: open.email!.receivedAt ?? '' })} onChoose={() => setChoosing(true)} />
+          : <><div style={mutedStyle}>Outlook only for now. Which thread?</div><MessagePicker provider="outlook" onPick={m => void pick(m)} /></>}
       {error && <ErrorLine message={error} />}
     </>
   );
