@@ -4,3 +4,4 @@ export * from "./fileOps";
 export * from "./dropZones";
 export * from "./commands";
 export { MacAppLauncher } from "./macAppLauncher";
+export { WindowsAppLauncher, windowsProgram } from "./windowsAppLauncher";

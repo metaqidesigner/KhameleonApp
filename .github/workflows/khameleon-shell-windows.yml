@@ -9,7 +9,7 @@ name: khameleon-shell (Windows)
 on:
   workflow_dispatch:
   push:
-    branches: ["design/home-implemented-glass", "main"]
+    branches: ["ui-overlay-redesign", "main"]
     paths:
       - "apps/khameleon-shell/**"
       - "khameleon-window-agent/**"
@@ -17,6 +17,7 @@ on:
       - "khameleon-memory/**"
       - "lib/integrations/**"
       - "pnpm-lock.yaml"
+      - "THIRD_PARTY_LICENSES.md"
       - ".github/workflows/khameleon-shell-windows.yml"
 
 jobs:
@@ -177,13 +178,44 @@ jobs:
             }).catch((e) => { console.error('FAIL:', e); process.exit(1); });
           "
 
-      - name: Package (unsigned - no Authenticode cert yet)
-        run: pnpm --filter @khameleon/shell exec electron-builder --win --dir
+      # Opening/closing apps by name (WindowsAppLauncher - "open Excel" in the
+      # chat goes through this). Notepad stands in for Office, which the
+      # runner doesn't have.
+      - name: Smoke-test opening and closing an app by name on Windows
+        shell: pwsh
+        working-directory: apps/khameleon-shell
+        run: |
+          node -e "
+            const { WindowsAppLauncher } = require('khameleon-file-agent');
+            const l = new WindowsAppLauncher();
+            (async () => {
+              await l.open('Notepad');
+              await new Promise(r => setTimeout(r, 2500));
+              if (!(await l.isRunning('Notepad'))) { console.error('FAIL: Notepad did not open'); process.exit(1); }
+              await l.quit('Notepad');
+              await new Promise(r => setTimeout(r, 2500));
+              if (await l.isRunning('Notepad')) { console.error('FAIL: Notepad did not close'); process.exit(1); }
+              console.log('OK: opened and closed Notepad by name');
+            })().catch((e) => { console.error('FAIL:', e); process.exit(1); });
+          "
+
+      # The real installer (NSIS) and the portable .exe - unsigned until there's
+      # a Windows code-signing certificate, so Windows SmartScreen will warn.
+      - name: Package the Windows installer (unsigned - no code-signing certificate yet)
+        run: pnpm --filter @khameleon/shell exec electron-builder --win
+
+      - name: Check the licence notices ship inside the app
+        shell: pwsh
+        run: |
+          foreach ($f in "THIRD_PARTY_LICENSES.md", "LICENSES.chromium.html", "LICENSE.electron.txt") {
+            if (-not (Test-Path "apps/khameleon-shell/release/win-unpacked/resources/$f")) { throw "Missing licence notice: $f" }
+          }
+          Write-Host "OK: all three licence notices are inside the Windows app"
 
       # Proves the actual packaged .exe launches for real on real Windows,
       # same bar as the macOS verification (process alive, no crash) - not
-      # claiming full UI verification, which still wants Newton's wife's
-      # real Windows machine per their own plan.
+      # claiming full UI verification, which still needs a real Windows PC
+      # (docs/windows-test-script.md).
       - name: Launch the packaged app and confirm it stays alive
         shell: pwsh
         run: |
@@ -196,9 +228,12 @@ jobs:
           Write-Host "OK: Khameleon.exe is running, PID $($proc.Id)"
           Stop-Process -Id $proc.Id -Force
 
-      - name: Upload unpacked Windows build for manual testing
+      # What a tester downloads (docs/windows-test-script.md): the installer
+      # and the portable version, from this run's Summary page.
+      - name: Upload the Windows installer for testing
         uses: actions/upload-artifact@v4
         with:
-          name: khameleon-windows-unpacked
-          path: apps/khameleon-shell/release/win-unpacked
-          retention-days: 14
+          name: khameleon-windows-installer
+          path: |
+            apps/khameleon-shell/release/*.exe
+          retention-days: 30

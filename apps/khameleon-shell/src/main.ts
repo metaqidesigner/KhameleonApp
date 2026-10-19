@@ -1,7 +1,7 @@
 import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen, shell, type WebContents } from "electron";
 import * as path from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
-import { FileOps, CommandRunner as FileCommandRunner, MacAppLauncher } from "khameleon-file-agent";
+import { FileOps, CommandRunner as FileCommandRunner, MacAppLauncher, WindowsAppLauncher } from "khameleon-file-agent";
 import { JsonFileStorage, MemoryStore, CommandRunner as MemoryCommandRunner } from "khameleon-memory";
 import {
   WindowController,
@@ -214,7 +214,7 @@ app.whenReady().then(() => {
   // the server) reaches them through the desktop link below (Build 7).
   const runners = {
     window: new WindowCommandRunner(windowController, requestObservePermission),
-    file: new FileCommandRunner(new FileOps(fileRoot), new MacAppLauncher()),
+    file: new FileCommandRunner(new FileOps(fileRoot), process.platform === "win32" ? new WindowsAppLauncher() : new MacAppLauncher()),
     memory: new MemoryCommandRunner(memory),
   };
 
