@@ -1,3 +1,6 @@
+// Fonts ship with the app (SIL Open Font Licence) - no calls to Google Fonts, and they work offline.
+import '@fontsource-variable/inter';
+import '@fontsource-variable/plus-jakarta-sans';
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";

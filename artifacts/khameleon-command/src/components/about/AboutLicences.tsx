@@ -16,6 +16,17 @@ const TONES: Record<Tone, { text: string; muted: string; card: string; border: s
 export function AboutLicences({ tone }: { tone: Tone }) {
   const t = TONES[tone];
   const [shown, setShown] = useState<LicenceNotice['licence'] | null>(null);
+  // The complete generated list (scripts/generate-licenses.mjs), served with the app.
+  const [all, setAll] = useState<string | null>(null);
+  const [allError, setAllError] = useState(false);
+  const showAll = async () => {
+    if (all !== null) { setAll(null); return; }
+    try {
+      const res = await fetch('/third-party-licenses.txt');
+      if (!res.ok) throw new Error();
+      setAll(await res.text());
+    } catch { setAllError(true); }
+  };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, color: t.text }}>
       <div style={{ fontSize: 12, color: t.muted, lineHeight: 1.5 }}>
@@ -37,6 +48,18 @@ export function AboutLicences({ tone }: { tone: Tone }) {
           </button>
         ))}
       </div>
+      <div>
+        <button type="button" onClick={() => void showAll()} aria-expanded={all !== null}
+          style={{ padding: '5px 10px', borderRadius: t.radius, fontSize: 11.5, fontFamily: 'inherit', cursor: 'pointer', background: 'transparent', border: `1px solid ${t.border}`, color: t.text }}>
+          {all !== null ? 'Hide all third-party licences' : 'All third-party licences (every package, model and font)'}
+        </button>
+        {allError && <div style={{ fontSize: 11, color: t.muted, marginTop: 4 }}>The full list couldn't be loaded - it's also in THIRD_PARTY_LICENSES.md with the app.</div>}
+      </div>
+      {all !== null && (
+        <pre aria-label="All third-party licences" style={{ margin: 0, padding: 10, borderRadius: t.radius, background: t.card, border: `1px solid ${t.border}`, fontSize: 10.5, lineHeight: 1.45, whiteSpace: 'pre-wrap', maxHeight: 360, overflowY: 'auto', color: t.muted }}>
+          {all}
+        </pre>
+      )}
       {shown && (
         <pre style={{ margin: 0, padding: 10, borderRadius: t.radius, background: t.card, border: `1px solid ${t.border}`, fontSize: 10.5, lineHeight: 1.45, whiteSpace: 'pre-wrap', maxHeight: 280, overflowY: 'auto', color: t.muted }}>
           {LICENCE_TEXTS[shown]}

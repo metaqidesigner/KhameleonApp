@@ -40,10 +40,10 @@ This document is the technical record of what Khameleon uses from third parties 
 
 ## Clean-up checklist (before launch)
 
-- [ ] Generate the complete dependency licence list (`pnpm licenses list --prod` for every package, plus Electron/Chromium notices) and add it to `THIRD_PARTY_LICENSES.md`.
-- [ ] Remove any dependency whose licence isn't commercially usable, or replace it.
-- [ ] Confirm every AI model offered for download still has a commercial-use licence; record its notice.
-- [ ] Make sure the full licence texts actually ship inside the installed app (not only in the repository), and that *About Khameleon → Licences* shows them.
+- [x] Generate the complete dependency licence list - done 2026-10-20: `pnpm licenses` (= `node scripts/generate-licenses.mjs`) builds `THIRD_PARTY_LICENSES.md` from what ships (server, desktop app and libraries' production packages + every package bundled into the frontend + models, fonts, Chromium, OCR data, adapted skills), with each licence text and NOTICE. 348 packages + 6 items. Re-run before every release.
+- [x] Remove any dependency whose licence isn't commercially usable - none found (2026-10-20); the generator now **fails** on any licence outside the commercial-use allow-list (`pnpm licenses:check`). jszip is "MIT OR GPL-3.0" - used under MIT.
+- [x] Confirm every AI model offered for download has a commercial-use licence - Qwen2.5-1.5B-Instruct-GGUF and Qwen2.5-7B-Instruct-GGUF confirmed Apache-2.0 on Hugging Face (2026-10-20). Re-check if a model is added.
+- [x] Full licence texts ship inside the app (2026-10-20): served as `/third-party-licenses.txt` and shown under About Khameleon → Licences → "All third-party licences"; the desktop installer also carries `THIRD_PARTY_LICENSES.md` (electron-builder extraResources). Still to confirm in a packaged build (pre-launch step A5).
 - [ ] Search the product for third-party names and branding; remove any outside the allowed cases above.
 - [ ] Check the skills shipped with Khameleon: adapted ones keep their notice and "modified" statement; new ones contain no copied text.
 - [ ] Review terms of service for every AI provider Khameleon can connect to (Anthropic, OpenAI, Google, Microsoft Azure) for anything affecting how Khameleon may use or present them.
@@ -52,4 +52,6 @@ This document is the technical record of what Khameleon uses from third parties 
 - [ ] Public MCP directory (registry.modelcontextprotocol.io): check its terms of use for listing/showing its entries in a commercial product.
 - [ ] Azure OpenAI: confirm Khameleon's terms of use state that the organisation's own Azure agreement governs data sent to its Azure OpenAI deployment, and that confidential conversations are never sent (step 5 lock).
 - [ ] Privacy notice: automatic task detection (Build 6) - off by default; when on, keeps a local log of app/window switches (no typing/screens/clicks) for the chosen period; content watching reads window text on the device, judged only by the on-device AI; banking/password/private windows left out by default. Check workplace monitoring rules (e.g. GDPR/employee monitoring) for organisations that might switch it on for staff.
+- [x] Fonts (2026-10-20): Inter and Plus Jakarta Sans were loaded from Google Fonts on every launch (sends users' IP addresses to Google - a GDPR risk - and fails offline); now shipped with the app (OFL-1.1, notice included). The app makes no outside requests when it opens.
+- [ ] Images in the app (`public/khameleon-head.webp`, `nebula-core.png`, `opengraph.jpg`, the icons): confirm who made them and that Khameleon owns or may use them commercially (Newton).
 - [ ] Legal review of this document and the licences page.
