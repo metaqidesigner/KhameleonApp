@@ -1,6 +1,7 @@
 export type Provider =
   | 'copilot'
   | 'khami'
+  | 'azure'
   | 'anthropic'
   | 'openai'
   | 'google'

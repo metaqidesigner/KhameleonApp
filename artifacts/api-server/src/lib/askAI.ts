@@ -13,7 +13,7 @@ import { findAgent } from "../agents/defaults.js";
 import type { AgentConfig, ToolEvent } from "../agents/types.js";
 import { detectConfidential } from "./escalation.js";
 
-export const AI_ORDER = ["khami", "copilot", "claude", "gpt4o", "gemini"] as const;
+export const AI_ORDER = ["khami", "copilot", "azure", "claude", "gpt4o", "gemini"] as const;
 
 export async function firstAvailableAI(): Promise<AgentConfig | undefined> {
   for (const id of AI_ORDER) {
@@ -27,6 +27,7 @@ export async function firstAvailableAI(): Promise<AgentConfig | undefined> {
 export function aiLabel(agent: Pick<AgentConfig, "id" | "name">): string {
   if (agent.id === "khami") return "Khami";
   if (agent.id === "copilot") return "Copilot";
+  if (agent.id === "azure") return "Azure AI";
   if (agent.id === "claude") return "Claude";
   if (agent.id === "gpt4o") return "GPT";
   if (agent.id === "gemini") return "Gemini";

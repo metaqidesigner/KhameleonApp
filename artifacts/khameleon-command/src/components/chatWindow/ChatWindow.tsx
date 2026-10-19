@@ -280,7 +280,7 @@ const STATUS_DOT_COLOR: Record<AgentOnlineStatus, string> = {
   online: '#4ee0a0', busy: '#ffb36b', standby: '#ffb36b', offline: '#5a6a6a',
 };
 
-const rank = (a: AgentConfig) => (a.provider === 'khami' ? 0 : a.provider === 'copilot' ? 1 : 2);
+const rank = (a: AgentConfig) => (a.provider === 'khami' ? 0 : a.provider === 'copilot' ? 1 : a.provider === 'azure' ? 2 : 3);
 
 function AgentStrip({ roster, statuses, pinnedId, onPin, zdrKnown, confidential = false }: {
   roster: AgentConfig[];

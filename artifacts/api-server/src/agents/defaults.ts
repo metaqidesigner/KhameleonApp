@@ -28,6 +28,19 @@ export const DEFAULT_AGENTS: AgentConfig[] = [
     color:        '#4f83e6',
     initials:     'CP',
   },
+  // Azure OpenAI - the organisation's own OpenAI models in its Azure account
+  // (Settings > AI). Offered after Copilot, only once an admin has set it up.
+  {
+    id:           'azure',
+    name:         'AZURE AI',
+    provider:     'azure',
+    model:        'azure-openai',
+    enabled:      true,
+    role:         'general',
+    systemPrompt: "You are helping inside Khameleon, a work assistant. Answer clearly and practically, in plain language. Never sign anything on the user's behalf; emails end with [Your name].",
+    color:        '#3a8ee6',
+    initials:     'AZ',
+  },
   {
     id:           'claude',
     name:         'CLAUDE',

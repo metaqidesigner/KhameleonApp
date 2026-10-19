@@ -30,6 +30,8 @@ This document is the technical record of what Khameleon uses from third parties 
 | React, Vite, Express, Drizzle, Zustand and other npm packages | App and server | Mostly MIT/ISC/Apache — full list to be generated | Generate full list from `pnpm licenses` at clean-up |
 | Microsoft 365 Copilot Chat API (Microsoft Graph, preview) | Copilot as the main agent when an organisation provides it | Microsoft APIs Terms of Use / Graph terms (not an open licence) | Preview: Microsoft says not supported for production - confirm status before launch; each user needs a Copilot licence; respect Microsoft's API terms and Copilot data handling; name "Microsoft 365 Copilot" only to describe what Khameleon connects to, no logos |
 | Anthropic SDK (`@anthropic-ai/sdk`) | Talking to Claude when an organisation has it | MIT | Include copyright and licence |
+| OpenAI SDK (`openai`) | GPT, Gemini (compatible interface) and **Azure OpenAI** | Apache 2.0 | Include licence and notice |
+| Azure OpenAI Service (Microsoft) | The organisation's own OpenAI models in its Azure account (step 5, added 2026-10-19) | The organisation's Microsoft Azure agreement / Product Terms (not an open licence) | Customer-supplied: the organisation's own resource, deployment and key; Khameleon only connects to it. Name "Azure OpenAI" only to describe what it connects to, no logos. Data sent is governed by the organisation's Azure terms - say so in Khameleon's terms of use |
 
 **Not used, by decision:** Anthropic's Word/PDF/PowerPoint/Excel skills (restricted licence); Anthropic's doc-coauthoring skill (no licence - Khameleon's own **Document co-writing** was written from scratch); Llama models (licence conditions); Ollama (not needed); MiniMax and OpenRouter (removed).
 
@@ -45,4 +47,5 @@ This document is the technical record of what Khameleon uses from third parties 
 - [ ] Check whether Microsoft's Copilot Chat API has left preview and what its production terms require (licensing, data handling, branding) before relying on it for paying customers.
 - [ ] Khameleon's own terms of use: users are responsible for the skills they install and the integrations they connect; connected services' own terms apply to data sent to them.
 - [ ] Public MCP directory (registry.modelcontextprotocol.io): check its terms of use for listing/showing its entries in a commercial product.
+- [ ] Azure OpenAI: confirm Khameleon's terms of use state that the organisation's own Azure agreement governs data sent to its Azure OpenAI deployment, and that confidential conversations are never sent (step 5 lock).
 - [ ] Legal review of this document and the licences page.

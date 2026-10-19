@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import OpenAI from "openai";
+import OpenAI, { AzureOpenAI } from "openai";
+import { getAzureConfig } from "../lib/azureOpenAI.js";
 import type { AgentConfig, AgentResponse, ChatMessage, Provider, ToolCallRecord, ToolEvent } from "./types.js";
 import { TOOL_DEFINITIONS } from "./tools/definitions.js";
 import { dispatchTool } from "./tools/dispatcher.js";
@@ -280,19 +281,25 @@ async function askOpenAI(
   messages: ChatMessage[],
   onToken?: (t: string) => void,
 ): Promise<AgentResponse> {
-  const apiKey  = await resolveKey(agent);
-  const baseURL = resolveBaseUrl(agent);
+  // Azure OpenAI: the organisation's own resource and deployment (lib/azureOpenAI.ts).
+  const azure = agent.provider === "azure" ? await getAzureConfig() : null;
+  if (agent.provider === "azure" && !azure) throw new Error("Azure OpenAI isn't set up - an admin adds it in Settings > AI.");
+  const apiKey  = azure ? azure.apiKey : await resolveKey(agent);
+  const baseURL = azure ? undefined : resolveBaseUrl(agent);
   if (!apiKey) throw new Error(`API key not configured for provider ${agent.provider}`);
+  if (azure) agent = { ...agent, model: azure.deployment };
 
   // Rate-limit header tracking (providerQuota.ts) only applies to the real
   // OpenAI API - google/openrouter/minimax/ollama/custom share this same
   // OpenAI-compatible code path via a different baseURL, but nothing
   // confirms they send the same x-ratelimit-* headers, so they're left
   // untracked rather than guessed at.
-  const client = new OpenAI({
-    apiKey, baseURL: baseURL ?? undefined,
-    ...(agent.provider === "openai" ? { fetch: trackingFetch("openai") } : {}),
-  });
+  const client = azure
+    ? new AzureOpenAI({ endpoint: azure.endpoint, apiKey: azure.apiKey, deployment: azure.deployment, apiVersion: azure.apiVersion })
+    : new OpenAI({
+      apiKey, baseURL: baseURL ?? undefined,
+      ...(agent.provider === "openai" ? { fetch: trackingFetch("openai") } : {}),
+    });
   const msgs = messages.map((m) => ({
     role: m.role as "user" | "assistant" | "system",
     content: m.content,
@@ -409,5 +416,6 @@ export async function isAgentAvailable(agent: AgentConfig): Promise<boolean> {
   if (!agent.enabled) return false;
   if (agent.provider === "khami") return (await khamiStatus()).available;
   if (agent.provider === "copilot") return !!(await getToken("copilot").catch(() => null));
+  if (agent.provider === "azure") return !!(await getAzureConfig());
   return !!(await resolveKey(agent));
 }

@@ -3,7 +3,7 @@
  * "the AI" for an answer. Khami (Khameleon's own, on this computer) is the
  * default; cloud engines are optional extras.
  */
-export type EngineId = "copilot" | "khami" | "anthropic" | "openai" | "google";
+export type EngineId = "copilot" | "azure" | "khami" | "anthropic" | "openai" | "google";
 
 export interface EngineMessage {
   role: "user" | "assistant";

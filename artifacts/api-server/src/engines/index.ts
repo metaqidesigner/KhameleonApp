@@ -2,6 +2,7 @@ import type { EngineStatus } from "./types.js";
 import { khamiStatus } from "./khami.js";
 import { getApiKey } from "../lib/apiKeys.js";
 import { getToken } from "../lib/oauthTokens.js";
+import { getAzureConfig } from "../lib/azureOpenAI.js";
 
 export * from "./types.js";
 export { askKhami, khamiStatus } from "./khami.js";
@@ -26,6 +27,11 @@ export async function engineStatuses(): Promise<EngineStatus[]> {
     id: "copilot", name: "Microsoft 365 Copilot", available: copilotConnected,
     note: copilotConnected ? undefined : "Not connected - needs a work account with a Copilot licence", onThisComputer: false,
   };
-  // Khami first (Khameleon's own AI); Copilot leads the outside AIs.
-  return [await khamiStatus(), copilot, ...cloud];
+  const azureSet = !!(await getAzureConfig().catch(() => null));
+  const azure: EngineStatus = {
+    id: "azure", name: "Azure OpenAI", available: azureSet,
+    note: azureSet ? undefined : "Not set up - an admin adds your organisation's Azure OpenAI in Settings > AI", onThisComputer: false,
+  };
+  // Khami first (Khameleon's own AI); Copilot leads the outside AIs, then the organisation's Azure.
+  return [await khamiStatus(), copilot, azure, ...cloud];
 }

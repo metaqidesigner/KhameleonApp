@@ -3,6 +3,7 @@ import { KhamiSetup } from '@/components/khami/KhamiSetup';
 import { saveApiKey, clearApiKey, type ApiKeyProvider } from '@/lib/jarvisApi';
 import { useUi, Label, Hint, Msg, Group, type Tone } from './ui';
 import { EscalationSetting } from './EscalationSetting';
+import { AzureOpenAI } from './AzureOpenAI';
 
 /**
  * Settings > AI (docs/gap-review.md Q5, docs/khami-design.md): Khami first -
@@ -10,7 +11,7 @@ import { EscalationSetting } from './EscalationSetting';
  * organisation may provide. Copilot connects by signing in (Integrations);
  * Claude, GPT and Gemini by key (stored encrypted).
  */
-interface EngineStatus { id: 'khami' | 'copilot' | 'anthropic' | 'openai' | 'google'; name: string; available: boolean; note?: string }
+interface EngineStatus { id: 'khami' | 'copilot' | 'azure' | 'anthropic' | 'openai' | 'google'; name: string; available: boolean; note?: string }
 
 const BASE = import.meta.env.VITE_API_URL || '/api';
 const KEYED: { id: ApiKeyProvider; engine: EngineStatus['id']; label: string; placeholder: string }[] = [
@@ -66,6 +67,7 @@ export function AiEngines({ tone, onOpenIntegrations }: { tone: Tone; onOpenInte
           <span style={{ fontSize: 11, color: t.muted }}>{copilot?.available ? 'Connected' : 'Sign in with your work account'}</span>
           {!copilot?.available && onOpenIntegrations && <button type="button" style={btn()} onClick={onOpenIntegrations}>Connect…</button>}
         </div>
+        <AzureOpenAI tone={tone} onChange={() => void load()} />
         {KEYED.map(k => {
           const on = !!status(k.engine)?.available;
           return (
