@@ -1,7 +1,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
-import { rm } from "node:fs/promises";
+import { rm, mkdir } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 
 // Plain `tsc` output can't actually run under Electron: this monorepo's
 // tsconfig.base.json compiles with moduleResolution "bundler", so emitted
@@ -48,6 +49,18 @@ async function buildAll() {
       ],
       sourcemap: "linked",
     });
+  }
+
+  // Capture full recording (native/mac/KhameleonInput.swift): Khameleon's own
+  // helper for watching clicks/typing and replaying them by element name.
+  // Built here on a Mac; elsewhere Capture records windows only.
+  if (process.platform === "darwin") {
+    await mkdir(path.resolve(distDir, "native"), { recursive: true });
+    try {
+      execFileSync("swiftc", ["-O", "-swift-version", "5", path.resolve(here, "native/mac/KhameleonInput.swift"), "-o", path.resolve(distDir, "native/khameleon-input")], { stdio: "inherit" });
+    } catch {
+      console.warn("Couldn't build the input helper (swiftc missing?) - Capture will record windows only.");
+    }
   }
 }
 

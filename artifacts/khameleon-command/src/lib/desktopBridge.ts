@@ -61,9 +61,13 @@ export interface CaptureStatus {
   currentApp?: string;
   currentTitle?: string;
   snapshotsAllowed: boolean;
+  /** Clicks and typing are being recorded too. */
+  fullRecording?: boolean;
+  fullRecordingNote?: string;
 }
 
-export interface CaptureStep { at: number; app: string; title: string; text?: string; note?: string }
+export interface CapturedAction { type: 'click' | 'type' | 'key' | 'secure'; app: string; window: string; role?: string; label?: string; text?: string; key?: string; at?: number }
+export interface CaptureStep { at: number; app: string; title: string; text?: string; note?: string; actions?: CapturedAction[] }
 
 export interface KhameleonCaptureBridge {
   status(): Promise<CaptureStatus>;
@@ -74,6 +78,7 @@ export interface KhameleonCaptureBridge {
   stop(): Promise<CaptureStep[]>;
   discard(): Promise<void>;
   openSnapshotSettings(): Promise<void>;
+  openInputSettings?(): Promise<void>;
   onUpdate(listener: (status: CaptureStatus) => void): () => void;
 }
 

@@ -20,6 +20,7 @@ import {
 import { LocalDocumentAgent, extractDocumentText, dispatchLocalTool } from "@khameleon/integrations";
 import { apiBase, desktopCode, startDesktopLink } from "./desktopLink";
 import { typeSavedLogin } from "./signIn";
+import { replayStep, type CapturedAction } from "./inputHelper";
 import { CaptureSession } from "./capture";
 import { EmailWatcher } from "./emailWatch";
 
@@ -386,6 +387,7 @@ app.whenReady().then(() => {
   ipcMain.handle("khameleon:capture:stop", () => capture.stop());
   ipcMain.handle("khameleon:capture:discard", () => capture.discard());
   ipcMain.handle("khameleon:capture:open-settings", () => capture.openSnapshotSettings());
+  ipcMain.handle("khameleon:capture:open-input-settings", () => capture.openInputSettings());
 
   // ── Email assistant (src/emailWatch.ts; docs/build-review.md, Build 4 answers) ──
   const emailHandle = { id: "email", backend: "external" as const, label: "Email" };
@@ -421,8 +423,30 @@ app.whenReady().then(() => {
   // ── Desktop link (src/desktopLink.ts; Build 7) ──────────────────────────
   ipcMain.handle("khameleon:desktop:code", () => desktopCode());
   const loginGlowHandle = { id: "signin", backend: "external" as const, label: "Signing in" };
+  // Replaying a recorded skill: the Khameleon pointer's caption, and pausing while the user is busy.
+  const replayPointer = new ElectronPointerBackend();
+  const replayActivity = new ElectronUserActivity();
   startDesktopLink(apiBase(appUrl), async (action, input) => {
     if (action === "window_command" || action === "file_command") return dispatchLocalTool(action, input, runners);
+    if (action === "replay_step") {
+      const step = input.step as CapturedAction;
+      const what = step.type === "click" ? `Clicking "${step.label}" in ${step.app}`
+        : step.type === "type" ? `Typing into "${step.label}" in ${step.app}`
+        : step.type === "key" ? `Pressing ${step.key} in ${step.app}` : `Working in ${step.app}`;
+      // Wait while the user is using the mouse or keyboard (same rule as the pointer elsewhere).
+      const started = Date.now();
+      while (replayActivity.isUserBusy()) {
+        await replayPointer.moveTo(undefined, "Paused - you're using the computer");
+        replayPointer.setCaption("Paused - you're using the computer", true);
+        if (Date.now() - started > 120_000) { replayPointer.hide(); return "FAILED - paused too long while you were using the computer, so the replay stopped."; }
+        await new Promise(r => setTimeout(r, 500));
+      }
+      await replayPointer.moveTo(undefined, what);
+      replayActivity.ignoreOwnInputFor(1500 + (step.type === "type" ? step.text.length * 40 : 0));
+      const r = await replayStep(step);
+      return r.ok ? `DONE - ${r.message}` : `FAILED - ${r.message}`;
+    }
+    if (action === "replay_done") { replayPointer.hide(); return "DONE"; }
     if (action === "sign_in") {
       return typeSavedLogin(
         { loginName: String(input.loginName ?? "login"), username: String(input.username ?? ""), secret: String(input.secret ?? ""), app: String(input.app ?? "") },

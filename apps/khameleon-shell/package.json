@@ -37,6 +37,7 @@
     "npmRebuild": false,
     "directories": { "output": "release" },
     "files": ["dist/**/*"],
+    "asarUnpack": ["dist/native/**"],
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "build-resources/icon.png",

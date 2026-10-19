@@ -33,7 +33,7 @@ export function SkillGuide({ tone, onSave, onCancel, initial }: {
   onSave: (input: CreateSkillSetInput) => Promise<void>;
   onCancel: () => void;
   /** A draft to start from - e.g. one written up from a Capture recording. */
-  initial?: { name: string; description: string; steps: string; source?: string; sourceDocumentId?: number; sourceSectionId?: string };
+  initial?: { name: string; description: string; steps: string; source?: string; sourceDocumentId?: number; sourceSectionId?: string; recording?: unknown[] };
 }) {
   const t = TONES[tone];
   const [step, setStep] = useState(0);
@@ -188,7 +188,7 @@ export function SkillGuide({ tone, onSave, onCancel, initial }: {
         {step < STEPS.length - 1
           ? <button type="button" style={btn(true)} disabled={!canNext} onClick={() => setStep(s => s + 1)}>{step === 3 ? 'Next (or skip)' : 'Next'}</button>
           : <button type="button" style={btn(true)} disabled={busy} onClick={() => void run(async () => {
-              await onSave({ name: name.trim(), description: description.trim(), content: content(), sourceType: 'authored', requestedTools: [], requestedIntegrationIds: [], workDomainIds: domainIds, sourceDocumentId: initial?.sourceDocumentId, sourceSectionId: initial?.sourceSectionId });
+              await onSave({ name: name.trim(), description: description.trim(), content: content(), sourceType: 'authored', requestedTools: [], requestedIntegrationIds: [], workDomainIds: domainIds, sourceDocumentId: initial?.sourceDocumentId, sourceSectionId: initial?.sourceSectionId, recording: initial?.recording });
             })}>{busy ? 'Saving…' : 'Save skill'}</button>}
       </div>
     </div>

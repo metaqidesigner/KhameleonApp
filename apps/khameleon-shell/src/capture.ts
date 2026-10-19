@@ -5,6 +5,7 @@ import { windowManager } from "node-window-manager";
 import { frontWindowTitle, needsTitleFallback } from "./windowTitle";
 import { extractDocumentText } from "@khameleon/integrations";
 import type { Bounds } from "khameleon-window-agent";
+import { startRecorder, type CapturedAction } from "./inputHelper";
 
 /**
  * Capture (docs/build-review.md, Build 4): records the task the user does so
@@ -20,6 +21,8 @@ export interface CaptureStep {
   at: number;
   app: string;
   title: string;
+  /** Full recording: the clicks and typing done in this window (by element name, never positions). */
+  actions?: CapturedAction[];
   /** Text read from the window's snapshot, if snapshots are allowed. */
   text?: string;
   note?: string;
@@ -31,6 +34,10 @@ export interface CaptureStatus {
   currentApp?: string;
   currentTitle?: string;
   snapshotsAllowed: boolean;
+  /** Clicks and typing are being recorded too (not just windows). */
+  fullRecording: boolean;
+  /** Why clicks/typing aren't being recorded, if they aren't. */
+  fullRecordingNote?: string;
 }
 
 const POLL_MS = 1000;
@@ -53,6 +60,8 @@ export class CaptureSession {
   private timer: NodeJS.Timeout | null = null;
   private dir = "";
   private last: { app: string; title: string; snappedAt: number } | null = null;
+  private stopRecorder: (() => void) | null = null;
+  private fullNote: string | undefined;
 
   constructor(
     private onUpdate: (status: CaptureStatus) => void,
@@ -76,7 +85,29 @@ export class CaptureSession {
       currentApp: this.last?.app,
       currentTitle: this.last?.title,
       snapshotsAllowed: this.snapshotsAllowed(),
+      fullRecording: !!this.stopRecorder && !this.fullNote,
+      fullRecordingNote: this.fullNote,
     };
+  }
+
+  /** Opens the Mac setting where clicks/typing recording is allowed. */
+  openInputSettings(): void {
+    if (process.platform === "darwin") void shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent");
+  }
+
+  /** A click/typing step from the recorder: attached to the window step it happened in. */
+  private onAction(a: CapturedAction): void {
+    if (this.state !== "recording") return; // paused: nothing recorded
+    let step = this.steps[this.steps.length - 1];
+    if (!step || (a.app && step.app !== a.app)) {
+      if (this.steps.length >= MAX_STEPS) return;
+      step = { at: Date.now(), app: a.app, title: a.window };
+      this.steps.push(step);
+      this.last = { app: a.app, title: a.window, snappedAt: 0 };
+    }
+    (step.actions ??= []).push(a);
+    if (step.actions.length > 200) step.actions.shift();
+    this.emit();
   }
 
   async start(): Promise<CaptureStatus> {
@@ -85,6 +116,9 @@ export class CaptureSession {
     this.dir = path.join(app.getPath("temp"), `khameleon-capture-${Date.now()}`);
     await mkdir(this.dir, { recursive: true });
     this.state = "recording";
+    this.fullNote = undefined;
+    this.stopRecorder = startRecorder(a => this.onAction(a), note => { this.fullNote = note; this.emit(); });
+    if (!this.stopRecorder) this.fullNote = process.platform === "darwin" ? "The click and typing recorder isn't available - only windows are noted." : "Recording clicks and typing works on a Mac only for now.";
     let sampling = false; // reading a window title or snapshot can take most of a second
     this.timer = setInterval(() => {
       if (sampling) return;
@@ -125,6 +159,8 @@ export class CaptureSession {
   async stop(): Promise<CaptureStep[]> {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    this.stopRecorder?.(); this.stopRecorder = null;
+    await new Promise(r => setTimeout(r, 300)); // let the last typing arrive
     this.glow.hide();
     this.state = "processing";
     this.emit();
@@ -148,6 +184,7 @@ export class CaptureSession {
   async discard(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    this.stopRecorder?.(); this.stopRecorder = null;
     this.glow.hide();
     if (this.dir) await rm(this.dir, { recursive: true, force: true }).catch(() => undefined);
     this.dir = "";

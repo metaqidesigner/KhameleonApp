@@ -15,7 +15,7 @@ const TONES: Record<Tone, { text: string; muted: string; glass: string; border: 
   classic: { text: 'var(--j-text)', muted: 'var(--j-text-muted)', glass: 'rgba(0,10,16,0.92)', border: 'rgba(0,212,255,0.25)', accent: 'var(--j-cyan)', rec: 'var(--j-cyan)', warn: 'var(--j-amber)', bad: 'var(--j-red)', input: 'rgba(0,4,8,0.6)', radius: 2 },
 };
 
-export interface CaptureDraft { name: string; description: string; steps: string; source: string }
+export interface CaptureDraft { name: string; description: string; steps: string; source: string; recording?: unknown[] }
 
 const BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -48,12 +48,16 @@ export function useCaptureTask(onDraft: (draft: CaptureDraft) => void) {
     try {
       const res = await fetch(`${BASE}/skill-sets/guide/from-capture`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ steps: steps.map(({ app, title, text, note }) => ({ app, title, text, note })) }),
+        body: JSON.stringify({ steps: steps.map(({ app, title, text, note, actions }) => ({ app, title, text, note, actions })) }),
       });
       const body = await res.json().catch(() => ({} as { error?: string }));
       if (!res.ok) throw new Error(body.error ?? `Request failed (HTTP ${res.status})`);
       const by = body.by === 'KHAMI' ? 'Khami' : body.by;
-      onDraft({ name: body.name ?? '', description: body.description ?? '', steps: body.steps ?? '', source: `Written up by ${by} from your recording (${steps.length} step${steps.length === 1 ? '' : 's'}).` });
+      const recording = steps.flatMap(s => s.actions ?? []);
+      onDraft({
+        name: body.name ?? '', description: body.description ?? '', steps: body.steps ?? '', recording: recording.length ? recording : undefined,
+        source: `Written up by ${by} from your recording (${steps.length} step${steps.length === 1 ? '' : 's'}${recording.length ? `, ${recording.length} clicks and typing - it can be replayed` : ''}).`,
+      });
     } finally {
       setWriting(false);
       await bridge.discard();
@@ -70,6 +74,7 @@ export function useCaptureTask(onDraft: (draft: CaptureDraft) => void) {
     note: (text: string) => act(async () => { await bridge?.note(text); }),
     discard: () => act(async () => { await bridge?.discard(); }),
     openSnapshotSettings: () => void bridge?.openSnapshotSettings(),
+    openInputSettings: () => void bridge?.openInputSettings?.(),
     stop,
   };
 }
@@ -103,8 +108,8 @@ export function CaptureBar({ capture, tone, onDescribeInstead }: { capture: Capt
       <div data-overlay-hit role="dialog" aria-label="Capture a task" style={{ ...shell, width: 420, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontWeight: 600 }}>Capture a task</div>
         <div style={{ color: t.muted, lineHeight: 1.45 }}>
-          Do the task once as you normally would. Khameleon notes each app and window you use, then writes it up as a skill for you to check.
-          Everything stays on this computer, and snapshots are deleted once the skill is saved.
+          Do the task once as you normally would. Khameleon notes each app and window, and the buttons you click and what you type (never passwords),
+          then writes it up as a skill you can check - and replay. Everything stays on this computer; snapshots are deleted once the skill is saved.
         </div>
         {s && !s.snapshotsAllowed && (
           <div style={{ color: t.warn, lineHeight: 1.45 }}>
@@ -164,9 +169,16 @@ export function CaptureBar({ capture, tone, onDescribeInstead }: { capture: Capt
           <button type="button" style={btn(true)} onClick={() => void capture.stop()}>Stop and write it up</button>
         </div>
       )}
+      {s.fullRecording && <div style={{ fontSize: 11, color: t.muted }}>Recording clicks and typing too - passwords are never recorded.</div>}
+      {!s.fullRecording && s.fullRecordingNote && (
+        <div style={{ fontSize: 11, color: t.muted }}>
+          {s.fullRecordingNote}{' '}
+          <button type="button" onClick={capture.openInputSettings} style={{ background: 'none', border: 'none', padding: 0, color: t.accent, cursor: 'pointer', font: 'inherit', textDecoration: 'underline' }}>Allow clicks and typing</button>
+        </div>
+      )}
       {!s.snapshotsAllowed && (
         <div style={{ fontSize: 11, color: t.muted }}>
-          Only window names are being noted.{' '}
+          Snapshots are off, so screen text isn't read.{' '}
           <button type="button" onClick={capture.openSnapshotSettings} style={{ background: 'none', border: 'none', padding: 0, color: t.accent, cursor: 'pointer', font: 'inherit', textDecoration: 'underline' }}>Allow snapshots</button>
         </div>
       )}

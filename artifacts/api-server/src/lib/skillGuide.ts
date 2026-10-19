@@ -52,7 +52,18 @@ export function extractSteps(reply: string): string {
 
 // ── From a Capture recording (docs/build-review.md, Build 4) ───────────────
 
-export interface CapturedStep { app: string; title: string; text?: string; note?: string }
+export interface CapturedAction { type: string; app?: string; role?: string; label?: string; text?: string; key?: string }
+export interface CapturedStep { app: string; title: string; text?: string; note?: string; actions?: CapturedAction[] }
+
+/** One recorded click/typing step in plain words. Pure. */
+export function describeAction(a: CapturedAction): string {
+  const what = a.label ? `"${a.label}"` : "an unnamed item";
+  if (a.type === "click") return `clicked ${what}${a.role ? ` (${a.role.replace(/^AX/, "").toLowerCase()})` : ""}`;
+  if (a.type === "type") return `typed "${(a.text ?? "").slice(0, 120)}" into ${what}`;
+  if (a.type === "key") return `pressed ${a.key}`;
+  if (a.type === "secure") return "entered a password (not recorded - a saved login is used instead)";
+  return a.type;
+}
 
 /** The recording, in words an AI can turn into a skill. Pure. */
 export function capturePrompt(skillWriterSteps: string, steps: CapturedStep[]): string {
@@ -61,6 +72,7 @@ export function capturePrompt(skillWriterSteps: string, steps: CapturedStep[]): 
     return [
       `${i + 1}. In ${where}`,
       s.note ? `   The user noted: ${s.note}` : "",
+      s.actions?.length ? `   What they did: ${s.actions.slice(0, 25).map(describeAction).join("; ")}` : "",
       s.text ? `   Visible on screen: ${s.text.slice(0, 600)}` : "",
     ].filter(Boolean).join("\n");
   }).join("\n");

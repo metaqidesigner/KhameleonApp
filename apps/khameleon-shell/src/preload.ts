@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld("khameleon", {
     stop: () => ipcRenderer.invoke("khameleon:capture:stop"),
     discard: () => ipcRenderer.invoke("khameleon:capture:discard"),
     openSnapshotSettings: () => ipcRenderer.invoke("khameleon:capture:open-settings"),
+    openInputSettings: () => ipcRenderer.invoke("khameleon:capture:open-input-settings"),
     onUpdate: (listener: (status: unknown) => void) => {
       const handler = (_e: unknown, status: unknown) => listener(status);
       ipcRenderer.on("khameleon:capture:update", handler);

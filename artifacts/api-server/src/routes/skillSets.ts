@@ -4,6 +4,7 @@ import { draftStepsPrompt, extractSteps, testSkillMatch, capturePrompt, parseCap
 import { loadInstalledSkills } from "../lib/installedSkills.js";
 import { askAI } from "../lib/askAI.js";
 import { queueCheck } from "../lib/procedureService.js";
+import { replaySkill } from "../lib/replay.js";
 import { db } from "@workspace/db";
 import {
   skillSetsTable, approvalsTable, actionReceiptsTable, entityWorkDomainsTable,
@@ -71,6 +72,8 @@ export interface CreateSkillSetBody {
   /** Build 5: made from a company document section. */
   sourceDocumentId?: number;
   sourceSectionId?: string;
+  /** Capture full recording: the clicks and typing to replay. */
+  recording?: unknown[];
 }
 
 /**
@@ -85,6 +88,19 @@ export interface CreateSkillSetBody {
  * POST / and Get skills (routes/skillSources.ts) so every route into the
  * catalogue goes through the same check.
  */
+/** Keeps only the recorded step fields replay needs; a password step keeps no characters. */
+function cleanRecording(raw: unknown[]): unknown[] {
+  return raw.slice(0, 500).flatMap((r): Record<string, string>[] => {
+    const a = r as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === "string" ? v.slice(0, 2000) : "");
+    if (a.type === "click") return [{ type: "click", app: str(a.app), window: str(a.window), role: str(a.role), label: str(a.label) }];
+    if (a.type === "type") return [{ type: "type", app: str(a.app), window: str(a.window), role: str(a.role), label: str(a.label), text: str(a.text) }];
+    if (a.type === "key") return [{ type: "key", app: str(a.app), window: str(a.window), key: str(a.key) }];
+    if (a.type === "secure") return [{ type: "secure", app: str(a.app), window: str(a.window), label: str(a.label) }];
+    return [];
+  });
+}
+
 export async function createSkillSetRecord(body: CreateSkillSetBody): Promise<{ skillSet: typeof skillSetsTable.$inferSelect; approvalId: number | null }> {
   const sourceType = body.sourceType ?? "authored";
   const requestedTools = parseJsonArray(body.requestedTools);
@@ -105,6 +121,7 @@ export async function createSkillSetRecord(body: CreateSkillSetBody): Promise<{ 
       requestedIntegrationIds,
       sourceDocumentId: body.sourceDocumentId ?? null,
       sourceSectionId: body.sourceSectionId ?? null,
+      recording: Array.isArray(body.recording) && body.recording.length ? cleanRecording(body.recording) : null,
       status: gated ? "pending" : "installed",
       installedAt: gated ? null : new Date(),
     })
@@ -415,6 +432,17 @@ router.post("/:id/update", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Error updating skill set");
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/** Capture full recording: replay the skill's recorded clicks and typing (stops at the first step it can't find). */
+router.post("/:id/replay", async (req, res) => {
+  try {
+    res.json(await replaySkill(Number(req.params.id)));
+  } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (!status) req.log.error({ err }, "Replay failed");
+    res.status(status ?? 500).json({ error: status ? (err as Error).message : "The replay couldn't run." });
   }
 });
 

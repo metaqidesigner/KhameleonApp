@@ -40,5 +40,7 @@ export async function ensureWorkTables(): Promise<void> {
   await db.execute(sql`ALTER TABLE vault_items ADD COLUMN IF NOT EXISTS username TEXT NOT NULL DEFAULT ''`);
   await db.execute(sql`ALTER TABLE vault_items ADD COLUMN IF NOT EXISTS always_ask BOOLEAN NOT NULL DEFAULT FALSE`);
   await db.execute(sql`ALTER TABLE skill_sets ADD COLUMN IF NOT EXISTS login_vault_item_id INTEGER`);
+  // Capture full recording: steps to replay.
+  await db.execute(sql`ALTER TABLE skill_sets ADD COLUMN IF NOT EXISTS recording JSONB`);
   logger.info("ensureWorkTables: meeting briefs and suggestions ready");
 }

@@ -11,6 +11,7 @@ import { CheckBadge, CheckDetails, useProcedureChecks } from '@/components/proce
 import { FromDocument, type DocumentDraft } from '@/components/procedures/FromDocument';
 import { ProcedureDocuments } from '@/components/procedures/ProcedureDocuments';
 import { SkillLoginPicker } from '@/components/skills/SkillLoginPicker';
+import { ReplaySkill } from '@/components/skills/ReplaySkill';
 import { useJarvisStore } from '@/store/jarvisStore';
 
 const STATUS_LABEL: Record<SkillSet['status'], string> = {
@@ -223,6 +224,7 @@ export default function Skills() {
                 )}
                 <div style={{ fontSize: 10, color: 'var(--j-text-muted)', marginTop: 4 }}>{s.description}</div>
                 {s.status === 'installed' && <div style={{ marginTop: 6 }}><SkillLoginPicker tone="classic" skillId={s.id} value={s.loginVaultItemId} /></div>}
+                {s.status === 'installed' && Array.isArray(s.recording) && s.recording.length > 0 && <div style={{ marginTop: 6 }}><ReplaySkill tone="classic" skillId={s.id} steps={s.recording.length} /></div>}
                 {(s.requestedTools.length > 0 || s.requestedIntegrationIds.length > 0) && (
                   <div style={{ fontSize: 9, color: 'var(--j-amber)', marginTop: 4, fontFamily: 'var(--j-font-mono)' }}>
                     Requests: {[...s.requestedTools, ...s.requestedIntegrationIds].join(', ')}

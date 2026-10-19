@@ -21,6 +21,8 @@ export interface SkillSet {
   workDomainIds: number[];
   /** Build 7: the saved login this skill signs in with (Vault item id). */
   loginVaultItemId?: number | null;
+  /** Capture full recording: steps a Replay runs (by element name). */
+  recording?: unknown[] | null;
   /** Only set when status === 'pending' - the approval id to resolve on confirm. */
   pendingApprovalId: number | null;
 }
@@ -39,6 +41,8 @@ export interface CreateSkillSetInput {
   /** Build 5: made from a company document section. */
   sourceDocumentId?: number;
   sourceSectionId?: string;
+  /** Capture full recording: the clicks and typing to replay. */
+  recording?: unknown[];
 }
 
 export interface CreateSkillSetResult {

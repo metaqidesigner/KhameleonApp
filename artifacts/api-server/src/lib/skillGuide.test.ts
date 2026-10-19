@@ -41,3 +41,12 @@ test("reads the drafted name, description and steps, even with extra chatter", (
     steps: "1. Open the statement.\n2. Copy the totals (check this).",
   });
 });
+
+test("recorded clicks and typing are described in plain words, passwords never", async () => {
+  const { describeAction, capturePrompt } = await import("./skillGuide.js");
+  assert.equal(describeAction({ type: "click", label: "Save", role: "AXButton" }), 'clicked "Save" (button)');
+  assert.equal(describeAction({ type: "type", label: "Amount", text: "4200" }), 'typed "4200" into "Amount"');
+  assert.match(describeAction({ type: "secure", label: "Password" }), /not recorded/);
+  const p = capturePrompt("", [{ app: "Excel", title: "Ledger", actions: [{ type: "click", label: "Save", role: "AXButton" }] }]);
+  assert.match(p, /What they did: clicked "Save" \(button\)/);
+});

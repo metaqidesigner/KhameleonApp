@@ -32,6 +32,8 @@ export const skillSetsTable = pgTable("skill_sets", {
   sourceSectionId:          text("source_section_id"),
   /** Build 7: the saved login (Vault item) this skill signs in with - a reference, never the secret. */
   loginVaultItemId:         integer("login_vault_item_id"),
+  /** Capture full recording: the clicks and typing to replay (by element name; passwords never stored). */
+  recording:                jsonb("recording"),
   createdAt:                timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
