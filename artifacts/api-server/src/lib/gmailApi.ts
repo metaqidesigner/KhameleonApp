@@ -234,3 +234,57 @@ export function stripHtml(html: string): string {
 export function threadToPlainText(messages: Pick<GmailMessage, "from" | "body">[]): string {
   return messages.map((m) => `From: ${m.from}\n\n${m.body}`).join("\n\n---\n\n");
 }
+
+// ── Inbox sorting and urgent alerts (Build 11) ─────────────────────────────────
+
+export interface GmailListed { id: string; threadId: string; subject: string; from: string; preview: string; internalDate: string; labelIds: string[] }
+
+/** Unread inbox messages, newest first, with their labels (IMPORTANT, CATEGORY_*). */
+export async function listUnreadInbox(max = 50): Promise<GmailListed[]> {
+  const listRes = await gmailFetch(`/messages?q=${encodeURIComponent("is:unread in:inbox")}&maxResults=${max}`);
+  await assertOk(listRes, "list unread messages");
+  const ids = ((await listRes.json()) as { messages?: { id: string }[] }).messages?.map((m) => m.id) ?? [];
+  const details = await Promise.all(ids.map(async (id) => {
+    const res = await gmailFetch(`/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`);
+    await assertOk(res, "get message metadata");
+    return res.json() as Promise<{ id: string; threadId: string; snippet: string; internalDate: string; labelIds?: string[]; payload: GmailPayload }>;
+  }));
+  return details.map((m) => ({
+    id: m.id, threadId: m.threadId, subject: headerValue(m.payload.headers, "Subject") || "(no subject)",
+    from: headerValue(m.payload.headers, "From"), preview: m.snippet ?? "", internalDate: m.internalDate, labelIds: m.labelIds ?? [],
+  }));
+}
+
+/** Addresses the user has written to recently (Sent), for "people you correspond with". */
+export async function recentRecipients(max = 100): Promise<string[]> {
+  const listRes = await gmailFetch(`/messages?labelIds=SENT&maxResults=${max}`);
+  await assertOk(listRes, "list sent messages");
+  const ids = ((await listRes.json()) as { messages?: { id: string }[] }).messages?.map((m) => m.id) ?? [];
+  const out = new Set<string>();
+  for (const id of ids.slice(0, max)) {
+    const res = await gmailFetch(`/messages/${id}?format=metadata&metadataHeaders=To&metadataHeaders=Cc`);
+    if (!res.ok) continue;
+    const m = (await res.json()) as { payload: GmailPayload };
+    for (const h of ["To", "Cc"]) for (const part of headerValue(m.payload.headers, h).split(",")) {
+      const addr = extractEmailAddress(part).toLowerCase();
+      if (addr.includes("@")) out.add(addr);
+    }
+  }
+  return [...out];
+}
+
+/** The id of a label, creating it if needed (e.g. "Khameleon/Urgent"). */
+export async function ensureLabel(name: string): Promise<string> {
+  const res = await gmailFetch(`/labels`);
+  await assertOk(res, "list labels");
+  const found = ((await res.json()) as { labels?: { id: string; name: string }[] }).labels?.find((l) => l.name === name);
+  if (found) return found.id;
+  const created = await gmailFetch(`/labels`, { method: "POST", body: JSON.stringify({ name, labelListVisibility: "labelShow", messageListVisibility: "show" }) });
+  await assertOk(created, "create label");
+  return ((await created.json()) as { id: string }).id;
+}
+
+export async function modifyLabels(messageId: string, add: string[], remove: string[]): Promise<void> {
+  const res = await gmailFetch(`/messages/${encodeURIComponent(messageId)}/modify`, { method: "POST", body: JSON.stringify({ addLabelIds: add, removeLabelIds: remove }) });
+  await assertOk(res, "change labels");
+}

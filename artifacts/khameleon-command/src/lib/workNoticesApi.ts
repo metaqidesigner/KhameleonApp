@@ -14,3 +14,8 @@ export const dismissSuggestion = (id: number) => call('POST', `/suggestions/${id
 export const openedSuggestion = (id: number) => call('POST', `/suggestions/${id}/opened`);
 export const getPrepSettings = () => call<PrepSettings>('GET', '/meeting-prep/settings');
 export const setPrepSettings = (p: Partial<PrepSettings>) => call<PrepSettings>('PUT', '/meeting-prep/settings', p);
+
+export type AlertMode = 'regular' | 'on_request' | 'off';
+export interface UrgentAlertSettings { mode: AlertMode; maxPerDay: number; quietStart: number; quietEnd: number }
+export const getUrgentAlertSettings = () => call<UrgentAlertSettings>('GET', '/urgent-alerts/settings');
+export const setUrgentAlertSettings = (p: Partial<UrgentAlertSettings>) => call<UrgentAlertSettings>('PUT', '/urgent-alerts/settings', p);

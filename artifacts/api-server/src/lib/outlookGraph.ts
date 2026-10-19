@@ -28,10 +28,11 @@ export interface GraphMessage {
   flag?: { flagStatus: string };
   parentFolderId?: string;
   isRead?: boolean;
+  importance?: string;
 }
 
 const MESSAGE_FIELDS = "id,conversationId,subject,from,toRecipients,bodyPreview,body,receivedDateTime";
-const TRIAGE_MESSAGE_FIELDS = "id,conversationId,subject,from,toRecipients,bodyPreview,receivedDateTime,categories,flag,parentFolderId,isRead";
+const TRIAGE_MESSAGE_FIELDS = "id,conversationId,subject,from,toRecipients,bodyPreview,receivedDateTime,categories,flag,parentFolderId,isRead,importance";
 
 async function graphFetch(path: string, init: RequestInit = {}): Promise<globalThis.Response> {
   const token = await getFreshToken("microsoft");
@@ -216,4 +217,16 @@ export function threadToPlainText(messages: Pick<GraphMessage, "from" | "body" |
       return `From: ${from}\nDate: ${m.receivedDateTime}\n\n${body}`;
     })
     .join("\n\n---\n\n");
+}
+
+/** Addresses the user has written to recently (Sent Items), for "people you correspond with" (Build 11). */
+export async function recentRecipients(top = 100): Promise<string[]> {
+  const res = await graphFetch(`/me/mailFolders/sentitems/messages?$top=${top}&$select=toRecipients,ccRecipients`);
+  await assertOk(res, "list sent messages");
+  const json = (await res.json()) as { value: { toRecipients?: GraphEmailAddress[]; ccRecipients?: GraphEmailAddress[] }[] };
+  const out = new Set<string>();
+  for (const m of json.value) for (const r of [...(m.toRecipients ?? []), ...(m.ccRecipients ?? [])]) {
+    if (r.emailAddress?.address) out.add(r.emailAddress.address.toLowerCase());
+  }
+  return [...out];
 }

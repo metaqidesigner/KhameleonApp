@@ -74,3 +74,16 @@ export async function listGmailMessages(): Promise<GmailMessagePreview[]> {
   const response = await fetch(`${BASE}/skills/gmail-messages`);
   return asJson<GmailMessagePreview[]>(response, 'List messages');
 }
+
+/** Build 11: sorting the Gmail inbox - same shape as Outlook's sort, with Gmail's own undo details. */
+export interface GmailTriageResult {
+  items: { id: string; subject: string; from: string; classification: 'urgent' | 'action_needed' | 'fyi' | 'low_priority'; actionTaken: string; undo: unknown }[];
+  actionItems: { text: string; taskId: number | null; sourceMessageId: string }[];
+  counts: Record<'urgent' | 'action_needed' | 'fyi' | 'low_priority', number>;
+}
+export async function runGmailTriageInbox(): Promise<GmailTriageResult> {
+  return asJson<GmailTriageResult>(await fetch(`${BASE}/skills/gmail-triage-inbox`, { method: 'POST' }), 'Sort request');
+}
+export async function undoGmailTriage(entries: unknown[], taskIds: number[] = []): Promise<{ restored: number; failed: number }> {
+  return asJson(await fetch(`${BASE}/skills/gmail-triage-inbox/undo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ entries, taskIds }) }), 'Undo request');
+}

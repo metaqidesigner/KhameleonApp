@@ -10,7 +10,7 @@ import {
 import { createTask, listTasks, updateTask } from "./taskOps.js";
 import { fetchUrl } from "./webFetch.js";
 import { checkToolRateLimit } from "./rateLimiter.js";
-import { getCalendar, prepareMeetingBrief } from "./workTools.js";
+import { getCalendar, prepareMeetingBrief, checkInbox } from "./workTools.js";
 
 export type ToolInput = Record<string, unknown>;
 
@@ -117,6 +117,9 @@ export async function dispatchTool(name: string, input: ToolInput): Promise<stri
 
     case "get_calendar":
       return getCalendar(optionalString(input, "when"));
+
+    case "check_inbox":
+      return checkInbox(optionalString(input, "focus"));
 
     case "prepare_meeting_brief":
       return prepareMeetingBrief(optionalString(input, "meeting") ?? "");

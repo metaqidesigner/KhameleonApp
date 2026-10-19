@@ -158,6 +158,16 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.Tool[] = [
     },
   },
   {
+    name: "check_inbox",
+    description:
+      "Look at the user's unread email (read-only) and report what's urgent, what needs action, and what's just FYI - with why. Use for 'anything urgent?', 'what's in my inbox?', 'do I need to reply to anything?'. Never moves, flags or marks anything.",
+    input_schema: {
+      type: "object",
+      properties: { focus: { type: "string", description: "Optional: 'urgent' to list only urgent mail." } },
+      required: [],
+    },
+  },
+  {
     name: "prepare_meeting_brief",
     description:
       "Prepare a short brief for one of the user's meetings: who's in it, recent emails from them, related open tasks, when they last met, and points to raise. Use for 'prep me for the 3pm', 'brief me on my meeting with Jane'.",

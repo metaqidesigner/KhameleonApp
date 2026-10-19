@@ -10,6 +10,9 @@ globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 
+// Don't use dynamic import() for the server's own modules (only for external
+// packages): esbuild then delays those modules' set-up, which once broke the
+// start-up order ("stringType is not a function" from zod) - 2026-10-19.
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });

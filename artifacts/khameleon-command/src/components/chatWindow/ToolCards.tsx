@@ -18,7 +18,7 @@ import {
   type OutlookMessagePreview, type OutlookThreadSummary, type TriageResult,
 } from '@/lib/outlookSkillsApi';
 import {
-  listGmailMessages, runGmailDraftEmail, sendGmailDraft, rewriteGmailDraft, rejectGmailDraft,
+  listGmailMessages, runGmailTriageInbox, undoGmailTriage, type GmailTriageResult, runGmailDraftEmail, sendGmailDraft, rewriteGmailDraft, rejectGmailDraft,
 } from '@/lib/gmailSkillsApi';
 
 /**
@@ -431,8 +431,10 @@ function SummarizeThreadCard() {
 const CLASS_LABEL: Record<string, string> = { urgent: 'Urgent', action_needed: 'Needs action', fyi: 'FYI', low_priority: 'Low priority' };
 
 function SortInboxCard() {
+  const [provider, setProvider] = useState<Provider>('outlook');
   const [stage, setStage] = useState<'ready' | 'sorting' | 'done' | 'undoing' | 'undone'>('ready');
-  const [result, setResult] = useState<TriageResult | null>(null);
+  const [result, setResult] = useState<TriageResult | GmailTriageResult | null>(null);
+  const label = provider === 'outlook' ? 'Outlook' : 'Gmail';
   const [error, setError] = useState<string | null>(null);
   const [undoNote, setUndoNote] = useState<string | null>(null);
 
@@ -440,14 +442,14 @@ function SortInboxCard() {
     setStage('sorting');
     setError(null);
     try {
-      const r = await runOutlookTriageInbox();
+      const r = provider === 'outlook' ? await runOutlookTriageInbox() : await runGmailTriageInbox();
       // Undo for a sort lives on its card (it needs the per-message details);
-      // the log records that it happened.
-      logActivity({ description: `Sorted ${r.items.length} Outlook email${r.items.length === 1 ? '' : 's'}`, category: 'inbox_sorted', scope: 'mail.readwrite', outcome: 'success', target: 'Outlook', canUndo: false });
+      // the log records that it happened (Gmail's sort logs itself on the server).
+      if (provider === 'outlook') logActivity({ description: `Sorted ${r.items.length} Outlook email${r.items.length === 1 ? '' : 's'}`, category: 'inbox_sorted', scope: 'mail.readwrite', outcome: 'success', target: 'Outlook', canUndo: false });
       setResult(r);
       setStage('done');
     } catch (e) {
-      logActivity({ description: "Inbox sort didn't finish", category: 'inbox_sorted', scope: 'mail.readwrite', outcome: 'failure', target: 'Outlook', detail: errText(e), canUndo: false });
+      logActivity({ description: "Inbox sort didn't finish", category: 'inbox_sorted', scope: 'mail.readwrite', outcome: 'failure', target: label, detail: errText(e), canUndo: false });
       setError(errText(e));
       setStage('ready');
     }
@@ -458,7 +460,9 @@ function SortInboxCard() {
     setStage('undoing');
     try {
       const taskIds = result.actionItems.map(a => a.taskId).filter((id): id is number => id !== null);
-      const r = await undoOutlookTriage(result.items.map(i => i.undo), taskIds);
+      const r = provider === 'outlook'
+        ? await undoOutlookTriage((result as TriageResult).items.map(i => i.undo), taskIds)
+        : await undoGmailTriage((result as GmailTriageResult).items.map(i => i.undo), taskIds);
       setUndoNote(`Restored ${r.restored} email${r.restored === 1 ? '' : 's'}${r.failed ? `, ${r.failed} couldn't be restored` : ''}.`);
       setStage('undone');
     } catch (e) {
@@ -471,7 +475,10 @@ function SortInboxCard() {
     <>
       {stage === 'ready' && (
         <>
-          <div style={mutedStyle}>Sorts unread Outlook mail into Urgent / Needs action / FYI / Low priority - flags, categorises and archives. Everything can be undone.</div>
+          <ProviderSwitch value={provider} onChange={setProvider} />
+          <div style={mutedStyle}>{provider === 'outlook'
+            ? 'Sorts unread Outlook mail into Urgent / Needs action / FYI / Low priority - flags, categorises and archives. Everything can be undone.'
+            : 'Sorts unread Gmail into Urgent / Needs action / FYI / Low priority - adds Khameleon labels, stars urgent mail, archives FYI and low priority. Everything can be undone.'}</div>
           <div><Btn primary onClick={() => void sort()}>Sort my inbox</Btn></div>
         </>
       )}

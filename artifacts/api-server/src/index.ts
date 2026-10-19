@@ -5,6 +5,7 @@ import { migrateLegacyTaskValues } from "./migrate-legacy-values";
 import { ensureProcedureTables } from "./ensure-procedure-tables";
 import { ensureWorkTables } from "./ensure-work-tables";
 import { startMeetingPrep } from "./lib/meetingPrepService";
+import { startUrgentAlerts } from "./lib/urgentAlerts";
 import { ensureSettingsTable } from "./ensure-settings-table";
 import { seedSkillSetsData } from "./seed-skill-sets-data";
 
@@ -34,6 +35,7 @@ async function bootstrap() {
   await ensureProcedureTables();
   await ensureWorkTables();
   startMeetingPrep();
+  startUrgentAlerts();
 
   // 3. Load persisted scheduler config from DB and arm the timer.
   //    Must happen before we accept traffic so GET /api/scheduler/status
