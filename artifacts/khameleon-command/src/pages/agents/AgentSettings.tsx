@@ -94,7 +94,7 @@ export default function AgentSettings() {
               {ROLES.map(r => <option key={r} value={r}>{r.toUpperCase()}</option>)}
             </select>
           ))}
-          {field('API KEY', <input style={inputStyle} type="password" value={editing.apiKey ?? ''} onChange={e => setEditing(p => ({ ...p, apiKey: e.target.value }))} placeholder="sk-... (leave blank for Replit integration)" />)}
+          {field('API KEY', <input style={inputStyle} type="password" value={editing.apiKey ?? ''} onChange={e => setEditing(p => ({ ...p, apiKey: e.target.value }))} placeholder="sk-... (leave blank to use the key in Settings)" />)}
           {field('BASE URL', <input style={inputStyle} value={editing.baseUrl ?? ''} onChange={e => setEditing(p => ({ ...p, baseUrl: e.target.value }))} placeholder="https://api.custom.com/v1" />)}
           {field('INITIALS', <input style={inputStyle} value={editing.initials ?? ''} maxLength={2} onChange={e => setEditing(p => ({ ...p, initials: e.target.value.toUpperCase() }))} placeholder="CL" />)}
           {field('COLOR', (

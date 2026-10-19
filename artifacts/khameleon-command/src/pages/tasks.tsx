@@ -1387,7 +1387,7 @@ export function AutoTriggers() {
               )}
 
               <div className="j-mono" style={{ fontSize: 8, color: 'rgba(201,168,76,0.65)', marginTop: 4, lineHeight: 1.5 }}>
-                ⚙ Configure via DIGEST_HOUR / DIGEST_MINUTE Replit Secrets
+                ⚙ Change the time in Settings → GENERAL → Morning digest
               </div>
             </div>
           </div>

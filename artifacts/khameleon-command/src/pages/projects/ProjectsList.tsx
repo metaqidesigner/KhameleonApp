@@ -99,15 +99,15 @@ export default function ProjectsList() {
       <div className="j-page-header">
         <div>
           <h1 className="j-brand">Projects</h1>
-          <p>Task boards and project tracking powered by Jarvis</p>
+          <p>Task boards and project tracking in Khameleon</p>
         </div>
         <NewProjectDialog />
       </div>
       <div className="j-page-content" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div className="j-card">
-          <div className="j-card-header">What Jarvis does here</div>
+          <div className="j-card-header">What Khameleon does here</div>
           <p style={{ fontSize: 13, color: '#8b949e', margin: 0, lineHeight: 1.6 }}>
-            Jarvis connects to your project management tools to surface blockers,
+            Khameleon connects to your project management tools to surface blockers,
             summarise progress, generate status updates, and proactively flag deadlines.
             Connect a source to populate your boards.
           </p>

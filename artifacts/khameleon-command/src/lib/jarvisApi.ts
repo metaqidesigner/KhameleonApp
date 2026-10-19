@@ -9,7 +9,7 @@ async function safeFetch<T>(url: string, opts?: RequestInit, fallback?: T): Prom
     return (await res.json()) as T;
   } catch {
     if (fallback !== undefined) return fallback;
-    throw new Error('Jarvis backend unreachable');
+    throw new Error('The Khameleon server can\'t be reached');
   }
 }
 
@@ -171,7 +171,7 @@ export async function askJarvis(prompt: string, agent?: string): Promise<AskResp
       body: JSON.stringify({ prompt, agent }),
     },
     {
-      content: `JARVIS OFFLINE — Configure engine in Settings.\n\nYour query: "${prompt}"`,
+      content: `Khameleon can't reach its server right now - check it's running, then try again.\n\nYour question: "${prompt}"`,
       tool_results: [],
       model: 'offline',
     },
@@ -228,7 +228,7 @@ export async function runResearch(query: string, opts?: { max_iterations?: numbe
     `${BASE}/research`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, ...opts }) },
     {
-      content: `## RESEARCH INITIATED: ${query}\n\nJARVIS is offline. Connect a backend with API keys to run deep research.\n\n### Status\n- Engine: OFFLINE\n- Reason: No backend connected\n- Action: Configure engine in Settings`,
+      content: `Khameleon can't reach its server, so this research couldn't run. Check the server is running, then try again.\n\nYour question: ${query}`,
       tool_results: [],
       model: 'offline',
     },
@@ -585,7 +585,7 @@ export function streamChat(
   const fallback = () => {
     if (closed) return;
     closed = true;
-    const txt = `JARVIS OFFLINE — RUN \`jarvis serve\` OR SET API KEYS\n\nYour query: "${prompt}"\n\nConfigure your engine in the Settings panel.`;
+    const txt = `Khameleon can't reach its server right now - check it's running, then try again.\n\nYour question: "${prompt}"`;
     let i = 0;
     const id = setInterval(() => {
       if (i < txt.length) { onToken(txt[i++]); }

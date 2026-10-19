@@ -463,7 +463,7 @@ function SystemStatusBody() {
 
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <tbody>
-          <KVRow icon={<SettingsIcon size={10} />} label="Engine" value={health.engine || 'replit-ai'} />
+          <KVRow icon={<SettingsIcon size={10} />} label="Engine" value={health.engine || 'Khami'} />
           <KVRow icon={<Cpu size={10} />}          label="Model"  value={health.model  || 'claude-3-5-sonnet / gpt-4o'} />
           <KVRow icon={<Clock size={10} />}        label="Uptime" value={fmtUptime(health.uptime ?? 0)} />
         </tbody>

@@ -153,7 +153,7 @@ function ConnectorsSection() {
 
       <p style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', marginBottom: 20, lineHeight: 1.6 }}>
         Connect external accounts to pull real email and calendar data into Khameleon.
-        Credentials must be added as Replit Secrets before connecting. Access and refresh
+        Each service's app details must be set up before connecting (Microsoft: Settings → MICROSOFT SIGN-IN; others: the server's settings). Access and refresh
         tokens are encrypted at rest once connected (see API KEYS for the encryption key setup).
       </p>
 
@@ -244,9 +244,9 @@ function ConnectorsSection() {
           ⚠ Credential Setup Required
         </div>
         <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', lineHeight: 1.7 }}>
-          <strong style={{ color: 'var(--j-text)' }}>Google:</strong> Create an OAuth Client ID at <span style={{ color: 'var(--j-cyan)' }}>console.cloud.google.com</span> → APIs &amp; Services → Credentials, then add GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET as Replit Secrets.<br />
-          <strong style={{ color: 'var(--j-text)' }}>Microsoft:</strong> Register an app at <span style={{ color: 'var(--j-cyan)' }}>portal.azure.com</span> → Azure Active Directory → App registrations, then add MICROSOFT_CLIENT_ID + MICROSOFT_CLIENT_SECRET as Replit Secrets.<br />
-          <strong style={{ color: 'var(--j-text)' }}>Spotify:</strong> Create an app at <span style={{ color: 'var(--j-cyan)' }}>developer.spotify.com/dashboard</span>, then add SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET as Replit Secrets. Weather needs no credentials — just a location, below.
+          <strong style={{ color: 'var(--j-text)' }}>Google:</strong> Create an OAuth Client ID at <span style={{ color: 'var(--j-cyan)' }}>console.cloud.google.com</span> → APIs &amp; Services → Credentials, then add GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET to the server's settings.<br />
+          <strong style={{ color: 'var(--j-text)' }}>Microsoft:</strong> Register an app at <span style={{ color: 'var(--j-cyan)' }}>portal.azure.com</span> → Microsoft Entra ID → App registrations, then enter its details in Settings → MICROSOFT SIGN-IN.<br />
+          <strong style={{ color: 'var(--j-text)' }}>Spotify:</strong> Create an app at <span style={{ color: 'var(--j-cyan)' }}>developer.spotify.com/dashboard</span>, then add SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET to the server's settings. Weather needs no credentials — just a location, below.
         </div>
       </div>
 
@@ -497,7 +497,7 @@ function ApiKeysSection() {
           background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.3)',
           fontFamily: 'var(--j-font-ui)', fontSize: 11, color: '#f87171', lineHeight: 1.7,
         }}>
-          <strong>Encryption key not configured.</strong> Set <span style={{ fontFamily: 'var(--j-font-mono)' }}>KHAMELEON_ENCRYPTION_KEY</span> (16+ characters) as a Replit Secret and restart the server —
+          <strong>Encryption key not configured.</strong> Set <span style={{ fontFamily: 'var(--j-font-mono)' }}>KHAMELEON_ENCRYPTION_KEY</span> (16+ characters) in the server's settings and restart it —
           saving a key below will fail until then. This is deliberate: Khameleon refuses to store credentials as plaintext rather than doing so silently.
         </div>
       )}

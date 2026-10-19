@@ -25,7 +25,7 @@ export interface AgentConfig {
   systemPrompt: string;
   color: string;
   initials: string;
-  /** If true, the agent receives the full Replit tool set (Anthropic only). */
+  /** If true, the agent receives Khameleon's full tool set (Anthropic only). */
   useTools?: boolean;
 }
 

@@ -39,7 +39,7 @@ function getMasterKey(): Buffer {
   if (secret.trim().length < 16) {
     throw new Error(
       "KHAMELEON_ENCRYPTION_KEY is not set (or is shorter than 16 characters). " +
-        "Set it as a Replit Secret before saving credentials — without it, API keys and " +
+        "Add it to the server's settings (see SELF_HOSTING.md) before saving credentials - without it, API keys and " +
         "OAuth tokens cannot be encrypted at rest, so saving is refused rather than silently " +
         "storing them as plaintext.",
     );
