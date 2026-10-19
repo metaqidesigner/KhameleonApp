@@ -16,7 +16,7 @@ export type WorkspaceTab = "tasks" | "domains" | "status";
 
 const TABS: { id: WorkspaceTab; label: string; render: () => ReactNode }[] = [
   { id: "tasks", label: "Tasks", render: () => <TasksTab /> },
-  { id: "domains", label: "Domains", render: () => <DomainsTab /> },
+  { id: "domains", label: "Domains & documents", render: () => <DomainsTab /> },
   { id: "status", label: "Status", render: () => <StatusTab /> },
 ];
 

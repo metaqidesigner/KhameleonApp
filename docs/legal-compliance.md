@@ -26,6 +26,8 @@ This document is the technical record of what Khameleon uses from third parties 
 | Model Context Protocol SDK | Khameleon's own Integrations client | MIT | Include copyright and licence |
 | tesseract.js | Reads text from scanned documents | Apache 2.0 | Include licence and notice |
 | pdf-parse | Reads text from PDFs | Apache 2.0 | Include licence and notice |
+| mammoth | Reads text from Word (.docx) procedure documents (Build 5, added 2026-10-19) | BSD-2-Clause | Include copyright notice and licence text |
+| Tesseract English language data (tessdata, downloaded once by tesseract.js) | On-device OCR of scanned documents | Apache 2.0 | Include notice; note in the clean-up whether to ship it inside the installer (so OCR never needs a first-time download) |
 | Electron | Desktop app | MIT (plus bundled Chromium notices) | Ship Electron's own licence files |
 | React, Vite, Express, Drizzle, Zustand and other npm packages | App and server | Mostly MIT/ISC/Apache — full list to be generated | Generate full list from `pnpm licenses` at clean-up |
 | Microsoft 365 Copilot Chat API (Microsoft Graph, preview) | Copilot as the main agent when an organisation provides it | Microsoft APIs Terms of Use / Graph terms (not an open licence) | Preview: Microsoft says not supported for production - confirm status before launch; each user needs a Copilot licence; respect Microsoft's API terms and Copilot data handling; name "Microsoft 365 Copilot" only to describe what Khameleon connects to, no logos |

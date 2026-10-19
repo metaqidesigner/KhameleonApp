@@ -1,6 +1,7 @@
 import { Router, type Response } from "express";
 import { STARTER_SKILLS } from "../starterSkills.js";
 import { readDocumentText } from "../lib/documentText.js";
+import { pickSection } from "../lib/procedures.js";
 import { listDocuments, getDocument, addDocument, updateDocument, deleteDocument, checkSkill, listChecks, draftFromSection } from "../lib/procedureService.js";
 
 /**
@@ -80,6 +81,13 @@ router.post("/draft-skill", async (req, res) => {
     const writer = STARTER_SKILLS.find(s => s.name === "Skill writer");
     res.json(await draftFromSection(documentId, sectionId, writer?.content ?? ""));
   } catch (err) { fail(res, err, req.log.error.bind(req.log)); }
+});
+
+/** Which work area a new skill belongs in: the one whose procedures fit it best (plain code). */
+router.post("/suggest-domain", async (req, res) => {
+  const { name, description, steps } = req.body as { name?: string; description?: string; steps?: string };
+  const pick = pickSection({ name: name ?? "", description: description ?? "", content: steps ?? "" }, await listDocuments());
+  res.json(pick ? { workDomainId: pick.doc.workDomainId, reason: `It matches "${pick.section.heading}" in ${pick.doc.name}.` } : { workDomainId: null, reason: null });
 });
 
 export default router;

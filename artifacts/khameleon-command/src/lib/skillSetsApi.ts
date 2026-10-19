@@ -34,6 +34,9 @@ export interface CreateSkillSetInput {
   requestedTools?: string[];
   requestedIntegrationIds?: string[];
   workDomainIds?: number[];
+  /** Build 5: made from a company document section. */
+  sourceDocumentId?: number;
+  sourceSectionId?: string;
 }
 
 export interface CreateSkillSetResult {

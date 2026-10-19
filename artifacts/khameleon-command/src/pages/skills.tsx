@@ -7,6 +7,9 @@ import { useSkillLibrary, SkillConfirmGate } from '@/components/skills/useSkillL
 import { GetSkills } from '@/components/skills/GetSkills';
 import { SkillGuide } from '@/components/skills/SkillGuide';
 import { CaptureBar, useCaptureTask, type CaptureDraft } from '@/components/skills/CaptureTask';
+import { CheckBadge, CheckDetails, useProcedureChecks } from '@/components/procedures/ProcedureCheckView';
+import { FromDocument, type DocumentDraft } from '@/components/procedures/FromDocument';
+import { ProcedureDocuments } from '@/components/procedures/ProcedureDocuments';
 import { useJarvisStore } from '@/store/jarvisStore';
 
 const STATUS_LABEL: Record<SkillSet['status'], string> = {
@@ -41,6 +44,12 @@ export default function Skills() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [guiding, setGuiding] = useState(false);
   const [captureDraft, setCaptureDraft] = useState<CaptureDraft | null>(null);
+  // Build 5 - same pieces as the Overlay (components/procedures).
+  const { checks, reload: reloadChecks } = useProcedureChecks();
+  const [openCheck, setOpenCheck] = useState<number | null>(null);
+  const [fromDoc, setFromDoc] = useState(false);
+  const [docDraft, setDocDraft] = useState<DocumentDraft | null>(null);
+  const [docsDomain, setDocsDomain] = useState<number | null>(null);
   const capture = useCaptureTask(useCallback((d: CaptureDraft) => { setCaptureDraft(d); setGuiding(true); }, []));
   const [editDraft, setEditDraft] = useState('');
 
@@ -60,7 +69,8 @@ export default function Skills() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, height: '100%', padding: 8 }}>
+    // The whole page scrolls; the skill list keeps a usable height however many panels sit above it.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, height: '100%', padding: 8, overflowY: 'auto' }} className="scrollbar-jarvis">
       {/* ADD / IMPORT */}
       <div style={{ flexShrink: 0 }}>
         <JPanel
@@ -141,17 +151,34 @@ export default function Skills() {
         <JPanel title="MAKE YOUR OWN SKILL" icon={<Plus size={13} />}
           action={<div style={{ display: 'flex', gap: 6 }}>
             {capture.available && !guiding && <button className="j-btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 9 }} onClick={capture.open}>CAPTURE A TASK</button>}
-            <button className="j-btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 9 }} onClick={() => { setGuiding(g => !g); setCaptureDraft(null); }}>{guiding ? 'CLOSE' : 'START GUIDE'}</button>
+            {!guiding && <button className="j-btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 9 }} onClick={() => { setGuiding(true); setFromDoc(true); setDocDraft(null); setCaptureDraft(null); }}>FROM A COMPANY DOCUMENT</button>}
+            <button className="j-btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 9 }} onClick={() => { setGuiding(g => !g); setCaptureDraft(null); setFromDoc(false); setDocDraft(null); }}>{guiding ? 'CLOSE' : 'START GUIDE'}</button>
           </div>}>
-          {guiding
-            ? <SkillGuide key={captureDraft ? `draft-${captureDraft.name}` : 'new'} tone="classic" initial={captureDraft ?? undefined}
-                onCancel={() => { setGuiding(false); setCaptureDraft(null); }}
-                onSave={async input => { await lib.create(input); setGuiding(false); setCaptureDraft(null); }} />
+          {guiding && fromDoc && !docDraft
+            ? <FromDocument tone="classic" onDraft={setDocDraft} onCancel={() => { setFromDoc(false); setGuiding(false); }} />
+            : guiding
+            ? <SkillGuide key={docDraft ? `doc-${docDraft.sourceSectionId}-${docDraft.name}` : captureDraft ? `draft-${captureDraft.name}` : 'new'} tone="classic" initial={docDraft ?? captureDraft ?? undefined}
+                onCancel={() => { setGuiding(false); setCaptureDraft(null); setFromDoc(false); setDocDraft(null); }}
+                onSave={async input => { await lib.create(input); setGuiding(false); setCaptureDraft(null); setFromDoc(false); setDocDraft(null); setTimeout(() => void reloadChecks(), 4000); }} />
             : <div style={{ fontSize: 11, color: 'var(--j-text-muted)' }}>
                 A step-by-step guide: name it, write or draft the steps, check Khameleon would use it, save.
                 {capture.available && ' Or capture a task: do it once while Khameleon notes the steps, and it writes the skill up for you.'}
               </div>}
           <CaptureBar capture={capture} tone="classic" onDescribeInstead={() => { setCaptureDraft(null); setGuiding(true); }} />
+        </JPanel>
+      </div>
+
+      {/* PROCEDURE DOCUMENTS - same as the Overlay's Workspace > Domains & documents (Build 5). */}
+      <div style={{ flexShrink: 0 }}>
+        <JPanel title="PROCEDURE DOCUMENTS" icon={<Zap size={13} />}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--j-text-muted)' }}>Your company's procedures, held in each work area. Skills in that area are checked against them step by step.</div>
+            <select className="j-input" aria-label="Work area" value={docsDomain ?? ''} onChange={e => setDocsDomain(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">Choose a work area…</option>
+              {domains.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+            {docsDomain !== null && <ProcedureDocuments key={docsDomain} tone="classic" workDomainId={docsDomain} onChange={() => setTimeout(() => void reloadChecks(), 4000)} />}
+          </div>
         </JPanel>
       </div>
 
@@ -175,7 +202,7 @@ export default function Skills() {
 
       {error && <div style={{ fontSize: 11, color: '#E77A7A' }}>{error}</div>}
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="scrollbar-jarvis">
+      <div style={{ flex: 1, minHeight: 420, overflowY: 'auto' }} className="scrollbar-jarvis">
         {loading ? (
           <div className="j-empty">LOADING…</div>
         ) : filtered.length === 0 ? (
@@ -188,7 +215,11 @@ export default function Skills() {
                   <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: '#fff', flex: 1 }}>{s.name}</span>
                   <span className="j-badge" style={{ fontSize: 8, color: STATUS_COLOR[s.status], borderColor: STATUS_COLOR[s.status] }}>{STATUS_LABEL[s.status]}</span>
                   {s.sourceType !== 'authored' && <span className="j-badge j-badge-cyan" style={{ fontSize: 8 }}>{s.sourceType.toUpperCase()}</span>}
+                  {s.status !== 'available' && <CheckBadge tone="classic" check={checks[s.id]} open={openCheck === s.id} onClick={() => setOpenCheck(o => (o === s.id ? null : s.id))} />}
                 </div>
+                {openCheck === s.id && checks[s.id] && (
+                  <div style={{ marginTop: 8 }}><CheckDetails tone="classic" skillId={s.id} check={checks[s.id]} onRechecked={() => void reloadChecks()} /></div>
+                )}
                 <div style={{ fontSize: 10, color: 'var(--j-text-muted)', marginTop: 4 }}>{s.description}</div>
                 {(s.requestedTools.length > 0 || s.requestedIntegrationIds.length > 0) && (
                   <div style={{ fontSize: 9, color: 'var(--j-amber)', marginTop: 4, fontFamily: 'var(--j-font-mono)' }}>

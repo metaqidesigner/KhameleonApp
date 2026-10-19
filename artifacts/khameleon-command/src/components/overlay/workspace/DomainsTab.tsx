@@ -3,11 +3,11 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { getWorkDomains, createWorkDomain, renameWorkDomain, deleteWorkDomain, type WorkDomain } from "@/lib/workDomainsApi";
 import { getSkillSets, type SkillSet } from "@/lib/skillSetsApi";
 import { TEXT, MUTED, inputStyle, Btn } from "./ui";
+import { ProcedureDocuments } from "@/components/procedures/ProcedureDocuments";
 
 /**
- * Workspace -> Domains (gap review Q3/Q7). The areas of work skills are
- * grouped by. Procedure documents attach here once Build 5 lands - the tab
- * becomes "Domains & documents" then; nothing placeholder is shown before.
+ * Workspace -> Domains & documents (gap review Q3/Q7, Build 5). The areas of
+ * work skills are grouped by, each holding its procedure documents.
  * Same endpoints as Classic's domain filter bar (Skills page).
  */
 
@@ -19,6 +19,7 @@ function DomainRow({ domain, skillCount, onSave, onDelete }: {
 }) {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showDocs, setShowDocs] = useState(false);
   const [name, setName] = useState(domain.name);
   const [description, setDescription] = useState(domain.description);
 
@@ -39,7 +40,14 @@ function DomainRow({ domain, skillCount, onSave, onDelete }: {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: TEXT }}>{domain.name}</div>
         {domain.description && <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{domain.description}</div>}
-        <div style={{ fontSize: 10.5, color: MUTED, marginTop: 4 }}>{skillCount} skill{skillCount === 1 ? "" : "s"}</div>
+        <div style={{ fontSize: 10.5, color: MUTED, marginTop: 4, display: "flex", gap: 10, alignItems: "center" }}>
+          <span>{skillCount} skill{skillCount === 1 ? "" : "s"}</span>
+          <button type="button" onClick={() => setShowDocs(v => !v)} aria-expanded={showDocs}
+            style={{ background: "none", border: "none", padding: 0, color: "#6FE6BD", fontSize: 10.5, cursor: "pointer", fontFamily: "inherit" }}>
+            {showDocs ? "Hide procedure documents" : "Procedure documents"}
+          </button>
+        </div>
+        {showDocs && <div style={{ marginTop: 8 }}><ProcedureDocuments tone="overlay" workDomainId={domain.id} /></div>}
         {confirmDelete && (
           <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6 }}>
             <span style={{ fontSize: 11.5, color: TEXT }}>Delete "{domain.name}"? Skills stay, they just lose this tag.</span>
@@ -87,7 +95,7 @@ export function DomainsTab() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.45 }}>
-        The areas of your work. Skills are grouped by these, and later each one will hold your company's procedure documents so captured skills can be checked against them.
+        The areas of your work. Skills are grouped by these, and each one holds your company's procedure documents - skills in that area are checked against them step by step.
       </div>
       <form onSubmit={e => { e.preventDefault(); if (newName.trim()) void act(async () => { await createWorkDomain(newName.trim()); setNewName(""); }); }}
         style={{ display: "flex", gap: 6 }}>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getWorkDomains, type WorkDomain } from '@/lib/workDomainsApi';
 import type { CreateSkillSetInput } from '@/lib/skillSetsApi';
+import { suggestDomain } from '@/lib/proceduresApi';
 
 /**
  * Guided "make your own skill" (Build 3 follow-up): five short steps with
@@ -32,7 +33,7 @@ export function SkillGuide({ tone, onSave, onCancel, initial }: {
   onSave: (input: CreateSkillSetInput) => Promise<void>;
   onCancel: () => void;
   /** A draft to start from - e.g. one written up from a Capture recording. */
-  initial?: { name: string; description: string; steps: string; source?: string };
+  initial?: { name: string; description: string; steps: string; source?: string; sourceDocumentId?: number; sourceSectionId?: string };
 }) {
   const t = TONES[tone];
   const [step, setStep] = useState(0);
@@ -49,7 +50,16 @@ export function SkillGuide({ tone, onSave, onCancel, initial }: {
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [suggested, setSuggested] = useState<string | null>(null);
   useEffect(() => { getWorkDomains().then(setDomains).catch(() => {}); }, []);
+
+  // Build 5: suggest the work area whose procedures fit this skill (the user confirms).
+  useEffect(() => {
+    if (step !== 4 || domainIds.length || suggested !== null) return;
+    suggestDomain({ name, description, steps }).then(r => {
+      if (r.workDomainId) { setDomainIds([r.workDomainId]); setSuggested(r.reason ?? ''); } else setSuggested('');
+    }).catch(() => setSuggested(''));
+  }, [step, domainIds.length, suggested, name, description, steps]);
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setError(null);
@@ -97,7 +107,7 @@ export function SkillGuide({ tone, onSave, onCancel, initial }: {
 
       {step === 0 && (
         <>
-          {initial?.source && <div style={{ fontSize: 11.5, color: t.good }}>{initial.source} Check each step - anything marked "(check this)" wasn't clear from the recording.</div>}
+          {initial?.source && <div style={{ fontSize: 11.5, color: t.good }}>{initial.source} Check each step - anything marked "(check this)" wasn't clear{initial.sourceDocumentId ? ' in the document' : ' from the recording'}.</div>}
           {label('Name your skill')}
           <input aria-label="Skill name" placeholder="e.g. Supplier statement reconciliation" value={name} onChange={e => setName(e.target.value)} style={input} />
           {label('What is it for, and when should it be used?')}
@@ -152,6 +162,7 @@ export function SkillGuide({ tone, onSave, onCancel, initial }: {
       {step === 4 && (
         <>
           {label('Which area of work is it for?')}
+          {suggested && <div style={{ fontSize: 11, color: t.good }}>Suggested - {suggested} Change it if that's not right.</div>}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {domains.map(d => {
               const on = domainIds.includes(d.id);
@@ -177,7 +188,7 @@ export function SkillGuide({ tone, onSave, onCancel, initial }: {
         {step < STEPS.length - 1
           ? <button type="button" style={btn(true)} disabled={!canNext} onClick={() => setStep(s => s + 1)}>{step === 3 ? 'Next (or skip)' : 'Next'}</button>
           : <button type="button" style={btn(true)} disabled={busy} onClick={() => void run(async () => {
-              await onSave({ name: name.trim(), description: description.trim(), content: content(), sourceType: 'authored', requestedTools: [], requestedIntegrationIds: [], workDomainIds: domainIds });
+              await onSave({ name: name.trim(), description: description.trim(), content: content(), sourceType: 'authored', requestedTools: [], requestedIntegrationIds: [], workDomainIds: domainIds, sourceDocumentId: initial?.sourceDocumentId, sourceSectionId: initial?.sourceSectionId });
             })}>{busy ? 'Saving…' : 'Save skill'}</button>}
       </div>
     </div>

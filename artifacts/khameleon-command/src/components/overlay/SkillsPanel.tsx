@@ -5,6 +5,9 @@ import { useSkillLibrary, SkillConfirmGate } from "@/components/skills/useSkillL
 import { GetSkills } from "@/components/skills/GetSkills";
 import { SkillGuide } from "@/components/skills/SkillGuide";
 import type { CaptureDraft } from "@/components/skills/CaptureTask";
+import { CheckBadge, CheckDetails, useProcedureChecks } from "@/components/procedures/ProcedureCheckView";
+import { FromDocument, type DocumentDraft } from "@/components/procedures/FromDocument";
+import type { ProcedureCheck } from "@/lib/proceduresApi";
 import type { SkillSet, CreateSkillSetInput, SkillSetSourceType } from "@/lib/skillSetsApi";
 import type { WorkDomain } from "@/lib/workDomainsApi";
 import type { OverlayPalette } from "./palettes";
@@ -70,16 +73,20 @@ function ConnectionBadges({ ids }: { ids: string[] }) {
   );
 }
 
-function SkillRow({ skill, domains, lib, onRun }: {
+function SkillRow({ skill, domains, lib, onRun, check, onRechecked }: {
   skill: SkillSet;
   domains: WorkDomain[];
   lib: ReturnType<typeof useSkillLibrary>;
   onRun: (s: SkillSet) => void;
+  /** Build 5: how it compares with its company procedure. */
+  check?: ProcedureCheck;
+  onRechecked?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(skill.content);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [showCheck, setShowCheck] = useState(false);
   useEffect(() => { if (!editing) setDraft(skill.content); }, [skill.content, editing]);
 
   const isInstalled = skill.status === "installed";
@@ -94,6 +101,16 @@ function SkillRow({ skill, domains, lib, onRun }: {
         </span>
         {skill.sourceType !== "authored" && <span style={{ fontSize: 9.5, color: MUTED, flexShrink: 0 }}>{skill.sourceType}</span>}
       </button>
+      {check && skill.status !== "available" && (
+        <div style={{ padding: "0 10px 8px 31px", display: "flex" }}>
+          <CheckBadge tone="overlay" check={check} open={showCheck} onClick={() => setShowCheck(v => !v)} />
+        </div>
+      )}
+      {showCheck && check && (
+        <div style={{ padding: "0 10px 10px 31px" }}>
+          <CheckDetails tone="overlay" skillId={skill.id} check={check} onRechecked={() => onRechecked?.()} />
+        </div>
+      )}
 
       {open && (
         <div style={{ padding: "0 10px 10px 31px", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -205,6 +222,9 @@ export function SkillsPanel({ palette, onClose, draft, onDraftDone }: {
 }) {
   const lib = useSkillLibrary();
   const requestChatTool = useJarvisStore(s => s.requestChatTool);
+  const { checks, reload: reloadChecks } = useProcedureChecks();
+  const [fromDoc, setFromDoc] = useState(false);
+  const [docDraft, setDocDraft] = useState<DocumentDraft | null>(null);
   const [adding, setAdding] = useState(!!draft);
   const [getting, setGetting] = useState(false);
   const [pasting, setPasting] = useState(false);
@@ -277,11 +297,19 @@ export function SkillsPanel({ palette, onClose, draft, onDraftDone }: {
           {getting && lib.error && <div role="alert" style={{ fontSize: 12, color: "#ffb0b0" }}>{lib.error}</div>}
           {!getting && <>
           {/* New: the guided skill maker; "paste one" keeps the quick form for skills from elsewhere. */}
-          {adding && !pasting && (
+          {adding && !pasting && fromDoc && !docDraft && (
+            <FromDocument tone="overlay" onDraft={d => setDocDraft(d)} onCancel={() => setFromDoc(false)} />
+          )}
+          {adding && !pasting && (!fromDoc || docDraft) && (
             <>
-              <SkillGuide key={draft ? `draft-${draft.name}` : 'new'} tone="overlay" initial={draft ?? undefined}
-                onCancel={() => { setAdding(false); onDraftDone?.(); }}
-                onSave={async input => { await lib.create(input); setAdding(false); onDraftDone?.(); }} />
+              <SkillGuide key={docDraft ? `doc-${docDraft.sourceSectionId}-${docDraft.name}` : draft ? `draft-${draft.name}` : 'new'} tone="overlay" initial={docDraft ?? draft ?? undefined}
+                onCancel={() => { setAdding(false); setFromDoc(false); setDocDraft(null); onDraftDone?.(); }}
+                onSave={async input => { await lib.create(input); setAdding(false); setFromDoc(false); setDocDraft(null); onDraftDone?.(); setTimeout(() => void reloadChecks(), 4000); }} />
+              {!docDraft && !draft?.source && (
+                <button type="button" onClick={() => setFromDoc(true)} style={{ background: "none", border: "none", color: MUTED, fontSize: 11.5, cursor: "pointer", textAlign: "left", padding: 0, fontFamily: "inherit" }}>
+                  Start from a company document instead
+                </button>
+              )}
               <button type="button" onClick={() => setPasting(true)} style={{ background: "none", border: "none", color: MUTED, fontSize: 11.5, cursor: "pointer", textAlign: "left", padding: 0, fontFamily: "inherit" }}>
                 Already have a skill written somewhere? Paste it instead
               </button>
@@ -292,12 +320,12 @@ export function SkillsPanel({ palette, onClose, draft, onDraftDone }: {
           {lib.loading && <div style={{ fontSize: 12, color: MUTED }}>Loading skills…</div>}
 
           <Section title="Waiting for your confirmation" count={lib.groups.pending.filter(inFilter).length}>
-            {lib.groups.pending.filter(inFilter).map(s => <SkillRow key={s.id} skill={s} domains={lib.domains} lib={lib} onRun={run} />)}
+            {lib.groups.pending.filter(inFilter).map(s => <SkillRow key={s.id} skill={s} domains={lib.domains} lib={lib} onRun={run} check={checks[s.id]} onRechecked={reloadChecks} />)}
           </Section>
 
           {installedByDomain.map(g => (
             <Section key={g.key} title={g.name} count={g.skills.length}>
-              {g.skills.map(s => <SkillRow key={`${g.key}-${s.id}`} skill={s} domains={lib.domains} lib={lib} onRun={run} />)}
+              {g.skills.map(s => <SkillRow key={`${g.key}-${s.id}`} skill={s} domains={lib.domains} lib={lib} onRun={run} check={checks[s.id]} onRechecked={reloadChecks} />)}
             </Section>
           ))}
 
@@ -312,7 +340,7 @@ export function SkillsPanel({ palette, onClose, draft, onDraftDone }: {
           )}
           {startersByDomain.map(g => (
             <Section key={`starter-${g.key}`} title={g.name} count={g.skills.length}>
-              {g.skills.map(s => <SkillRow key={`starter-${g.key}-${s.id}`} skill={s} domains={lib.domains} lib={lib} onRun={run} />)}
+              {g.skills.map(s => <SkillRow key={`starter-${g.key}-${s.id}`} skill={s} domains={lib.domains} lib={lib} onRun={run} check={checks[s.id]} onRechecked={reloadChecks} />)}
             </Section>
           ))}
           </>}
