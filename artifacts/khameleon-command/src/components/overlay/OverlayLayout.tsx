@@ -11,6 +11,7 @@ import { EdgeChrome, BOTTOM_BAR_HEIGHT } from "./EdgeChrome";
 import { LookLayoutControls, useSyncAcrossWindows } from "./LookLayoutControls";
 import type { OverlayPalette } from "./palettes";
 import { SkillsPanel } from "./SkillsPanel";
+import { pairDesktopLink } from "@/lib/desktopBridge";
 import { SettingsPanel } from "./SettingsPanel";
 import { EmailAssistant } from "./EmailAssistant";
 import { SuggestionSlot } from "@/components/notices/SuggestionSlot";
@@ -151,6 +152,9 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   const [khamiPrompt, setKhamiPrompt] = useState(false);
   const [captureDraft, setCaptureDraft] = useState<CaptureDraft | null>(null);
   const capture = useCaptureTask(useCallback((d: CaptureDraft) => { setCaptureDraft(d); setSkillsOpen(true); }, []));
+
+  // Build 7: let the chat's AI work in this computer's apps (pairs the desktop link).
+  useEffect(() => { if (!locked) void pairDesktopLink().catch(() => {}); }, [locked]);
 
   // Offer Khami setup once if it isn't set up and the user hasn't said "Later".
   useEffect(() => {

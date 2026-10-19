@@ -43,6 +43,10 @@ contextBridge.exposeInMainWorld("khameleon", {
       return () => { ipcRenderer.removeListener("khameleon:email:update", handler); };
     },
   },
+  // Desktop link (src/desktopLink.ts): the pairing code the signed-in window registers with the server.
+  desktopLink: {
+    code: () => ipcRenderer.invoke("khameleon:desktop:code"),
+  },
   // Saved desktop choices: which layout starts, follow-me vs main screen.
   prefs: {
     get: () => ipcRenderer.invoke("khameleon:prefs:get"),

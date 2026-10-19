@@ -8,6 +8,7 @@ import { getCustomToolDefinitions, isCustomToolName, dispatchCustomTool, getMcpS
 import { askKhami, khamiStatus } from "../engines/khami.js";
 import { toolsForAnyAi } from "./tools/anyAiTools.js";
 import { runOpenAiToolLoop, type ChatClient } from "./openAiToolLoop.js";
+import { guardFalseSuccess } from "./tools/workTools.js";
 import { askCopilot } from "../lib/copilotChat.js";
 import { getToken } from "../lib/oauthTokens.js";
 import { pickSkill, skillInstructions } from "../lib/skillPicker.js";
@@ -400,6 +401,7 @@ export async function askAgent(
       const systemMsg = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
       const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
       const tools = opts.plain ? [] : await toolsForAnyAi(lastUser).catch(() => []);
+      const toolResults: string[] = [];
       const r = await askKhami({
         system: tools.length
           ? systemMsg + "\n\nYou can use the tools provided when they help. Afterwards, tell the user the outcome in a sentence or two. Don't narrate attempts; if something can't be done, say so once, plainly."
@@ -407,8 +409,15 @@ export async function askAgent(
         messages: messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
         onToken,
         tools,
-        onToolEvent: onToolEvent as ((e: import("../engines/types.js").EngineToolEvent) => void) | undefined,
+        onToolEvent: (e: import("../engines/types.js").EngineToolEvent) => {
+          if (e.type === "tool_result" && e.result) toolResults.push(e.result);
+          (onToolEvent as ((e: import("../engines/types.js").EngineToolEvent) => void) | undefined)?.(e);
+        },
       });
+      // Never let "done" stand when a tool said it failed (agents/tools/workTools.ts).
+      const guarded = guardFalseSuccess(r.content, toolResults);
+      if (guarded !== r.content) onToken?.(guarded.slice(r.content.length)); // the correction reaches a streaming chat too
+      r.content = guarded;
       // On this computer: no per-use cost, and energy isn't estimated for local runs.
       // The brain's own name stays on the Licences page, not in the product.
       return { agentId: agent.id, content: r.content, model: "Khami", latencyMs: r.latencyMs, tokens: r.tokens, costUsd: 0, energyWh: 0 };

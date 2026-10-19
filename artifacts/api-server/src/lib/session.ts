@@ -107,6 +107,11 @@ export async function appAuthGate(req: Request, res: Response, next: NextFunctio
     next();
     return;
   }
+  // The paired desktop app's own requests: checked by its pairing code instead (routes/desktop.ts).
+  if (req.path === "/desktop/next" || req.path.startsWith("/desktop/result/")) {
+    next();
+    return;
+  }
 
   // Option B wins the moment any account exists - a real per-user login is
   // strictly more capable than the shared password, so once an instance has

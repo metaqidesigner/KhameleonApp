@@ -17,7 +17,8 @@ import {
   type Bounds,
   type IndicatorState,
 } from "khameleon-window-agent";
-import { LocalAgentRunner, LocalDocumentAgent, extractDocumentText } from "@khameleon/integrations";
+import { LocalDocumentAgent, extractDocumentText, dispatchLocalTool } from "@khameleon/integrations";
+import { apiBase, desktopCode, startDesktopLink } from "./desktopLink";
 import { CaptureSession } from "./capture";
 import { EmailWatcher } from "./emailWatch";
 
@@ -178,30 +179,14 @@ app.whenReady().then(() => {
   );
   const fileRoot = process.env.KHAMELEON_FILE_ROOT ?? app.getPath("documents");
   const memory = new MemoryStore(new JsonFileStorage(path.join(app.getPath("userData"), "memory.json")));
-  // LocalAgentRunner replaces the earlier single-shot KhameleonCoordinator
-  // router: it lets Claude call window/file/memory tools multiple times in
-  // one turn, so a single instruction like "open a YouTube video enlarged,
-  // then move it aside" actually executes as two real actions instead of
-  // requiring two separate commands. Kept wired here (not used by the real
-  // frontend yet) as the foundation Phase 2-4's new window-control tools
-  // plug into.
-  const localAgent = new LocalAgentRunner(
-    {
-      window: new WindowCommandRunner(windowController, requestObservePermission),
-      file: new FileCommandRunner(new FileOps(fileRoot), new MacAppLauncher()),
-      memory: new MemoryCommandRunner(memory),
-    },
-    undefined,
-    undefined,
-    undefined,
-    // read_document tool's real implementation - reuses the same
-    // extraction LocalDocumentAgent uses. Fine for non-sensitive documents:
-    // its result goes to Claude's cloud API like any other tool_result,
-    // which is exactly why LocalDocumentAgent stays a separate channel for
-    // anything flagged sensitive (Cross-App Control Phase 4,
-    // khameleon-decisions-log.md, 2026-10-04).
-    async (filePath) => (await extractDocumentText(filePath)).text,
-  );
+  // The tested window/file/memory runners. The chat's AI (Khami first, on
+  // the server) reaches them through the desktop link below (Build 7) - this
+  // replaced the earlier Claude-only LocalAgentRunner.
+  const runners = {
+    window: new WindowCommandRunner(windowController, requestObservePermission),
+    file: new FileCommandRunner(new FileOps(fileRoot), new MacAppLauncher()),
+    memory: new MemoryCommandRunner(memory),
+  };
 
   const appUrl = process.env.KHAMELEON_APP_URL ?? DEFAULT_APP_URL;
 
@@ -423,9 +408,20 @@ app.whenReady().then(() => {
   for (const g of glowBackends) g.setShowLabels(prefs.glowLabels);
   if (prefs.emailAssistant) emailWatcher.start();
 
+  // The dev control panel's command box: asks Khami on the server, which uses
+  // the desktop tools through the link (no direct cloud AI call here any more).
   ipcMain.handle("khameleon:command", async (_event, text: unknown) => {
     if (typeof text !== "string" || !text.trim()) throw new Error("A non-empty command is required.");
-    return localAgent.run(text);
+    const res = await fetch(`${apiBase(appUrl)}/agents/khami/ask`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: text }] }) });
+    const body = (await res.json()) as { content?: string; error?: string };
+    return { reply: body.content || body.error || "No answer.", toolCalls: [] };
+  });
+
+  // ── Desktop link (src/desktopLink.ts; Build 7) ──────────────────────────
+  ipcMain.handle("khameleon:desktop:code", () => desktopCode());
+  startDesktopLink(apiBase(appUrl), async (action, input) => {
+    if (action === "window_command" || action === "file_command") return dispatchLocalTool(action, input, runners);
+    throw new Error(`The desktop app doesn't know how to "${action}".`);
   });
 
   // Deliberately a SEPARATE channel, not a tool LocalAgentRunner can call

@@ -158,6 +158,26 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.Tool[] = [
     },
   },
   {
+    name: "desktop_apps",
+    description:
+      "Work inside an app window that is already open on the user's computer. Instructions: 'observe <app>' (watch it), 'control <app>' (work in it - the user is asked to allow it), 'type \"<text>\" into <app>' (types where the cursor is), 'stop controlling'. To OPEN or QUIT an app use desktop_files instead. One instruction per call.",
+    input_schema: {
+      type: "object",
+      properties: { command: { type: "string", description: "One short instruction." } },
+      required: ["command"],
+    },
+  },
+  {
+    name: "desktop_files",
+    description:
+      "Open or quit apps, and manage files, on the user's computer. Instructions: 'open <app>', 'quit <app>', 'create folder <name>', 'move <file> to <folder>', 'trash <file>' (recoverable), 'sort <folder>'. One instruction per call.",
+    input_schema: {
+      type: "object",
+      properties: { command: { type: "string", description: "One short instruction." } },
+      required: ["command"],
+    },
+  },
+  {
     name: "check_inbox",
     description:
       "Look at the user's unread email (read-only) and report what's urgent, what needs action, and what's just FYI - with why. Use for 'anything urgent?', 'what's in my inbox?', 'do I need to reply to anything?'. Never moves, flags or marks anything.",

@@ -1,10 +1,11 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import Background from './Background';
 import TopBar from './TopBar';
 import NewsTicker from './NewsTicker';
 import CommandPalette from './CommandPalette';
 import ChatWindow from './chatWindow/ChatWindow';
 import { SuggestionSlot } from '@/components/notices/SuggestionSlot';
+import { pairDesktopLink } from '@/lib/desktopBridge';
 import { LeftSidebar } from './LeftSidebar';
 import { JarvisOrbPortal } from './orb/JarvisOrbPortal';
 import { VoiceController } from './orb/VoiceController';
@@ -65,6 +66,8 @@ function PageRouter() {
 }
 
 export function AppShell() {
+  // Build 7: let the chat's AI work in this computer's apps (pairs the desktop link; no-op in a browser).
+  useEffect(() => { void pairDesktopLink().catch(() => {}); }, []);
   return (
     <>
       <Background />

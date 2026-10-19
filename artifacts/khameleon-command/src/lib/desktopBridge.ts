@@ -108,3 +108,12 @@ export interface KhameleonEmailBridge {
 export function emailBridge(): KhameleonEmailBridge | undefined {
   return (window as unknown as { khameleon?: { email?: KhameleonEmailBridge } }).khameleon?.email;
 }
+
+/** Build 7: pairs this desktop app with the server (lib/desktopLink.ts there), using this window's sign-in. */
+export async function pairDesktopLink(): Promise<boolean> {
+  const link = (window as unknown as { khameleon?: { desktopLink?: { code(): Promise<string> } } }).khameleon?.desktopLink;
+  if (!link) return false;
+  const code = await link.code();
+  const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/desktop/pair`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+  return res.ok;
+}
