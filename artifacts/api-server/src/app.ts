@@ -1,6 +1,6 @@
 import path from "node:path";
 import express, { type Express } from "express";
-import cors from "cors";
+import { hostGuard, originGuard } from "./lib/networkSafety.js";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
@@ -29,7 +29,9 @@ app.use(
     },
   }),
 );
-app.use(cors());
+// Who may call the API (lib/networkSafety.ts): Khameleon's own pages only; localhost names when local-only.
+app.use(hostGuard);
+app.use(originGuard);
 app.use(cookieParser());
 // Procedure documents arrive as base64 files (up to 20 MB); everything else keeps the small default.
 const bigJson = express.json({ limit: "30mb" });

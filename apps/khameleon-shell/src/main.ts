@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen } from "electron";
+import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen, shell, type WebContents } from "electron";
 import * as path from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
 import { FileOps, CommandRunner as FileCommandRunner, MacAppLauncher } from "khameleon-file-agent";
@@ -116,7 +116,7 @@ let permissionRequestSeq = 0;
  * not a general precedent - every other window in this app stays sandboxed.
  */
 function requestObservePermission(appLabel: string, state: IndicatorState): Promise<boolean> {
-  const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const verb = state === "working" ? "work in" : "observe";
   const channel = `khameleon:permission-reply:${permissionRequestSeq++}`;
 
@@ -158,8 +158,22 @@ function requestObservePermission(appLabel: string, state: IndicatorState): Prom
   });
 }
 
+/**
+ * Khameleon's windows have special abilities (preload.ts: Capture, the open
+ * email, the desktop pairing code), so only Khameleon's own pages may load in
+ * them. Links to anywhere else open in the user's normal browser; navigation
+ * to other sites is refused (pre-launch security review, 2026-10-20).
+ */
+function lockToKhameleon(contents: WebContents, trustedOrigins: string[]): void {
+  const trusted = (url: string) => { try { return trustedOrigins.includes(new URL(url).origin); } catch { return false; } };
+  const openOutside = (url: string) => { if (/^https?:\/\//i.test(url)) void shell.openExternal(url); };
+  contents.setWindowOpenHandler(({ url }) => { openOutside(url); return { action: "deny" }; });
+  contents.on("will-navigate", (event, url) => { if (!trusted(url)) { event.preventDefault(); openOutside(url); } });
+  contents.on("will-redirect", (event, url) => { if (!trusted(url)) { event.preventDefault(); openOutside(url); } });
+}
+
 function failureHtml(url: string, reason: string): string {
-  const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   return `<!doctype html><html><body style="background:#0b0f14;color:#e6e6e6;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px;box-sizing:border-box;">
     <div><h2>Can't reach Khameleon</h2><p>Tried to load <code>${escape(url)}</code> and got: ${escape(reason)}</p>
     <p>Make sure your Khameleon instance (e.g. the Docker container from SELF_HOSTING.md) is running, then reload.</p></div>
@@ -206,6 +220,8 @@ app.whenReady().then(() => {
   };
 
   const appUrl = process.env.KHAMELEON_APP_URL ?? DEFAULT_APP_URL;
+  // Khameleon's own page and its server (they differ in development).
+  const trustedOrigins = [...new Set([new URL(appUrl).origin, new URL(apiBase(appUrl)).origin])];
 
   const preload = path.join(__dirname, "preload.js");
 
@@ -222,6 +238,7 @@ app.whenReady().then(() => {
       title: "Khameleon",
       webPreferences: { preload, contextIsolation: true, sandbox: true },
     });
+    lockToKhameleon(mainWindow.webContents, trustedOrigins);
     mainWindow.loadURL(appUrl);
     mainWindow.webContents.on("did-fail-load", (_event, _code, description) => {
       mainWindow?.loadURL(`data:text/html,${encodeURIComponent(failureHtml(appUrl, description))}`);
@@ -291,6 +308,7 @@ app.whenReady().then(() => {
     // over its own controls (useClickThrough.ts). forward:true keeps mouse
     // movement flowing to the page so it can tell when that happens.
     overlay.setIgnoreMouseEvents(true, { forward: true });
+    lockToKhameleon(overlay.webContents, trustedOrigins);
     overlay.loadURL(new URL("/overlay", appUrl).toString());
     // An unreachable server can't be shown in a click-through window -
     // fall back to the Classic window, which shows the "can't reach" page.

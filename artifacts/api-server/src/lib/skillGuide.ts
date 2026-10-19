@@ -59,7 +59,7 @@ export interface CapturedStep { app: string; title: string; text?: string; note?
 export function describeAction(a: CapturedAction): string {
   const what = a.label ? `"${a.label}"` : "an unnamed item";
   if (a.type === "click") return `clicked ${what}${a.role ? ` (${a.role.replace(/^AX/, "").toLowerCase()})` : ""}`;
-  if (a.type === "type") return `typed "${(a.text ?? "").slice(0, 120)}" into ${what}`;
+  if (a.type === "type") return (a as { withheld?: string }).withheld ? `typed confidential details into ${what} (not kept)` : `typed "${(a.text ?? "").slice(0, 120)}" into ${what}`;
   if (a.type === "key") return `pressed ${a.key}`;
   if (a.type === "secure") return "entered a password (not recorded - a saved login is used instead)";
   return a.type;

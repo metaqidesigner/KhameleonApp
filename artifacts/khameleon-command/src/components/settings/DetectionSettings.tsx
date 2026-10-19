@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { desktopPrefsBridge, detectionBridge, type DesktopPrefs, type DetectionPrefs, type DetectionStatus } from '@/lib/desktopBridge';
 import { useUi, Label, Hint, Msg, Group, type Tone } from './ui';
+import { KHAMI_HOME } from '@/lib/where';
 
 /**
  * Settings > Detection (docs/build-review.md, Build 6). Off by default. Spot
@@ -54,7 +55,7 @@ export function DetectionSettings({ tone }: { tone: Tone }) {
           <Label tone={tone}>Also watch what's in the window</Label>
           {onOff(d.watchContent, v => void save({ watchContent: v }))}
           <Hint tone={tone}>
-            When you stay on a window for about 20 seconds (at most once a minute), Khameleon reads its title and visible text - on this computer, by Khami only - and offers when it looks like one of your skills, a company procedure, or a task worth capturing.
+            When you stay on a window for about 20 seconds (at most once a minute), Khameleon reads its title and visible text - checked {KHAMI_HOME}, by Khami only - and offers when it looks like one of your skills, a company procedure, or a task worth capturing.
             A "Watching for tasks" sign shows while it's on, with Pause. Reading the text needs the Screen Recording permission; without it, only window titles are used.
           </Hint>
         </Group>

@@ -3,6 +3,7 @@ import { GUARDRAILS } from '@/lib/guardrails';
 import { getSessionStatus, logout, type SessionStatus } from '@/lib/sessionApi';
 import { listAccounts, setAccountActive, type Account } from '@/lib/accountsApi';
 import { useUi, Label, Hint, Msg, Group, type Tone } from './ui';
+import { KHAMI_HOME } from '@/lib/where';
 
 /**
  * Settings > Security and Account (gap review Q10, Q1): the protections
@@ -67,7 +68,7 @@ export function SecuritySettings({ tone }: { tone: Tone }) {
             </div>
           </div>
         ))}
-        <Hint tone={tone}>Khami works on this computer, so what it reads stays here. Actions Khameleon takes for you are recorded in the activity log.</Hint>
+        <Hint tone={tone}>Khami works {KHAMI_HOME}, so what it reads stays there. Actions Khameleon takes for you are recorded in the activity log.</Hint>
       </Group>
       {msg && <Msg tone={tone} ok={msg.ok}>{msg.text}</Msg>}
     </div>

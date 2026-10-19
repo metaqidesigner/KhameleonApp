@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listProcedureDocs, draftSkillFromDocument, type ProcedureDocSummary } from '@/lib/proceduresApi';
 import { useUi, Hint, Msg, type Tone } from '@/components/settings/ui';
+import { KHAMI_HOME } from '@/lib/where';
 
 /**
  * Build 5 addendum - a skill "From a company document": pick a procedure
@@ -52,7 +53,7 @@ export function FromDocument({ tone, onDraft, onCancel }: { tone: Tone; onDraft:
               </button>
             ))}
           </div>
-          {doc?.confidential && <Hint tone={tone}>This document is confidential - Khami drafts it on this computer.</Hint>}
+          {doc?.confidential && <Hint tone={tone}>This document is confidential - Khami drafts it {KHAMI_HOME}.</Hint>}
         </>
       )}
       {error && <Msg tone={tone} ok={false}>{error}</Msg>}

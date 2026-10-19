@@ -23,6 +23,7 @@ import { KhamiSetup } from "@/components/khami/KhamiSetup";
 import { AboutLicences } from "@/components/about/AboutLicences";
 import { GetIntegrations } from "@/components/integrations/GetIntegrations";
 import { getKhamiSetup } from "@/lib/khamiApi";
+import { KHAMI_HOME } from '@/lib/where';
 
 const KHAMI_LATER_KEY = "khami-setup-later";
 
@@ -131,7 +132,7 @@ function KhamiPrompt({ palette, onSetUp, onLater, bottom }: { palette: OverlayPa
       }}>
       <div style={{ fontSize: 12.5, fontWeight: 600, color: palette.text }}>Set up Khami?</div>
       <div style={{ fontSize: 11.5, color: palette.textMuted, marginTop: 4, lineHeight: 1.45 }}>
-        Khami is Khameleon's own AI. It runs privately on this computer and works offline. Takes a one-time download.
+        Khami is Khameleon's own AI. It runs privately {KHAMI_HOME} and works offline. Takes a one-time download.
       </div>
       <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
         <button type="button" onClick={onSetUp} style={{ padding: "5px 11px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "inherit", background: palette.accentSoft, border: `1px solid ${palette.accent}`, color: palette.text }}>Set up</button>

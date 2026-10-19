@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, Trash2, Plus } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { getRoster, upsertAgent, deleteAgent, FALLBACK_ROSTER, PROVIDER_LABELS, type AgentConfig, type Provider, type AgentRole } from '@/lib/agentsApi';
+import { KHAMI_HOME } from '@/lib/where';
 
 // Khami first; removed providers (OpenRouter, MiniMax, Ollama) aren't offered (docs/khami-design.md).
 const PROVIDERS: Provider[] = ['copilot','khami','anthropic','openai','google','custom'];
@@ -116,7 +117,7 @@ export default function AgentSettings() {
         </div>
         <div style={{ marginTop: 12, padding: '8px 10px', background: 'rgba(0,212,255,0.03)', border: '1px solid rgba(0,212,255,0.08)' }}>
           <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 9, color: 'var(--j-text-muted)', letterSpacing: '0.05em', lineHeight: 1.8 }}>
-            KHAMI: Khameleon's own AI, on this computer - set it up from Khami setup. No key, no cost.<br/>
+            KHAMI: Khameleon's own AI, {KHAMI_HOME} - set it up from Khami setup. No key, no cost.<br/>
             MICROSOFT 365 COPILOT: connect it from Integrations (work account with a Copilot licence).<br/>
             CLAUDE · GPT · GEMINI: optional - add your organisation's key in Settings.
           </div>

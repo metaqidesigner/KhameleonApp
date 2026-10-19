@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listProcedureDocs, addProcedureDoc, replaceProcedureDoc, updateProcedureDoc, deleteProcedureDoc, type ProcedureDocSummary } from '@/lib/proceduresApi';
 import { useUi, Hint, Msg, type Tone } from '@/components/settings/ui';
+import { KHAMI_HOME } from '@/lib/where';
 
 /**
  * Build 5: a work area's procedure documents (Workspace > Domains &
@@ -77,7 +78,7 @@ export function ProcedureDocuments({ tone, workDomainId, onChange }: { tone: Ton
       </div>
       <input ref={addInput} type="file" accept={ACCEPT} hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void add(f); }} />
       <input ref={replaceInput} type="file" accept={ACCEPT} hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f && replacing.current) void replace(replacing.current, f); }} />
-      {busy === 'add' && <Hint tone={tone}>Scanned pages take a little longer - they're read on this computer.</Hint>}
+      {busy === 'add' && <Hint tone={tone}>Scanned pages take a little longer - they're read {KHAMI_HOME}.</Hint>}
       {msg && <Msg tone={tone} ok={msg.ok}>{msg.text}</Msg>}
     </div>
   );

@@ -4,6 +4,7 @@ import { initScheduler } from "./scheduler";
 import { migrateLegacyTaskValues } from "./migrate-legacy-values";
 import { ensureProcedureTables } from "./ensure-procedure-tables";
 import { ensureWorkTables } from "./ensure-work-tables";
+import { listenHost } from "./lib/networkSafety";
 import { startMeetingPrep } from "./lib/meetingPrepService";
 import { startUrgentAlerts } from "./lib/urgentAlerts";
 import { ensureSettingsTable } from "./ensure-settings-table";
@@ -48,12 +49,12 @@ async function bootstrap() {
 
   // 5. Start accepting HTTP requests only after all initialisation is complete.
   await new Promise<void>((resolve, reject) => {
-    app.listen(port, (err?: Error) => {
+    app.listen(port, listenHost(), (err?: Error) => {
       if (err) {
         reject(err);
         return;
       }
-      logger.info({ port }, "Server listening");
+      logger.info({ port, host: listenHost() }, "Server listening");
       resolve();
     });
   });

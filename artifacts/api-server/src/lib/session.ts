@@ -20,6 +20,7 @@
  * accepted trade-off for this minimal option, not an oversight.
  */
 
+import { isLoopback } from "./networkSafety.js";
 import crypto from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { accountsEnabled } from "./accounts.js";
@@ -137,6 +138,11 @@ export async function appAuthGate(req: Request, res: Response, next: NextFunctio
   }
 
   if (!isAppAuthConfigured()) {
+    // No password or accounts: only this computer may use it (lib/networkSafety.ts).
+    if (!isLoopback(req.socket.remoteAddress) && process.env.KHAMELEON_ALLOW_NO_PASSWORD !== "true") {
+      res.status(403).json({ error: "This Khameleon has no password, so it only accepts requests from the computer it runs on. Set KHAMELEON_APP_PASSWORD (or create accounts) to use it from other computers - see SELF_HOSTING.md." });
+      return;
+    }
     next();
     return;
   }

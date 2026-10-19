@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getEscalationMode, setEscalationMode, type EscalationMode } from '@/lib/escalationApi';
 import { useUi, Label, Hint, Msg, Group, type Tone } from './ui';
+import { KHAMI_HOME } from '@/lib/where';
 
 /**
  * Settings > AI > "When a task is tricky" (docs/khami-design.md, step 5):
@@ -33,7 +34,7 @@ export function EscalationSetting({ tone }: { tone: Tone }) {
           <button key={o.value} type="button" role="radio" aria-checked={mode === o.value} onClick={() => void choose(o.value)} style={btn(mode === o.value)}>{o.label}</button>
         ))}
       </div>
-      <Hint tone={tone}>{OPTIONS.find(o => o.value === mode)?.hint ?? ''} Confidential conversations always stay with Khami on this computer.</Hint>
+      <Hint tone={tone}>{OPTIONS.find(o => o.value === mode)?.hint ?? ''} Confidential conversations always stay with Khami {KHAMI_HOME}.</Hint>
       {error && <Msg tone={tone} ok={false}>{error}</Msg>}
     </Group>
   );

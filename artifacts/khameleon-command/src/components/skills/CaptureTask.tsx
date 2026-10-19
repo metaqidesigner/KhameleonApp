@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { captureBridge, type CaptureStatus } from '@/lib/desktopBridge';
+import { KHAMI_HOME } from '@/lib/where';
 
 /**
  * Capture a task (docs/build-review.md, Build 4): the user does a task once
@@ -109,7 +110,7 @@ export function CaptureBar({ capture, tone, onDescribeInstead }: { capture: Capt
         <div style={{ fontWeight: 600 }}>Capture a task</div>
         <div style={{ color: t.muted, lineHeight: 1.45 }}>
           Do the task once as you normally would. Khameleon notes each app and window, and the buttons you click and what you type (never passwords),
-          then writes it up as a skill you can check - and replay. Everything stays on this computer; snapshots are deleted once the skill is saved.
+          then writes it up as a skill you can check - and replay. Snapshots stay on this computer and are deleted once the skill is saved; Khami writes it up {KHAMI_HOME}.
         </div>
         {s && !s.snapshotsAllowed && (
           <div style={{ color: t.warn, lineHeight: 1.45 }}>

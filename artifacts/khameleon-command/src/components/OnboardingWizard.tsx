@@ -9,6 +9,7 @@ import {
 import { ApiKeyRow } from './ApiKeyRow';
 import { PROVIDERS, API_KEY_PROVIDER_DEFS } from '@/lib/apiKeyProviders';
 import { ConnectIntegrationGate } from './ConnectIntegrationGate';
+import { KHAMI_HOME } from '@/lib/where';
 
 /**
  * design-spec.md §14 — a real first-run onboarding flow. Architecturally
@@ -193,7 +194,7 @@ export function OnboardingWizard() {
         {step === 'API KEY' && (
           <StepShell title="OPTIONAL: ADD ANOTHER AI" onSkip={goNext} onNext={goNext} nextLabel="NEXT">
             <p style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: '#b8d4e8', lineHeight: 1.6, marginBottom: 14 }}>
-              Khami handles your work on this computer. If your organisation gives you access to Claude, add its key so Khami can hand over the trickiest tasks. Skip this if you don't have one.
+              Khami handles your work {KHAMI_HOME}. If your organisation gives you access to Claude, add its key so Khami can hand over the trickiest tasks. Skip this if you don't have one.
             </p>
             <ApiKeyRow
               def={ANTHROPIC_DEF}

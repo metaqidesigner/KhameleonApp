@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { helpWithEmail, rewriteReply, saveReplyDraft, type AssistResult, type EmailRef } from '@/lib/emailAssistApi';
 import { createTask } from '@/lib/jarvisApi';
 import { emailBridge } from '@/lib/desktopBridge';
+import { KHAMI_HOME } from '@/lib/where';
 
 /**
  * The email assistant's card (docs/build-review.md, Build 4 answers): a
@@ -110,7 +111,7 @@ export function EmailCard({ tone, emailRef, subject, fromName, copilotAvailable,
         <button type="button" aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', padding: 2, cursor: 'pointer', color: t.muted }}><X size={14} /></button>
       </div>
 
-      {busy === 'reading' && <div role="status" style={{ color: t.muted }}>{who} is reading this email{who === 'Khami' ? ' on this computer' : ''}… this can take a minute.</div>}
+      {busy === 'reading' && <div role="status" style={{ color: t.muted }}>{who} is reading this email{who === 'Khami' ? ` ${KHAMI_HOME}` : ''}… this can take a minute.</div>}
 
       {result && (
         <>
@@ -160,7 +161,7 @@ export function EmailCard({ tone, emailRef, subject, fromName, copilotAvailable,
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10.5, color: t.muted, lineHeight: 1.4 }}>
         <span style={{ flex: 1 }}>
-          {who === 'Khami' ? 'By Khami, on this computer.' : `By ${who}.`} Khameleon never sends anything.
+          {who === 'Khami' ? `By Khami, ${KHAMI_HOME}.` : `By ${who}.`} Khameleon never sends anything.
         </span>
         {copilotAvailable && agent !== 'copilot' && busy !== 'reading' && (
           <button type="button" style={{ ...btn(), padding: '2px 8px', fontSize: 10.5 }} onClick={askCopilot}>Ask Copilot</button>

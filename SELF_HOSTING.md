@@ -32,7 +32,16 @@ You'll land on the real first-run onboarding wizard — the same one this app al
 
 Your data lives in a Docker named volume (`khameleon_pgdata`), not inside the container — `docker compose down` and `docker compose up -d` again picks up right where you left off. `docker compose down -v` deletes the volume and all data with it; only do this deliberately.
 
-## Putting a password on it (optional)
+## Who can reach Khameleon (read this)
+
+Since 2026-10-20 (pre-launch security review):
+
+- **A password (or accounts) is required to use Khameleon from another computer.** Without `KHAMELEON_APP_PASSWORD` or multi-user accounts, Khameleon only answers requests from the computer it runs on - others get a message explaining how to set a password. In Docker, requests arrive from outside the container, so **set a password or create accounts**. Only if the network is protected some other way (e.g. a VPN plus your own sign-in proxy) can you opt out with `KHAMELEON_ALLOW_NO_PASSWORD=true`.
+- **Where it listens:** `KHAMELEON_HOST` (default `127.0.0.1`, this computer only; the Docker image sets `0.0.0.0` inside the container).
+- **Which web pages may call it:** only Khameleon's own pages (the same address as the server). If the app is served from a different address, list it in `KHAMELEON_ALLOWED_ORIGINS` (comma-separated, e.g. `https://khameleon.example.com`). Requests from other websites can't change anything or read answers.
+- **Local installs** also only accept requests addressed to `localhost`, which stops web pages from tricking the browser into reaching it.
+
+## Putting a password on it
 
 By default there's no login at all — anyone who reaches the URL gets full access. Fine on your own machine or a trusted local network; not fine the moment you expose this beyond that.
 

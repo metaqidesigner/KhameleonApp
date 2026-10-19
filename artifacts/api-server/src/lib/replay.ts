@@ -31,7 +31,9 @@ export async function replaySkill(skillId: number): Promise<ReplayReport> {
       const step = steps[i];
       const what = `${describeAction(step)}${step.app ? ` in ${step.app}` : ""}`;
       let result: string;
-      if (step.type === "secure") {
+      if (step.type === "type" && (step as { withheld?: string }).withheld) {
+        result = `FAILED - this step's typing wasn't kept because it looked confidential. Type it into "${step.label ?? "the box"}" yourself, then replay the rest.`;
+      } else if (step.type === "secure") {
         result = loginName
           ? await signInWithSavedLogin(loginName, step.app, { id: skill.id, name: skill.name, loginVaultItemId: skill.loginVaultItemId })
           : `FAILED - this step needs a password. Link a saved login to the skill ("Signs in with") and replay again.`;

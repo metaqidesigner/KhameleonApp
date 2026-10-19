@@ -21,6 +21,7 @@ import type { AgentRef, ChatMessage, ChatThread, RouteMode, StarterCard } from '
 import { ROUTE_MODE_LABELS, ROUTE_MODE_DESCRIPTIONS } from './types';
 import { ToolCard, KindBadge, TOOL_KIND, TOOL_TITLE } from './ToolCards';
 import type { ChatToolId } from '@/store/jarvisStore';
+import { KHAMI_HOME } from '@/lib/where';
 
 const HEAD_SRC = '/khameleon-head.webp';
 const DEFAULT_FLOATING_SIZE = { width: 400, height: 600 };
@@ -306,7 +307,7 @@ function AgentStrip({ roster, statuses, pinnedId, onPin, zdrKnown, confidential 
           return (
         <button key={a.id} type="button" onClick={() => onPin(a.id)} disabled={blocked} className="chat-agent-pill" data-active={pinnedId === a.id && !blocked}
           style={blocked ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
-          title={blocked ? `${a.name} isn't used for confidential conversations - they stay on this computer with Khami` : `${a.name} - ${statuses[a.id] ?? 'offline'}`}>
+          title={blocked ? `${a.name} isn't used for confidential conversations - they stay with Khami ${KHAMI_HOME}` : `${a.name} - ${statuses[a.id] ?? 'offline'}`}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_DOT_COLOR[statuses[a.id] ?? 'offline'], display: 'inline-block', marginRight: 5 }} />
           {a.name}
         </button>
@@ -729,9 +730,9 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
 
       if (check.confidential && agent.provider !== 'khami') {
         if (khami && statuses[khami.id] === 'online') {
-          runSingle(khami, conversation, { note: `Kept with Khami on this computer - ${check.reasons[0] ?? 'it\'s confidential'}.`, confidential: true });
+          runSingle(khami, conversation, { note: `Kept with Khami ${KHAMI_HOME} - ${check.reasons[0] ?? 'it\'s confidential'}.`, confidential: true });
         } else {
-          setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: `This includes confidential details (${check.reasons[0] ?? 'marked confidential'}), so it stays on this computer - and Khami isn't set up yet. Set it up from the head menu (Khami setup) to do this.`, timestamp: Date.now() }]);
+          setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: `This includes confidential details (${check.reasons[0] ?? 'marked confidential'}), so it stays with Khami ${KHAMI_HOME} - and Khami isn't set up yet. Set it up from the head menu (Khami setup) to do this.`, timestamp: Date.now() }]);
           setSending(false);
         }
         return;
@@ -843,7 +844,7 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
           </div>
         )}
         <button type="button" onClick={() => { if (confidential) { setLocked(false); setFoundConfidential(null); } else setLocked(true); }} aria-pressed={confidential}
-          title={confidential ? `Confidential - stays on this computer with Khami${foundConfidential ? ` (${foundConfidential[0]})` : ''}. Click to unlock.` : 'Mark this conversation confidential - only Khami, on this computer, will answer'}
+          title={confidential ? `Confidential - stays with Khami ${KHAMI_HOME}${foundConfidential ? ` (${foundConfidential[0]})` : ''}. Click to unlock.` : 'Mark this conversation confidential - only Khami, on this computer, will answer'}
           aria-label={confidential ? 'Confidential conversation - click to unlock' : 'Mark conversation confidential'} className="chat-icon-btn"
           style={confidential ? { color: '#ffb36b' } : undefined}>
           {confidential ? <Lock size={14} /> : <LockOpen size={14} />}

@@ -5,6 +5,7 @@ import { loadInstalledSkills } from "../lib/installedSkills.js";
 import { askAI } from "../lib/askAI.js";
 import { queueCheck } from "../lib/procedureService.js";
 import { replaySkill } from "../lib/replay.js";
+import { detectConfidential } from "../lib/escalation.js";
 import { db } from "@workspace/db";
 import {
   skillSetsTable, approvalsTable, actionReceiptsTable, entityWorkDomainsTable,
@@ -94,7 +95,13 @@ function cleanRecording(raw: unknown[]): unknown[] {
     const a = r as Record<string, unknown>;
     const str = (v: unknown) => (typeof v === "string" ? v.slice(0, 2000) : "");
     if (a.type === "click") return [{ type: "click", app: str(a.app), window: str(a.window), role: str(a.role), label: str(a.label) }];
-    if (a.type === "type") return [{ type: "type", app: str(a.app), window: str(a.window), role: str(a.role), label: str(a.label), text: str(a.text) }];
+    if (a.type === "type") {
+      // Text that looks confidential (bank details, pay, health...) isn't kept - replay asks the user to type it.
+      const text = str(a.text);
+      return detectConfidential(text).confidential
+        ? [{ type: "type", app: str(a.app), window: str(a.window), role: str(a.role), label: str(a.label), text: "", withheld: "true" }]
+        : [{ type: "type", app: str(a.app), window: str(a.window), role: str(a.role), label: str(a.label), text }];
+    }
     if (a.type === "key") return [{ type: "key", app: str(a.app), window: str(a.window), key: str(a.key) }];
     if (a.type === "secure") return [{ type: "secure", app: str(a.app), window: str(a.window), label: str(a.label) }];
     return [];

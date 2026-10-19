@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getKhamiSetup, downloadKhamiBrain, chooseKhamiBrain, type KhamiSetup as Setup, type BrainId } from '@/lib/khamiApi';
+import { KHAMI_HOME } from '@/lib/where';
 
 /**
  * Khami setup (docs/khami-design.md): pick Khami's brain - Standard or
@@ -55,7 +56,7 @@ export function KhamiSetup({ tone, onReady }: { tone: Tone; onReady?: () => void
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, color: t.text }}>
       <div style={{ fontSize: 12, color: t.muted, lineHeight: 1.5 }}>
-        Khami is Khameleon's own AI. It runs privately on this computer - nothing you ask it leaves your machine, and it works without internet.
+        Khami is Khameleon's own AI. It runs privately {KHAMI_HOME} - nothing you ask it goes anywhere else, and it works without internet.
         Choose how capable it should be. This computer has about {setup.memoryGb} GB of memory.
       </div>
 

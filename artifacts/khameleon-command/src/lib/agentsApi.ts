@@ -1,3 +1,4 @@
+import { KHAMI_HOME } from './where';
 const BASE = import.meta.env.VITE_API_URL || '/api';
 
 export type Provider = 'copilot'|'khami'|'azure'|'anthropic'|'openai'|'google'|'openrouter'|'ollama'|'minimax'|'custom';
@@ -314,7 +315,7 @@ export async function askAll(
 
 // Provider display helpers
 export const PROVIDER_LABELS: Record<Provider, string> = {
-  copilot:'Microsoft 365 Copilot', khami:'Khami (on this computer)', azure:'Azure OpenAI (your organisation)', anthropic:'Anthropic', openai:'OpenAI', google:'Google',
+  copilot:'Microsoft 365 Copilot', khami:`Khami (${KHAMI_HOME})`, azure:'Azure OpenAI (your organisation)', anthropic:'Anthropic', openai:'OpenAI', google:'Google',
   openrouter:'OpenRouter', ollama:'Ollama', minimax:'MiniMax', custom:'Custom',
 };
 

@@ -72,6 +72,9 @@ RUN chmod +x ./entrypoint.sh
 ENV NODE_ENV=production
 ENV WEB_DIST_PATH=/app/web
 ENV PORT=4001
+# Inside the container the server must listen on all addresses; without a
+# password it still refuses requests from other computers (lib/networkSafety.ts).
+ENV KHAMELEON_HOST=0.0.0.0
 EXPOSE 4001
 
 ENTRYPOINT ["./entrypoint.sh"]
