@@ -1,7 +1,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
-import { rm, mkdir } from "node:fs/promises";
+import { rm, mkdir, copyFile } from "node:fs/promises";
+import { createRequire as makeRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 
 // Plain `tsc` output can't actually run under Electron: this monorepo's
@@ -50,6 +51,14 @@ async function buildAll() {
       sourcemap: "linked",
     });
   }
+
+  // Licence notices that must ship inside the installed app (docs/legal-compliance.md):
+  // Electron's own licence and Chromium's bundled notices.
+  const electronDir = path.dirname(makeRequire(import.meta.url).resolve("electron/package.json"));
+  const notices = path.resolve(here, "build-resources/notices");
+  await mkdir(notices, { recursive: true });
+  await copyFile(path.join(electronDir, "dist/LICENSES.chromium.html"), path.join(notices, "LICENSES.chromium.html"));
+  await copyFile(path.join(electronDir, "dist/LICENSE"), path.join(notices, "LICENSE.electron.txt"));
 
   // Capture full recording (native/mac/KhameleonInput.swift): Khameleon's own
   // helper for watching clicks/typing and replaying them by element name.
