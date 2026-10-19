@@ -90,6 +90,14 @@ export interface ChatMessage {
   kind?: WorkKind;
   /** A toolbar action rendered as an interactive card instead of text. */
   toolCard?: { tool: import('@/store/jarvisStore').ChatToolId; payload?: import('@/store/jarvisStore').ChatToolPayload };
+  /**
+   * Khami step 5: an offer to hand this turn to an outside AI - before
+   * Khami answers ("This one's tricky…") or after ("Khami wasn't sure…").
+   * `conversation` is what would be sent.
+   */
+  escalation?: { when: 'before' | 'after'; agentId: string; name: string; reason: string; conversation: { role: 'user' | 'assistant'; content: string }[]; handled?: boolean };
+  /** A small note shown above an answer, e.g. "Kept with Khami - it includes bank details". */
+  note?: string;
 }
 
 /** Minimal, honestly-scoped v1 - no backend concept of a thread exists yet (2026-10-02 ground-truth check), so this is persisted client-side per domain, not a fabricated server entity. */

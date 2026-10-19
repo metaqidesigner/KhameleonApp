@@ -38,6 +38,8 @@ export interface RouteResult {
   sessionId?: string;
   /** Installed skills the agent actually loaded this turn. */
   skillsUsed?: string[];
+  /** Khami wasn't sure - an outside AI Khameleon can offer instead (step 5). */
+  offer?: { id: string; name: string; reason: string } | null;
 }
 
 /** Real per-call tool-use events (name + durationMs from the agent's own tool runner) become reasoning steps - never fabricated placeholder "thinking" text. Exported for direct unit testing. */
@@ -81,6 +83,7 @@ export function routeSingleStreaming(
   onError: (e: string) => void,
   pinnedAgentName?: string,
   sessionId?: string,
+  confidential?: boolean,
 ): () => void {
   const toolEvents: ToolEvent[] = [];
   return streamAgentChat(
@@ -98,10 +101,12 @@ export function routeSingleStreaming(
       reasoning: toolEventsToReasoning(toolEvents),
       skillsUsed: skillsUsed(toolEvents),
       sessionId: d.sessionId,
+      offer: d.offer ?? null,
     }),
     onError,
     (e) => toolEvents.push(e),
     sessionId,
+    confidential,
   );
 }
 
@@ -114,8 +119,9 @@ export async function routeMultiAgent(
   mode: 'parallel' | 'vote' | 'council',
   messages: AgentChatMessage[],
   agentIds: string[],
+  confidential?: boolean,
 ): Promise<RouteResult> {
-  const res = await askAll(messages, agentIds, backendModeFor(mode));
+  const res = await askAll(messages, agentIds, backendModeFor(mode), confidential);
   const winner = res.verdict ?? res.results[0];
   if (!winner) throw new Error('No agent responded.');
   return {

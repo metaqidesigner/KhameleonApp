@@ -207,9 +207,13 @@ export async function askAgent(id: string, messages: ChatMessage[]): Promise<Age
   });
 }
 
+/** An outside AI Khameleon offers when Khami wasn't sure (Khami step 5). */
+export interface EscalationOffer { id: string; name: string; reason: string }
+
 export interface StreamDone {
   agentId: string; model: string; latencyMs: number; tokens: number;
   costUsd: number; sessionId?: string; toolCallCount?: number;
+  confidential?: boolean; offer?: EscalationOffer | null;
 }
 
 export function streamAgentChat(
@@ -220,6 +224,8 @@ export function streamAgentChat(
   onError: (e: string) => void,
   onToolEvent?: (e: ToolEvent) => void,
   sessionId?: string,
+  /** The user locked this conversation as confidential - only Khami may answer. */
+  confidential?: boolean,
 ): () => void {
   let closed = false;
   const ctrl = new AbortController();
@@ -229,7 +235,7 @@ export function streamAgentChat(
       const res = await fetch(`${BASE}/agents/${agentId}/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, stream: true, sessionId }),
+        body: JSON.stringify({ messages, stream: true, sessionId, confidential }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
@@ -257,6 +263,8 @@ export function streamAgentChat(
               costUsd:      d.costUsd as number,
               sessionId:    d.sessionId as string | undefined,
               toolCallCount: d.toolCallCount as number | undefined,
+              confidential: d.confidential as boolean | undefined,
+              offer: (d.offer as EscalationOffer | null | undefined) ?? null,
             });
           } catch { /* ignore parse errors */ }
         }
@@ -295,10 +303,11 @@ export async function askAll(
   messages: ChatMessage[],
   agentIds?: string[],
   mode: 'parallel'|'vote' = 'parallel',
+  confidential?: boolean,
 ): Promise<{ results: AgentResponse[]; verdict?: AgentResponse; mode: string }> {
   return safeFetch(
     `${BASE}/agents/ask-all`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, agent_ids: agentIds, mode }) },
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, agent_ids: agentIds, mode, confidential }) },
   );
 }
 

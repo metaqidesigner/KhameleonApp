@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GripVertical, Mic, Paperclip, Send, X, Minus, PanelRightClose, PanelRightOpen,
-  Eye, EyeOff, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Loader2, Zap,
+  Eye, EyeOff, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Loader2, Zap, Lock, LockOpen,
 } from 'lucide-react';
+import { checkEscalation } from '@/lib/escalationApi';
 import { useJarvisStore } from '@/store/jarvisStore';
 import { useWindowDrag, fitToViewport } from './useWindowDrag';
 import { routeSingleStreaming, routeMultiAgent, pickAutoRouteAgent, rowsToResumedMessages } from './chatWindowApi';
@@ -119,8 +120,37 @@ function MetaLine({ meta }: { meta?: ChatMessage['meta'] }) {
   );
 }
 
-function MessageBubble({ message, onSend }: { message: ChatMessage; onSend: (prompt: string, display?: string) => void }) {
+function OfferCard({ message, onOffer }: { message: ChatMessage; onOffer?: (id: string, accept: boolean) => void }) {
+  const e = message.escalation!;
+  const btn = (primary: boolean): React.CSSProperties => ({
+    padding: '4px 10px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', color: '#d6efee',
+    background: primary ? 'rgba(111,230,189,0.14)' : 'transparent', border: `1px solid ${primary ? '#6FE6BD' : 'rgba(255,255,255,0.16)'}`,
+  });
+  const before = e.when === 'before';
+  return (
+    <div role="group" aria-label={`Offer to use ${e.name}`} style={{ marginTop: before ? 0 : 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(111,230,189,0.25)', fontSize: 12, color: '#d6efee', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span>{before ? `This one's tricky - ${e.reason}. Use ${e.name} for it?` : `${e.reason}. Ask ${e.name} instead?`}</span>
+      {e.handled ? <span style={{ fontSize: 11, color: '#8fb4b6' }}>Done.</span> : (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button type="button" style={btn(true)} onClick={() => onOffer?.(message.id, true)}>{before ? `Use ${e.name}` : `Ask ${e.name}`}</button>
+          {before && <button type="button" style={btn(false)} onClick={() => onOffer?.(message.id, false)}>Keep with Khami</button>}
+        </div>
+      )}
+      <span style={{ fontSize: 10.5, color: '#8fb4b6' }}>{e.name} is outside this computer. Confidential conversations always stay with Khami.</span>
+    </div>
+  );
+}
+
+function MessageBubble({ message, onSend, onOffer }: { message: ChatMessage; onSend: (prompt: string, display?: string) => void; onOffer?: (id: string, accept: boolean) => void }) {
   const isUser = message.role === 'user';
+  if (message.escalation?.when === 'before') {
+    return (
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 14 }}>
+        <HeadAvatar size={26} />
+        <div style={{ flex: 1, minWidth: 0, maxWidth: '90%' }}><OfferCard message={message} onOffer={onOffer} /></div>
+      </div>
+    );
+  }
   if (message.toolCard) {
     return (
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 14 }}>
@@ -134,6 +164,7 @@ function MessageBubble({ message, onSend }: { message: ChatMessage; onSend: (pro
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', maxWidth: '90%', flexDirection: isUser ? 'row-reverse' : 'row' }}>
         {!isUser && <HeadAvatar size={26} />}
         <div>
+          {!isUser && message.note && <div style={{ fontSize: 10.5, color: '#ffb36b', marginBottom: 3 }}>{message.note}</div>}
           {!isUser && message.answeredBy && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 3 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: '#d6efee' }}>{message.answeredBy.name}</span>
@@ -154,6 +185,7 @@ function MessageBubble({ message, onSend }: { message: ChatMessage; onSend: (pro
           </div>
           <ReasoningBlock message={message} />
           <MetaLine meta={message.meta} />
+          {message.escalation?.when === 'after' && <OfferCard message={message} onOffer={onOffer} />}
         </div>
       </div>
     </div>
@@ -250,12 +282,14 @@ const STATUS_DOT_COLOR: Record<AgentOnlineStatus, string> = {
 
 const rank = (a: AgentConfig) => (a.provider === 'khami' ? 0 : a.provider === 'copilot' ? 1 : 2);
 
-function AgentStrip({ roster, statuses, pinnedId, onPin, zdrKnown }: {
+function AgentStrip({ roster, statuses, pinnedId, onPin, zdrKnown, confidential = false }: {
   roster: AgentConfig[];
   statuses: Record<string, AgentOnlineStatus>;
   pinnedId: string | null;
   onPin: (id: string | null) => void;
   zdrKnown: boolean;
+  /** Confidential conversation: outside AIs are shown but can't be picked (Khami step 5). */
+  confidential?: boolean;
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderBottom: '1px solid rgba(95,240,216,0.1)', overflowX: 'auto', flexShrink: 0 }}>
@@ -267,12 +301,17 @@ function AgentStrip({ roster, statuses, pinnedId, onPin, zdrKnown }: {
       {roster.filter(a => a.provider === 'khami' || statuses[a.id] === 'online')
         // Khameleon's own Khami first, then Copilot ahead of other outside AIs.
         .sort((a, b) => rank(a) - rank(b))
-        .map(a => (
-        <button key={a.id} type="button" onClick={() => onPin(a.id)} className="chat-agent-pill" data-active={pinnedId === a.id} title={`${a.name} - ${statuses[a.id] ?? 'offline'}`}>
+        .map(a => {
+          const blocked = confidential && a.provider !== 'khami';
+          return (
+        <button key={a.id} type="button" onClick={() => onPin(a.id)} disabled={blocked} className="chat-agent-pill" data-active={pinnedId === a.id && !blocked}
+          style={blocked ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+          title={blocked ? `${a.name} isn't used for confidential conversations - they stay on this computer with Khami` : `${a.name} - ${statuses[a.id] ?? 'offline'}`}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_DOT_COLOR[statuses[a.id] ?? 'offline'], display: 'inline-block', marginRight: 5 }} />
           {a.name}
         </button>
-      ))}
+          );
+        })}
       <div style={{ flex: 1 }} />
       {zdrKnown && <span style={{ fontSize: 9, color: '#4ee0a0', fontFamily: 'var(--chat-mono)', flexShrink: 0, whiteSpace: 'nowrap' }}>ZDR on</span>}
     </div>
@@ -608,60 +647,117 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
     toolRequests.forEach(r => consumeToolRequest(r.id));
   }, [toolRequests, consumeToolRequest]);
 
+  // Khami step 5: confidential lock (button in the header, or found by
+  // Khameleon in what's written) and offers to hand tricky work to an
+  // outside AI - Copilot first. The server enforces the lock too.
+  const [locked, setLocked] = useState(false);
+  const [foundConfidential, setFoundConfidential] = useState<string[] | null>(null);
+  const confidential = locked || !!foundConfidential;
+
+  type Turn = { role: 'user' | 'assistant'; content: string }[];
+  const agentRef = (agent: AgentConfig): AgentRef => ({ id: agent.id, name: agent.name, status: statuses[agent.id] ?? 'offline', color: agent.color, initials: agent.initials });
+
+  /** One answer from one AI, streamed into a new message. */
+  const runSingle = useCallback((agent: AgentConfig, conversation: Turn, opts: { note?: string; confidential?: boolean } = {}) => {
+    setSending(true);
+    const pinnedAgent = roster.find(a => a.id === pinnedId);
+    const assistantId = crypto.randomUUID();
+    setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '', timestamp: Date.now(), note: opts.note }]);
+    let accumulated = '';
+    stopStreamRef.current = routeSingleStreaming(
+      agent.id, conversation,
+      (token) => {
+        accumulated += token;
+        setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content: accumulated } : m)));
+        if (liveRegionRef.current) liveRegionRef.current.textContent = `${agent.name} is responding`;
+      },
+      (result) => {
+        const offerAgent = result.offer ? roster.find(a => a.id === result.offer!.id) : undefined;
+        setMessages(prev => prev.map(m => (m.id === assistantId ? {
+          ...m,
+          answeredBy: agentRef(agent),
+          routedForReason: result.routedForReason,
+          reasoning: result.reasoning,
+          skillsUsed: result.skillsUsed,
+          meta: { durationMs: result.durationMs, costUsd: result.costUsd, energyWh: result.energyWh },
+          escalation: result.offer && offerAgent ? { when: 'after', agentId: offerAgent.id, name: result.offer.name, reason: result.offer.reason, conversation } : undefined,
+        } : m)));
+        // Carries this window's conversation forward under one real
+        // backend session (previously generated server-side every turn
+        // and silently discarded here) - this is also what lets a
+        // resumed briefing session's follow-up messages land in the
+        // SAME session rather than starting a new, disconnected one.
+        if (result.sessionId) setActiveSessionId(result.sessionId);
+        if (liveRegionRef.current) liveRegionRef.current.textContent = `${agent.name} replied`;
+        setSending(false);
+      },
+      (err) => {
+        setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content: `Error: ${err}` } : m)));
+        setSending(false);
+      },
+      pinnedAgent?.name,
+      activeSessionId ?? undefined,
+      opts.confidential,
+    );
+  }, [roster, pinnedId, statuses, activeSessionId]);
+
+  /** The user's choice on an offer card: hand over, or keep with Khami. */
+  const answerOffer = useCallback((messageId: string, accept: boolean) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg?.escalation || msg.escalation.handled) return;
+    setMessages(prev => prev.map(m => (m.id === messageId && m.escalation ? { ...m, escalation: { ...m.escalation, handled: true } } : m)));
+    // Locked since the offer was made: it stays with Khami (the server refuses outside AIs too).
+    const handOver = accept && !confidential;
+    const target = handOver ? roster.find(a => a.id === msg.escalation!.agentId) : roster.find(a => a.provider === 'khami');
+    if (target) runSingle(target, msg.escalation.conversation, { confidential, note: accept && confidential ? 'Kept with Khami - this conversation is now confidential.' : undefined });
+  }, [messages, roster, runSingle, confidential]);
+
   const sendMessage = useCallback(async (text: string, display?: string) => {
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text, displayContent: display, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
     setSending(true);
 
-    // Tool cards are interactive UI, not conversation text - leave them out.
-    const conversation = [...messages, userMsg].filter(m => !m.toolCard).map(m => ({ role: m.role, content: m.content }));
+    // Tool cards and offer cards are interactive UI, not conversation text - leave them out.
+    const conversation = [...messages, userMsg].filter(m => !m.toolCard && !(m.escalation && !m.content)).map(m => ({ role: m.role, content: m.content }));
     const pinnedAgent = roster.find(a => a.id === pinnedId);
+    const khami = roster.find(a => a.provider === 'khami');
 
     if (routeMode === 'single') {
       const agent = pinnedAgent ?? pickAutoRouteAgent(roster, statuses) ?? roster[0];
-      const assistantId = crypto.randomUUID();
-      setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '', timestamp: Date.now() }]);
-      let accumulated = '';
-      stopStreamRef.current = routeSingleStreaming(
-        agent.id, conversation,
-        (token) => {
-          accumulated += token;
-          setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content: accumulated } : m)));
-          if (liveRegionRef.current) liveRegionRef.current.textContent = `${agent.name} is responding`;
-        },
-        (result) => {
-          setMessages(prev => prev.map(m => (m.id === assistantId ? {
-            ...m,
-            answeredBy: { id: agent.id, name: agent.name, status: statuses[agent.id] ?? 'offline', color: agent.color, initials: agent.initials },
-            routedForReason: result.routedForReason,
-            reasoning: result.reasoning,
-            skillsUsed: result.skillsUsed,
-            meta: { durationMs: result.durationMs, costUsd: result.costUsd, energyWh: result.energyWh },
-          } : m)));
-          // Carries this window's conversation forward under one real
-          // backend session (previously generated server-side every turn
-          // and silently discarded here) - this is also what lets a
-          // resumed briefing session's follow-up messages land in the
-          // SAME session rather than starting a new, disconnected one.
-          if (result.sessionId) setActiveSessionId(result.sessionId);
-          if (liveRegionRef.current) liveRegionRef.current.textContent = `${agent.name} replied`;
+      const check = await checkEscalation(conversation, agent.id, locked);
+      if (check.confidential && !locked) setFoundConfidential(check.reasons);
+
+      if (check.confidential && agent.provider !== 'khami') {
+        if (khami && statuses[khami.id] === 'online') {
+          runSingle(khami, conversation, { note: `Kept with Khami on this computer - ${check.reasons[0] ?? 'it\'s confidential'}.`, confidential: true });
+        } else {
+          setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: `This includes confidential details (${check.reasons[0] ?? 'marked confidential'}), so it stays on this computer - and Khami isn't set up yet. Set it up from the head menu (Khami setup) to do this.`, timestamp: Date.now() }]);
           setSending(false);
-        },
-        (err) => {
-          setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content: `Error: ${err}` } : m)));
-          setSending(false);
-        },
-        pinnedAgent?.name,
-        activeSessionId ?? undefined,
-      );
+        }
+        return;
+      }
+      const offerAgent = check.offer ? roster.find(a => a.id === check.offer!.id) : undefined;
+      if (offerAgent && check.mode === 'auto') {
+        runSingle(offerAgent, conversation, { note: `Handed to ${check.offer!.name} - ${check.reason ?? 'it\'s a tricky one'}.` });
+        return;
+      }
+      if (offerAgent && check.mode === 'ask') {
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(), role: 'assistant', content: '', timestamp: Date.now(),
+          escalation: { when: 'before', agentId: offerAgent.id, name: check.offer!.name, reason: check.reason ?? "it's a tricky one", conversation },
+        }]);
+        setSending(false);
+        return;
+      }
+      runSingle(agent, conversation, { confidential: check.confidential });
     } else {
       try {
         const agentIds = pinnedAgent ? [pinnedAgent.id] : roster.filter(a => a.enabled).map(a => a.id);
-        const result = await routeMultiAgent(routeMode, conversation, agentIds);
+        const result = await routeMultiAgent(routeMode, conversation, agentIds, confidential);
         const agent = roster.find(a => a.id === result.agentId);
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(), role: 'assistant', content: result.content, timestamp: Date.now(),
-          answeredBy: agent ? { id: agent.id, name: agent.name, status: statuses[agent.id] ?? 'offline', color: agent.color, initials: agent.initials } : undefined,
+          answeredBy: agent ? agentRef(agent) : undefined,
           routedForReason: result.routedForReason,
           reasoning: result.reasoning,
           meta: { durationMs: result.durationMs, costUsd: result.costUsd, energyWh: result.energyWh },
@@ -673,7 +769,7 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
         setSending(false);
       }
     }
-  }, [messages, roster, pinnedId, routeMode, statuses, activeSessionId]);
+  }, [messages, roster, pinnedId, routeMode, statuses, locked, confidential, runSingle]);
 
   if (!chatOpen) return null;
 
@@ -746,6 +842,12 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
             )}
           </div>
         )}
+        <button type="button" onClick={() => { if (confidential) { setLocked(false); setFoundConfidential(null); } else setLocked(true); }} aria-pressed={confidential}
+          title={confidential ? `Confidential - stays on this computer with Khami${foundConfidential ? ` (${foundConfidential[0]})` : ''}. Click to unlock.` : 'Mark this conversation confidential - only Khami, on this computer, will answer'}
+          aria-label={confidential ? 'Confidential conversation - click to unlock' : 'Mark conversation confidential'} className="chat-icon-btn"
+          style={confidential ? { color: '#ffb36b' } : undefined}>
+          {confidential ? <Lock size={14} /> : <LockOpen size={14} />}
+        </button>
         <button type="button" onClick={() => setReasoningDefault(!reasoningDefault)} aria-pressed={reasoningDefault} title="Default reasoning visibility" aria-label="Toggle default reasoning visibility" className="chat-icon-btn">
           {reasoningDefault ? <Eye size={14} /> : <EyeOff size={14} />}
         </button>
@@ -802,7 +904,7 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
   const content = (
     <>
       {chrome}
-      <AgentStrip roster={roster} statuses={statuses} pinnedId={pinnedId} onPin={setPinnedId} zdrKnown={false} />
+      <AgentStrip roster={roster} statuses={statuses} pinnedId={pinnedId} onPin={setPinnedId} zdrKnown={false} confidential={confidential} />
       <div ref={liveRegionRef} aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)' }} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative' }}>
         <img src={HEAD_SRC} alt="" aria-hidden style={{ position: 'absolute', inset: 0, margin: 'auto', width: '55%', opacity: 0.13, objectFit: 'contain', pointerEvents: 'none', transform: 'translate(1%,-6%)' }} />
@@ -830,7 +932,7 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
                 <TaskRunCard run={run} onRemove={removeActiveTask} />
               </div>
             ))}
-            {messages.map(m => <MessageBubble key={m.id} message={m} onSend={sendMessage} />)}
+            {messages.map(m => <MessageBubble key={m.id} message={m} onSend={sendMessage} onOffer={answerOffer} />)}
             {sending && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#7fa3a6', fontSize: 11 }}>
                 <Loader2 size={12} className="chat-spin" /> thinking…

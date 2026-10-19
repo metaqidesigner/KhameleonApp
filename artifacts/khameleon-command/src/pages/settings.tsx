@@ -3,6 +3,7 @@ import { LookLayoutControls, useSyncAcrossWindows } from '@/components/overlay/L
 import { KhamiSetup } from '@/components/khami/KhamiSetup';
 import { AboutLicences } from '@/components/about/AboutLicences';
 import { MicrosoftSignIn } from '@/components/settings/MicrosoftSignIn';
+import { EscalationSetting } from '@/components/settings/EscalationSetting';
 import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin, Music, Play, Pause, SkipForward, SkipBack, Mic } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
@@ -542,6 +543,10 @@ function EngineSection() {
         <div style={{ padding: 12, background: 'rgba(0,4,8,0.6)', border: '1px solid rgba(0,212,255,0.15)' }}>
           <KhamiSetup tone="classic" />
         </div>
+      </Row>
+      {/* Same setting as the Overlay's Settings > AI (components/settings/EscalationSetting). */}
+      <Row>
+        <EscalationSetting tone="classic" />
       </Row>
       <div style={{
         marginBottom: 16, padding: '10px 12px', fontFamily: 'var(--j-font-ui)', fontSize: 11,

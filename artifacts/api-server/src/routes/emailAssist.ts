@@ -5,6 +5,7 @@ import { findAgent } from "../agents/defaults.js";
 import { isConnected } from "../lib/oauthTokens.js";
 import * as outlook from "../lib/outlookGraph.js";
 import * as gmail from "../lib/gmailApi.js";
+import { detectConfidential } from "../lib/escalation.js";
 import { assistPrompt, rewritePrompt, parseAssist, subjectMatches, looksLikeAPerson, splitSender, type AssistEmail } from "../lib/emailAssist.js";
 
 /**
@@ -115,9 +116,17 @@ function fail(req: { log: { error: (o: object, m: string) => void } }, res: { st
   res.status(status ?? 502).json({ error: errorText(err) });
 }
 
+/** Confidential emails stay with Khami, even when the user picks Ask Copilot. */
+function guardConfidential(email: AssistEmail, which: unknown): void {
+  if (which === "copilot" && detectConfidential(`${email.subject}\n${email.body}`).confidential) {
+    throw Object.assign(new Error("This email includes confidential details, so it stays on this computer with Khami."), { status: 403 });
+  }
+}
+
 router.post("/help", async (req, res) => {
   try {
     const email = await loadEmail(req.body);
+    guardConfidential(email, req.body?.agent);
     const agent = await pickAgent(req.body?.agent);
     const reply = await askAgent(agent, [{ role: "user", content: assistPrompt(email) }]);
     if (reply.error) { res.status(502).json({ error: reply.error }); return; }
@@ -132,6 +141,7 @@ router.post("/rewrite", async (req, res) => {
   if (!reply?.trim() || !how?.trim()) { res.status(400).json({ error: "Nothing to change." }); return; }
   try {
     const email = await loadEmail(req.body);
+    guardConfidential(email, req.body?.agent);
     const agent = await pickAgent(req.body?.agent);
     const out = await askAgent(agent, [{ role: "user", content: rewritePrompt(email, reply, how.trim()) }]);
     if (out.error) { res.status(502).json({ error: out.error }); return; }

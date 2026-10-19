@@ -11,6 +11,7 @@
 import { askAgent, isAgentAvailable } from "../agents/gateway.js";
 import { findAgent } from "../agents/defaults.js";
 import type { AgentConfig, ToolEvent } from "../agents/types.js";
+import { detectConfidential } from "./escalation.js";
 
 export const AI_ORDER = ["khami", "copilot", "claude", "gpt4o", "gemini"] as const;
 
@@ -32,6 +33,21 @@ export function aiLabel(agent: Pick<AgentConfig, "id" | "name">): string {
   return agent.name;
 }
 
+/** The first outside AI the user has, Copilot first - for "use Copilot for this?". */
+export async function firstOutsideAI(): Promise<AgentConfig | undefined> {
+  for (const id of AI_ORDER) {
+    if (id === "khami") continue;
+    const a = findAgent(id);
+    if (a && (await isAgentAvailable(a))) return a;
+  }
+  return undefined;
+}
+
+export class ConfidentialError extends Error {
+  status = 403;
+  constructor() { super("This includes confidential details, so it stays on this computer with Khami. Set up Khami (head menu > Khami setup) to do it."); }
+}
+
 export class NoAIError extends Error {
   status = 503;
   constructor() { super("No AI is available - set up Khami (head menu > Khami setup)."); }
@@ -47,8 +63,14 @@ export interface AskAIOptions {
 }
 
 export async function askAI(opts: AskAIOptions): Promise<{ text: string; by: string; agentId: string }> {
+  // Confidential work never leaves the computer (docs/khami-design.md, step 5).
+  const confidential = detectConfidential(`${opts.system ?? ""}\n${opts.prompt}`).confidential;
   let agent: AgentConfig | undefined;
-  if (opts.agentId) {
+  if (confidential) {
+    const khami = findAgent("khami");
+    agent = khami && (await isAgentAvailable(khami)) ? khami : undefined;
+    if (!agent) throw new ConfidentialError();
+  } else if (opts.agentId) {
     const a = findAgent(opts.agentId);
     agent = a && (await isAgentAvailable(a)) ? a : undefined;
   } else {

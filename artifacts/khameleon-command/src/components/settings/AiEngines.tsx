@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { KhamiSetup } from '@/components/khami/KhamiSetup';
 import { saveApiKey, clearApiKey, type ApiKeyProvider } from '@/lib/jarvisApi';
 import { useUi, Label, Hint, Msg, Group, type Tone } from './ui';
+import { EscalationSetting } from './EscalationSetting';
 
 /**
  * Settings > AI (docs/gap-review.md Q5, docs/khami-design.md): Khami first -
@@ -58,7 +59,7 @@ export function AiEngines({ tone, onOpenIntegrations }: { tone: Tone; onOpenInte
 
       <Group>
         <Label tone={tone}>Outside AIs (optional)</Label>
-        <Hint tone={tone}>Only if your organisation provides them. You can pick one in the chat; Khameleon also uses the first one here when Khami isn't set up.</Hint>
+        <Hint tone={tone}>Only if your organisation provides them. Khami offers them for tricky work (Copilot first), you can pick one in the chat, and they step in when Khami isn't set up. Confidential work never goes to them.</Hint>
         <div style={row}>
           {dot(!!copilot?.available)}
           <span style={{ flex: 1, fontSize: 12.5 }}>Microsoft 365 Copilot</span>
@@ -87,6 +88,7 @@ export function AiEngines({ tone, onOpenIntegrations }: { tone: Tone; onOpenInte
           );
         })}
       </Group>
+      <EscalationSetting tone={tone} />
       {msg && <Msg tone={tone} ok={msg.ok}>{msg.text}</Msg>}
     </div>
   );

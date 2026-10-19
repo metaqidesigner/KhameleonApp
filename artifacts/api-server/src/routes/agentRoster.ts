@@ -6,6 +6,14 @@ import { recordQuery, getMetrics, getHistory, getAllMetrics } from "../agents/st
 import type { AgentConfig, ChatMessage, ToolEvent } from "../agents/types.js";
 import { db, actionReceiptsTable } from "@workspace/db";
 import { readableError } from "../lib/readableError.js";
+import { conversationConfidential } from "./escalation.js";
+import { soundsUnsure } from "../lib/escalation.js";
+import { getEscalationMode } from "../lib/escalationSettings.js";
+import { firstOutsideAI, aiLabel } from "../lib/askAI.js";
+
+/** Confidential work stays with Khami (docs/khami-design.md, step 5): outside AIs are left out. */
+const CONFIDENTIAL_MESSAGE = "This conversation includes confidential details, so it stays on this computer with Khami.";
+const isLocal = (a: AgentConfig) => a.provider === "khami";
 
 /**
  * Failed chat requests go into the activity log too (gap review Q10: the
@@ -114,7 +122,8 @@ router.post("/ask-all", async (req, res) => {
   if (!messages?.length) { res.status(400).json({ error: "messages required" }); return; }
 
   const roster  = getRoster().filter((a) => a.enabled);
-  const targets = agent_ids ? roster.filter((a) => agent_ids.includes(a.id)) : roster;
+  const locked = conversationConfidential(messages, (req.body as { confidential?: boolean }).confidential).confidential;
+  const targets = (agent_ids ? roster.filter((a) => agent_ids.includes(a.id)) : roster).filter((a) => !locked || isLocal(a));
   const results = await Promise.all(targets.map((a) => askAgent(a, messages)));
 
   results.forEach((r) => {
@@ -148,7 +157,8 @@ router.post("/compare", async (req, res) => {
   if (!prompt || !agent_ids?.length) { res.status(400).json({ error: "prompt and agent_ids required" }); return; }
 
   const messages: ChatMessage[] = [{ role: "user", content: prompt }];
-  const agents  = agent_ids.map((id) => findAgent(id)).filter((a): a is AgentConfig => !!a);
+  const locked = conversationConfidential(messages, (req.body as { confidential?: boolean }).confidential).confidential;
+  const agents  = agent_ids.map((id) => findAgent(id)).filter((a): a is AgentConfig => !!a && (!locked || isLocal(a)));
   const results = await Promise.all(agents.map((a) => askAgent(a, messages)));
   results.forEach((r) => {
     if (!r.error) recordQuery(r.agentId, r.latencyMs, r.tokens, r.costUsd, r.energyWh, prompt, r.content, r.model, randomUUID());
@@ -169,12 +179,35 @@ router.post("/:id/ask", async (req, res) => {
   const agent = findAgent(req.params.id);
   if (!agent) { res.status(404).json({ error: "Agent not found" }); return; }
 
-  const { messages, stream, sessionId: clientSessionId } = req.body as {
+  const { messages, stream, sessionId: clientSessionId, confidential: lockedByUser } = req.body as {
     messages: ChatMessage[];
     stream?: boolean;
     sessionId?: string;
+    confidential?: boolean;
   };
   if (!messages?.length) { res.status(400).json({ error: "messages required" }); return; }
+
+  // The lock, enforced here whatever the page asked for.
+  const conf = conversationConfidential(messages, lockedByUser);
+  if (conf.confidential && !isLocal(agent)) {
+    if (stream) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.write(`data: ${JSON.stringify({ error: CONFIDENTIAL_MESSAGE, confidential: true, reasons: conf.reasons })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true, agentId: agent.id, confidential: true })}\n\n`);
+      res.end();
+    } else {
+      res.status(403).json({ error: CONFIDENTIAL_MESSAGE, confidential: true, reasons: conf.reasons });
+    }
+    return;
+  }
+
+  /** When Khami says it couldn't really do it, offer the first outside AI (unless confidential or "never"). */
+  const offerFor = async (content: string) => {
+    if (!isLocal(agent) || conf.confidential || !soundsUnsure(content)) return null;
+    if ((await getEscalationMode()) === "never") return null;
+    const a = await firstOutsideAI();
+    return a ? { id: a.id, name: aiLabel(a), reason: "Khami wasn't sure" } : null;
+  };
 
   // Use client-provided sessionId (for multi-turn continuity) or generate a new one
   const sessionId = clientSessionId ?? randomUUID();
@@ -218,6 +251,8 @@ router.post("/:id/ask", async (req, res) => {
         costUsd:   result.costUsd,
         sessionId,
         toolCallCount: result.toolCalls?.length ?? 0,
+        confidential: conf.confidential,
+        offer: result.error ? null : await offerFor(result.content),
       })}\n\n`
     );
     res.end();
@@ -234,7 +269,7 @@ router.post("/:id/ask", async (req, res) => {
       sessionId, result.toolCalls,
     );
   }
-  res.json({ ...result, sessionId });
+  res.json({ ...result, sessionId, confidential: conf.confidential, offer: result.error ? null : await offerFor(result.content) });
 });
 
 export default router;

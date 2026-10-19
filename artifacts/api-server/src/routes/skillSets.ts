@@ -2,9 +2,7 @@ import { Router } from "express";
 import { STARTER_SKILLS } from "../starterSkills.js";
 import { draftStepsPrompt, extractSteps, testSkillMatch, capturePrompt, parseCaptureDraft, type CapturedStep } from "../lib/skillGuide.js";
 import { loadInstalledSkills } from "../lib/installedSkills.js";
-import { askAgent, isAgentAvailable } from "../agents/gateway.js";
-import { findAgent } from "../agents/defaults.js";
-import type { AgentConfig } from "../agents/types.js";
+import { askAI } from "../lib/askAI.js";
 import { db } from "@workspace/db";
 import {
   skillSetsTable, approvalsTable, actionReceiptsTable, entityWorkDomainsTable,
@@ -158,44 +156,29 @@ router.post("/guide/draft-steps", async (req, res) => {
   if (!task?.trim()) { res.status(400).json({ error: "Describe the task first." }); return; }
   try {
     const writer = STARTER_SKILLS.find((s) => s.name === "Skill writer");
-    const order = ["khami", "copilot", "claude", "gpt4o", "gemini"];
-    let agent: AgentConfig | undefined;
-    for (const id of order) {
-      const a = findAgent(id);
-      if (a && (await isAgentAvailable(a))) { agent = a; break; }
-    }
-    if (!agent) { res.status(503).json({ error: "No AI is available - set up Khami first (head menu > Khami setup)." }); return; }
     const prompt = draftStepsPrompt(writer?.content ?? "", { name: name ?? "", description: description ?? "", task, result });
-    const reply = await askAgent(agent, [{ role: "user", content: prompt }]);
-    if (reply.error) { res.status(502).json({ error: reply.error }); return; }
-    res.json({ steps: extractSteps(reply.content), by: agent.name });
+    // Khami first; confidential details never leave the computer (lib/askAI.ts).
+    const reply = await askAI({ prompt });
+    res.json({ steps: extractSteps(reply.text), by: reply.by });
   } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (status) { res.status(status).json({ error: (err as Error).message }); return; }
     req.log.error({ err }, "Error drafting skill steps");
     res.status(500).json({ error: "Internal server error" });
   }
 });
-
-/** First AI available, Khameleon's own first (docs/khami-design.md). */
-async function firstAvailableAgent(): Promise<AgentConfig | undefined> {
-  for (const id of ["khami", "copilot", "claude", "gpt4o", "gemini"]) {
-    const a = findAgent(id);
-    if (a && (await isAgentAvailable(a))) return a;
-  }
-  return undefined;
-}
 
 /** Turns a Capture recording into a draft skill for the user to check (Build 4). */
 router.post("/guide/from-capture", async (req, res) => {
   const { steps } = req.body as { steps?: CapturedStep[] };
   if (!Array.isArray(steps) || steps.length === 0) { res.status(400).json({ error: "Nothing was recorded." }); return; }
   try {
-    const agent = await firstAvailableAgent();
-    if (!agent) { res.status(503).json({ error: "No AI is available - set up Khami first (head menu > Khami setup)." }); return; }
     const writer = STARTER_SKILLS.find((s) => s.name === "Skill writer");
-    const reply = await askAgent(agent, [{ role: "user", content: capturePrompt(writer?.content ?? "", steps.slice(0, 60)) }]);
-    if (reply.error) { res.status(502).json({ error: reply.error }); return; }
-    res.json({ ...parseCaptureDraft(reply.content), by: agent.name });
+    const reply = await askAI({ prompt: capturePrompt(writer?.content ?? "", steps.slice(0, 60)) });
+    res.json({ ...parseCaptureDraft(reply.text), by: reply.by });
   } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (status) { res.status(status).json({ error: (err as Error).message }); return; }
     req.log.error({ err }, "Error writing up a capture");
     res.status(500).json({ error: "Internal server error" });
   }
