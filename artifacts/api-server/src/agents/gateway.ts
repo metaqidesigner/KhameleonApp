@@ -7,6 +7,7 @@ import { dispatchTool } from "./tools/dispatcher.js";
 import { getCustomToolDefinitions, isCustomToolName, dispatchCustomTool, getMcpServerConfigs } from "./tools/customIntegrations.js";
 import { askKhami, khamiStatus } from "../engines/khami.js";
 import { toolsForAnyAi } from "./tools/anyAiTools.js";
+import { runOpenAiToolLoop, type ChatClient } from "./openAiToolLoop.js";
 import { askCopilot } from "../lib/copilotChat.js";
 import { getToken } from "../lib/oauthTokens.js";
 import { pickSkill, skillInstructions } from "../lib/skillPicker.js";
@@ -280,6 +281,7 @@ async function askOpenAI(
   agent: AgentConfig,
   messages: ChatMessage[],
   onToken?: (t: string) => void,
+  onToolEvent?: (e: ToolEvent) => void,
 ): Promise<AgentResponse> {
   // Azure OpenAI: the organisation's own resource and deployment (lib/azureOpenAI.ts).
   const azure = agent.provider === "azure" ? await getAzureConfig() : null;
@@ -312,9 +314,18 @@ async function askOpenAI(
   let content = "";
   let tokens  = 0;
 
-  if (onToken) {
+  // Step 5: the same safe tools as Khami and the chat (agents/tools/anyAiTools.ts),
+  // unless this is a plain internal job (useTools false).
+  const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+  const tools = agent.useTools === false ? [] : await toolsForAnyAi(lastUser).catch(() => []);
+  if (tools.length) {
+    const r = await runOpenAiToolLoop(client as unknown as ChatClient, agent.model, msgs, tools, onToolEvent);
+    content = r.content;
+    tokens = r.tokens || Math.ceil(content.length / 4);
+    onToken?.(content); // answered in one piece once the tools are done
+  } else if (onToken) {
     const stream = await client.chat.completions.create({
-      model: agent.model, messages, max_completion_tokens: 8192, stream: true,
+      model: agent.model, messages: msgs, max_completion_tokens: 8192, stream: true,
     });
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
@@ -323,7 +334,7 @@ async function askOpenAI(
     tokens = Math.ceil(content.length / 4);
   } else {
     const res = await client.chat.completions.create({
-      model: agent.model, messages, max_completion_tokens: 8192,
+      model: agent.model, messages: msgs, max_completion_tokens: 8192,
     });
     content = res.choices[0]?.message?.content ?? "";
     tokens  = res.usage?.total_tokens ?? Math.ceil(content.length / 4);
@@ -405,7 +416,7 @@ export async function askAgent(
     if (agent.provider === "anthropic") {
       return await askAnthropic(agent, messages, onToken, onToolEvent);
     }
-    return await askOpenAI(agent, messages, onToken);
+    return await askOpenAI(agent, messages, onToken, onToolEvent);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { agentId: agent.id, content: "", model: agent.model, latencyMs: 0, tokens: 0, costUsd: 0, energyWh: 0, error: msg };

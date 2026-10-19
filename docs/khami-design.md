@@ -31,6 +31,13 @@ How it connects: Microsoft's **Copilot Chat API** (Microsoft Graph, `/beta/copil
 3. **Confidential work never leaves the computer** — Khami won't escalate it, even if asked.
 4. **Nothing else available or no internet** — Khami does its best and says plainly when an answer may be weaker.
 
+### Built (step 5, 2026-10-19)
+
+- **Tricky work** is spotted by plain code (long writing, careful reasoning, very long requests) and by Khami's own "I'm not sure" answers. Khami then offers the first outside AI the user has - Microsoft 365 Copilot, then the organisation's Azure OpenAI, then Claude, GPT, Gemini. Settings > AI: ask first (default), hand over automatically, or never.
+- **Confidential lock:** a lock in the chat, or automatic when a message includes bank/card/NI numbers, pay, health or HR-case details, passwords, passport/date-of-birth details, or is marked confidential. Enforced on the server for the chat and every feature using the shared AI helper (`lib/askAI.ts`).
+- **Azure OpenAI** is an outside AI an admin sets up in Settings > AI.
+- **GPT, Gemini and Azure use the same safe tools** as Khami and the chat (function calling, `agents/openAiToolLoop.ts`).
+
 ## Carried over from earlier decisions
 
 - Skills work with Khami: Khameleon picks the matching skill itself and hands Khami the steps (Claude keeps its own proven way when it's the one answering).
