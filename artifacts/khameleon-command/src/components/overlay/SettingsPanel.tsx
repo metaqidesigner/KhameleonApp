@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { LookLayoutControls } from "./LookLayoutControls";
 import { ProfileSettings } from "@/components/settings/ProfileSettings";
 import { VoiceSettings } from "@/components/settings/VoiceSettings";
+import { AlertSettings } from "@/components/settings/AlertSettings";
 import { AiEngines } from "@/components/settings/AiEngines";
 import { MicrosoftSignIn } from "@/components/settings/MicrosoftSignIn";
 import { CredentialsSettings } from "@/components/settings/CredentialsSettings";
@@ -16,12 +17,13 @@ import type { OverlayPalette } from "./palettes";
  * account when team accounts are on). Integrations keep their own panel.
  * Classic shows the same sections on its Settings and Vault pages.
  */
-export type SettingsTab = "profile" | "look" | "voice" | "ai" | "microsoft" | "credentials" | "security";
+export type SettingsTab = "profile" | "look" | "voice" | "alerts" | "ai" | "microsoft" | "credentials" | "security";
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: "profile", label: "Profile" },
   { id: "look", label: "Look & layout" },
   { id: "voice", label: "Voice" },
+  { id: "alerts", label: "Alerts" },
   { id: "ai", label: "AI" },
   { id: "microsoft", label: "Microsoft sign-in" },
   { id: "credentials", label: "Credentials" },
@@ -75,6 +77,7 @@ export function SettingsPanel({ palette, initialTab = "profile", onClose, onOpen
         {tab === "profile" && <ProfileSettings tone="overlay" />}
         {tab === "look" && <LookLayoutControls tone="overlay" />}
         {tab === "voice" && <VoiceSettings tone="overlay" />}
+        {tab === "alerts" && <AlertSettings tone="overlay" />}
         {tab === "ai" && <AiEngines tone="overlay" onOpenIntegrations={onOpenIntegrations} />}
         {tab === "microsoft" && <MicrosoftSignIn tone="overlay" />}
         {tab === "credentials" && <CredentialsSettings tone="overlay" />}

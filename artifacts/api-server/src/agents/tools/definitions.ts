@@ -141,6 +141,34 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.Tool[] = [
       required: ["url"],
     },
   },
+  // ── Work tools (read-only): calendar ──────────────────────────────────────
+  {
+    name: "get_calendar",
+    description:
+      "Read the user's calendar (read-only). Use for questions like 'what's on this afternoon?', 'am I free tomorrow?', 'what meetings do I have this week?'. Returns each event's time, title, place and the other people in it.",
+    input_schema: {
+      type: "object",
+      properties: {
+        when: {
+          type: "string",
+          description: "Which period: 'today' (the rest of today), 'this afternoon', 'tomorrow', 'this week', 'next week', or a date as YYYY-MM-DD.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "prepare_meeting_brief",
+    description:
+      "Prepare a short brief for one of the user's meetings: who's in it, recent emails from them, related open tasks, when they last met, and points to raise. Use for 'prep me for the 3pm', 'brief me on my meeting with Jane'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        meeting: { type: "string", description: "Which meeting, in the user's words - a time ('3pm', '15:30'), a name ('the Q3 review'), a person ('Jane'), or 'next'." },
+      },
+      required: ["meeting"],
+    },
+  },
   // ── Task management tools ──────────────────────────────────────────────────
   {
     name: "create_task",

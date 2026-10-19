@@ -26,3 +26,4 @@ export * from "./custom_integrations";
 export * from "./action_receipts";
 export * from "./users";
 export * from "./procedures";
+export * from "./work_notices";

@@ -3,6 +3,9 @@ import { inArray } from 'drizzle-orm';
 import { findAgent } from './agents/defaults.js';
 import { askAgent } from './agents/gateway.js';
 import { logger } from './lib/logger.js';
+import { askAI } from './lib/askAI.js';
+import { todaysBriefs, pruneBriefs } from './lib/meetingPrepService.js';
+import { addSuggestion } from './lib/suggestions.js';
 
 // ── Scheduler config keys ──────────────────────────────────────
 
@@ -141,23 +144,34 @@ async function runMorningDigest(): Promise<void> {
   logger.info({ today }, 'Scheduler: starting morning digest');
   state.lastRunAt = new Date().toISOString();
 
-  const result = await askAgent(agent, [
-    {
-      role: 'user',
-      content:
+  // Khami first (lib/askAI.ts) - this used to call Claude directly.
+  try {
+    const r = await askAI({
+      system: agent.systemPrompt,
+      prompt:
         `Good morning! Please generate today's morning digest for ${today}. ` +
         `Review existing tasks using list_tasks, then create a balanced, categorised daily plan with create_task. ` +
         `Cover all six time buckets: Start of Day, Core Work, Meetings, Communication, Administrative, and End of Day.`,
-    },
-  ]);
+      withTools: true,
+    });
+    logger.info({ by: r.by }, 'Scheduler: morning digest complete');
+  } catch (err) {
+    logger.error({ err }, 'Scheduler: morning digest returned an error');
+  }
 
-  if (result.error) {
-    logger.error({ error: result.error }, 'Scheduler: morning digest returned an error');
-  } else {
-    logger.info(
-      { tokens: result.tokens, latencyMs: result.latencyMs, toolCalls: result.toolCalls?.length ?? 0 },
-      'Scheduler: morning digest complete',
-    );
+  // Build 10: the day's meeting briefs, made now and shown together.
+  try {
+    const briefs = await todaysBriefs();
+    if (briefs.length) {
+      await addSuggestion({
+        kind: 'meeting_brief', title: `Your meetings today (${briefs.length})`, body: briefs.map(b => b.brief).join('\n\n---\n\n'),
+        why: 'Briefs for today\'s meetings with other people, from your morning digest.',
+        expiresAt: new Date(new Date().setHours(23, 59, 0, 0)),
+      });
+    }
+    await pruneBriefs();
+  } catch (err) {
+    logger.warn({ err }, 'Scheduler: meeting briefs for the digest skipped');
   }
 }
 

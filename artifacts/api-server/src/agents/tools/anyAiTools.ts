@@ -24,6 +24,8 @@ export interface AnyAiTool {
 
 const TASK_TOOLS = ["create_task", "list_tasks", "update_task"];
 const WEB_TOOLS = ["fetch_url"];
+const CALENDAR_TOOLS = ["get_calendar"];
+const PREP_TOOLS = ["prepare_meeting_brief"];
 
 /** Which of Khameleon's own tools a request seems to need. Pure - exported for testing. */
 export function ownToolsFor(request: string): string[] {
@@ -31,6 +33,8 @@ export function ownToolsFor(request: string): string[] {
   const tools: string[] = [];
   if (/\b(task|tasks|to-?do|remind|reminder|follow[- ]?up|deadline|due)\b/.test(r)) tools.push(...TASK_TOOLS);
   if (/https?:\/\/|\bwww\.|\bwebsite\b|\bweb ?page\b|\burl\b/.test(r)) tools.push(...WEB_TOOLS);
+  if (/\b(calendar|diary|meetings?|schedule|agenda|appointments?|free|busy|available|this (morning|afternoon|evening)|tomorrow|next week|this week|what'?s on)\b/.test(r)) tools.push(...CALENDAR_TOOLS);
+  if (/\b(prep|prepare|brief|briefing)\b/.test(r) && /\b(meeting|call|catch[- ]?up|\d{1,2}(:\d{2})?\s*(am|pm)|\d{1,2}[:.]\d{2}|with)\b/.test(r)) tools.push(...PREP_TOOLS);
   return tools;
 }
 

@@ -3,6 +3,8 @@ import { logger } from "./lib/logger";
 import { initScheduler } from "./scheduler";
 import { migrateLegacyTaskValues } from "./migrate-legacy-values";
 import { ensureProcedureTables } from "./ensure-procedure-tables";
+import { ensureWorkTables } from "./ensure-work-tables";
+import { startMeetingPrep } from "./lib/meetingPrepService";
 import { ensureSettingsTable } from "./ensure-settings-table";
 import { seedSkillSetsData } from "./seed-skill-sets-data";
 
@@ -30,6 +32,8 @@ async function bootstrap() {
   //    including fresh deployments where drizzle-kit push has not been run).
   await ensureSettingsTable();
   await ensureProcedureTables();
+  await ensureWorkTables();
+  startMeetingPrep();
 
   // 3. Load persisted scheduler config from DB and arm the timer.
   //    Must happen before we accept traffic so GET /api/scheduler/status

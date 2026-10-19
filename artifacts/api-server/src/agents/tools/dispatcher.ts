@@ -10,6 +10,7 @@ import {
 import { createTask, listTasks, updateTask } from "./taskOps.js";
 import { fetchUrl } from "./webFetch.js";
 import { checkToolRateLimit } from "./rateLimiter.js";
+import { getCalendar, prepareMeetingBrief } from "./workTools.js";
 
 export type ToolInput = Record<string, unknown>;
 
@@ -113,6 +114,12 @@ export async function dispatchTool(name: string, input: ToolInput): Promise<stri
       if (description) patch.description = description;
       return updateTask(id, patch);
     }
+
+    case "get_calendar":
+      return getCalendar(optionalString(input, "when"));
+
+    case "prepare_meeting_brief":
+      return prepareMeetingBrief(optionalString(input, "meeting") ?? "");
 
     default:
       throw new Error(`Unknown tool: '${name}'. No handler registered.`);

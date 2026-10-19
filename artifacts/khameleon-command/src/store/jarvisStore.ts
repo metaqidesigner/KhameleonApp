@@ -216,11 +216,13 @@ export const DEFAULT_OVERLAY_PREFS: OverlayPrefs = {
 };
 
 /** The toolbar actions that open a card in the chat. */
-export type ChatToolId = 'search-memory' | 'research' | 'draft-reply' | 'summarize-thread' | 'sort-inbox' | 'polish' | 'run-skill';
+export type ChatToolId = 'search-memory' | 'research' | 'draft-reply' | 'summarize-thread' | 'sort-inbox' | 'polish' | 'run-skill' | 'notice';
 
 /** Extra data a card needs - currently only which skill to run. */
 export interface ChatToolPayload {
   skill?: { name: string; content: string };
+  /** A suggestion-slot item opened in the chat (meeting brief, urgent mail). */
+  notice?: { title: string; body: string; why?: string };
 }
 
 export const useJarvisStore = create<JarvisStore>()(

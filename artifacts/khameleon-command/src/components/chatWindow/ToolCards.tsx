@@ -36,6 +36,7 @@ export const TOOL_KIND: Record<ChatToolId, WorkKind> = {
   'sort-inbox': 'action',
   polish: 'action',
   'run-skill': 'action',
+  notice: 'ask',
 };
 
 export const TOOL_TITLE: Record<ChatToolId, string> = {
@@ -46,6 +47,7 @@ export const TOOL_TITLE: Record<ChatToolId, string> = {
   'sort-inbox': 'Sort inbox',
   polish: 'Polish wording',
   'run-skill': 'Run skill',
+  notice: 'From Khameleon',
 };
 
 const KIND_META: Record<WorkKind, { label: string; icon: ReactNode }> = {
@@ -548,6 +550,13 @@ export function ToolCard({ tool, payload, onSend }: { tool: ChatToolId; payload?
       case 'sort-inbox': return <SortInboxCard />;
       case 'polish': return <PolishCard onSend={onSend} />;
       case 'run-skill': return <RunSkillCard skill={payload?.skill} onSend={onSend} />;
+      case 'notice': return payload?.notice ? (
+        <>
+          <div style={{ fontWeight: 600 }}>{payload.notice.title}</div>
+          {payload.notice.why && <div style={mutedStyle}>{payload.notice.why}</div>}
+          <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{payload.notice.body}</div>
+        </>
+      ) : null;
     }
   })();
   return (

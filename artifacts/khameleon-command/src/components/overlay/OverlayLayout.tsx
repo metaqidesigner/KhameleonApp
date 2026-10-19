@@ -13,6 +13,7 @@ import type { OverlayPalette } from "./palettes";
 import { SkillsPanel } from "./SkillsPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { EmailAssistant } from "./EmailAssistant";
+import { SuggestionSlot } from "@/components/notices/SuggestionSlot";
 import { CaptureBar, useCaptureTask, type CaptureDraft } from "@/components/skills/CaptureTask";
 import { WorkspacePanel } from "./workspace/WorkspacePanel";
 import { KhamiSetup } from "@/components/khami/KhamiSetup";
@@ -212,6 +213,7 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
       {!locked && <EdgeChrome mode={prefs.edgeChrome} palette={palette} bare={bare} />}
       {skillsOpen && !locked && <SkillsPanel palette={palette} draft={captureDraft} onDraftDone={() => setCaptureDraft(null)} onClose={() => { setSkillsOpen(false); setCaptureDraft(null); }} />}
       {!locked && <EmailAssistant palette={palette} />}
+      {!locked && <SuggestionSlot tone="overlay" style={{ position: "fixed", top: 14, right: 84, zIndex: 58 }} />}
       {!locked && <CaptureBar capture={capture} tone="overlay" onDescribeInstead={() => { setCaptureDraft({ name: '', description: '', steps: '', source: '' }); setSkillsOpen(true); }} />}
       {workspaceOpen && !locked && <WorkspacePanel palette={palette} onClose={() => setWorkspaceOpen(false)} />}
       {integrationsOpen && !locked && <IntegrationsPanel palette={palette} onClose={() => setIntegrationsOpen(false)} />}
