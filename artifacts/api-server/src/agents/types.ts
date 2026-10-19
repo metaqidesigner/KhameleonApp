@@ -11,7 +11,7 @@ export type Provider =
   | 'custom';
 
 export type AgentStatus = 'online' | 'standby' | 'offline' | 'busy';
-export type AgentRole = 'general' | 'research' | 'code' | 'analysis' | 'creative';
+export type AgentRole = 'general' | 'research' | 'code' | 'analysis' | 'creative' | 'planning';
 
 export interface AgentConfig {
   id: string;

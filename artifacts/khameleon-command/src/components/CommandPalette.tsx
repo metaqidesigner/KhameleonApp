@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, LayoutDashboard, Bot, FlaskConical, BrainCircuit, Shield, BarChart2, Settings, MessageSquare, Zap, FolderKanban, Plug, CalendarDays, Inbox, Lock } from 'lucide-react';
-import { useJarvisStore, type TabId } from '@/store/jarvisStore';
+import { useKhameleonStore, type TabId } from '@/store/khameleonStore';
 
 const MODULES: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'canvas',    label: 'CANVAS',    icon: <LayoutDashboard size={13}/> },
@@ -31,7 +31,7 @@ type ResultItem =
   | { kind: 'action'; id: string; label: string };
 
 export default function CommandPalette() {
-  const { commandPaletteOpen, setCommandPaletteOpen, setActiveTab, setChatOpen } = useJarvisStore();
+  const { commandPaletteOpen, setCommandPaletteOpen, setActiveTab, setChatOpen } = useKhameleonStore();
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -115,7 +115,7 @@ export default function CommandPalette() {
         </div>
 
         {/* Results */}
-        <div style={{ maxHeight:400, overflowY:'auto' }} className="scrollbar-jarvis">
+        <div style={{ maxHeight:400, overflowY:'auto' }} className="scrollbar-khameleon">
           {results.map((item, i) => {
             const showGroup = item.kind !== lastKind;
             lastKind = item.kind;

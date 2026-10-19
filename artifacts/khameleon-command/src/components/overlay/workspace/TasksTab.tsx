@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
-import { getTasks, createTask, updateTask, deleteTask, type Task, type TaskPriority } from "@/lib/jarvisApi";
+import { getTasks, createTask, updateTask, deleteTask, type Task, type TaskPriority } from "@/lib/khameleonApi";
 import { groupTasksByProject } from "@/lib/taskProjects";
 import { TEXT, MUTED, inputStyle, Btn } from "./ui";
 

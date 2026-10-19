@@ -11,7 +11,7 @@
  * Built because pages/research.tsx's "Initiate Research" button called
  * POST /api/research, but this router only ever had a GET / handler
  * (research_items listing) - the button always 404'd and silently showed
- * a canned "JARVIS is offline" fallback, in every environment, regardless
+ * a canned "offline" fallback, in every environment, regardless
  * of configuration. Found by code inspection during the 2026-09-03
  * backend-route audit, not by running it.
  *

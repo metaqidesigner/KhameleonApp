@@ -83,15 +83,12 @@ const RECEIPT_SCHEMA = {
 
 /**
  * Reads and answers questions about a document entirely offline - no
- * network call, no Anthropic SDK, no dependency on LocalAgentRunner or any
- * cloud-backed class. This is a deliberately SEPARATE, parallel path, not a
- * tool LocalAgentRunner can call: a tool's result flows back into that
- * class's cloud conversation on the next iteration, which would send
- * whatever this extracts (or a close paraphrase of it) to Anthropic's API
- * anyway - exactly what "sensitive/local mode" exists to prevent. Keeping
- * this a wholly separate class is what makes "never leaves the device" an
- * honest claim rather than a leaky one (Cross-App Control Phase 3,
- * khameleon-decisions-log.md, 2026-10-03).
+ * network call and no cloud-backed class. This is a deliberately SEPARATE
+ * path, not a chat tool: a tool's result goes back into the chat's
+ * conversation, which may be with an outside AI - exactly what
+ * "sensitive/local mode" exists to prevent. Keeping this a wholly separate
+ * class is what makes "never leaves the device" an honest claim (Cross-App
+ * Control Phase 3, khameleon-decisions-log.md, 2026-10-03).
  *
  * Reads real PDFs with a text layer directly, and falls back to real
  * on-device OCR (Tesseract, via documentImport.ts) for scanned PDFs and
@@ -99,7 +96,7 @@ const RECEIPT_SCHEMA = {
  * deferred from Phase 3 was closed the same day, once it turned out to
  * block something Newton considers critical (tax receipts).
  *
- * Noticeably weaker than Claude at nuanced interpretation - this is a small
+ * Noticeably weaker than large cloud AIs at nuanced interpretation - this is a small
  * (1.5B parameter) model chosen specifically to be realistic to bundle and
  * run on an ordinary laptop. Good at straightforward extraction (figures,
  * labels, direct questions), set as the honest expectation with Newton

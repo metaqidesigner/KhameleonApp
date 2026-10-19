@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeRoots, computeChildren } from './taskNesting';
-import type { Task } from './jarvisApi';
+import type { Task } from './khameleonApi';
 
 function makeTask(id: number, overrides: Partial<Task> = {}): Task {
   return {

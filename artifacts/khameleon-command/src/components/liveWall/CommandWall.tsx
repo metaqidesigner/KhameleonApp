@@ -5,11 +5,11 @@ import {
   GitBranch, GripVertical, LockKeyhole, Mail, Pause, Play,
   Plug, Radio, RotateCcw, Send, Sparkles, Timer, Wand2, X,
 } from "lucide-react";
-import { useJarvisStore } from "@/store/jarvisStore";
-import { useJarvisHealth, useJarvisTelemetry } from "@/hooks/useJarvis";
+import { useKhameleonStore } from "@/store/khameleonStore";
+import { useKhameleonHealth, useKhameleonTelemetry } from "@/hooks/useKhameleon";
 import {
-  getDailyTasks, getConnectors, getTasks, updateTask, type Task, type TaskCategory, type JarvisConnector,
-} from "@/lib/jarvisApi";
+  getDailyTasks, getConnectors, getTasks, updateTask, type Task, type TaskCategory, type KhameleonConnector,
+} from "@/lib/khameleonApi";
 import {
   streamAgentChat, FALLBACK_ROSTER, getRoster, getAgentStatus,
   type AgentConfig, type AgentStatus, type ChatMessage,
@@ -150,16 +150,16 @@ function useStageFit(designWidth: number, designHeight: number) {
 
 export function CommandWall() {
   const { containerRef: stageRef, scale: stageScale } = useStageFit(STAGE_DESIGN_WIDTH, STAGE_DESIGN_HEIGHT);
-  const orbStatus           = useJarvisStore(s => s.orbStatus);
-  const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
-  const orbActiveAgentId    = useJarvisStore(s => s.orbActiveAgentId);
-  const voiceSettings       = useJarvisStore(s => s.voiceSettings);
-  const pushAgentEvent      = useJarvisStore(s => s.pushAgentEvent);
-  const agentHistory        = useJarvisStore(s => s.agentHistory);
-  const taskRevision        = useJarvisStore(s => s.taskRevision);
-  const adjustEmbeddedOrbMountCount = useJarvisStore(s => s.adjustEmbeddedOrbMountCount);
-  const { data: health    = undefined } = useJarvisHealth();
-  const { data: telemetry = undefined } = useJarvisTelemetry();
+  const orbStatus           = useKhameleonStore(s => s.orbStatus);
+  const setOrbStatus        = useKhameleonStore(s => s.setOrbStatus);
+  const orbActiveAgentId    = useKhameleonStore(s => s.orbActiveAgentId);
+  const voiceSettings       = useKhameleonStore(s => s.voiceSettings);
+  const pushAgentEvent      = useKhameleonStore(s => s.pushAgentEvent);
+  const agentHistory        = useKhameleonStore(s => s.agentHistory);
+  const taskRevision        = useKhameleonStore(s => s.taskRevision);
+  const adjustEmbeddedOrbMountCount = useKhameleonStore(s => s.adjustEmbeddedOrbMountCount);
+  const { data: health    = undefined } = useKhameleonHealth();
+  const { data: telemetry = undefined } = useKhameleonTelemetry();
 
   const [activeDomains, setActiveDomains] = useState<Set<TaskCategory>>(new Set());
   const [mode, setMode] = useState<Mode>("Parallel");
@@ -179,7 +179,7 @@ export function CommandWall() {
   const [streaming, setStreaming] = useState(false);
   const [roster, setRoster] = useState<AgentConfig[]>(FALLBACK_ROSTER);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
-  const [connectors, setConnectors] = useState<JarvisConnector[]>([]);
+  const [connectors, setConnectors] = useState<KhameleonConnector[]>([]);
   const [dailyData, setDailyData] = useState<Record<string, Task[]>>({});
   const [byCategory, setByCategory] = useState<Record<string, number>>({});
   const [totalTasks, setTotalTasks] = useState(0);
@@ -592,7 +592,7 @@ export function CommandWall() {
         // .wall-shell sets isolation:isolate, trapping any z-index inside its
         // own stacking context - a fixed-position slideout meant to sit above
         // the whole app (including the outer shell's own header) has to
-        // render outside it entirely, the same way JarvisOrbPortal does.
+        // render outside it entirely, the same way KhameleonOrbPortal does.
         <div className="activity-scrim" onClick={() => setActivityOpen(false)}>
           <aside className="activity-slideout glass" onClick={e => e.stopPropagation()}>
             <div className="activity-slideout-head"><strong>Activity feed</strong><button type="button" onClick={() => setActivityOpen(false)} aria-label="Close activity feed"><X size={16}/></button></div>

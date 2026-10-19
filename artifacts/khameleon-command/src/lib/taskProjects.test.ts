@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { groupTasksByProject } from './taskProjects';
-import type { Task } from './jarvisApi';
+import type { Task } from './khameleonApi';
 
 const t = (id: number, over: Partial<Task> = {}): Task => ({
   id, title: `T${id}`, description: '', status: 'todo', priority: 'medium', category: 'deep_work',

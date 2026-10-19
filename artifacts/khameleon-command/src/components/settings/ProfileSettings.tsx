@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getOnboardingStatus, saveProfile, getSchedulerStatus, saveSchedulerConfig } from '@/lib/jarvisApi';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { getOnboardingStatus, saveProfile, getSchedulerStatus, saveSchedulerConfig } from '@/lib/khameleonApi';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import { useUi, Label, Hint, Msg, Group, type Tone } from './ui';
 
 /** Settings > Profile (gap review Q18): name and role, morning digest time, redo first-run setup. */
@@ -14,7 +14,7 @@ export function ProfileSettings({ tone }: { tone: Tone }) {
   const [minute, setMinute] = useState(0);
   const [digestOn, setDigestOn] = useState<boolean | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const openWizard = useJarvisStore(s => s.setOnboardingWizardOpen);
+  const openWizard = useKhameleonStore(s => s.setOnboardingWizardOpen);
 
   useEffect(() => {
     getOnboardingStatus().then(s => { setName(s.profile.displayName ?? ''); setRole(s.profile.role ?? ''); }).catch(() => {});

@@ -6,14 +6,14 @@ import {
   CalendarDays, ChevronDown, ChevronRight, Plus, Bot, AlarmClock,
   Compass, ListTodo, Radio, Gauge, RotateCcw, TrendingUp, X,
 } from 'lucide-react';
-import { useJarvisHealth, useJarvisTelemetry } from '@/hooks/useJarvis';
-import { getDailyTasks, getSchedulerStatus, type Task, type SchedulerStatus, OFFLINE_HEALTH, MOCK_TELEMETRY } from '@/lib/jarvisApi';
+import { useKhameleonHealth, useKhameleonTelemetry } from '@/hooks/useKhameleon';
+import { getDailyTasks, getSchedulerStatus, type Task, type SchedulerStatus, OFFLINE_HEALTH, MOCK_TELEMETRY } from '@/lib/khameleonApi';
 import { getTaskCompletionTrend, type CompletionTrendPoint } from '@/lib/taskTrendApi';
 import {
-  useJarvisStore,
+  useKhameleonStore,
   type CanvasWindowPosition,
   type CanvasWindowZone,
-} from '@/store/jarvisStore';
+} from '@/store/khameleonStore';
 import HUDRings from '@/components/HUDRings';
 import {
   FLOATING_WINDOW_DRAG_TYPE,
@@ -85,7 +85,7 @@ function StatusIcon({ active, done, color }: { active: number; done: number; col
   }
   if (active > 0) {
     return (
-      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ animation: 'jarvis-spin 2s linear infinite' }}>
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ animation: 'khameleon-spin 2s linear infinite' }}>
         <circle cx="6.5" cy="6.5" r="5.5" stroke={color} strokeWidth="1.3" strokeDasharray="5 3" strokeLinecap="round" />
       </svg>
     );
@@ -372,8 +372,8 @@ function DigestCountdownBadge({ onClick }: { onClick: () => void }) {
 function TodaysPlanBody() {
   const [dailyData, setDailyData]   = useState<Record<string, Task[]>>({});
   const [totalTasks, setTotalTasks] = useState(0);
-  const setActiveTab                = useJarvisStore(s => s.setActiveTab);
-  const taskRevision                = useJarvisStore(s => s.taskRevision);
+  const setActiveTab                = useKhameleonStore(s => s.setActiveTab);
+  const taskRevision                = useKhameleonStore(s => s.taskRevision);
 
   const loadDailyTasks = useCallback(() => {
     getDailyTasks().then(d => {
@@ -446,8 +446,8 @@ export function FocusRing({ pct }: { pct: number }) {
 
 // ── System Status window body ─────────────────────────────────
 function SystemStatusBody() {
-  const { data: health    = OFFLINE_HEALTH } = useJarvisHealth();
-  const { data: telemetry = MOCK_TELEMETRY } = useJarvisTelemetry();
+  const { data: health    = OFFLINE_HEALTH } = useKhameleonHealth();
+  const { data: telemetry = MOCK_TELEMETRY } = useKhameleonTelemetry();
   const isOnline = health.status !== 'offline';
 
   return (
@@ -472,7 +472,7 @@ function SystemStatusBody() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, paddingTop: 2 }}>
         <Activity size={11} style={{
           color: isOnline ? 'var(--j-teal)' : 'var(--j-text-faint)',
-          animation: isOnline ? 'jarvis-pulse 2.5s ease-in-out infinite' : undefined,
+          animation: isOnline ? 'khameleon-pulse 2.5s ease-in-out infinite' : undefined,
         }} />
         <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, fontStyle: 'italic', color: 'var(--j-text-faint)' }}>
           Listening for 'Hello Khameleon'
@@ -484,7 +484,7 @@ function SystemStatusBody() {
 
 // ── Agent Activity window body ────────────────────────────────
 function AgentActivityBody() {
-  const agentHistory = useJarvisStore(s => s.agentHistory);
+  const agentHistory = useKhameleonStore(s => s.agentHistory);
 
   if (agentHistory.length === 0) {
     return (
@@ -498,7 +498,7 @@ function AgentActivityBody() {
           border: '1.5px solid rgba(140,124,240,0.15)',
           borderTop: '1.5px solid rgba(140,124,240,0.65)',
           borderRadius: '50%',
-          animation: 'jarvis-spin 2.2s linear infinite',
+          animation: 'khameleon-spin 2.2s linear infinite',
         }} />
         <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12, color: 'var(--j-text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
           No activity — query Khameleon to begin
@@ -508,7 +508,7 @@ function AgentActivityBody() {
   }
 
   return (
-    <div className="scrollbar-jarvis" style={{ overflowY: 'auto', height: '100%' }}>
+    <div className="scrollbar-khameleon" style={{ overflowY: 'auto', height: '100%' }}>
       {agentHistory.slice(0, 30).map(ev => (
         <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
           <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-faint)', whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -639,10 +639,10 @@ export default function UnifiedCanvas() {
 
   // Newest event is always prepended, so its id changes on every push —
   // this keeps working even after the history hits its 50-item cap.
-  const latestEventId = useJarvisStore(s => s.agentHistory[0]?.id);
-  const canvasWindowPositions = useJarvisStore(s => s.canvasWindowsPositions);
-  const setCanvasWindowPositions = useJarvisStore(s => s.setCanvasWindowPositions);
-  const resetCanvasLayout = useJarvisStore(s => s.resetCanvasLayout);
+  const latestEventId = useKhameleonStore(s => s.agentHistory[0]?.id);
+  const canvasWindowPositions = useKhameleonStore(s => s.canvasWindowsPositions);
+  const setCanvasWindowPositions = useKhameleonStore(s => s.setCanvasWindowPositions);
+  const resetCanvasLayout = useKhameleonStore(s => s.resetCanvasLayout);
 
   const windowsInZone = useCallback((zone: CanvasWindowZone) => (
     CANVAS_WINDOW_IDS
@@ -701,7 +701,7 @@ export default function UnifiedCanvas() {
 
   // ── Today's Focus ring — real progress from daily tasks ───
   const [focusPct, setFocusPct] = useState(0);
-  const taskRevision = useJarvisStore(s => s.taskRevision);
+  const taskRevision = useKhameleonStore(s => s.taskRevision);
   const refreshFocus = useCallback(() => {
     getDailyTasks().then(d => {
       const done  = d.doneCount ?? 0;

@@ -6,7 +6,7 @@ import { KhameleonHead } from "./KhameleonHead";
 import { OVERLAY_PALETTES } from "./palettes";
 import { useClickThrough } from "./useClickThrough";
 import { Toolbars, defaultToolbarGroups } from "./Toolbars";
-import { useJarvisStore } from "@/store/jarvisStore";
+import { useKhameleonStore } from "@/store/khameleonStore";
 import { EdgeChrome, BOTTOM_BAR_HEIGHT } from "./EdgeChrome";
 import { LookLayoutControls, useSyncAcrossWindows } from "./LookLayoutControls";
 import type { OverlayPalette } from "./palettes";
@@ -145,7 +145,7 @@ function KhamiPrompt({ palette, onSetUp, onLater, bottom }: { palette: OverlayPa
 export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   useClickThrough();
   useSyncAcrossWindows();
-  const prefs = useJarvisStore(s => s.overlayPrefs);
+  const prefs = useKhameleonStore(s => s.overlayPrefs);
   const [lookOpen, setLookOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -196,9 +196,9 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   const palette = OVERLAY_PALETTES[prefs.palette] ?? OVERLAY_PALETTES["brand-teal"];
   const bare = prefs.iconStyle === "bare";
   const bottomBar = prefs.edgeChrome === "bars" ? BOTTOM_BAR_HEIGHT : 0;
-  const setChatOpen = useJarvisStore(s => s.setChatOpen);
-  const setChatMinimized = useJarvisStore(s => s.setChatWindowMinimized);
-  const requestChatTool = useJarvisStore(s => s.requestChatTool);
+  const setChatOpen = useKhameleonStore(s => s.setChatOpen);
+  const setChatMinimized = useKhameleonStore(s => s.setChatWindowMinimized);
+  const requestChatTool = useKhameleonStore(s => s.requestChatTool);
   const toolbarGroups = useMemo(() => defaultToolbarGroups({
     askKhameleon: () => { setChatMinimized(false); setChatOpen(true); },
     openTool: requestChatTool,

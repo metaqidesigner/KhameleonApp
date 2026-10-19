@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Bell, MoreHorizontal, User, Sun, Moon, LogOut, Settings as SettingsIcon } from 'lucide-react';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import { getSessionStatus, logout, type SessionStatus } from '@/lib/sessionApi';
 
 // Theme toggle — kept from previous version
@@ -56,7 +56,7 @@ function BrandMark() {
 // for a no-accounts instance (renders the exact same inert icon it always
 // did), a real dropdown once accounts mode is active.
 function AccountMenu() {
-  const setActiveTab = useJarvisStore(s => s.setActiveTab);
+  const setActiveTab = useKhameleonStore(s => s.setActiveTab);
   const [session, setSession] = useState<SessionStatus | null>(null);
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -129,7 +129,7 @@ function AccountMenu() {
 }
 
 export default function TopBar() {
-  const setCommandPaletteOpen = useJarvisStore(s => s.setCommandPaletteOpen);
+  const setCommandPaletteOpen = useKhameleonStore(s => s.setCommandPaletteOpen);
   return (
     <div className="j-topbar-slim">
       {/* ── Left: brand only; the deprecated Assistant/Workspace split is removed. ── */}

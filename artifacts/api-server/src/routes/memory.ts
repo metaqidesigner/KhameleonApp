@@ -20,7 +20,7 @@ router.get("/", async (req, res) => {
 /**
  * GET /search?q= — real search over stored memory items (key/value/category
  * ILIKE match). Previously this path didn't exist at all: pages/memory.tsx's
- * "MEMORY RETRIEVAL" search box called it via searchMemory() in jarvisApi.ts,
+ * "MEMORY RETRIEVAL" search box called it via searchMemory() in khameleonApi.ts,
  * got a 404 every time, and safeFetch silently substituted two canned
  * "Demo result" rows - always the same two, regardless of query. Found by
  * the 2026-09-03 backend-route audit.
@@ -114,7 +114,7 @@ router.post("/index", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const parsed = CreateMemoryItemBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
     const [item] = await db.insert(memoryItemsTable).values(parsed.data).returning();
     res.status(201).json(item);
@@ -128,8 +128,8 @@ router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [item] = await db.select().from(memoryItemsTable).where(eq(memoryItemsTable.id, id));
-    if (!item) return res.status(404).json({ error: "Memory item not found" });
-    if (item.isProtected) return res.status(403).json({ error: "Cannot delete protected memory" });
+    if (!item) { res.status(404).json({ error: "Memory item not found" }); return; }
+    if (item.isProtected) { res.status(403).json({ error: "Cannot delete protected memory" }); return; }
 
     await db.delete(memoryItemsTable).where(eq(memoryItemsTable.id, id));
     res.status(204).send();

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 
 export interface UseVoiceReturn {
   voiceInputAvailable: boolean;
@@ -89,9 +89,9 @@ export function useVoice(
   onListenStart?: () => void,
   onListenEnd?: () => void,
 ): UseVoiceReturn {
-  const voiceSettings = useJarvisStore(s => s.voiceSettings);
-  const setOrbStatus  = useJarvisStore(s => s.setOrbStatus);
-  const autoSpeak     = useJarvisStore(s => s.autoSpeak);
+  const voiceSettings = useKhameleonStore(s => s.voiceSettings);
+  const setOrbStatus  = useKhameleonStore(s => s.setOrbStatus);
+  const autoSpeak     = useKhameleonStore(s => s.autoSpeak);
 
   const [voiceInputAvailable] = useState(() =>
     typeof window !== 'undefined' &&

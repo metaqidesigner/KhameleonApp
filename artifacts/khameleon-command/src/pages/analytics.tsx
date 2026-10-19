@@ -6,8 +6,8 @@ import {
 import { BarChart2 } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { ActivityLog } from '@/components/activity/ActivityLog';
-import { useJarvisTelemetry } from '@/hooks/useJarvis';
-import { MOCK_TELEMETRY } from '@/lib/jarvisApi';
+import { useKhameleonTelemetry } from '@/hooks/useKhameleon';
+import { MOCK_TELEMETRY } from '@/lib/khameleonApi';
 
 const CHART_STYLE = {
   background:'transparent',
@@ -34,7 +34,7 @@ function p95(latencies: number[]): number | undefined {
 }
 
 export default function Analytics() {
-  const { data: telemetry = MOCK_TELEMETRY } = useJarvisTelemetry();
+  const { data: telemetry = MOCK_TELEMETRY } = useKhameleonTelemetry();
 
   // Build the 14-day query-volume / cost chart from telemetry.queries (real,
   // timestamped query records already being fetched below) instead of
@@ -176,7 +176,7 @@ export default function Analytics() {
       {/* Same activity log as the Overlay's Workspace -> Status (shared component). */}
       <div style={{ flex: '0 0 auto' }}>
         <JPanel title="ACTIVITY LOG" icon={<BarChart2 size={13}/>}>
-          <div style={{ maxHeight: 320, overflowY: 'auto' }} className="scrollbar-jarvis">
+          <div style={{ maxHeight: 320, overflowY: 'auto' }} className="scrollbar-khameleon">
             <ActivityLog tone="classic" />
           </div>
         </JPanel>

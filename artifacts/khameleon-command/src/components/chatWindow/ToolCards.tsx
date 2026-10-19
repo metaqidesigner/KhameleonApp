@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Layers, Clock, Loader2, MessageCircle, Zap, Undo2 } from 'lucide-react';
-import type { ChatToolId, ChatToolPayload } from '@/store/jarvisStore';
+import type { ChatToolId, ChatToolPayload } from '@/store/khameleonStore';
 import { runSkillPrompt } from '@/components/skills/useSkillLibrary';
 import { createActionReceipt } from '@/lib/actionReceiptsApi';
 
@@ -9,7 +9,7 @@ function logActivity(input: Parameters<typeof createActionReceipt>[0]) {
   createActionReceipt(input).catch(() => {});
 }
 import type { WorkKind } from './types';
-import { searchMemory, runResearch, type MemorySearchResult } from '@/lib/jarvisApi';
+import { searchMemory, runResearch, type MemorySearchResult } from '@/lib/khameleonApi';
 import { useOpenEmail } from './useOpenEmail';
 import type { FoundEmail } from '@/lib/emailAssistApi';
 import {

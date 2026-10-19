@@ -42,7 +42,7 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const parsed = CreateProjectBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
     const [project] = await db.insert(projectsTable).values(parsed.data).returning();
     res.status(201).json({ ...project, taskCount: 0, completedTaskCount: 0 });
@@ -56,7 +56,7 @@ router.get("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
-    if (!project) return res.status(404).json({ error: "Project not found" });
+    if (!project) { res.status(404).json({ error: "Project not found" }); return; }
 
     res.json({ ...project, ...(await getTaskCounts(id)) });
   } catch (err) {
@@ -69,14 +69,14 @@ router.patch("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const parsed = UpdateProjectBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
     const [updated] = await db
       .update(projectsTable)
       .set(parsed.data)
       .where(eq(projectsTable.id, id))
       .returning();
-    if (!updated) return res.status(404).json({ error: "Project not found" });
+    if (!updated) { res.status(404).json({ error: "Project not found" }); return; }
 
     res.json({ ...updated, ...(await getTaskCounts(id)) });
   } catch (err) {

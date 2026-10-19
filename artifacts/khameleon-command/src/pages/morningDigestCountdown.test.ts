@@ -5,9 +5,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GeneralSection } from './settings';
 import { AutoTriggers } from './tasks';
-import { getSchedulerStatus } from '@/lib/jarvisApi';
+import { getSchedulerStatus } from '@/lib/khameleonApi';
 
-vi.mock('@/lib/jarvisApi', () => ({
+vi.mock('@/lib/khameleonApi', () => ({
   createTask: vi.fn(),
   deleteTask: vi.fn(),
   getHealth: vi.fn(),

@@ -8,7 +8,7 @@ import { AlertSettings } from '@/components/settings/AlertSettings';
 import { DetectionSettings } from '@/components/settings/DetectionSettings';
 import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin, Music, Play, Pause, SkipForward, SkipBack, Mic } from 'lucide-react';
 import JPanel from '@/components/JPanel';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import { MIC_KEY } from '@/components/orb/VoiceController';
 import { ConnectIntegrationGate } from '@/components/ConnectIntegrationGate';
 import { ApiKeyRow } from '@/components/ApiKeyRow';
@@ -19,7 +19,7 @@ import {
   getWeatherDefault, saveWeatherDefault, getWeatherCurrent, type WeatherCurrent,
   getSpotifyNowPlaying, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, type SpotifyNowPlaying,
   getOnboardingStatus, saveProfile, type Profile,
-} from '@/lib/jarvisApi';
+} from '@/lib/khameleonApi';
 import { getQuotaSnapshots, type QuotaSnapshots } from '@/lib/quotaApi';
 import { getTtsStatus, getElevenLabsVoices, previewVoice, type ElevenLabsVoice } from '@/lib/voiceApi';
 
@@ -566,7 +566,7 @@ function EngineSection() {
         <div style={{
           marginTop: 10, fontFamily: 'var(--j-font-mono)', fontSize: 11,
           color: result.startsWith('●') ? 'var(--j-green)' : 'var(--j-red)',
-          animation: 'jarvis-fadein 0.2s ease both',
+          animation: 'khameleon-fadein 0.2s ease both',
         }}>{result}</div>
       )}
     </>
@@ -574,7 +574,7 @@ function EngineSection() {
 }
 
 function AppearanceSection() {
-  const { scanLinesEnabled, setScanLines, cornerBracketsEnabled, setCornerBrackets, tickerSpeed, setTickerSpeed } = useJarvisStore();
+  const { scanLinesEnabled, setScanLines, cornerBracketsEnabled, setCornerBrackets, tickerSpeed, setTickerSpeed } = useKhameleonStore();
   useSyncAcrossWindows();
   return (
     <>
@@ -638,12 +638,12 @@ function AppearanceSection() {
  */
 
 function VoiceSection() {
-  const wakeWordActive           = useJarvisStore(s => s.wakeWordActive);
-  const setWakeWordActive        = useJarvisStore(s => s.setWakeWordActive);
-  const wakeWordBlocked          = useJarvisStore(s => s.wakeWordBlocked);
-  const setMicPermissionModalOpen = useJarvisStore(s => s.setMicPermissionModalOpen);
-  const voiceSettings            = useJarvisStore(s => s.voiceSettings);
-  const setVoiceSettings         = useJarvisStore(s => s.setVoiceSettings);
+  const wakeWordActive           = useKhameleonStore(s => s.wakeWordActive);
+  const setWakeWordActive        = useKhameleonStore(s => s.setWakeWordActive);
+  const wakeWordBlocked          = useKhameleonStore(s => s.wakeWordBlocked);
+  const setMicPermissionModalOpen = useKhameleonStore(s => s.setMicPermissionModalOpen);
+  const voiceSettings            = useKhameleonStore(s => s.voiceSettings);
+  const setVoiceSettings         = useKhameleonStore(s => s.setVoiceSettings);
   const [micStatus, setMicStatus] = useState<'granted' | 'denied' | 'unknown'>('unknown');
   const [ttsConfigured, setTtsConfigured] = useState<boolean | null>(null);
   const [voices, setVoices] = useState<ElevenLabsVoice[]>([]);
@@ -765,7 +765,7 @@ export function GeneralSection() {
   const [digestHour, setDigestHour] = useState(7);
   const [digestMinute, setDigestMinute] = useState(0);
   const [digestMsg, setDigestMsg] = useState<string>();
-  const setOnboardingWizardOpen = useJarvisStore(s => s.setOnboardingWizardOpen);
+  const setOnboardingWizardOpen = useKhameleonStore(s => s.setOnboardingWizardOpen);
 
   useEffect(() => {
     const fetch = () => { getSchedulerStatus().then(s => { setSched(s); setDigestHour(s.digestHour); setDigestMinute(s.digestMinute); }); };

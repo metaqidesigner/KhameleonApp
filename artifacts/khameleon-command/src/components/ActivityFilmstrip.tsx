@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getDailyTasks, type Task } from '@/lib/jarvisApi';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { getDailyTasks, type Task } from '@/lib/khameleonApi';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import { DAY_SECTIONS } from '@/pages/canvas';
 
 /**
@@ -41,7 +41,7 @@ function seededWave(seed: number): string {
 
 export function ActivityFilmstrip() {
   const [sections, setSections] = useState<Record<string, Task[]>>({});
-  const taskRevision = useJarvisStore(s => s.taskRevision);
+  const taskRevision = useKhameleonStore(s => s.taskRevision);
 
   const load = useCallback(() => {
     getDailyTasks().then(d => setSections(d.sections ?? {}));

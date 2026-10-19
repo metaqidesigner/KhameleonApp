@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dispatchLocalTool, LOCAL_TOOL_DEFINITIONS } from "../src/tools";
-import type { Runners } from "../src/coordinator";
+import { dispatchLocalTool, type Runners } from "../src/tools";
 
 function fakeRunners(overrides: Partial<Runners> = {}): Runners {
   return {
@@ -10,21 +9,6 @@ function fakeRunners(overrides: Partial<Runners> = {}): Runners {
     ...overrides,
   };
 }
-
-describe("LOCAL_TOOL_DEFINITIONS", () => {
-  it("declares exactly the three action tools, each requiring a command string", () => {
-    const names = LOCAL_TOOL_DEFINITIONS.map((t) => t.name);
-    expect(names).toEqual(["window_command", "file_command", "memory_command", "read_document"]);
-    for (const tool of LOCAL_TOOL_DEFINITIONS.filter((t) => t.name !== "read_document")) {
-      expect(tool.input_schema.required).toEqual(["command"]);
-    }
-  });
-
-  it("declares read_document as requiring a filePath string", () => {
-    const tool = LOCAL_TOOL_DEFINITIONS.find((t) => t.name === "read_document");
-    expect(tool?.input_schema.required).toEqual(["filePath"]);
-  });
-});
 
 describe("dispatchLocalTool", () => {
   it("routes window_command to the window runner", async () => {

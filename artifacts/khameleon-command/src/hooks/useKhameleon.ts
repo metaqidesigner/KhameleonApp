@@ -1,15 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getHealth, getTelemetry, getAgents, getConnectors,
-  getCurrentMode, askJarvis, searchMemory, indexMemoryPath,
+  getCurrentMode, askKhameleon, searchMemory, indexMemoryPath,
   getAgentFeed,
-  type JarvisHealth, type JarvisConnector,
-  type JarvisTelemetry, type FeedItem,
-} from '@/lib/jarvisApi';
+  type KhameleonHealth, type KhameleonConnector,
+  type KhameleonTelemetry, type FeedItem,
+} from '@/lib/khameleonApi';
 
-export function useJarvisHealth() {
-  return useQuery<JarvisHealth>({
-    queryKey: ['jarvis', 'health'],
+export function useKhameleonHealth() {
+  return useQuery<KhameleonHealth>({
+    queryKey: ['khameleon', 'health'],
     queryFn: getHealth,
     refetchInterval: 15_000,
     staleTime: 10_000,
@@ -17,9 +17,9 @@ export function useJarvisHealth() {
   });
 }
 
-export function useJarvisTelemetry() {
-  return useQuery<JarvisTelemetry>({
-    queryKey: ['jarvis', 'telemetry'],
+export function useKhameleonTelemetry() {
+  return useQuery<KhameleonTelemetry>({
+    queryKey: ['khameleon', 'telemetry'],
     queryFn: getTelemetry,
     refetchInterval: 30_000,
     staleTime: 25_000,
@@ -27,18 +27,18 @@ export function useJarvisTelemetry() {
   });
 }
 
-export function useJarvisAgents() {
+export function useKhameleonAgents() {
   return useQuery<string[]>({
-    queryKey: ['jarvis', 'agents'],
+    queryKey: ['khameleon', 'agents'],
     queryFn: getAgents,
     staleTime: 5 * 60_000,
     retry: false,
   });
 }
 
-export function useJarvisConnectors() {
-  return useQuery<JarvisConnector[]>({
-    queryKey: ['jarvis', 'connectors'],
+export function useKhameleonConnectors() {
+  return useQuery<KhameleonConnector[]>({
+    queryKey: ['khameleon', 'connectors'],
     queryFn: getConnectors,
     staleTime: 60_000,
     retry: false,
@@ -47,16 +47,16 @@ export function useJarvisConnectors() {
 
 export function useGetCurrentMode() {
   return useQuery<{ name: string }>({
-    queryKey: ['jarvis', 'mode'],
+    queryKey: ['khameleon', 'mode'],
     queryFn: getCurrentMode,
     staleTime: 5 * 60_000,
     retry: false,
   });
 }
 
-export function useJarvisAgentFeed() {
+export function useKhameleonAgentFeed() {
   return useQuery<FeedItem[]>({
-    queryKey: ['jarvis', 'feed'],
+    queryKey: ['khameleon', 'feed'],
     queryFn: getAgentFeed,
     refetchInterval: 30_000,
     staleTime: 25_000,
@@ -64,16 +64,16 @@ export function useJarvisAgentFeed() {
   });
 }
 
-export function useAskJarvis() {
+export function useAskKhameleon() {
   return useMutation({
     mutationFn: ({ prompt, agent }: { prompt: string; agent?: string }) =>
-      askJarvis(prompt, agent),
+      askKhameleon(prompt, agent),
   });
 }
 
 export function useMemorySearch(q: string) {
   return useQuery({
-    queryKey: ['jarvis', 'memory', q],
+    queryKey: ['khameleon', 'memory', q],
     queryFn: () => searchMemory(q),
     enabled: q.length > 2,
     staleTime: 30_000,
@@ -85,7 +85,7 @@ export function useIndexMemory() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (path: string) => indexMemoryPath(path),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['jarvis', 'memory'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['khameleon', 'memory'] }),
   });
 }
 

@@ -25,7 +25,7 @@ export default function JPanel({
       badge={badge}
       action={action}
       className={className}
-      bodyClassName="scrollbar-jarvis"
+      bodyClassName="scrollbar-khameleon"
       panelStyle={style}
       noPadding={noPadding}
     >

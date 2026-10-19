@@ -74,7 +74,7 @@ export default function Integrations() {
       {/* Same module as the Overlay's Integrations panel (components/integrations/GetIntegrations). */}
       <div style={{ flexShrink: 0 }}>
         <JPanel title="GET INTEGRATIONS" icon={<Plug size={13} />}>
-          <div style={{ maxHeight: 360, overflowY: 'auto' }} className="scrollbar-jarvis">
+          <div style={{ maxHeight: 360, overflowY: 'auto' }} className="scrollbar-khameleon">
             <GetIntegrations tone="classic" />
           </div>
         </JPanel>
@@ -102,7 +102,7 @@ export default function Integrations() {
 
       {error && <div style={{ fontSize: 11, color: '#E77A7A' }}>{error}</div>}
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="scrollbar-jarvis">
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="scrollbar-khameleon">
         {loading ? (
           <div className="j-empty">LOADING…</div>
         ) : filtered.length === 0 ? (

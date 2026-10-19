@@ -1,4 +1,4 @@
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 
 /** Circuit board trace paths that overlay the dark background */
 function CircuitTraces() {
@@ -83,7 +83,7 @@ function CircuitTraces() {
 }
 
 export default function Background() {
-  const scanLines = useJarvisStore(s => s.scanLinesEnabled);
+  const scanLines = useKhameleonStore(s => s.scanLinesEnabled);
   return (
     <div
       className="j-bg-layer"

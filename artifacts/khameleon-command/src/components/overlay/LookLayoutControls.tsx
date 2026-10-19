@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useJarvisStore, type OverlayPrefs } from "@/store/jarvisStore";
+import { useKhameleonStore, type OverlayPrefs } from "@/store/khameleonStore";
 import { desktopPrefsBridge, type DesktopPrefs } from "@/lib/desktopBridge";
 
 /**
@@ -72,7 +72,7 @@ function Choice<T extends string>({ label, hint, value, options, onChange, tone 
 export function useSyncAcrossWindows() {
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "jarvis-ui") void useJarvisStore.persist.rehydrate();
+      if (e.key === "jarvis-ui") void useKhameleonStore.persist.rehydrate();
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -80,8 +80,8 @@ export function useSyncAcrossWindows() {
 }
 
 export function LookLayoutControls({ tone }: { tone: Tone }) {
-  const prefs = useJarvisStore(s => s.overlayPrefs);
-  const setPref = useJarvisStore(s => s.setOverlayPref);
+  const prefs = useKhameleonStore(s => s.overlayPrefs);
+  const setPref = useKhameleonStore(s => s.setOverlayPref);
   const desktop = desktopPrefsBridge();
   const [desktopPrefs, setDesktopPrefs] = useState<DesktopPrefs | null>(null);
 

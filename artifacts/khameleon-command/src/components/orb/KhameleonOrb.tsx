@@ -1,7 +1,7 @@
 import './orb.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MicOff } from 'lucide-react';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import { OrbChatPanel } from './OrbChatPanel';
 import { OutputWaveform } from './VoiceWaveform';
 import {
@@ -29,19 +29,19 @@ const QUICK_AGENTS = [
   { id: 'local',  label: 'Local'   },
 ];
 
-export function JarvisOrb() {
-  const orbStatus           = useJarvisStore(s => s.orbStatus);
-  const orbPosition         = useJarvisStore(s => s.orbPosition);
-  const setOrbPosition      = useJarvisStore(s => s.setOrbPosition);
-  const orbMinimized        = useJarvisStore(s => s.orbMinimized);
-  const setOrbMinimized     = useJarvisStore(s => s.setOrbMinimized);
-  const orbChatOpen         = useJarvisStore(s => s.orbChatOpen);
-  const setOrbChatOpen      = useJarvisStore(s => s.setOrbChatOpen);
-  const setOrbActiveAgentId = useJarvisStore(s => s.setOrbActiveAgentId);
-  const toggleVoice         = useJarvisStore(s => s.toggleVoice);
-  const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
-  const voiceEnabled        = useJarvisStore(s => s.voiceEnabled);
-  const embeddedOrbMountCount = useJarvisStore(s => s.embeddedOrbMountCount);
+export function KhameleonOrb() {
+  const orbStatus           = useKhameleonStore(s => s.orbStatus);
+  const orbPosition         = useKhameleonStore(s => s.orbPosition);
+  const setOrbPosition      = useKhameleonStore(s => s.setOrbPosition);
+  const orbMinimized        = useKhameleonStore(s => s.orbMinimized);
+  const setOrbMinimized     = useKhameleonStore(s => s.setOrbMinimized);
+  const orbChatOpen         = useKhameleonStore(s => s.orbChatOpen);
+  const setOrbChatOpen      = useKhameleonStore(s => s.setOrbChatOpen);
+  const setOrbActiveAgentId = useKhameleonStore(s => s.setOrbActiveAgentId);
+  const toggleVoice         = useKhameleonStore(s => s.toggleVoice);
+  const setOrbStatus        = useKhameleonStore(s => s.setOrbStatus);
+  const voiceEnabled        = useKhameleonStore(s => s.voiceEnabled);
+  const embeddedOrbMountCount = useKhameleonStore(s => s.embeddedOrbMountCount);
 
   const pos     = orbPosition ?? getDefaultPos();
   const orbSize = orbMinimized ? ORB_SIZE_MIN : ORB_SIZE;
@@ -224,7 +224,7 @@ export function JarvisOrb() {
       return;
     }
     setOrbStatus('listening');
-    window.setTimeout(() => window.dispatchEvent(new CustomEvent('jarvis-orb-start-listening')), 0);
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent('khameleon-orb-start-listening')), 0);
   }, [orbStatus, orbMinimized, setOrbMinimized, setOrbStatus]);
 
   // ── Right-click: open the typed greeting panel ───────────────
@@ -245,7 +245,7 @@ export function JarvisOrb() {
     <>
       <div
         ref={wrapperRef}
-        className={`jarvis-orb-wrapper${dragging ? '' : ' orb-animated'}`}
+        className={`khameleon-orb-wrapper${dragging ? '' : ' orb-animated'}`}
         style={{ left: pos.x, top: pos.y, cursor: didDragRef.current ? 'grabbing' : 'grab' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -253,7 +253,7 @@ export function JarvisOrb() {
         onClick={onClick}
         onContextMenu={onContextMenu}
       >
-        <div className={`jarvis-orb-container ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}${orbMinimized ? ' minimized' : ''}`}>
+        <div className={`khameleon-orb-container ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}${orbMinimized ? ' minimized' : ''}`}>
           {/* Ambient bloom behind everything */}
           <div className={`orb-glow ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}`} />
 

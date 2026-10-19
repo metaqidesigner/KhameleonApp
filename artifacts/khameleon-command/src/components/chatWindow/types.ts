@@ -89,7 +89,7 @@ export interface ChatMessage {
   /** Set for assistant messages; plain chat answers are 'ask'. */
   kind?: WorkKind;
   /** A toolbar action rendered as an interactive card instead of text. */
-  toolCard?: { tool: import('@/store/jarvisStore').ChatToolId; payload?: import('@/store/jarvisStore').ChatToolPayload };
+  toolCard?: { tool: import('@/store/khameleonStore').ChatToolId; payload?: import('@/store/khameleonStore').ChatToolPayload };
   /**
    * Khami step 5: an offer to hand this turn to an outside AI - before
    * Khami answers ("This one's tricky…") or after ("Khami wasn't sure…").

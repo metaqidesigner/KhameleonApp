@@ -422,7 +422,7 @@ export default function Approvals() {
               cursor: messagesLoading ? 'wait' : 'pointer',
             }}
           >
-            <RefreshCw size={11} style={messagesLoading ? { animation: 'jarvis-spin 1s linear infinite' } : undefined} />
+            <RefreshCw size={11} style={messagesLoading ? { animation: 'khameleon-spin 1s linear infinite' } : undefined} />
             {messages === null ? 'Browse inbox' : 'Refresh'}
           </button>
         </div>
@@ -499,7 +499,7 @@ export default function Approvals() {
               cursor: gmailMessagesLoading ? 'wait' : 'pointer',
             }}
           >
-            <RefreshCw size={11} style={gmailMessagesLoading ? { animation: 'jarvis-spin 1s linear infinite' } : undefined} />
+            <RefreshCw size={11} style={gmailMessagesLoading ? { animation: 'khameleon-spin 1s linear infinite' } : undefined} />
             {gmailMessages === null ? 'Browse inbox' : 'Refresh'}
           </button>
         </div>

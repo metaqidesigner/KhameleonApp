@@ -1,6 +1,6 @@
 import { Radio } from 'lucide-react';
-import { useJarvisAgentFeed } from '@/hooks/useJarvis';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonAgentFeed } from '@/hooks/useKhameleon';
+import { useKhameleonStore } from '@/store/khameleonStore';
 
 function fmtTime(ts: number) {
   return new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -9,8 +9,8 @@ function fmtTime(ts: number) {
 const OFFLINE_MSG = 'Khameleon offline — set API keys to connect   ///   awaiting engine connection   ///   system standby';
 
 export default function NewsTicker() {
-  const { data: feed } = useJarvisAgentFeed();
-  const tickerSpeed    = useJarvisStore(s => s.tickerSpeed);
+  const { data: feed } = useKhameleonAgentFeed();
+  const tickerSpeed    = useKhameleonStore(s => s.tickerSpeed);
 
   let content: string;
   if (!feed || feed.length === 0) {

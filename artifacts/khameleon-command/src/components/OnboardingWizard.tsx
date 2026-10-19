@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { KhamiSetup } from '@/components/khami/KhamiSetup';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import {
   getOnboardingStatus, saveProfile, completeOnboarding,
   getApiKeyStatus, type ApiKeyStatus,
   getSchedulerStatus, saveSchedulerConfig, type SchedulerStatus,
-} from '@/lib/jarvisApi';
+} from '@/lib/khameleonApi';
 import { ApiKeyRow } from './ApiKeyRow';
 import { PROVIDERS, API_KEY_PROVIDER_DEFS } from '@/lib/apiKeyProviders';
 import { ConnectIntegrationGate } from './ConnectIntegrationGate';
@@ -78,8 +78,8 @@ function StepShell({ title, children, onSkip, onNext, nextLabel, nextDisabled }:
 }
 
 export function OnboardingWizard() {
-  const open = useJarvisStore(s => s.onboardingWizardOpen);
-  const setOpen = useJarvisStore(s => s.setOnboardingWizardOpen);
+  const open = useKhameleonStore(s => s.onboardingWizardOpen);
+  const setOpen = useKhameleonStore(s => s.setOnboardingWizardOpen);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [name, setName] = useState('');

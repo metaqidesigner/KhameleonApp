@@ -19,7 +19,7 @@ router.post("/:id/run", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [automation] = await db.select().from(automationsTable).where(eq(automationsTable.id, id));
-    if (!automation) return res.status(404).json({ error: "Automation not found" });
+    if (!automation) { res.status(404).json({ error: "Automation not found" }); return; }
 
     const now = new Date().toISOString();
     await db

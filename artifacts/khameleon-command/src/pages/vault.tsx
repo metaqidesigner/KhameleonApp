@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Lock, Plus, Eye, EyeOff, Trash2, History, ShieldOff } from 'lucide-react';
 import JPanel from '@/components/JPanel';
-import { getOnboardingStatus } from '@/lib/jarvisApi';
+import { getOnboardingStatus } from '@/lib/khameleonApi';
 import {
   updateVaultItem,
   getVaultItems, createVaultItem, revealVaultItem, deleteVaultItem, getVaultAccessLog,
@@ -165,7 +165,7 @@ export default function Vault() {
 
       {error && <div style={{ fontSize: 11, color: '#E77A7A' }}>{error}</div>}
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="scrollbar-jarvis">
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="scrollbar-khameleon">
         {loading ? (
           <div className="j-empty">LOADING…</div>
         ) : items.length === 0 ? (

@@ -36,7 +36,7 @@ router.post("/session/log", async (req: Request, res: Response) => {
     res.json({ ok: true });
   } catch (err) {
     if (err instanceof InvalidBriefingTurnError) {
-      return res.status(400).json({ error: err.message });
+      res.status(400).json({ error: err.message }); return;
     }
     req.log.error({ err }, "Failed to log briefing conversation turn");
     res.status(500).json({ error: "Internal server error" });

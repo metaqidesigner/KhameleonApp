@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { helpWithEmail, rewriteReply, saveReplyDraft, type AssistResult, type EmailRef } from '@/lib/emailAssistApi';
-import { createTask } from '@/lib/jarvisApi';
+import { createTask } from '@/lib/khameleonApi';
 import { emailBridge } from '@/lib/desktopBridge';
 import { KHAMI_HOME } from '@/lib/where';
 

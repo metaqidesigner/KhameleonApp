@@ -3,7 +3,7 @@ import {
   Loader2, CheckCircle2, AlertTriangle, AlertCircle, Clock, ChevronDown, ChevronRight,
   RotateCcw, X, Terminal, FileText,
 } from 'lucide-react';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import {
   streamTaskRun, retryTaskRun, cancelTaskRun,
   type TaskAgentType, type TaskRun, type TaskRunStatus, type TaskStep, type TriggerType,
@@ -104,7 +104,7 @@ export function AgentTypeBadge({ type }: { type: TaskAgentType }) {
 export function StepRow({ step }: { step: TaskStep }) {
   const icons: Record<string, React.ReactNode> = {
     pending:  <div style={{ width: 10, height: 10, borderRadius: '50%', border: '1.5px solid var(--j-text-faint)', flexShrink: 0 }} />,
-    running:  <Loader2 size={10} style={{ color: 'var(--j-teal)', animation: 'jarvis-spin 1s linear infinite', flexShrink: 0 }} />,
+    running:  <Loader2 size={10} style={{ color: 'var(--j-teal)', animation: 'khameleon-spin 1s linear infinite', flexShrink: 0 }} />,
     done:     <CheckCircle2 size={10} style={{ color: 'var(--j-green)', flexShrink: 0 }} />,
     failed:   <AlertTriangle size={10} style={{ color: 'var(--j-coral)', flexShrink: 0 }} />,
   };
@@ -139,7 +139,7 @@ export function TaskRunCard({ run: initialRun, onRemove }: TaskRunCardProps) {
   // flagged in the 2026-10-01 audit as a direct contradiction of that rule).
   const [expanded, setExpanded] = useState(false);
   const [retrying, setRetrying] = useState(false);
-  const removeActiveTask        = useJarvisStore(s => s.removeActiveTask);
+  const removeActiveTask        = useKhameleonStore(s => s.removeActiveTask);
 
   useEffect(() => { setRun(initialRun); }, [initialRun.id]);
 
@@ -199,12 +199,12 @@ export function TaskRunCard({ run: initialRun, onRemove }: TaskRunCardProps) {
       background: 'rgba(8,14,32,0.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
       border: `1px solid ${borderColor}`, borderRadius: 14,
       boxShadow: `inset 0 1px 0 rgba(255,255,255,0.03), 0 4px 24px rgba(0,0,0,0.4), 0 0 32px ${glowColor}`,
-      overflow: 'hidden', animation: 'jarvis-fadein 0.25s ease both',
+      overflow: 'hidden', animation: 'khameleon-fadein 0.25s ease both',
       ...(needsAttention && { animation: 'task-pulse 3s ease-in-out infinite' }),
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: expanded ? `1px solid rgba(120,168,220,0.07)` : 'none' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, overflow: 'hidden' }}>
-          {run.status === 'running'   ? <Loader2 size={12} style={{ color: 'var(--j-teal)', animation: 'jarvis-spin 1s linear infinite', flexShrink: 0 }} />
+          {run.status === 'running'   ? <Loader2 size={12} style={{ color: 'var(--j-teal)', animation: 'khameleon-spin 1s linear infinite', flexShrink: 0 }} />
           : run.status === 'completed'? <CheckCircle2 size={12} style={{ color: 'var(--j-green)', flexShrink: 0 }} />
           : run.status === 'failed'   ? <AlertTriangle size={12} style={{ color: 'var(--j-coral)', flexShrink: 0 }} />
           : run.status === 'awaiting_confirmation' ? <AlertCircle size={12} style={{ color: 'var(--j-amber)', flexShrink: 0 }} />
@@ -225,7 +225,7 @@ export function TaskRunCard({ run: initialRun, onRemove }: TaskRunCardProps) {
           )}
           {run.status === 'failed' && (
             <button onClick={handleRetry} disabled={retrying} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--j-amber)', padding: '0 2px', display: 'flex' }}>
-              <RotateCcw size={11} style={{ animation: retrying ? 'jarvis-spin 0.7s linear infinite' : 'none' }} />
+              <RotateCcw size={11} style={{ animation: retrying ? 'khameleon-spin 0.7s linear infinite' : 'none' }} />
             </button>
           )}
           {isActive && (
@@ -262,7 +262,7 @@ export function TaskRunCard({ run: initialRun, onRemove }: TaskRunCardProps) {
           )}
           {run.steps.length === 0 && (run.status === 'queued' || run.status === 'running') && (
             <div style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--j-text-faint)', fontFamily: 'var(--j-font-mono)', fontSize: 10 }}>
-              <Loader2 size={12} style={{ animation: 'jarvis-spin 1s linear infinite' }} />
+              <Loader2 size={12} style={{ animation: 'khameleon-spin 1s linear infinite' }} />
               Analysing command and planning steps…
             </div>
           )}
@@ -272,7 +272,7 @@ export function TaskRunCard({ run: initialRun, onRemove }: TaskRunCardProps) {
                 <FileText size={10} style={{ color: 'var(--j-text-faint)' }} />
                 <span className="j-mono" style={{ fontSize: 9, color: 'var(--j-text-faint)', letterSpacing: '0.1em' }}>LIVE PREVIEW</span>
               </div>
-              <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text)', lineHeight: 1.65, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 220, overflowY: 'auto', padding: '8px 10px', background: 'rgba(0,196,184,0.03)', border: '1px solid rgba(0,196,184,0.09)', borderRadius: 8 }} className="scrollbar-jarvis">
+              <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text)', lineHeight: 1.65, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 220, overflowY: 'auto', padding: '8px 10px', background: 'rgba(0,196,184,0.03)', border: '1px solid rgba(0,196,184,0.09)', borderRadius: 8 }} className="scrollbar-khameleon">
                 {run.previewContent}
                 {run.status === 'running' && <span className="j-blink" style={{ color: 'var(--j-teal)' }}>▌</span>}
               </div>

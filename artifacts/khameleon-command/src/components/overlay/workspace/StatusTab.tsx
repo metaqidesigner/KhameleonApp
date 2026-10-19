@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityLog } from "@/components/activity/ActivityLog";
 import { getRoster, getAgentStatus, type AgentConfig } from "@/lib/agentsApi";
-import type { JarvisTelemetry } from "@/lib/jarvisApi";
+import type { KhameleonTelemetry } from "@/lib/khameleonApi";
 import { TEXT, MUTED } from "./ui";
 
 /**
@@ -16,7 +16,7 @@ const BASE = import.meta.env.VITE_API_URL || "/api";
 interface Health { uptime: number }
 
 function useStatusData() {
-  const [telemetry, setTelemetry] = useState<JarvisTelemetry | null | "unreachable">(null);
+  const [telemetry, setTelemetry] = useState<KhameleonTelemetry | null | "unreachable">(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [ready, setReady] = useState<Set<string> | null>(null);

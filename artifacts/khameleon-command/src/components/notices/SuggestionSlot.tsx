@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { CalendarClock, MailWarning, Repeat, X } from 'lucide-react';
 import { detectionBridge, requestCapture } from '@/lib/desktopBridge';
 import { getSuggestions, dismissSuggestion, openedSuggestion, type Suggestion } from '@/lib/workNoticesApi';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import { TONES, type Tone } from '@/components/settings/ui';
 
 /**
@@ -15,8 +15,8 @@ export function SuggestionSlot({ tone, style }: { tone: Tone; style?: React.CSSP
   const t = TONES[tone];
   const [items, setItems] = useState<Suggestion[]>([]);
   const [expanded, setExpanded] = useState(false);
-  const requestChatTool = useJarvisStore(s => s.requestChatTool);
-  const setChatOpen = useJarvisStore(s => s.setChatOpen);
+  const requestChatTool = useKhameleonStore(s => s.requestChatTool);
+  const setChatOpen = useKhameleonStore(s => s.setChatOpen);
 
   const load = useCallback(() => getSuggestions().then(setItems).catch(() => {}), []);
   useEffect(() => {

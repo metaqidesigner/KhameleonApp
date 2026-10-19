@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
-import { saveApiKey, clearApiKey } from '@/lib/jarvisApi';
+import { saveApiKey, clearApiKey } from '@/lib/khameleonApi';
 import type { ApiKeyProviderDef } from '@/lib/apiKeyProviders';
 import type { QuotaSnapshot } from '@/lib/quotaApi';
 

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Radio, Database } from 'lucide-react';
 import JPanel from '@/components/JPanel';
-import { useJarvisStore } from '@/store/jarvisStore';
-import { getConnectors, type JarvisConnector } from '@/lib/jarvisApi';
+import { useKhameleonStore } from '@/store/khameleonStore';
+import { getConnectors, type KhameleonConnector } from '@/lib/khameleonApi';
 
 // True messaging-channel integrations (Discord, Telegram, Signal, etc.) have
 // no backend of any kind anywhere in this codebase - no OAuth, no bot
@@ -31,8 +31,8 @@ function ChannelTile({ name }: { name: string }) {
 // per-provider OAuth start URLs that are only defined there) - this panel
 // used to reimplement a fake version of it locally instead of pointing
 // there, with a "CONNECT" button that did nothing but toggle local state.
-function ConnectorTile({ connector }: { connector: JarvisConnector }) {
-  const setActiveTab = useJarvisStore(s => s.setActiveTab);
+function ConnectorTile({ connector }: { connector: KhameleonConnector }) {
+  const setActiveTab = useKhameleonStore(s => s.setActiveTab);
   const color = connector.connected ? 'var(--j-green)' : 'var(--j-text-faint)';
 
   return (
@@ -56,7 +56,7 @@ function ConnectorTile({ connector }: { connector: JarvisConnector }) {
 }
 
 export default function Communications() {
-  const [connectors, setConnectors] = useState<JarvisConnector[]>([]);
+  const [connectors, setConnectors] = useState<KhameleonConnector[]>([]);
 
   useEffect(() => { getConnectors().then(setConnectors); }, []);
 

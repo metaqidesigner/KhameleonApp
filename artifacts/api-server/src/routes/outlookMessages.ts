@@ -4,7 +4,7 @@
  * Not a skill itself: a small, shared, read-only endpoint so the frontend
  * can let a user pick a real message instead of requiring them to paste a
  * raw Graph message id (previously the only way in — the verification
- * runbook in replit.md even documents fetching one via Graph Explorer as a
+ * runbook in docs/outlook-test-runbook.md even documents fetching one via Graph Explorer as a
  * workaround). Backs the inbox browser on the Approvals page for both
  * outlook-draft-email and outlook-summarize-thread.
  */

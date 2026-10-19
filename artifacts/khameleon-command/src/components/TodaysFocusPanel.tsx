@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getDailyTasks, type Task } from '@/lib/jarvisApi';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { getDailyTasks, type Task } from '@/lib/khameleonApi';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import { FocusRing, DAY_SECTIONS } from '@/pages/canvas';
 
 /**
@@ -23,7 +23,7 @@ export function TodaysFocusPanel() {
   const [sections, setSections] = useState<Record<string, Task[]>>({});
   const [doneCount, setDoneCount] = useState(0);
   const [total, setTotal] = useState(0);
-  const taskRevision = useJarvisStore(s => s.taskRevision);
+  const taskRevision = useKhameleonStore(s => s.taskRevision);
 
   const load = useCallback(() => {
     getDailyTasks().then(d => {

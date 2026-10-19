@@ -41,7 +41,7 @@ router.post("/:id/approve", async (req, res) => {
       .set({ status: "approved", resolvedAt: now })
       .where(eq(approvalsTable.id, id))
       .returning();
-    if (!updated) return res.status(404).json({ error: "Approval not found" });
+    if (!updated) { res.status(404).json({ error: "Approval not found" }); return; }
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Error approving request");
@@ -58,7 +58,7 @@ router.post("/:id/reject", async (req, res) => {
       .set({ status: "rejected", resolvedAt: now })
       .where(eq(approvalsTable.id, id))
       .returning();
-    if (!updated) return res.status(404).json({ error: "Approval not found" });
+    if (!updated) { res.status(404).json({ error: "Approval not found" }); return; }
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Error rejecting request");

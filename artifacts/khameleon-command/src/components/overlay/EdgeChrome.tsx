@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Activity, Clock3, Filter, MessageSquare, Radio, Receipt } from "lucide-react";
-import { useJarvisStore } from "@/store/jarvisStore";
+import { useKhameleonStore } from "@/store/khameleonStore";
 import { getWorkDomains, type WorkDomain } from "@/lib/workDomainsApi";
-import type { JarvisTelemetry, FeedItem } from "@/lib/jarvisApi";
+import type { KhameleonTelemetry, FeedItem } from "@/lib/khameleonApi";
 import type { OverlayPalette } from "./palettes";
 
 /**
@@ -34,18 +34,18 @@ function usePolled<T>(path: string): T | null {
 }
 
 function useEdgeData() {
-  const telemetry = usePolled<JarvisTelemetry>("/telemetry");
+  const telemetry = usePolled<KhameleonTelemetry>("/telemetry");
   const feed = usePolled<FeedItem[]>("/feed");
   const [domains, setDomains] = useState<WorkDomain[]>([]);
   useEffect(() => { getWorkDomains().then(setDomains).catch(() => {}); }, []);
-  const domainId = useJarvisStore(s => s.chatLastDomainId);
-  const setDomainId = useJarvisStore(s => s.setChatLastDomainId);
+  const domainId = useKhameleonStore(s => s.chatLastDomainId);
+  const setDomainId = useKhameleonStore(s => s.setChatLastDomainId);
   return { telemetry, feed: feed ?? [], domains, domainId, setDomainId };
 }
 
 const SINCE = "Since Khameleon's server last started";
 
-function stats(t: JarvisTelemetry | null) {
+function stats(t: KhameleonTelemetry | null) {
   if (!t) return [];
   return [
     { icon: <MessageSquare size={13} strokeWidth={1.5} />, label: "Questions", value: String(t.total_queries) },

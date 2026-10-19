@@ -20,7 +20,7 @@ router.get("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [agent] = await db.select().from(agentsTable).where(eq(agentsTable.id, id));
-    if (!agent) return res.status(404).json({ error: "Agent not found" });
+    if (!agent) { res.status(404).json({ error: "Agent not found" }); return; }
     res.json(agent);
   } catch (err) {
     req.log.error({ err }, "Error fetching agent");
@@ -31,7 +31,7 @@ router.get("/:id", async (req, res) => {
 router.post("/route", async (req, res) => {
   try {
     const parsed = RouteTaskBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
     const { task } = parsed.data;
     const agents = await db.select().from(agentsTable).where(eq(agentsTable.status, "active"));

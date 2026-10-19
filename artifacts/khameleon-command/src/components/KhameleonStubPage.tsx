@@ -7,7 +7,7 @@ interface Props {
   connectors: string[];
 }
 
-export default function JarvisStubPage({ title, icon, connectors }: Props) {
+export default function KhameleonStubPage({ title, icon, connectors }: Props) {
   return (
     <div style={{ height:'100%', padding:8 }}>
       <JPanel title={title} icon={icon}>
@@ -21,7 +21,7 @@ export default function JarvisStubPage({ title, icon, connectors }: Props) {
               position:'absolute', inset:0, borderRadius:'50%',
               border:'2px solid transparent',
               borderTop:'2px solid rgba(0,212,255,0.6)',
-              animation:'jarvis-spin 3s linear infinite',
+              animation:'khameleon-spin 3s linear infinite',
             }} />
             <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
               {icon}
@@ -31,7 +31,7 @@ export default function JarvisStubPage({ title, icon, connectors }: Props) {
           <div style={{ fontFamily:'var(--j-font-head)', fontSize:16, color:'var(--j-cyan)', letterSpacing:'0.12em', textAlign:'center' }}>
             {title}
           </div>
-          <div style={{ fontFamily:'var(--j-font-mono)', fontSize:11, color:'var(--j-text-muted)', letterSpacing:'0.12em', animation:'jarvis-pulse 2s ease-in-out infinite' }}>
+          <div style={{ fontFamily:'var(--j-font-mono)', fontSize:11, color:'var(--j-text-muted)', letterSpacing:'0.12em', animation:'khameleon-pulse 2s ease-in-out infinite' }}>
             CONNECTING TO KHAMELEON NETWORK...
           </div>
 
@@ -43,7 +43,7 @@ export default function JarvisStubPage({ title, icon, connectors }: Props) {
               {connectors.map(c => (
                 <div key={c} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', background:'rgba(0,212,255,0.03)', border:'1px solid rgba(0,212,255,0.1)' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <div style={{ width:5, height:5, borderRadius:'50%', background:'rgba(0,212,255,0.3)', animation:'jarvis-pulse 2s ease-in-out infinite' }} />
+                    <div style={{ width:5, height:5, borderRadius:'50%', background:'rgba(0,212,255,0.3)', animation:'khameleon-pulse 2s ease-in-out infinite' }} />
                     <span style={{ fontFamily:'var(--j-font-ui)', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--j-text-muted)' }}>{c}</span>
                   </div>
                   <button className="j-btn-ghost" style={{ height:24, padding:'0 10px', fontSize:10 }}>CONNECT</button>

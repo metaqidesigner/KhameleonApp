@@ -1,4 +1,4 @@
-import type { Task } from './jarvisApi';
+import type { Task } from './khameleonApi';
 
 /**
  * Tasks grouped by project with progress (gap review Q15: projects fold

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { StatusBadge, TriggerBadge, AgentTypeBadge, StepRow, TaskRunCard } from '@/components/taskRun/TaskRunParts';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import {
   submitCommand, getTaskRuns, retryTaskRun, cancelTaskRun, streamTaskRun,
   type TaskRun, type TaskStep, type TaskRunStatus, type TriggerType,
@@ -20,7 +20,7 @@ import {
   getSchedulerStatus,
   type Task, type TaskCategory, type TaskPriority, type TaskRecurrence,
   type SchedulerStatus,
-} from '@/lib/jarvisApi';
+} from '@/lib/khameleonApi';
 import { computeRoots, computeChildren } from '@/lib/taskNesting';
 import { streamAgentChat } from '@/lib/agentsApi';
 import { installSkillSetFromCatalog, confirmSkillSetInstall } from '@/lib/skillSetsApi';
@@ -327,7 +327,7 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown, onAcceptSuggestion, o
           paddingLeft: indent ? 28 : 12,
           background: 'rgba(0,196,184,0.04)',
           borderTop: '1px solid rgba(0,196,184,0.1)',
-          animation: 'jarvis-fadein 0.15s ease both',
+          animation: 'khameleon-fadein 0.15s ease both',
         }}>
           <ListTree size={9} style={{ color: 'var(--j-teal)', flexShrink: 0 }} />
           <select
@@ -354,7 +354,7 @@ function TaskCard({ task, onToggle, onDelete, onBreakdown, onAcceptSuggestion, o
             style={{ height: 24, padding: '0 10px', fontSize: 10, flexShrink: 0 }}
           >
             {savingParent
-              ? <Loader2 size={9} style={{ animation: 'jarvis-spin 0.7s linear infinite' }} />
+              ? <Loader2 size={9} style={{ animation: 'khameleon-spin 0.7s linear infinite' }} />
               : 'Save'}
           </button>
           <button
@@ -445,7 +445,7 @@ function CreateTaskForm({ onSave, onCancel, defaultCategory, availableTasks }: C
     <div style={{
       background: 'rgba(8,14,32,0.9)', border: '1px solid rgba(0,196,184,0.2)',
       borderRadius: 10, padding: '12px', marginBottom: 8,
-      animation: 'jarvis-fadein 0.2s ease both',
+      animation: 'khameleon-fadein 0.2s ease both',
     }}>
       <input
         ref={titleRef}
@@ -510,7 +510,7 @@ function CreateTaskForm({ onSave, onCancel, defaultCategory, availableTasks }: C
           className="j-btn-primary"
           style={{ height: 30, padding: '0 16px', fontSize: 11 }}
         >
-          {saving ? <Loader2 size={11} style={{ animation: 'jarvis-spin 0.7s linear infinite' }} /> : <Plus size={11} />}
+          {saving ? <Loader2 size={11} style={{ animation: 'khameleon-spin 0.7s linear infinite' }} /> : <Plus size={11} />}
           Add Task
         </button>
         <button onClick={onCancel} className="j-btn-ghost" style={{ height: 30, padding: '0 12px', fontSize: 11 }}>
@@ -838,7 +838,7 @@ function BreakdownPanel({ task, onClose, onDone }: BreakdownPanelProps) {
       borderBottom: 'none',
       borderRadius: '12px 12px 0 0',
       maxHeight: '55%', display: 'flex', flexDirection: 'column',
-      animation: 'jarvis-fadein 0.2s ease both', zIndex: 20,
+      animation: 'khameleon-fadein 0.2s ease both', zIndex: 20,
       boxShadow: `0 -8px 40px rgba(0,0,0,0.5), 0 0 0 1px color-mix(in srgb, ${orchColor} 12%, transparent)`,
     }}>
       {/* Header */}
@@ -858,7 +858,7 @@ function BreakdownPanel({ task, onClose, onDone }: BreakdownPanelProps) {
           Breaking down: {task.title}
         </span>
         {status === 'running' && (
-          <Loader2 size={11} style={{ color: orchColor, animation: 'jarvis-spin 0.8s linear infinite', flexShrink: 0 }} />
+          <Loader2 size={11} style={{ color: orchColor, animation: 'khameleon-spin 0.8s linear infinite', flexShrink: 0 }} />
         )}
         {status === 'done' && (
           <CheckCircle2 size={11} style={{ color: 'var(--j-green)', flexShrink: 0 }} />
@@ -873,7 +873,7 @@ function BreakdownPanel({ task, onClose, onDone }: BreakdownPanelProps) {
       </div>
 
       {/* Streaming content */}
-      <div className="scrollbar-jarvis" style={{ flex: 1, overflowY: 'auto', padding: '10px 14px' }}>
+      <div className="scrollbar-khameleon" style={{ flex: 1, overflowY: 'auto', padding: '10px 14px' }}>
         {status === 'error' ? (
           <div style={{ color: 'var(--j-coral)', fontFamily: 'var(--j-font-ui)', fontSize: 11, lineHeight: 1.5 }}>
             {errMsg || 'An error occurred while contacting the Orchestrator agent. Check that the API key is configured.'}
@@ -1166,10 +1166,10 @@ function MyTasksPanel() {
       )}
 
       {/* ── Task list or daily view ── */}
-      <div className="scrollbar-jarvis" style={{ flex: 1, overflowY: 'auto' }}>
+      <div className="scrollbar-khameleon" style={{ flex: 1, overflowY: 'auto' }}>
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 32, color: 'var(--j-text-faint)' }}>
-            <Loader2 size={14} style={{ animation: 'jarvis-spin 1s linear infinite' }} />
+            <Loader2 size={14} style={{ animation: 'khameleon-spin 1s linear infinite' }} />
             <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 12 }}>Loading tasks…</span>
           </div>
         ) : view === 'daily' ? (
@@ -1220,8 +1220,8 @@ function CommandBar({ onSubmit, loading }: { onSubmit: (text: string) => void; l
   const [input,     setInput]     = useState('');
   const [listening, setListening] = useState(false);
   const inputRef                  = useRef<HTMLInputElement>(null);
-  const pendingVoiceQuery    = useJarvisStore(s => s.pendingVoiceQuery);
-  const setPendingVoiceQuery = useJarvisStore(s => s.setPendingVoiceQuery);
+  const pendingVoiceQuery    = useKhameleonStore(s => s.pendingVoiceQuery);
+  const setPendingVoiceQuery = useKhameleonStore(s => s.setPendingVoiceQuery);
 
   useEffect(() => {
     if (pendingVoiceQuery) { setInput(pendingVoiceQuery); setPendingVoiceQuery(null); inputRef.current?.focus(); }
@@ -1249,11 +1249,11 @@ function CommandBar({ onSubmit, loading }: { onSubmit: (text: string) => void; l
           value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submit()} disabled={loading} />
       </div>
       <button onClick={startVoice} className="j-btn-ghost" title={listening ? 'Listening…' : 'Voice input'}
-        style={{ height: 48, width: 48, padding: 0, flexShrink: 0, borderRadius: 12, borderColor: listening ? 'rgba(226,90,110,0.5)' : undefined, color: listening ? 'var(--j-coral)' : undefined, animation: listening ? 'jarvis-pulse 0.8s ease-in-out infinite' : 'none' }}>
+        style={{ height: 48, width: 48, padding: 0, flexShrink: 0, borderRadius: 12, borderColor: listening ? 'rgba(226,90,110,0.5)' : undefined, color: listening ? 'var(--j-coral)' : undefined, animation: listening ? 'khameleon-pulse 0.8s ease-in-out infinite' : 'none' }}>
         {listening ? <MicOff size={16} /> : <Mic size={16} />}
       </button>
       <button className="j-btn-primary" style={{ height: 48, padding: '0 28px', borderRadius: 12, fontSize: 13, letterSpacing: '0.12em' }} onClick={submit} disabled={!input.trim() || loading}>
-        {loading ? <Loader2 size={14} style={{ animation: 'jarvis-spin 0.7s linear infinite' }} /> : <Send size={14} />}
+        {loading ? <Loader2 size={14} style={{ animation: 'khameleon-spin 0.7s linear infinite' }} /> : <Send size={14} />}
         EXECUTE
       </button>
     </div>
@@ -1416,7 +1416,7 @@ export function AutoTriggers() {
 function HistoryRow({ run, onRerun }: { run: TaskRun; onRerun: (text: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div style={{ borderBottom: '1px solid rgba(120,168,220,0.06)', animation: 'jarvis-fadein 0.2s ease both' }}>
+    <div style={{ borderBottom: '1px solid rgba(120,168,220,0.06)', animation: 'khameleon-fadein 0.2s ease both' }}>
       <div onClick={() => setExpanded(e => !e)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', cursor: 'pointer', userSelect: 'none' }}>
         {expanded ? <ChevronDown size={9} style={{ color: 'var(--j-text-faint)', flexShrink: 0 }} /> : <ChevronRight size={9} style={{ color: 'var(--j-text-faint)', flexShrink: 0 }} />}
         <span className="j-mono" style={{ fontSize: 8, color: 'var(--j-text-faint)', flexShrink: 0 }}>{relativeTime(run.createdAt)}</span>
@@ -1433,7 +1433,7 @@ function HistoryRow({ run, onRerun }: { run: TaskRun; onRerun: (text: string) =>
         <div style={{ paddingLeft: 16, paddingBottom: 8 }}>
           {run.resultSummary && <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', marginBottom: 4, lineHeight: 1.5 }}>{run.resultSummary}</div>}
           {run.steps.map(s => <StepRow key={s.index} step={s} />)}
-          {run.previewContent && <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-muted)', background: 'rgba(0,196,184,0.03)', border: '1px solid rgba(0,196,184,0.08)', borderRadius: 6, padding: '6px 8px', maxHeight: 100, overflowY: 'auto' }} className="scrollbar-jarvis">{run.previewContent.slice(0, 800)}</div>}
+          {run.previewContent && <div style={{ marginTop: 6, fontFamily: 'var(--j-font-mono)', fontSize: 9, color: 'var(--j-text-muted)', background: 'rgba(0,196,184,0.03)', border: '1px solid rgba(0,196,184,0.08)', borderRadius: 6, padding: '6px 8px', maxHeight: 100, overflowY: 'auto' }} className="scrollbar-khameleon">{run.previewContent.slice(0, 800)}</div>}
         </div>
       )}
     </div>
@@ -1459,7 +1459,7 @@ function CommandsPanel() {
   const [searchQ,     setSearchQ]     = useState('');
   const [statusFilter,   setStatusFilter]   = useState<TaskRunStatus | 'all'>('all');
   const [triggerFilter,  setTriggerFilter]  = useState<TriggerType | 'all'>('all');
-  const addActiveTask = useJarvisStore(s => s.addActiveTask);
+  const addActiveTask = useKhameleonStore(s => s.addActiveTask);
 
   const loadHistory = useCallback(async () => {
     const params: Parameters<typeof getTaskRuns>[0] = { limit: 80 };

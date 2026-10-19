@@ -1,4 +1,4 @@
-import type { ApiKeyProvider } from './jarvisApi';
+import type { ApiKeyProvider } from './khameleonApi';
 
 /**
  * Shared provider metadata for API keys and OAuth connectors. Split out

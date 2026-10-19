@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import { MIC_KEY } from '@/components/orb/VoiceController';
 import { getTtsStatus, getElevenLabsVoices, previewVoice, type ElevenLabsVoice } from '@/lib/voiceApi';
 import { useUi, Label, Hint, Group, type Tone } from './ui';
@@ -7,11 +7,11 @@ import { useUi, Label, Hint, Group, type Tone } from './ui';
 /** Settings > Voice (gap review Q18, unchanged features): microphone, wake word, speed, volume, voice, preview. */
 export function VoiceSettings({ tone }: { tone: Tone }) {
   const { t, input, btn } = useUi(tone);
-  const wakeWordActive = useJarvisStore(s => s.wakeWordActive);
-  const setWakeWordActive = useJarvisStore(s => s.setWakeWordActive);
-  const setMicModal = useJarvisStore(s => s.setMicPermissionModalOpen);
-  const voice = useJarvisStore(s => s.voiceSettings);
-  const setVoice = useJarvisStore(s => s.setVoiceSettings);
+  const wakeWordActive = useKhameleonStore(s => s.wakeWordActive);
+  const setWakeWordActive = useKhameleonStore(s => s.setWakeWordActive);
+  const setMicModal = useKhameleonStore(s => s.setMicPermissionModalOpen);
+  const voice = useKhameleonStore(s => s.voiceSettings);
+  const setVoice = useKhameleonStore(s => s.setVoiceSettings);
   const [mic, setMic] = useState<'granted' | 'denied' | 'unknown'>('unknown');
   const [tts, setTts] = useState<boolean | null>(null);
   const [voices, setVoices] = useState<ElevenLabsVoice[]>([]);

@@ -1,4 +1,4 @@
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 
 const BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -14,7 +14,7 @@ async function safeFetch<T>(url: string, opts?: RequestInit, fallback?: T): Prom
 }
 
 // ── Types ─────────────────────────────────────────────────
-export interface JarvisHealth {
+export interface KhameleonHealth {
   status: 'online' | 'degraded' | 'offline';
   engine: string;
   model: string;
@@ -28,7 +28,7 @@ export interface JarvisHealth {
   avg_latency_ms?: number;
 }
 
-export interface JarvisConnector {
+export interface KhameleonConnector {
   id: string;
   name: string;
   connected: boolean;
@@ -54,7 +54,7 @@ export interface AgentStats {
   p95_latency?: number;
 }
 
-export interface JarvisTelemetry {
+export interface KhameleonTelemetry {
   queries: { ts: number; agent: string; latency_ms: number; cost_usd: number; energy_wh: number }[];
   energy_wh: number;
   cost_usd: number;
@@ -75,7 +75,7 @@ export interface FeedItem {
 }
 
 // ── Fallbacks / Mock data ──────────────────────────────────
-export const OFFLINE_HEALTH: JarvisHealth = {
+export const OFFLINE_HEALTH: KhameleonHealth = {
   status: 'offline', engine: 'none', model: '—',
   uptime: 0, gpu: '—', vram_gb: 0,
   tokens_per_sec: 0, watt_per_query: 0,
@@ -88,7 +88,7 @@ export const KNOWN_AGENTS = [
   'proactive_agent', 'operative',
 ] as const;
 
-const MOCK_CONNECTORS: JarvisConnector[] = [
+const MOCK_CONNECTORS: KhameleonConnector[] = [
   { id: 'gmail', name: 'Gmail', connected: false },
   { id: 'gcal', name: 'Google Calendar', connected: false },
   { id: 'gdrive', name: 'Google Drive', connected: false },
@@ -125,7 +125,7 @@ const MOCK_FEED: FeedItem[] = [
   { id: '3', ts: Date.now() - 600000, agent: 'morning_digest', prompt: 'Morning briefing', latency_ms: 890, tokens: 820, cost_usd: 0 },
 ];
 
-export const MOCK_TELEMETRY: JarvisTelemetry = {
+export const MOCK_TELEMETRY: KhameleonTelemetry = {
   queries: [],
   energy_wh: 0,
   cost_usd: 0,
@@ -138,20 +138,20 @@ export const MOCK_TELEMETRY: JarvisTelemetry = {
 export { MOCK_CHANNELS };
 
 // ── API functions ──────────────────────────────────────────
-export async function getHealth(): Promise<JarvisHealth> {
-  return safeFetch<JarvisHealth>(`${BASE}/health`, undefined, OFFLINE_HEALTH);
+export async function getHealth(): Promise<KhameleonHealth> {
+  return safeFetch<KhameleonHealth>(`${BASE}/health`, undefined, OFFLINE_HEALTH);
 }
 
-export async function getTelemetry(): Promise<JarvisTelemetry> {
-  return safeFetch<JarvisTelemetry>(`${BASE}/telemetry`, undefined, MOCK_TELEMETRY);
+export async function getTelemetry(): Promise<KhameleonTelemetry> {
+  return safeFetch<KhameleonTelemetry>(`${BASE}/telemetry`, undefined, MOCK_TELEMETRY);
 }
 
 export async function getAgents(): Promise<string[]> {
   return safeFetch<string[]>(`${BASE}/agents`, undefined, [...KNOWN_AGENTS]);
 }
 
-export async function getConnectors(): Promise<JarvisConnector[]> {
-  return safeFetch<JarvisConnector[]>(`${BASE}/connectors`, undefined, MOCK_CONNECTORS);
+export async function getConnectors(): Promise<KhameleonConnector[]> {
+  return safeFetch<KhameleonConnector[]>(`${BASE}/connectors`, undefined, MOCK_CONNECTORS);
 }
 
 export async function getCurrentMode(): Promise<{ name: string }> {
@@ -162,7 +162,7 @@ export async function getAgentFeed(): Promise<FeedItem[]> {
   return safeFetch<FeedItem[]>(`${BASE}/feed`, undefined, MOCK_FEED);
 }
 
-export async function askJarvis(prompt: string, agent?: string): Promise<AskResponse> {
+export async function askKhameleon(prompt: string, agent?: string): Promise<AskResponse> {
   return safeFetch<AskResponse>(
     `${BASE}/ask`,
     {
@@ -350,7 +350,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   });
   if (!res.ok) throw new Error('Failed to create task');
   const task = await res.json() as Task;
-  useJarvisStore.getState().notifyTasksChanged();
+  useKhameleonStore.getState().notifyTasksChanged();
   return task;
 }
 
@@ -362,21 +362,21 @@ export async function updateTask(id: number, input: UpdateTaskInput): Promise<Ta
   });
   if (!res.ok) throw new Error('Failed to update task');
   const task = await res.json() as Task;
-  useJarvisStore.getState().notifyTasksChanged();
+  useKhameleonStore.getState().notifyTasksChanged();
   return task;
 }
 
 export async function deleteTask(id: number): Promise<void> {
   const res = await fetch(`${BASE}/tasks/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete task');
-  useJarvisStore.getState().notifyTasksChanged();
+  useKhameleonStore.getState().notifyTasksChanged();
 }
 
 /** §15.2: "does not repeat for the same task thread" - permanent once dismissed. */
 export async function dismissSkillSetSuggestion(taskId: number): Promise<void> {
   const res = await fetch(`${BASE}/tasks/${taskId}/skill-set-suggestion/dismiss`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to dismiss suggestion');
-  useJarvisStore.getState().notifyTasksChanged();
+  useKhameleonStore.getState().notifyTasksChanged();
 }
 
 // ── Scheduler ──────────────────────────────────────────────

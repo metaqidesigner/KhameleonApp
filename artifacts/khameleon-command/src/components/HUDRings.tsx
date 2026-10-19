@@ -1,10 +1,10 @@
 import React from 'react';
 import { Clock, Activity, Cpu } from 'lucide-react';
-import type { JarvisHealth, JarvisTelemetry } from '@/lib/jarvisApi';
+import type { KhameleonHealth, KhameleonTelemetry } from '@/lib/khameleonApi';
 
 interface HUDRingsProps {
-  health: JarvisHealth;
-  telemetry: JarvisTelemetry;
+  health: KhameleonHealth;
+  telemetry: KhameleonTelemetry;
 }
 
 // ── Geometry helpers ─────────────────────────────────────────
@@ -166,7 +166,7 @@ export default function HUDRings({ health }: HUDRingsProps) {
               width: 5, height: 5, borderRadius: '50%', marginTop: 8,
               background: isOnline ? 'var(--j-green)' : 'var(--j-coral)',
               boxShadow: isOnline ? '0 0 8px var(--j-green)' : 'none',
-              animation: isOnline ? 'jarvis-pulse 2s ease-in-out infinite' : undefined,
+              animation: isOnline ? 'khameleon-pulse 2s ease-in-out infinite' : undefined,
             }} />
           </div>
         </div>

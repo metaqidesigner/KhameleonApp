@@ -69,7 +69,7 @@ export default function Council() {
       </div>
 
       {/* session */}
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }} className="scrollbar-jarvis">
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }} className="scrollbar-khameleon">
         {rounds.length === 0 && !running ? (
           <div className="j-empty">
             <Users size={36} color="var(--j-text-faint)" />
@@ -94,7 +94,7 @@ export default function Council() {
                           <span style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, color: '#fff' }}>{cfg?.name ?? r.agentId}</span>
                           <span className="j-mono" style={{ marginLeft: 'auto', fontSize: 8, color: 'var(--j-text-faint)' }}>{r.latencyMs}ms</span>
                         </div>
-                        <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: r.error ? 'var(--j-red)' : 'var(--j-text)', lineHeight: 1.55, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }} className="scrollbar-jarvis">
+                        <div style={{ fontFamily: 'var(--j-font-mono)', fontSize: 10, color: r.error ? 'var(--j-red)' : 'var(--j-text)', lineHeight: 1.55, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }} className="scrollbar-khameleon">
                           {r.error ?? r.content}
                         </div>
                       </div>
@@ -112,7 +112,7 @@ export default function Council() {
             ))}
             {running && (
               <div className="j-empty" style={{ padding: '20px 0' }}>
-                <div style={{ width: 32, height: 32, border: '2px solid rgba(0,212,255,0.2)', borderTop: '2px solid var(--j-cyan)', borderRadius: '50%', animation: 'jarvis-spin 0.8s linear infinite' }} />
+                <div style={{ width: 32, height: 32, border: '2px solid rgba(0,212,255,0.2)', borderTop: '2px solid var(--j-cyan)', borderRadius: '50%', animation: 'khameleon-spin 0.8s linear infinite' }} />
                 COUNCIL IN SESSION...
               </div>
             )}
@@ -134,7 +134,7 @@ export default function Council() {
           style={{ flex: 1, height: 44, padding: '8px 12px', background: 'rgba(0,212,255,0.04)', border: '1px solid rgba(0,212,255,0.15)', color: 'var(--j-text)', fontFamily: 'var(--j-font-mono)', fontSize: 12, resize: 'none', outline: 'none' }}
         />
         <button className="j-btn-primary" style={{ width: 44, height: 44, padding: 0, flexShrink: 0 }} onClick={runCouncil} disabled={running || !prompt.trim() || !selectedIds.length}>
-          {running ? <div style={{ width: 14, height: 14, border: '2px solid rgba(0,212,255,0.3)', borderTop: '2px solid var(--j-cyan)', borderRadius: '50%', animation: 'jarvis-spin 0.8s linear infinite' }} /> : <Send size={14} />}
+          {running ? <div style={{ width: 14, height: 14, border: '2px solid rgba(0,212,255,0.3)', borderTop: '2px solid var(--j-cyan)', borderRadius: '50%', animation: 'khameleon-spin 0.8s linear infinite' }} /> : <Send size={14} />}
         </button>
       </div>
     </div>

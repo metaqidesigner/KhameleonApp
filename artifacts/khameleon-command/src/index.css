@@ -224,7 +224,7 @@ html, body, #root {
   border-radius: 50%;
   background: var(--j-green);
   box-shadow: 0 0 6px var(--j-green);
-  animation: jarvis-pulse 2s ease-in-out infinite;
+  animation: khameleon-pulse 2s ease-in-out infinite;
 }
 .j-panel-badge {
   display: inline-flex;
@@ -518,7 +518,7 @@ html, body, #root {
     rgba(0, 196, 184, 0.09) 50%,
     rgba(0, 196, 184, 0.03) 100%);
   background-size: 400px 100%;
-  animation: jarvis-shimmer 1.8s ease-in-out infinite;
+  animation: khameleon-shimmer 1.8s ease-in-out infinite;
   border: 1px solid rgba(0, 196, 184, 0.09);
 }
 
@@ -543,10 +543,10 @@ html, body, #root {
 .j-rel-fill { height: 100%; background: var(--j-teal); border-radius: 1px; transition: width 0.4s; }
 
 /* ── Scrollbar ───────────────────────────────────────────── */
-.scrollbar-jarvis::-webkit-scrollbar { width: 4px; }
-.scrollbar-jarvis::-webkit-scrollbar-track { background: rgba(8, 14, 32, 0.8); border-radius: 2px; }
-.scrollbar-jarvis::-webkit-scrollbar-thumb { background: rgba(0, 196, 184, 0.25); border-radius: 2px; }
-.scrollbar-jarvis { scrollbar-width: thin; scrollbar-color: rgba(0, 196, 184, 0.25) rgba(8, 14, 32, 0.8); }
+.scrollbar-khameleon::-webkit-scrollbar { width: 4px; }
+.scrollbar-khameleon::-webkit-scrollbar-track { background: rgba(8, 14, 32, 0.8); border-radius: 2px; }
+.scrollbar-khameleon::-webkit-scrollbar-thumb { background: rgba(0, 196, 184, 0.25); border-radius: 2px; }
+.scrollbar-khameleon { scrollbar-width: thin; scrollbar-color: rgba(0, 196, 184, 0.25) rgba(8, 14, 32, 0.8); }
 
 /* ── react-grid-layout overrides ─────────────────────────── */
 .react-grid-item { transition: none !important; }
@@ -566,20 +566,20 @@ html, body, #root {
 }
 
 /* ── Keyframes (unchanged) ───────────────────────────────── */
-@keyframes jarvis-scan {
+@keyframes khameleon-scan {
   0%   { transform: translateX(-100vw); }
   100% { transform: translateX(100vw); }
 }
-@keyframes jarvis-spin   { from { transform: rotate(0deg); }   to { transform: rotate(360deg); } }
-@keyframes jarvis-spin-r { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
-@keyframes jarvis-pulse  { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
-@keyframes jarvis-blink  { 0%,49%  { opacity: 1; } 50%,100% { opacity: 0; } }
-@keyframes jarvis-shimmer {
+@keyframes khameleon-spin   { from { transform: rotate(0deg); }   to { transform: rotate(360deg); } }
+@keyframes khameleon-spin-r { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+@keyframes khameleon-pulse  { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes khameleon-blink  { 0%,49%  { opacity: 1; } 50%,100% { opacity: 0; } }
+@keyframes khameleon-shimmer {
   0%   { background-position: -400px 0; }
   100% { background-position: 1000px 0; }
 }
-@keyframes jarvis-flicker { 0%,98%,100% { opacity:1; } 99% { opacity:0.9; } }
-@keyframes jarvis-fadein {
+@keyframes khameleon-flicker { 0%,98%,100% { opacity:1; } 99% { opacity:0.9; } }
+@keyframes khameleon-fadein {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
@@ -597,9 +597,9 @@ html, body, #root {
   50% { box-shadow: 0 0 0 4px rgba(0, 196, 184, 0.12); }
 }
 
-.j-blink   { animation: jarvis-blink 0.7s steps(1) infinite; }
-.j-animate-fadein { animation: jarvis-fadein 0.3s ease both; }
-.j-flicker { animation: jarvis-flicker 8s linear infinite; }
+.j-blink   { animation: khameleon-blink 0.7s steps(1) infinite; }
+.j-animate-fadein { animation: khameleon-fadein 0.3s ease both; }
+.j-flicker { animation: khameleon-flicker 8s linear infinite; }
 
 /* ── Mobile ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -1201,7 +1201,7 @@ html.light body {
   );
 }
 /* Scale up the orb visual inside the card */
-.ac-orb-area .jarvis-orb-container {
+.ac-orb-area .khameleon-orb-container {
   transform: scale(1.82);
   transform-origin: center center;
 }

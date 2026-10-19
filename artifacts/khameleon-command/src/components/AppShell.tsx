@@ -9,11 +9,11 @@ import { LoginRequests } from '@/components/notices/LoginRequests';
 import { DetectionBadge } from '@/components/notices/DetectionBadge';
 import { pairDesktopLink } from '@/lib/desktopBridge';
 import { LeftSidebar } from './LeftSidebar';
-import { JarvisOrbPortal } from './orb/JarvisOrbPortal';
+import { KhameleonOrbPortal } from './orb/KhameleonOrbPortal';
 import { VoiceController } from './orb/VoiceController';
 import { OnboardingWizard } from './OnboardingWizard';
 import { NeedsInputWatcher } from './NeedsInputWatcher';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 
 const Home = lazy(() => import('@/pages/home'));
 const Agents     = lazy(() => import('@/pages/agents'));
@@ -36,7 +36,7 @@ function Fallback() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-        <div style={{ width: 48, height: 48, border: '2px solid rgba(0,196,184,0.25)', borderTop: '2px solid var(--j-teal)', borderRadius: '50%', animation: 'jarvis-spin 0.8s linear infinite' }} />
+        <div style={{ width: 48, height: 48, border: '2px solid rgba(0,196,184,0.25)', borderTop: '2px solid var(--j-teal)', borderRadius: '50%', animation: 'khameleon-spin 0.8s linear infinite' }} />
         <span style={{ fontFamily: 'var(--j-font-mono)', fontSize: 11, color: 'var(--j-text-muted)', letterSpacing: '0.15em' }}>LOADING MODULE…</span>
       </div>
     </div>
@@ -44,7 +44,7 @@ function Fallback() {
 }
 
 function PageRouter() {
-  const activeTab = useJarvisStore(s => s.activeTab);
+  const activeTab = useKhameleonStore(s => s.activeTab);
   return (
     <Suspense fallback={<Fallback />}>
       {activeTab === 'canvas'    && <Home />}
@@ -71,7 +71,7 @@ export function AppShell() {
   // Build 7: let the chat's AI work in this computer's apps (pairs the desktop link; no-op in a browser).
   useEffect(() => { void pairDesktopLink().catch(() => {}); }, []);
   // Build 6: a detection offer's "Capture it" - Capture lives on the Skill Sets page in Classic.
-  const setActiveTab = useJarvisStore(s => s.setActiveTab);
+  const setActiveTab = useKhameleonStore(s => s.setActiveTab);
   useEffect(() => {
     const go = () => { (window as unknown as { __khameleonCaptureRequested?: boolean }).__khameleonCaptureRequested = true; setActiveTab('skills'); };
     window.addEventListener('khameleon:start-capture', go);
@@ -101,7 +101,7 @@ export function AppShell() {
       </div>
 
       {/* Floating orb — always present */}
-      <JarvisOrbPortal />
+      <KhameleonOrbPortal />
 
       {/* design-spec.md §6.5.1 real needs-input interrupt (2026-10-01) */}
       <NeedsInputWatcher />

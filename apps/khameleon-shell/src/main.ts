@@ -211,8 +211,7 @@ app.whenReady().then(() => {
   const fileRoot = process.env.KHAMELEON_FILE_ROOT ?? app.getPath("documents");
   const memory = new MemoryStore(new JsonFileStorage(path.join(app.getPath("userData"), "memory.json")));
   // The tested window/file/memory runners. The chat's AI (Khami first, on
-  // the server) reaches them through the desktop link below (Build 7) - this
-  // replaced the earlier Claude-only LocalAgentRunner.
+  // the server) reaches them through the desktop link below (Build 7).
   const runners = {
     window: new WindowCommandRunner(windowController, requestObservePermission),
     file: new FileCommandRunner(new FileOps(fileRoot), new MacAppLauncher()),
@@ -512,16 +511,11 @@ app.whenReady().then(() => {
     throw new Error(`The desktop app doesn't know how to "${action}".`);
   });
 
-  // Deliberately a SEPARATE channel, not a tool LocalAgentRunner can call
-  // (Cross-App Control Phase 3, khameleon-decisions-log.md, 2026-10-03).
-  // LocalAgentRunner's loop sends every tool result back to Anthropic's
-  // cloud API on the next iteration - routing a sensitive document through
-  // it as a "tool" would send the extracted content (or a close paraphrase
-  // of it) to the cloud anyway, exactly what local/sensitive mode exists to
-  // prevent. This channel never touches localAgent or the Anthropic SDK at
-  // all; the renderer calls it directly when the user has flagged a
-  // document as sensitive, bypassing cloud Claude entirely for that
-  // interaction.
+  // Deliberately a SEPARATE channel, not a chat tool (Cross-App Control
+  // Phase 3, khameleon-decisions-log.md, 2026-10-03): a tool's result goes
+  // back into the chat's conversation, which may be with an outside AI.
+  // The renderer calls this directly when the user has flagged a document
+  // as sensitive, so it never leaves the computer.
   const localDocumentAgent = new LocalDocumentAgent();
   ipcMain.handle("khameleon:read-document-locally", async (_event, filePath: unknown, question: unknown) => {
     if (typeof filePath !== "string" || !filePath.trim()) throw new Error("A non-empty file path is required.");

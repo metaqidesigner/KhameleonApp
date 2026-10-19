@@ -12,7 +12,7 @@ import { FromDocument, type DocumentDraft } from '@/components/procedures/FromDo
 import { ProcedureDocuments } from '@/components/procedures/ProcedureDocuments';
 import { SkillLoginPicker } from '@/components/skills/SkillLoginPicker';
 import { ReplaySkill } from '@/components/skills/ReplaySkill';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 
 const STATUS_LABEL: Record<SkillSet['status'], string> = {
   available: 'AVAILABLE',
@@ -38,7 +38,7 @@ export default function Skills() {
   const error = lib.error ?? undefined;
   const [selectedDomain, setSelectedDomain] = useState<number | null>(null);
   const { domains, reload: reloadDomains } = useWorkDomains();
-  const requestChatTool = useJarvisStore(s => s.requestChatTool);
+  const requestChatTool = useKhameleonStore(s => s.requestChatTool);
 
   const [form, setForm] = useState<CreateSkillSetInput>(BLANK);
   const [importMode, setImportMode] = useState(false);
@@ -77,7 +77,7 @@ export default function Skills() {
 
   return (
     // The whole page scrolls; the skill list keeps a usable height however many panels sit above it.
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, height: '100%', padding: 8, overflowY: 'auto' }} className="scrollbar-jarvis">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, height: '100%', padding: 8, overflowY: 'auto' }} className="scrollbar-khameleon">
       {/* ADD / IMPORT */}
       <div style={{ flexShrink: 0 }}>
         <JPanel
@@ -192,7 +192,7 @@ export default function Skills() {
       {/* GET SKILLS - same module as the Overlay's Skills panel (components/skills/GetSkills). */}
       <div style={{ flexShrink: 0 }}>
         <JPanel title="GET SKILLS FROM GITHUB" icon={<Download size={13} />}>
-          <div style={{ maxHeight: 360, overflowY: 'auto' }} className="scrollbar-jarvis">
+          <div style={{ maxHeight: 360, overflowY: 'auto' }} className="scrollbar-khameleon">
             <GetSkills tone="classic" onInstall={lib.installFromGithub} />
           </div>
         </JPanel>
@@ -209,7 +209,7 @@ export default function Skills() {
 
       {error && <div style={{ fontSize: 11, color: '#E77A7A' }}>{error}</div>}
 
-      <div style={{ flex: 1, minHeight: 420, overflowY: 'auto' }} className="scrollbar-jarvis">
+      <div style={{ flex: 1, minHeight: 420, overflowY: 'auto' }} className="scrollbar-khameleon">
         {loading ? (
           <div className="j-empty">LOADING…</div>
         ) : filtered.length === 0 ? (

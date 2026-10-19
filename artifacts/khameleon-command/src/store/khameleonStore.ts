@@ -73,7 +73,7 @@ export interface VoiceSettings {
   elevenLabsModelId: string;
 }
 
-interface JarvisStore {
+interface KhameleonStore {
   activeTab: TabId;
   chatOpen: boolean;
   /** Persisted minimised state for each named canvas window */
@@ -102,7 +102,7 @@ interface JarvisStore {
   orbChatOpen: boolean;
   /** Count of currently-mounted AssistantCard instances (its own embedded
       orb+chat - the Assistant tab's hero, Workspace's compact panel). The
-      persistent floating orb (JarvisOrbPortal) hides itself while this is
+      persistent floating orb (KhameleonOrbPortal) hides itself while this is
       >0, so there is never more than one orb on screen at once. A count
       rather than a boolean survives two instances briefly overlapping
       (e.g. a tab-switch transition) without one's unmount hiding the
@@ -126,7 +126,7 @@ interface JarvisStore {
   onboardingWizardOpen: boolean;
 
   // Chat Window (2026-10-02) - persisted per the same convention as the
-  // canvas windows above (jarvisStore, not a new store). Position/size are
+  // canvas windows above (khameleonStore, not a new store). Position/size are
   // only meaningful while floating; docked ignores them and uses the
   // right-rail's own layout.
   chatWindowBounds: { x: number; y: number; width: number; height: number };
@@ -225,7 +225,7 @@ export interface ChatToolPayload {
   notice?: { title: string; body: string; why?: string };
 }
 
-export const useJarvisStore = create<JarvisStore>()(
+export const useKhameleonStore = create<KhameleonStore>()(
   persist(
     (set) => ({
       activeTab: 'canvas',
@@ -388,7 +388,7 @@ export const useJarvisStore = create<JarvisStore>()(
       consumeChatToolRequest: (id) => set(s => ({ chatToolRequests: s.chatToolRequests.filter(r => r.id !== id) })),
     }),
     {
-      name: 'jarvis-ui',
+      name: 'jarvis-ui', // kept from the old working name so saved settings survive
       partialize: (s) => ({
         activeTab: s.activeTab,
         canvasWindowsMinimized: s.canvasWindowsMinimized,

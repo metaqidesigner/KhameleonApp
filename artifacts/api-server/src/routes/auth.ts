@@ -404,7 +404,8 @@ router.get("/oauth/callback", async (req: Request, res: Response) => {
 
 router.get("/oauth/:provider/status", async (req: Request, res: Response) => {
   try {
-    res.json({ provider: req.params.provider, connected: await isConnected(req.params.provider) });
+    const provider = String(req.params.provider);
+    res.json({ provider, connected: await isConnected(provider) });
   } catch (err) {
     req.log.error({ err }, "Error checking OAuth status");
     res.status(500).json({ error: "Internal server error" });
@@ -413,7 +414,7 @@ router.get("/oauth/:provider/status", async (req: Request, res: Response) => {
 
 router.delete("/oauth/:provider", async (req: Request, res: Response) => {
   try {
-    await deleteToken(req.params.provider);
+    await deleteToken(String(req.params.provider));
     req.log.info({ provider: req.params.provider }, "OAuth token revoked");
 
     // §16.5: disconnecting is local and reversible - logged as a receipt,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Download, Play, Plus, X } from "lucide-react";
-import { useJarvisStore } from "@/store/jarvisStore";
+import { useKhameleonStore } from "@/store/khameleonStore";
 import { useSkillLibrary, SkillConfirmGate } from "@/components/skills/useSkillLibrary";
 import { GetSkills } from "@/components/skills/GetSkills";
 import { SkillGuide } from "@/components/skills/SkillGuide";
@@ -225,7 +225,7 @@ export function SkillsPanel({ palette, onClose, draft, onDraftDone }: {
   onDraftDone?: () => void;
 }) {
   const lib = useSkillLibrary();
-  const requestChatTool = useJarvisStore(s => s.requestChatTool);
+  const requestChatTool = useKhameleonStore(s => s.requestChatTool);
   const { checks, reload: reloadChecks } = useProcedureChecks();
   const [fromDoc, setFromDoc] = useState(false);
   const [docDraft, setDocDraft] = useState<DocumentDraft | null>(null);

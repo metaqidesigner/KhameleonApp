@@ -4,7 +4,7 @@ import {
   Library, MessageCircle, PenLine, RefreshCw, Search, Sparkles, Table2, ZoomIn,
 } from "lucide-react";
 import type { OverlayPalette } from "./palettes";
-import type { ChatToolId } from "@/store/jarvisStore";
+import type { ChatToolId } from "@/store/khameleonStore";
 
 /**
  * The four edge toolbars (docs/build-review.md, Build 2). Left: Capture &

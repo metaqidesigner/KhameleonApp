@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Send, MicOff } from 'lucide-react';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import {
   streamAgentChat,
   FALLBACK_ROSTER,
@@ -8,9 +8,9 @@ import {
   type AgentConfig,
   type ChatMessage,
 } from '@/lib/agentsApi';
-import { getOnboardingStatus } from '@/lib/jarvisApi';
-import type { VoiceSettings } from '@/store/jarvisStore';
-// reuse orb visual styles (JarvisOrb.tsx imports this too, but we need it standalone on the assistant page)
+import { getOnboardingStatus } from '@/lib/khameleonApi';
+import type { VoiceSettings } from '@/store/khameleonStore';
+// reuse orb visual styles (KhameleonOrb.tsx imports this too, but we need it standalone on the assistant page)
 import './orb/orb.css';
 
 const PREFERRED_VOICES = [
@@ -57,14 +57,14 @@ const AGENT_COLORS: Record<string, string> = {
 };
 
 export function AssistantCard() {
-  const orbStatus           = useJarvisStore(s => s.orbStatus);
-  const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
-  const orbActiveAgentId    = useJarvisStore(s => s.orbActiveAgentId);
-  const setOrbActiveAgentId = useJarvisStore(s => s.setOrbActiveAgentId);
-  const voiceEnabled        = useJarvisStore(s => s.voiceEnabled);
-  const voiceSettings       = useJarvisStore(s => s.voiceSettings);
-  const pushAgentEvent      = useJarvisStore(s => s.pushAgentEvent);
-  const adjustEmbeddedOrbMountCount = useJarvisStore(s => s.adjustEmbeddedOrbMountCount);
+  const orbStatus           = useKhameleonStore(s => s.orbStatus);
+  const setOrbStatus        = useKhameleonStore(s => s.setOrbStatus);
+  const orbActiveAgentId    = useKhameleonStore(s => s.orbActiveAgentId);
+  const setOrbActiveAgentId = useKhameleonStore(s => s.setOrbActiveAgentId);
+  const voiceEnabled        = useKhameleonStore(s => s.voiceEnabled);
+  const voiceSettings       = useKhameleonStore(s => s.voiceSettings);
+  const pushAgentEvent      = useKhameleonStore(s => s.pushAgentEvent);
+  const adjustEmbeddedOrbMountCount = useKhameleonStore(s => s.adjustEmbeddedOrbMountCount);
 
   const [roster, setRoster]     = useState<AgentConfig[]>(FALLBACK_ROSTER);
   const [messages, setMessages] = useState<AcMsg[]>([]);
@@ -103,7 +103,7 @@ export function AssistantCard() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Speaking amplitude pulse (same logic as JarvisOrb)
+  // Speaking amplitude pulse (same logic as KhameleonOrb)
   useEffect(() => {
     cancelAnimationFrame(ampRafRef.current);
     if (orbStatus !== 'speaking') {
@@ -221,7 +221,7 @@ export function AssistantCard() {
 
   const orbEl = (
     <div style={{ position: 'relative', width: 90, height: 90 }}>
-      <div className={`jarvis-orb-container ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}`}>
+      <div className={`khameleon-orb-container ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}`}>
         <div className={`orb-glow ${voiceEnabled || orbStatus !== 'online' ? orbStatus : 'muted'}`} />
         <div className="orb-arc orb-arc-1" />
         <div className="orb-arc orb-arc-2" />

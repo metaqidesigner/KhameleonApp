@@ -6,7 +6,7 @@ import { getCalendarEvents, type CalendarEvent } from '@/lib/calendarApi';
 /**
  * Real calendar backend (routes/calendar.ts) has existed since well
  * before this pass - live Google Calendar / Outlook Calendar fetch with
- * a local DB fallback - but the page itself was a 7-line JarvisStubPage
+ * a local DB fallback - but the page itself was a 7-line KhameleonStubPage
  * with a permanently-looping "CONNECTING..." animation and a CONNECT
  * button with no onClick at all. This is the real page for that
  * already-real backend.

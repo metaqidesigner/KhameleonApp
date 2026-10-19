@@ -1,7 +1,7 @@
 import React from 'react';
 import { Workflow } from 'lucide-react';
-import JarvisStubPage from '@/components/JarvisStubPage';
+import KhameleonStubPage from '@/components/KhameleonStubPage';
 
 export default function Automations() {
-  return <JarvisStubPage title="AUTOMATIONS" icon={<Workflow size={13}/>} connectors={['GitHub Actions','Zapier','Make','n8n']} />;
+  return <KhameleonStubPage title="AUTOMATIONS" icon={<Workflow size={13}/>} connectors={['GitHub Actions','Zapier','Make','n8n']} />;
 }

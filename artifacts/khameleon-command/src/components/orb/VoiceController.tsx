@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import { MicPermissionModal } from './MicPermissionModal';
 
 // Exported so Settings' Voice section can read the same key for display
 // (granted/denied/not-yet-asked) without duplicating the string literal.
-export const MIC_KEY = 'jarvis_mic_granted';
+export const MIC_KEY = 'jarvis_mic_granted'; // old working name kept so the saved choice survives
 const WAKE_PHRASES = ['hello khameleon', 'hey khameleon', 'ok khameleon', 'khameleon'];
 
 type WakeStatus = 'idle' | 'waiting' | 'listening' | 'blocked';
@@ -15,19 +15,19 @@ function getSR() {
 }
 
 export function VoiceController() {
-  const wakeWordActive      = useJarvisStore(s => s.wakeWordActive);
-  const wakeWordBlocked     = useJarvisStore(s => s.wakeWordBlocked);
-  const setWakeWordBlocked  = useJarvisStore(s => s.setWakeWordBlocked);
-  const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
-  const openOrbChat         = useJarvisStore(s => s.openOrbChat);
-  const setPendingVoiceQuery = useJarvisStore(s => s.setPendingVoiceQuery);
-  const voiceSettings       = useJarvisStore(s => s.voiceSettings);
-  const orbStatus           = useJarvisStore(s => s.orbStatus);
+  const wakeWordActive      = useKhameleonStore(s => s.wakeWordActive);
+  const wakeWordBlocked     = useKhameleonStore(s => s.wakeWordBlocked);
+  const setWakeWordBlocked  = useKhameleonStore(s => s.setWakeWordBlocked);
+  const setOrbStatus        = useKhameleonStore(s => s.setOrbStatus);
+  const openOrbChat         = useKhameleonStore(s => s.openOrbChat);
+  const setPendingVoiceQuery = useKhameleonStore(s => s.setPendingVoiceQuery);
+  const voiceSettings       = useKhameleonStore(s => s.voiceSettings);
+  const orbStatus           = useKhameleonStore(s => s.orbStatus);
   // Lives in the store (not local state) so Settings' Voice section can
   // reopen this after a user skips it the first time - see the store
   // comment on micPermissionModalOpen for why.
-  const showModal           = useJarvisStore(s => s.micPermissionModalOpen);
-  const setShowModal        = useJarvisStore(s => s.setMicPermissionModalOpen);
+  const showModal           = useKhameleonStore(s => s.micPermissionModalOpen);
+  const setShowModal        = useKhameleonStore(s => s.setMicPermissionModalOpen);
 
   const [wakeStatus, setWakeStatus] = useState<WakeStatus>('idle');
 
@@ -149,8 +149,8 @@ export function VoiceController() {
   // A direct Orb click starts voice even when the typed popup is closed.
   useEffect(() => {
     const startFromOrb = () => startQueryListener();
-    window.addEventListener('jarvis-orb-start-listening', startFromOrb);
-    return () => window.removeEventListener('jarvis-orb-start-listening', startFromOrb);
+    window.addEventListener('khameleon-orb-start-listening', startFromOrb);
+    return () => window.removeEventListener('khameleon-orb-start-listening', startFromOrb);
   }, [startQueryListener]);
 
   // Restart wake listener after TTS finishes
@@ -259,7 +259,7 @@ export function VoiceController() {
             color: indicatorColor,
             letterSpacing: '0.08em',
             pointerEvents: 'none',
-            animation: wakeStatus === 'waiting' ? 'jarvis-wake-pulse 2s ease-in-out infinite' : undefined,
+            animation: wakeStatus === 'waiting' ? 'khameleon-wake-pulse 2s ease-in-out infinite' : undefined,
           }}
         >
           {indicatorLabel}

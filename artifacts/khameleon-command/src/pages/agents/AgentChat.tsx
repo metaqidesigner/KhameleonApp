@@ -32,7 +32,7 @@ function ToolEventBubble({ event }: { event: ToolEvent }) {
     ? <XCircle size={11} />
     : isResult
       ? <CheckCircle2 size={11} />
-      : <Loader2 size={11} style={{ animation: 'jarvis-spin 1s linear infinite' }} />;
+      : <Loader2 size={11} style={{ animation: 'khameleon-spin 1s linear infinite' }} />;
 
   const label = isStart
     ? `Calling ${event.name}…`
@@ -240,7 +240,7 @@ export default function AgentChat() {
       </div>
 
       {/* ── Message list ── */}
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }} className="scrollbar-jarvis">
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }} className="scrollbar-khameleon">
         {messages.length === 0 ? (
           <div className="j-empty" style={{ margin: 'auto', flexDirection: 'column', gap: 8 }}>
             <div style={{ width: 48, height: 48, borderRadius: '50%', background: agent?.color ?? '#00d4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--j-font-ui)', fontSize: 16, fontWeight: 700, color: '#000' }}>
@@ -256,13 +256,13 @@ export default function AgentChat() {
         ) : messages.map((msg, i) => {
           if (msg.role === 'tool_event' && msg.toolEvent) {
             return (
-              <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', paddingLeft: 4, animation: 'jarvis-fadein 0.15s ease both' }}>
+              <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', paddingLeft: 4, animation: 'khameleon-fadein 0.15s ease both' }}>
                 <ToolEventBubble event={msg.toolEvent} />
               </div>
             );
           }
           return (
-            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 3, animation: 'jarvis-fadein 0.2s ease both' }}>
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 3, animation: 'khameleon-fadein 0.2s ease both' }}>
               <div style={{
                 maxWidth: '82%', padding: '8px 12px',
                 background: msg.isError ? 'rgba(192,21,42,0.06)' : msg.role === 'user' ? 'rgba(192,21,42,0.10)' : 'rgba(0,212,255,0.05)',
@@ -273,7 +273,7 @@ export default function AgentChat() {
               }}>
                 {msg.content}
                 {msg.role === 'assistant' && streaming && i === messages.length - 1 && (
-                  <span style={{ display: 'inline-block', width: 2, height: 12, background: 'var(--j-cyan)', marginLeft: 2, animation: 'jarvis-blink 1s infinite' }} />
+                  <span style={{ display: 'inline-block', width: 2, height: 12, background: 'var(--j-cyan)', marginLeft: 2, animation: 'khameleon-blink 1s infinite' }} />
                 )}
               </div>
               {msg.role === 'assistant' && msg.latencyMs != null && (

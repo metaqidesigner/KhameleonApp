@@ -2,7 +2,7 @@
 // native 54px, cover-cropped from a 1360px nebula photo, was too few real
 // pixels to show any of the reference's wispy cloud detail - it just read
 // as scattered dots. Bumped every layer (container/arcs/rings/core/moon/
-// beacon, see orb.css's ".jarvis-orb-wrapper ..." overrides) by the same
+// beacon, see orb.css's ".khameleon-orb-wrapper ..." overrides) by the same
 // factor so the composition's proportions stay exactly as they were, just
 // bigger - not just a CSS transform:scale(), which would've faithfully
 // preserved the same blurry 54px raster at a larger size instead of
@@ -295,7 +295,7 @@ export function clampOrbPosition(
 /**
  * Picks a resting spot for the orb itself once the chat popup has claimed
  * its own fixed rect near the orb's default corner. The popup's position is
- * not recomputed as the orb moves (see JarvisOrb's panelPos state) — this
+ * not recomputed as the orb moves (see KhameleonOrb's panelPos state) — this
  * is the inverse of getOrbChatPanelPosition: the panel stays put and the
  * orb is the one that moves out of its way, landing just outside whichever
  * edge of the panel keeps it closest to its original corner.

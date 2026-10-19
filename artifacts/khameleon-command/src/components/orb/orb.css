@@ -72,29 +72,29 @@
 }
 
 /* ── Wrapper + container ───────────────────────────────────── */
-.jarvis-orb-wrapper {
+.khameleon-orb-wrapper {
   position: fixed;
   z-index: 9999;
   user-select: none;
   touch-action: none;
 }
-.jarvis-orb-wrapper:active { cursor: grabbing !important; }
+.khameleon-orb-wrapper:active { cursor: grabbing !important; }
 /* Standard easing (design-spec.md §3 Motion) for the orb's automatic moves
    (auto-avoiding the chat popup, returning to its default corner). Applied
    whenever the orb isn't actively being dragged by hand, so a manual drag
-   still tracks the pointer 1:1 with no lag — see JarvisOrb's `dragging` state. */
-.jarvis-orb-wrapper.orb-animated {
+   still tracks the pointer 1:1 with no lag — see KhameleonOrb's `dragging` state. */
+.khameleon-orb-wrapper.orb-animated {
   transition: left 0.4s cubic-bezier(0.22, 1, 0.36, 1), top 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.jarvis-orb-container {
+.khameleon-orb-container {
   position: relative;
   width: 90px;
   height: 90px;
   overflow: visible;          /* arcs extend slightly beyond 90px */
   transition: width 0.3s ease, height 0.3s ease;
 }
-.jarvis-orb-container.minimized {
+.khameleon-orb-container.minimized {
   width: 48px;
   height: 48px;
 }
@@ -111,15 +111,15 @@
    the core real bigger dimensions instead means the browser rasterizes
    its nebula background-image from more of the source photo. Not scoped
    to .minimized - that state stays as a small mic-off pill regardless. */
-.jarvis-orb-wrapper .jarvis-orb-container:not(.minimized) { width: 126px; height: 126px; }
-.jarvis-orb-wrapper .orb-glow { inset: -28px; }
-.jarvis-orb-wrapper .orb-arc-1 { width: 134px; height: 134px; margin-left: -67px; margin-top: -67px; border-width: 2.1px; }
-.jarvis-orb-wrapper .orb-arc-2 { width: 118px; height: 118px; margin-left: -59px; margin-top: -59px; border-width: 1.4px; }
-.jarvis-orb-wrapper .orb-ring-outer { width: 101px; height: 101px; margin-left: -50.5px; margin-top: -50.5px; }
-.jarvis-orb-wrapper .orb-ring-inner { width: 84px; height: 84px; margin-left: -42px; margin-top: -42px; }
-.jarvis-orb-wrapper .orb-moon { width: 11px; height: 11px; top: -5.5px; left: calc(50% - 5.5px); }
-.jarvis-orb-wrapper .orb-beacon { width: 8px; height: 8px; top: -4px; left: calc(50% - 4px); }
-.jarvis-orb-wrapper .orb-core { width: 76px; height: 76px; }
+.khameleon-orb-wrapper .khameleon-orb-container:not(.minimized) { width: 126px; height: 126px; }
+.khameleon-orb-wrapper .orb-glow { inset: -28px; }
+.khameleon-orb-wrapper .orb-arc-1 { width: 134px; height: 134px; margin-left: -67px; margin-top: -67px; border-width: 2.1px; }
+.khameleon-orb-wrapper .orb-arc-2 { width: 118px; height: 118px; margin-left: -59px; margin-top: -59px; border-width: 1.4px; }
+.khameleon-orb-wrapper .orb-ring-outer { width: 101px; height: 101px; margin-left: -50.5px; margin-top: -50.5px; }
+.khameleon-orb-wrapper .orb-ring-inner { width: 84px; height: 84px; margin-left: -42px; margin-top: -42px; }
+.khameleon-orb-wrapper .orb-moon { width: 11px; height: 11px; top: -5.5px; left: calc(50% - 5.5px); }
+.khameleon-orb-wrapper .orb-beacon { width: 8px; height: 8px; top: -4px; left: calc(50% - 4px); }
+.khameleon-orb-wrapper .orb-core { width: 76px; height: 76px; }
 
 /* ── Ambient glow bloom ────────────────────────────────────── */
 .orb-glow {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { MessageSquare, LayoutGrid, FileText, Link2, TrendingUp, CheckSquare, Settings } from 'lucide-react';
-import { useJarvisStore, type TabId } from '@/store/jarvisStore';
+import { useKhameleonStore, type TabId } from '@/store/khameleonStore';
 
 const NAV_ITEMS: { id: TabId; icon: React.ReactNode; title: string }[] = [
   { id: 'canvas',    icon: <LayoutGrid   size={17} />, title: 'Canvas'    },
@@ -12,8 +12,8 @@ const NAV_ITEMS: { id: TabId; icon: React.ReactNode; title: string }[] = [
 ];
 
 export function LeftSidebar() {
-  const activeTab    = useJarvisStore(s => s.activeTab);
-  const setActiveTab = useJarvisStore(s => s.setActiveTab);
+  const activeTab    = useKhameleonStore(s => s.activeTab);
+  const setActiveTab = useKhameleonStore(s => s.setActiveTab);
 
   return (
     <div className="j-left-sidebar">

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Shield, Lock, LogOut, Users, Power } from 'lucide-react';
 import JPanel from '@/components/JPanel';
-import { useJarvisStore } from '@/store/jarvisStore';
-import { getApiKeyStatus, clearApiKey, type ApiKeyProvider, type ApiKeyStatus } from '@/lib/jarvisApi';
+import { useKhameleonStore } from '@/store/khameleonStore';
+import { getApiKeyStatus, clearApiKey, type ApiKeyProvider, type ApiKeyStatus } from '@/lib/khameleonApi';
 import { getSessionStatus, logout, signup, type SessionStatus } from '@/lib/sessionApi';
 import { listAccounts, setAccountActive, type Account } from '@/lib/accountsApi';
 import { GUARDRAILS } from '@/lib/guardrails';
@@ -18,7 +18,7 @@ const KEYS: KeyDef[] = [
 ];
 
 export default function Security() {
-  const agentHistory = useJarvisStore(s => s.agentHistory);
+  const agentHistory = useKhameleonStore(s => s.agentHistory);
   const [keySet, setKeySet] = useState<ApiKeyStatus>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [session, setSession] = useState<SessionStatus | null>(null);
@@ -236,7 +236,7 @@ export default function Security() {
                     <div style={{
                       width:6, height:6, borderRadius:'50%',
                       background: g.implemented ? 'var(--j-green)' : 'var(--j-text-faint)',
-                      animation: g.implemented ? 'jarvis-pulse 2s ease-in-out infinite' : 'none',
+                      animation: g.implemented ? 'khameleon-pulse 2s ease-in-out infinite' : 'none',
                     }}/>
                     <span className="j-mono" style={{ fontSize:10, color: g.implemented ? 'var(--j-green)' : 'var(--j-text-faint)' }}>
                       {g.implemented ? 'ACTIVE' : 'NOT IMPLEMENTED'}
@@ -266,7 +266,7 @@ export default function Security() {
               </thead>
               <tbody>
                 {agentHistory.map(ev => (
-                  <tr key={ev.id} style={{ animation:'jarvis-fadein 0.25s ease both' }}>
+                  <tr key={ev.id} style={{ animation:'khameleon-fadein 0.25s ease both' }}>
                     <td className="j-mono" style={{ fontSize:9, color:'var(--j-text-muted)' }}>
                       {new Date(ev.ts).toLocaleTimeString('en-US',{ hour12:false })}
                     </td>

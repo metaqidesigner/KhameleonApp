@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { marked } from 'marked';
 import { Play, Copy, ChevronDown, ChevronRight, FlaskConical } from 'lucide-react';
 import JPanel from '@/components/JPanel';
-import { runResearch } from '@/lib/jarvisApi';
+import { runResearch } from '@/lib/khameleonApi';
 
 interface ResearchToolResult {
   name: string;
@@ -74,7 +74,7 @@ export default function Research() {
               <span style={{ fontFamily:'var(--j-font-ui)', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.18em', color:'var(--j-text-muted)' }}>OPTIONS</span>
             </button>
             {optOpen && (
-              <div style={{ padding:'10px 0', display:'flex', flexDirection:'column', gap:10, animation:'jarvis-fadein 0.2s ease both' }}>
+              <div style={{ padding:'10px 0', display:'flex', flexDirection:'column', gap:10, animation:'khameleon-fadein 0.2s ease both' }}>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                   <label style={{ fontFamily:'var(--j-font-ui)', fontSize:11, color:'var(--j-text-muted)', textTransform:'uppercase', letterSpacing:'0.1em' }}>MAX ITERATIONS</label>
                   <input type="number" min={1} max={10} value={maxIter} onChange={e => setMaxIter(Number(e.target.value))} className="j-input" style={{ width:60 }}/>
@@ -101,7 +101,7 @@ export default function Research() {
             disabled={running || !query.trim()}
           >
             {running ? (
-              <><div style={{ width:12, height:12, border:'1.5px solid rgba(255,255,255,0.3)', borderTop:'1.5px solid #fff', borderRadius:'50%', animation:'jarvis-spin 0.7s linear infinite' }} />PROCESSING...</>
+              <><div style={{ width:12, height:12, border:'1.5px solid rgba(255,255,255,0.3)', borderTop:'1.5px solid #fff', borderRadius:'50%', animation:'khameleon-spin 0.7s linear infinite' }} />PROCESSING...</>
             ) : (
               <><Play size={14}/>▶ INITIATE RESEARCH</>
             )}
@@ -116,7 +116,7 @@ export default function Research() {
             <div style={{ position:'relative', width:80, height:80 }}>
               {[40,32,22].map((r,i) => (
                 <svg key={i} style={{ position:'absolute', inset:0 }} width={80} height={80}>
-                  <circle cx={40} cy={40} r={r} fill="none" stroke="rgba(0,212,255,0.2)" strokeWidth={1} strokeDasharray={i===0?undefined:`${r*0.5} ${r*0.3}`} style={{ animation:`jarvis-spin${i===1?'-r':''} ${12+i*4}s linear infinite` }} />
+                  <circle cx={40} cy={40} r={r} fill="none" stroke="rgba(0,212,255,0.2)" strokeWidth={1} strokeDasharray={i===0?undefined:`${r*0.5} ${r*0.3}`} style={{ animation:`khameleon-spin${i===1?'-r':''} ${12+i*4}s linear infinite` }} />
                 </svg>
               ))}
             </div>
@@ -125,9 +125,9 @@ export default function Research() {
         )}
         {running && (
           <div className="j-empty" style={{ height:'80%' }}>
-            <div style={{ width:12, height:12, border:'2px solid rgba(0,212,255,0.3)', borderTop:'2px solid var(--j-cyan)', borderRadius:'50%', animation:'jarvis-spin 0.8s linear infinite' }} />
+            <div style={{ width:12, height:12, border:'2px solid rgba(0,212,255,0.3)', borderTop:'2px solid var(--j-cyan)', borderRadius:'50%', animation:'khameleon-spin 0.8s linear infinite' }} />
             PROCESSING RESEARCH QUERY...
-            <div style={{ fontFamily:'var(--j-font-mono)', fontSize:10, color:'var(--j-text-faint)', animation:'jarvis-pulse 1.5s ease-in-out infinite' }}>SCANNING WEB SOURCES · SYNTHESISING RESULTS</div>
+            <div style={{ fontFamily:'var(--j-font-mono)', fontSize:10, color:'var(--j-text-faint)', animation:'khameleon-pulse 1.5s ease-in-out infinite' }}>SCANNING WEB SOURCES · SYNTHESISING RESULTS</div>
           </div>
         )}
         {result && (
@@ -141,7 +141,7 @@ export default function Research() {
                 </span>
               </button>
               {traceOpen && (
-                <div style={{ padding:'6px 0', fontFamily:'var(--j-font-mono)', fontSize:10, color:'var(--j-text-muted)', animation:'jarvis-fadein 0.15s ease both' }}>
+                <div style={{ padding:'6px 0', fontFamily:'var(--j-font-mono)', fontSize:10, color:'var(--j-text-muted)', animation:'khameleon-fadein 0.15s ease both' }}>
                   {result.toolResults.length === 0 ? (
                     <span>No tool calls — answered from the model's own knowledge.</span>
                   ) : (
@@ -156,7 +156,7 @@ export default function Research() {
             </div>
 
             {/* Markdown */}
-            <div ref={resultRef} className="j-prose scrollbar-jarvis" style={{ flex:1, overflowY:'auto' }}
+            <div ref={resultRef} className="j-prose scrollbar-khameleon" style={{ flex:1, overflowY:'auto' }}
               dangerouslySetInnerHTML={{ __html: marked.parse(result.content) as string }}
             />
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { KhamiSetup } from '@/components/khami/KhamiSetup';
-import { saveApiKey, clearApiKey, type ApiKeyProvider } from '@/lib/jarvisApi';
+import { saveApiKey, clearApiKey, type ApiKeyProvider } from '@/lib/khameleonApi';
 import { useUi, Label, Hint, Msg, Group, type Tone } from './ui';
 import { EscalationSetting } from './EscalationSetting';
 import { AzureOpenAI } from './AzureOpenAI';

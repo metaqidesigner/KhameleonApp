@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
-import { getTasks, type Task } from '@/lib/jarvisApi';
+import { getTasks, type Task } from '@/lib/khameleonApi';
 
 /**
  * design-spec.md §6.5.1 — "Interrupting notifications are reserved strictly
@@ -24,7 +24,7 @@ import { getTasks, type Task } from '@/lib/jarvisApi';
  * must NOT interrupt. A broader definition later should be added here
  * deliberately, not folded in by default.
  *
- * Rendered once, globally, in AppShell.tsx - like JarvisOrbPortal, this
+ * Rendered once, globally, in AppShell.tsx - like KhameleonOrbPortal, this
  * has to work regardless of which tab is open, since the whole point of
  * an interrupt is surfacing something the user isn't currently looking
  * at. Polls rather than pushing, since no real-time task-update channel

@@ -25,7 +25,7 @@ router.get("/current", async (req, res) => {
       .limit(1);
     if (!active) {
       const [first] = await db.select().from(operatingModesTable).limit(1);
-      return res.json(first ?? { id: 1, name: "Work Mode", description: "Standard work configuration", icon: "Briefcase", isActive: true, color: "cyan" });
+      res.json(first ?? { id: 1, name: "Work Mode", description: "Standard work configuration", icon: "Briefcase", isActive: true, color: "cyan" }); return;
     }
     res.json(active);
   } catch (err) {
@@ -36,8 +36,8 @@ router.get("/current", async (req, res) => {
 
 router.put("/current", async (req, res) => {
   try {
-    const parsed = SetModeBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+    const parsed = SetCurrentModeBody.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
     // Deactivate all modes
     await db.update(operatingModesTable).set({ isActive: false });
@@ -49,7 +49,7 @@ router.put("/current", async (req, res) => {
       .where(eq(operatingModesTable.id, parsed.data.modeId))
       .returning();
 
-    if (!updated) return res.status(404).json({ error: "Mode not found" });
+    if (!updated) { res.status(404).json({ error: "Mode not found" }); return; }
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Error setting mode");

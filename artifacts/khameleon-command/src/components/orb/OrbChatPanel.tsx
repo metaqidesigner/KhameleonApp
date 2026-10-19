@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Send, Volume2, X } from 'lucide-react';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import {
   streamAgentChat,
   FALLBACK_ROSTER,
@@ -8,8 +8,8 @@ import {
   type AgentConfig,
   type ChatMessage,
 } from '@/lib/agentsApi';
-import { getOnboardingStatus } from '@/lib/jarvisApi';
-import type { VoiceSettings } from '@/store/jarvisStore';
+import { getOnboardingStatus } from '@/lib/khameleonApi';
+import type { VoiceSettings } from '@/store/khameleonStore';
 import { useVoice } from './useVoice';
 import { InputWaveform } from './VoiceWaveform';
 
@@ -68,15 +68,15 @@ function getGreeting(name: string | null): { title: string; sub: string } {
 }
 
 export function OrbChatPanel({ style, onClose }: Props) {
-  const orbActiveAgentId    = useJarvisStore(s => s.orbActiveAgentId);
-  const setOrbActiveAgentId = useJarvisStore(s => s.setOrbActiveAgentId);
-  const orbStatus           = useJarvisStore(s => s.orbStatus);
-  const setOrbStatus        = useJarvisStore(s => s.setOrbStatus);
-  const voiceEnabled        = useJarvisStore(s => s.voiceEnabled);
-  const voiceSettings       = useJarvisStore(s => s.voiceSettings);
-  const pushAgentEvent      = useJarvisStore(s => s.pushAgentEvent);
-  const pendingVoiceQuery   = useJarvisStore(s => s.pendingVoiceQuery);
-  const setPendingVoiceQuery = useJarvisStore(s => s.setPendingVoiceQuery);
+  const orbActiveAgentId    = useKhameleonStore(s => s.orbActiveAgentId);
+  const setOrbActiveAgentId = useKhameleonStore(s => s.setOrbActiveAgentId);
+  const orbStatus           = useKhameleonStore(s => s.orbStatus);
+  const setOrbStatus        = useKhameleonStore(s => s.setOrbStatus);
+  const voiceEnabled        = useKhameleonStore(s => s.voiceEnabled);
+  const voiceSettings       = useKhameleonStore(s => s.voiceSettings);
+  const pushAgentEvent      = useKhameleonStore(s => s.pushAgentEvent);
+  const pendingVoiceQuery   = useKhameleonStore(s => s.pendingVoiceQuery);
+  const setPendingVoiceQuery = useKhameleonStore(s => s.setPendingVoiceQuery);
 
   const [roster, setRoster]     = useState<AgentConfig[]>(FALLBACK_ROSTER);
   const [messages, setMessages] = useState<OrbMsg[]>([]);
@@ -330,7 +330,7 @@ export function OrbChatPanel({ style, onClose }: Props) {
       {/* Orb Visual Area */}
       <div className="orb-chat-visual-area">
         <div style={{ position: 'relative', width: 90, height: 90, transform: 'scale(1.15)' }}>
-          <div className={`jarvis-orb-container ${voiceEnabled ? orbStatus : 'muted'}`}>
+          <div className={`khameleon-orb-container ${voiceEnabled ? orbStatus : 'muted'}`}>
             <div className={`orb-glow ${voiceEnabled ? orbStatus : 'muted'}`} />
             <div className="orb-arc orb-arc-1" />
             <div className="orb-arc orb-arc-2" />

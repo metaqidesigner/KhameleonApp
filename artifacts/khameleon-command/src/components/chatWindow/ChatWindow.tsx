@@ -4,7 +4,7 @@ import {
   Eye, EyeOff, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Loader2, Zap, Lock, LockOpen,
 } from 'lucide-react';
 import { checkEscalation } from '@/lib/escalationApi';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import { useWindowDrag, fitToViewport } from './useWindowDrag';
 import { routeSingleStreaming, routeMultiAgent, pickAutoRouteAgent, rowsToResumedMessages } from './chatWindowApi';
 import {
@@ -12,7 +12,7 @@ import {
   type AgentConfig, type AgentStatus as AgentOnlineStatus, type AgentConversationSession,
 } from '@/lib/agentsApi';
 import { getWorkDomains, type WorkDomain } from '@/lib/workDomainsApi';
-import { getDailyTasks, getOnboardingStatus, type Task } from '@/lib/jarvisApi';
+import { getDailyTasks, getOnboardingStatus, type Task } from '@/lib/khameleonApi';
 import { getTaskRun } from '@/lib/taskRunApi';
 import type { TaskRun } from '@/lib/taskRunApi';
 import { TaskRunCard } from '@/components/taskRun/TaskRunParts';
@@ -20,7 +20,7 @@ import { useVoice, type UseVoiceReturn } from '@/components/orb/useVoice';
 import type { AgentRef, ChatMessage, ChatThread, RouteMode, StarterCard } from './types';
 import { ROUTE_MODE_LABELS, ROUTE_MODE_DESCRIPTIONS } from './types';
 import { ToolCard, KindBadge, TOOL_KIND, TOOL_TITLE } from './ToolCards';
-import type { ChatToolId } from '@/store/jarvisStore';
+import type { ChatToolId } from '@/store/khameleonStore';
 import { KHAMI_HOME } from '@/lib/where';
 
 const HEAD_SRC = '/khameleon-head.webp';
@@ -458,25 +458,25 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
   /** Classic reaches the toolbar actions from a Tools menu in the header; the Overlay has its edge toolbars instead. */
   showToolsMenu?: boolean;
 } = {}) {
-  const chatOpen = useJarvisStore(s => s.chatOpen);
-  const setChatOpen = useJarvisStore(s => s.setChatOpen);
-  const bounds = useJarvisStore(s => s.chatWindowBounds);
-  const setBounds = useJarvisStore(s => s.setChatWindowBounds);
-  const docked = useJarvisStore(s => s.chatWindowDocked);
-  const setDocked = useJarvisStore(s => s.setChatWindowDocked);
-  const minimized = useJarvisStore(s => s.chatWindowMinimized);
-  const setMinimized = useJarvisStore(s => s.setChatWindowMinimized);
-  const reasoningDefault = useJarvisStore(s => s.chatReasoningDefault);
-  const setReasoningDefault = useJarvisStore(s => s.setChatReasoningDefault);
-  const routeMode = useJarvisStore(s => s.chatRouteMode);
-  const setRouteMode = useJarvisStore(s => s.setChatRouteMode);
-  const lastDomainId = useJarvisStore(s => s.chatLastDomainId);
-  const setLastDomainId = useJarvisStore(s => s.setChatLastDomainId);
-  const wakeWordActive = useJarvisStore(s => s.wakeWordActive);
-  const wakeWordBlocked = useJarvisStore(s => s.wakeWordBlocked);
-  const activeTaskIds = useJarvisStore(s => s.activeTaskIds);
-  const removeActiveTask = useJarvisStore(s => s.removeActiveTask);
-  const taskRevision = useJarvisStore(s => s.taskRevision);
+  const chatOpen = useKhameleonStore(s => s.chatOpen);
+  const setChatOpen = useKhameleonStore(s => s.setChatOpen);
+  const bounds = useKhameleonStore(s => s.chatWindowBounds);
+  const setBounds = useKhameleonStore(s => s.setChatWindowBounds);
+  const docked = useKhameleonStore(s => s.chatWindowDocked);
+  const setDocked = useKhameleonStore(s => s.setChatWindowDocked);
+  const minimized = useKhameleonStore(s => s.chatWindowMinimized);
+  const setMinimized = useKhameleonStore(s => s.setChatWindowMinimized);
+  const reasoningDefault = useKhameleonStore(s => s.chatReasoningDefault);
+  const setReasoningDefault = useKhameleonStore(s => s.setChatReasoningDefault);
+  const routeMode = useKhameleonStore(s => s.chatRouteMode);
+  const setRouteMode = useKhameleonStore(s => s.setChatRouteMode);
+  const lastDomainId = useKhameleonStore(s => s.chatLastDomainId);
+  const setLastDomainId = useKhameleonStore(s => s.setChatLastDomainId);
+  const wakeWordActive = useKhameleonStore(s => s.wakeWordActive);
+  const wakeWordBlocked = useKhameleonStore(s => s.wakeWordBlocked);
+  const activeTaskIds = useKhameleonStore(s => s.activeTaskIds);
+  const removeActiveTask = useKhameleonStore(s => s.removeActiveTask);
+  const taskRevision = useKhameleonStore(s => s.taskRevision);
 
   const [roster, setRoster] = useState<AgentConfig[]>(FALLBACK_ROSTER);
   const [statuses, setStatuses] = useState<Record<string, AgentOnlineStatus>>({});
@@ -618,7 +618,7 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
   }, [chatOpen, docked, setDocked, setMinimized]);
 
   // Live Task Card: real TaskRun data via the global activeTaskIds list
-  // (jarvisStore) - a task keeps running and stays tracked here whether
+  // (khameleonStore) - a task keeps running and stays tracked here whether
   // or not this window is open/minimized, since the ids live in the
   // global store, not this component's own state.
   useEffect(() => {
@@ -635,10 +635,10 @@ export default function ChatWindow({ bottomInset = 0, rightInset = 0, showToolsM
   );
 
   // Toolbar actions (Overlay) arrive as requests; each becomes a card.
-  const toolRequests = useJarvisStore(s => s.chatToolRequests);
-  const requestChatTool = useJarvisStore(s => s.requestChatTool);
+  const toolRequests = useKhameleonStore(s => s.chatToolRequests);
+  const requestChatTool = useKhameleonStore(s => s.requestChatTool);
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
-  const consumeToolRequest = useJarvisStore(s => s.consumeChatToolRequest);
+  const consumeToolRequest = useKhameleonStore(s => s.consumeChatToolRequest);
   useEffect(() => {
     if (toolRequests.length === 0) return;
     setMessages(prev => [...prev, ...toolRequests.map(r => ({

@@ -52,7 +52,7 @@ export default function MultiAgent() {
               style={{ flex: 1, height: 52, padding: '6px 10px', background: 'rgba(0,212,255,0.04)', border: '1px solid rgba(0,212,255,0.15)', color: 'var(--j-text)', fontFamily: 'var(--j-font-mono)', fontSize: 11, resize: 'none', outline: 'none' }}
             />
             <button className="j-btn-primary" style={{ width: 52, height: 52, padding: 0 }} onClick={run} disabled={running || !prompt.trim() || !selectedIds.length}>
-              {running ? <div style={{ width: 14, height: 14, border: '2px solid rgba(0,212,255,0.3)', borderTop: '2px solid var(--j-cyan)', borderRadius: '50%', animation: 'jarvis-spin 0.8s linear infinite' }} /> : <Send size={15} />}
+              {running ? <div style={{ width: 14, height: 14, border: '2px solid rgba(0,212,255,0.3)', borderTop: '2px solid var(--j-cyan)', borderRadius: '50%', animation: 'khameleon-spin 0.8s linear infinite' }} /> : <Send size={15} />}
             </button>
           </div>
         </JPanel>
@@ -94,10 +94,10 @@ export default function MultiAgent() {
       )}
 
       {/* results */}
-      <div style={{ flex: 1, overflowY: 'auto' }} className="scrollbar-jarvis">
+      <div style={{ flex: 1, overflowY: 'auto' }} className="scrollbar-khameleon">
         {running ? (
           <div className="j-empty">
-            <div style={{ width: 40, height: 40, border: '2px solid rgba(0,212,255,0.2)', borderTop: '2px solid var(--j-cyan)', borderRadius: '50%', animation: 'jarvis-spin 0.8s linear infinite' }} />
+            <div style={{ width: 40, height: 40, border: '2px solid rgba(0,212,255,0.2)', borderTop: '2px solid var(--j-cyan)', borderRadius: '50%', animation: 'khameleon-spin 0.8s linear infinite' }} />
             QUERYING {selectedIds.length} AGENTS IN {mode.toUpperCase()} MODE...
           </div>
         ) : results.length === 0 ? (

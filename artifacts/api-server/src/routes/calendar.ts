@@ -153,7 +153,7 @@ router.get("/events/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const [event] = await db.select().from(calendarEventsTable).where(eq(calendarEventsTable.id, id));
-    if (!event) return res.status(404).json({ error: "Event not found" });
+    if (!event) { res.status(404).json({ error: "Event not found" }); return; }
     res.json(event);
   } catch (err) {
     req.log.error({ err }, "Error fetching calendar event");

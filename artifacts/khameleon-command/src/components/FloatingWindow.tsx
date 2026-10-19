@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useJarvisStore } from '@/store/jarvisStore';
+import { useKhameleonStore } from '@/store/khameleonStore';
 import { SignalGlassPanel } from './SignalGlassPanel';
 
 export type CanvasZone = 'left' | 'centre' | 'right';
@@ -43,13 +43,13 @@ export function FloatingWindow({
   defaultMinimized = false, windowId, onWindowDrop, children,
 }: FloatingWindowProps) {
   // Persisted path — only used when windowId is provided
-  const stored = useJarvisStore(s =>
+  const stored = useKhameleonStore(s =>
     windowId !== undefined ? s.canvasWindowsMinimized[windowId] : undefined,
   );
-  const model = useJarvisStore(s => windowId !== undefined ? s.canvasWindowModels[windowId] : undefined);
-  const setCanvasWindowMinimized = useJarvisStore(s => s.setCanvasWindowMinimized);
-  const registerCanvasWindow = useJarvisStore(s => s.registerCanvasWindow);
-  const setCanvasWindowFocused = useJarvisStore(s => s.setCanvasWindowFocused);
+  const model = useKhameleonStore(s => windowId !== undefined ? s.canvasWindowModels[windowId] : undefined);
+  const setCanvasWindowMinimized = useKhameleonStore(s => s.setCanvasWindowMinimized);
+  const registerCanvasWindow = useKhameleonStore(s => s.registerCanvasWindow);
+  const setCanvasWindowFocused = useKhameleonStore(s => s.setCanvasWindowFocused);
 
   // Local fallback (no windowId) — keeps the component self-contained
   const [localMinimized, setLocalMinimized] = useState(defaultMinimized);

@@ -183,13 +183,13 @@ router.patch("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const parsed = UpdateInboxItemBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+    if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
     const [updated] = await db
       .update(inboxItemsTable)
       .set(parsed.data)
       .where(eq(inboxItemsTable.id, id))
       .returning();
-    if (!updated) return res.status(404).json({ error: "Item not found" });
+    if (!updated) { res.status(404).json({ error: "Item not found" }); return; }
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Error updating inbox item");

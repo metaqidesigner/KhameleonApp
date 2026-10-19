@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Briefcase, Cpu, EyeOff, Info, LayoutGrid, LogIn, Plug, SlidersHorizontal } from "lucide-react";
 import { overlayBridge } from "@/lib/desktopBridge";
-import { useJarvisStore } from "@/store/jarvisStore";
+import { useKhameleonStore } from "@/store/khameleonStore";
 import type { OverlayPalette } from "./palettes";
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
@@ -25,9 +25,9 @@ export function KhameleonHead({ palette, locked = false, bottom = 18, onOpenLook
   onOpenIntegrations?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const chatOpen = useJarvisStore(s => s.chatOpen);
-  const setChatOpen = useJarvisStore(s => s.setChatOpen);
-  const setChatMinimized = useJarvisStore(s => s.setChatWindowMinimized);
+  const chatOpen = useKhameleonStore(s => s.chatOpen);
+  const setChatOpen = useKhameleonStore(s => s.setChatOpen);
+  const setChatMinimized = useKhameleonStore(s => s.setChatWindowMinimized);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

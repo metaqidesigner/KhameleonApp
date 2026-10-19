@@ -14,7 +14,7 @@ const PRIORITY_COLOR: Record<string, string> = {
 /**
  * Real inbox backend (routes/inbox.ts) has existed since well before
  * this pass - live Gmail / Outlook fetch with a local DB fallback - but
- * the page itself was a 7-line JarvisStubPage. This is the real page.
+ * the page itself was a 7-line KhameleonStubPage. This is the real page.
  *
  * "Mark as read" only appears when source === 'local': PATCH /:id only
  * ever writes to the local DB table (a serial int id), and Gmail/Outlook
