@@ -19,6 +19,7 @@ import { db } from "@workspace/db";
 import { vaultItemsTable, vaultAccessLogTable } from "@workspace/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { encrypt, decrypt } from "../lib/crypto.js";
+import { clearGrantsFor } from "../lib/savedLogins.js";
 import { assertEncryptionConfigured, validateNewVaultItem } from "../lib/vaultGuard.js";
 import { getCurrentUserId } from "../lib/requestContext.js";
 
@@ -34,6 +35,8 @@ const PUBLIC_COLUMNS = {
   owner: vaultItemsTable.owner,
   description: vaultItemsTable.description,
   status: vaultItemsTable.status,
+  username: vaultItemsTable.username,
+  alwaysAsk: vaultItemsTable.alwaysAsk,
   createdAt: vaultItemsTable.createdAt,
 };
 
@@ -66,8 +69,8 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { name, category, permissionLevel, owner, description, secretValue } = req.body as {
-      name?: string; category?: string; permissionLevel?: string; owner?: string; description?: string; secretValue?: string;
+    const { name, category, permissionLevel, owner, description, secretValue, username, alwaysAsk } = req.body as {
+      name?: string; category?: string; permissionLevel?: string; owner?: string; description?: string; secretValue?: string; username?: string; alwaysAsk?: boolean;
     };
     validateNewVaultItem({ name, category, secretValue });
 
@@ -81,6 +84,8 @@ router.post("/", async (req, res) => {
         owner: owner?.trim() || "",
         description: description?.trim() || "",
         encryptedValue: encrypt(secretValue!.trim()),
+        username: typeof username === "string" ? username.trim() : "",
+        alwaysAsk: alwaysAsk === true,
       })
       .returning(PUBLIC_COLUMNS);
 
@@ -130,6 +135,11 @@ router.patch("/:id", async (req, res) => {
     if (typeof owner === "string") patch.owner = owner.trim();
     if (typeof description === "string") patch.description = description.trim();
     if (typeof status === "string" && status.trim()) patch.status = status.trim();
+    if (typeof (req.body as { username?: unknown }).username === "string") patch.username = String((req.body as { username: string }).username).trim();
+    if (typeof (req.body as { alwaysAsk?: unknown }).alwaysAsk === "boolean") {
+      patch.alwaysAsk = (req.body as { alwaysAsk: boolean }).alwaysAsk;
+      if (patch.alwaysAsk) await clearGrantsFor(id); // "always ask" overrides any earlier "Always for this skill"
+    }
     if (typeof secretValue === "string" && secretValue.trim()) {
       assertEncryptionConfigured();
       patch.encryptedValue = encrypt(secretValue.trim());

@@ -77,5 +77,6 @@ export function pickSkill(request: string, skills: InstalledSkill[]): SkillPick 
 export function skillInstructions(skill: InstalledSkill): string {
   // Small offline brains copy sign-offs onto everything; say it right next to the steps.
   return `\n\nFor this request, follow the user's saved skill "${skill.name}":\n---\n${skill.content.trim()}\n---\n`
-    + `Finish when the steps are done. Do not add a sign-off, a signature or "[Your name]" unless the steps ask you to draft an email or letter.`;
+    + `Finish when the steps are done. Do not add a sign-off, a signature or "[Your name]" unless the steps ask you to draft an email or letter.`
+    + (skill.loginName ? `\nWhen the steps need you to sign in, call sign_in_with_saved_login with login "${skill.loginName}". Never ask for, write or type a password yourself. If the sign-in fails, stop and tell the user.` : "");
 }

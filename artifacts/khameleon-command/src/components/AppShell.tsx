@@ -5,6 +5,7 @@ import NewsTicker from './NewsTicker';
 import CommandPalette from './CommandPalette';
 import ChatWindow from './chatWindow/ChatWindow';
 import { SuggestionSlot } from '@/components/notices/SuggestionSlot';
+import { LoginRequests } from '@/components/notices/LoginRequests';
 import { pairDesktopLink } from '@/lib/desktopBridge';
 import { LeftSidebar } from './LeftSidebar';
 import { JarvisOrbPortal } from './orb/JarvisOrbPortal';
@@ -85,7 +86,10 @@ export function AppShell() {
       <CommandPalette />
       <ChatWindow />
       {/* Same suggestion slot as the Overlay (components/notices). */}
-      <SuggestionSlot tone="classic" style={{ position: "fixed", top: 52, right: 16, zIndex: 60 }} />
+      <div style={{ position: "fixed", top: 52, right: 16, zIndex: 60, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+        <LoginRequests tone="classic" />
+        <SuggestionSlot tone="classic" />
+      </div>
 
       {/* Floating orb — always present */}
       <JarvisOrbPortal />

@@ -158,6 +158,19 @@ export const TOOL_DEFINITIONS: Anthropic.Messages.Tool[] = [
     },
   },
   {
+    name: "sign_in_with_saved_login",
+    description:
+      "Sign in to a website or app with one of the user's saved logins (Settings > Credentials). Khameleon asks the user first, then types the user name and password into the sign-in form itself - you never see or handle the password. Use when a skill's steps need you to sign in. Put the sign-in page in front first (with desktop_apps or desktop_files). If the result starts with FAILED, stop and tell the user.",
+    input_schema: {
+      type: "object",
+      properties: {
+        login: { type: "string", description: "The saved login's name, e.g. 'Supplier portal'." },
+        app: { type: "string", description: "Optional: the app or browser window showing the sign-in page, e.g. 'Chrome'." },
+      },
+      required: ["login"],
+    },
+  },
+  {
     name: "desktop_apps",
     description:
       "Work inside an app window that is already open on the user's computer. Instructions: 'observe <app>' (watch it), 'control <app>' (work in it - the user is asked to allow it), 'type \"<text>\" into <app>' (types where the cursor is), 'stop controlling'. To OPEN or QUIT an app use desktop_files instead. One instruction per call.",

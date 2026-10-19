@@ -7,8 +7,8 @@ import { useUi, Hint, Msg, type Tone } from './ui';
  * encrypted. Adds the missing edit (the server always supported it). Shared
  * by the Overlay's Settings panel and Classic's Vault page.
  */
-interface Draft { name: string; category: string; description: string; secretValue: string }
-const EMPTY: Draft = { name: '', category: '', description: '', secretValue: '' };
+interface Draft { name: string; category: string; description: string; secretValue: string; username: string; alwaysAsk: boolean }
+const EMPTY: Draft = { name: '', category: '', description: '', secretValue: '', username: '', alwaysAsk: false };
 
 export function CredentialsSettings({ tone }: { tone: Tone }) {
   const { t, input, btn } = useUi(tone);
@@ -31,9 +31,9 @@ export function CredentialsSettings({ tone }: { tone: Tone }) {
 
   const save = () => {
     if (editing === 'new') {
-      return run(() => createVaultItem({ name: draft.name.trim(), category: draft.category.trim() || 'Login', description: draft.description.trim(), secretValue: draft.secretValue }), `Saved "${draft.name.trim()}".`);
+      return run(() => createVaultItem({ name: draft.name.trim(), category: draft.category.trim() || 'Login', description: draft.description.trim(), secretValue: draft.secretValue, username: draft.username.trim(), alwaysAsk: draft.alwaysAsk }), `Saved "${draft.name.trim()}".`);
     }
-    const patch = { name: draft.name.trim(), category: draft.category.trim() || 'Login', description: draft.description.trim(), ...(draft.secretValue ? { secretValue: draft.secretValue } : {}) };
+    const patch = { name: draft.name.trim(), category: draft.category.trim() || 'Login', description: draft.description.trim(), username: draft.username.trim(), alwaysAsk: draft.alwaysAsk, ...(draft.secretValue ? { secretValue: draft.secretValue } : {}) };
     return run(() => updateVaultItem(editing as number, patch), `Updated "${draft.name.trim()}".`);
   };
 
@@ -43,8 +43,13 @@ export function CredentialsSettings({ tone }: { tone: Tone }) {
       <input aria-label="Name" placeholder="Name, e.g. Supplier portal" value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} style={input} autoFocus />
       <input aria-label="Type" placeholder="Type, e.g. Login" value={draft.category} onChange={e => setDraft(d => ({ ...d, category: e.target.value }))} style={input} />
       <input aria-label="Description" placeholder="What it's for (optional)" value={draft.description} onChange={e => setDraft(d => ({ ...d, description: e.target.value }))} style={input} />
+      <input aria-label="User name" placeholder="User name or email for signing in (optional)" autoComplete="off" value={draft.username} onChange={e => setDraft(d => ({ ...d, username: e.target.value }))} style={input} />
       <input aria-label="Secret" type="password" autoComplete="new-password" placeholder={editing === 'new' ? 'Password or secret' : 'New password or secret (leave empty to keep the current one)'}
         value={draft.secretValue} onChange={e => setDraft(d => ({ ...d, secretValue: e.target.value }))} style={input} />
+      <label style={{ fontSize: 11.5, color: t.muted, display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+        <input type="checkbox" checked={draft.alwaysAsk} onChange={e => setDraft(d => ({ ...d, alwaysAsk: e.target.checked }))} />
+        Always ask before a skill uses it (no "Always for this skill")
+      </label>
       <div style={{ display: 'flex', gap: 6 }}>
         <button type="submit" style={btn(true)} disabled={busy || !draft.name.trim() || (editing === 'new' && !draft.secretValue)}>{busy ? 'Saving…' : 'Save'}</button>
         <button type="button" style={btn()} onClick={() => { setEditing(null); setDraft(EMPTY); }}>Cancel</button>
@@ -54,7 +59,7 @@ export function CredentialsSettings({ tone }: { tone: Tone }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <Hint tone={tone}>Logins and secrets, stored encrypted. Coming next: skills that sign in for you (e.g. to a supplier portal) will use these - always asking you first.</Hint>
+      <Hint tone={tone}>Logins and secrets, stored encrypted. A skill can sign in with one of these - Khameleon asks you first and types it in itself; the AI never sees the password.</Hint>
       {items.length === 0 && editing !== 'new' && <div style={{ fontSize: 12, color: t.muted }}>Nothing saved yet.</div>}
       {items.map(item => (
         <div key={item.id}>
@@ -62,7 +67,7 @@ export function CredentialsSettings({ tone }: { tone: Tone }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: t.radius, background: t.card, border: `1px solid ${t.border}` }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
-                <div style={{ fontSize: 11, color: t.muted }}>{item.category}{item.description ? ` · ${item.description}` : ''}</div>
+                <div style={{ fontSize: 11, color: t.muted }}>{item.category}{item.username ? ` · ${item.username}` : ''}{item.alwaysAsk ? ' · always asks' : ''}{item.description ? ` · ${item.description}` : ''}</div>
               </div>
               {confirmDelete === item.id ? (
                 <>
@@ -72,7 +77,7 @@ export function CredentialsSettings({ tone }: { tone: Tone }) {
                 </>
               ) : (
                 <>
-                  <button type="button" style={btn()} onClick={() => { setEditing(item.id); setDraft({ name: item.name, category: item.category, description: item.description ?? '', secretValue: '' }); setMsg(null); }}>Edit</button>
+                  <button type="button" style={btn()} onClick={() => { setEditing(item.id); setDraft({ name: item.name, category: item.category, description: item.description ?? '', secretValue: '', username: item.username ?? '', alwaysAsk: !!item.alwaysAsk }); setMsg(null); }}>Edit</button>
                   <button type="button" style={btn()} onClick={() => setConfirmDelete(item.id)}>Delete</button>
                 </>
               )}

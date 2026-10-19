@@ -36,5 +36,9 @@ export async function ensureWorkTables(): Promise<void> {
       opened_at TIMESTAMPTZ
     )
   `);
+  // Build 7: saved logins for skills.
+  await db.execute(sql`ALTER TABLE vault_items ADD COLUMN IF NOT EXISTS username TEXT NOT NULL DEFAULT ''`);
+  await db.execute(sql`ALTER TABLE vault_items ADD COLUMN IF NOT EXISTS always_ask BOOLEAN NOT NULL DEFAULT FALSE`);
+  await db.execute(sql`ALTER TABLE skill_sets ADD COLUMN IF NOT EXISTS login_vault_item_id INTEGER`);
   logger.info("ensureWorkTables: meeting briefs and suggestions ready");
 }

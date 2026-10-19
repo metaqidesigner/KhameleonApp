@@ -12,7 +12,7 @@
 // - External secrets-manager integration (HashiCorp Vault, AWS Secrets Manager)
 // Those need real infrastructure/product decisions, not just more code.
 
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -33,6 +33,10 @@ export const vaultItemsTable = pgTable("vault_items", {
   description: text("description").notNull().default(""),
   status: text("status").notNull().default("active"),
   encryptedValue: text("encrypted_value").notNull(),
+  /** Build 7: for logins - the user name typed before the password (not secret). */
+  username: text("username").notNull().default(""),
+  /** Build 7: ask every time before a skill uses this login (no "always" allowed). */
+  alwaysAsk: boolean("always_ask").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

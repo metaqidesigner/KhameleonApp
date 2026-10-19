@@ -18,6 +18,10 @@ export interface InstalledSkill {
   name: string;
   description: string;
   content: string;
+  id?: number;
+  /** Build 7: the saved login this skill signs in with (a Vault reference). */
+  loginVaultItemId?: number | null;
+  loginName?: string;
 }
 
 export const USE_SKILL_TOOL_NAME = "use_skill";
@@ -68,8 +72,12 @@ export async function loadInstalledSkills(): Promise<InstalledSkill[]> {
   const { db, skillSetsTable } = await import("@workspace/db");
   const { eq } = await import("drizzle-orm");
   const rows = await db
-    .select({ name: skillSetsTable.name, description: skillSetsTable.description, content: skillSetsTable.content })
+    .select({ id: skillSetsTable.id, name: skillSetsTable.name, description: skillSetsTable.description, content: skillSetsTable.content, loginVaultItemId: skillSetsTable.loginVaultItemId })
     .from(skillSetsTable)
     .where(eq(skillSetsTable.status, "installed"));
-  return rows;
+  // Build 7: the name of each skill's saved login (never the secret).
+  const { vaultItemsTable } = await import("@workspace/db");
+  const loginIds = rows.map(r => r.loginVaultItemId).filter((x): x is number => !!x);
+  const logins = loginIds.length ? await db.select({ id: vaultItemsTable.id, name: vaultItemsTable.name }).from(vaultItemsTable) : [];
+  return rows.map(r => ({ ...r, loginName: logins.find(l => l.id === r.loginVaultItemId)?.name }));
 }

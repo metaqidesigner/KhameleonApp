@@ -8,7 +8,7 @@ import {
   type VaultItem, type VaultAccessLogEntry, type CreateVaultItemInput,
 } from '@/lib/vaultApi';
 
-const BLANK: CreateVaultItemInput = { name: '', category: '', permissionLevel: 'read', owner: '', description: '', secretValue: '' };
+const BLANK: CreateVaultItemInput = { name: '', category: '', permissionLevel: 'read', owner: '', description: '', secretValue: '', username: '', alwaysAsk: false };
 
 export default function Vault() {
   const [items, setItems] = useState<VaultItem[]>([]);
@@ -27,7 +27,7 @@ export default function Vault() {
   const [logFor, setLogFor] = useState<number | null>(null);
   const [logEntries, setLogEntries] = useState<VaultAccessLogEntry[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editDraft, setEditDraft] = useState({ name: '', category: '', description: '', secretValue: '' });
+  const [editDraft, setEditDraft] = useState({ name: '', category: '', description: '', secretValue: '', username: '', alwaysAsk: false });
 
   const load = () => { getVaultItems().then(rows => { setItems(rows); setLoading(false); }); };
   useEffect(() => {
@@ -127,6 +127,13 @@ export default function Vault() {
               </select>
             </div>
             <input className="j-input" placeholder="Description (optional)" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            {/* Build 7 - same fields as the Overlay's Settings > Credentials. */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input className="j-input" style={{ flex: 1 }} autoComplete="off" placeholder="User name for signing in (optional - for logins a skill uses)" value={form.username ?? ''} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} />
+              <label style={{ fontSize: 10, color: 'var(--j-text-muted)', display: 'flex', gap: 5, alignItems: 'center', whiteSpace: 'nowrap' }}>
+                <input type="checkbox" checked={!!form.alwaysAsk} onChange={e => setForm(f => ({ ...f, alwaysAsk: e.target.checked }))} /> ALWAYS ASK
+              </label>
+            </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input
                 type="password"
@@ -189,13 +196,17 @@ export default function Vault() {
                     onSubmit={async e => {
                       e.preventDefault();
                       try {
-                        await updateVaultItem(item.id, { name: editDraft.name.trim(), category: editDraft.category.trim(), description: editDraft.description.trim(), ...(editDraft.secretValue ? { secretValue: editDraft.secretValue } : {}) });
+                        await updateVaultItem(item.id, { name: editDraft.name.trim(), category: editDraft.category.trim(), description: editDraft.description.trim(), username: editDraft.username.trim(), alwaysAsk: editDraft.alwaysAsk, ...(editDraft.secretValue ? { secretValue: editDraft.secretValue } : {}) });
                         setEditingId(null); load();
                       } catch (err) { setError(err instanceof Error ? err.message : 'Failed to update'); }
                     }}>
                     <input className="j-input" aria-label="Name" value={editDraft.name} onChange={e => setEditDraft(d => ({ ...d, name: e.target.value }))} />
                     <input className="j-input" aria-label="Category" value={editDraft.category} onChange={e => setEditDraft(d => ({ ...d, category: e.target.value }))} />
                     <input className="j-input" aria-label="Description" placeholder="Description" value={editDraft.description} onChange={e => setEditDraft(d => ({ ...d, description: e.target.value }))} />
+                    <input className="j-input" aria-label="User name" autoComplete="off" placeholder="User name for signing in (optional)" value={editDraft.username} onChange={e => setEditDraft(d => ({ ...d, username: e.target.value }))} />
+                    <label style={{ fontSize: 10, color: 'var(--j-text-muted)', display: 'flex', gap: 5, alignItems: 'center' }}>
+                      <input type="checkbox" checked={editDraft.alwaysAsk} onChange={e => setEditDraft(d => ({ ...d, alwaysAsk: e.target.checked }))} /> ALWAYS ASK BEFORE A SKILL USES IT
+                    </label>
                     <input className="j-input" aria-label="New secret" type="password" autoComplete="new-password" placeholder="New secret (leave empty to keep the current one)" value={editDraft.secretValue} onChange={e => setEditDraft(d => ({ ...d, secretValue: e.target.value }))} />
                     <div><button type="submit" className="j-btn-primary" style={{ height: 28, padding: '0 12px', fontSize: 10 }} disabled={!editDraft.name.trim()}>SAVE CHANGES</button></div>
                   </form>
@@ -222,7 +233,7 @@ export default function Vault() {
                     <History size={11} /> {logFor === item.id ? 'HIDE LOG' : 'ACCESS LOG'}
                   </button>
                   <button className="j-btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 9 }}
-                    onClick={() => { setEditingId(editingId === item.id ? null : item.id); setEditDraft({ name: item.name, category: item.category, description: item.description ?? '', secretValue: '' }); }}>
+                    onClick={() => { setEditingId(editingId === item.id ? null : item.id); setEditDraft({ name: item.name, category: item.category, description: item.description ?? '', secretValue: '', username: item.username ?? '', alwaysAsk: !!item.alwaysAsk }); }}>
                     {editingId === item.id ? 'CANCEL EDIT' : 'EDIT'}
                   </button>
                   <button

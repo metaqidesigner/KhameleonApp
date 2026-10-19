@@ -30,6 +30,8 @@ export const skillSetsTable = pgTable("skill_sets", {
   /** Build 5: a skill made from a company document stays linked to the section it came from. */
   sourceDocumentId:         integer("source_document_id"),
   sourceSectionId:          text("source_section_id"),
+  /** Build 7: the saved login (Vault item) this skill signs in with - a reference, never the secret. */
+  loginVaultItemId:         integer("login_vault_item_id"),
   createdAt:                timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

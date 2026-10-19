@@ -9,6 +9,7 @@ import { askKhami, khamiStatus } from "../engines/khami.js";
 import { toolsForAnyAi } from "./tools/anyAiTools.js";
 import { runOpenAiToolLoop, type ChatClient } from "./openAiToolLoop.js";
 import { guardFalseSuccess } from "./tools/workTools.js";
+import { runWithSkill } from "../lib/skillContext.js";
 import { askCopilot } from "../lib/copilotChat.js";
 import { getToken } from "../lib/oauthTokens.js";
 import { pickSkill, skillInstructions } from "../lib/skillPicker.js";
@@ -358,11 +359,13 @@ async function withPickedSkill(
   agent: AgentConfig,
   messages: ChatMessage[],
   onToolEvent?: (e: ToolEvent) => void,
+  picked?: { skill: InstalledSkill | null },
 ): Promise<ChatMessage[]> {
   const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
   const skills = await loadInstalledSkills().catch((): InstalledSkill[] => []);
   const pick = pickSkill(lastUser, skills);
   if (!pick) return messages;
+  if (picked) picked.skill = pick.skill;
   onToolEvent?.({ type: "tool_start", name: USE_SKILL_TOOL_NAME, input: { name: pick.skill.name } });
   onToolEvent?.({ type: "tool_result", name: USE_SKILL_TOOL_NAME, result: `Using ${pick.skill.name}`, durationMs: 0 });
   const system = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
@@ -387,9 +390,12 @@ export async function askAgent(
     // Khami, GPT, Gemini - gets the matching skill picked by Khameleon and
     // handed over in its instructions (lib/skillPicker.ts). Reported as a
     // use_skill event so the chat shows "Using: <skill>" either way.
+    const picked: { skill: InstalledSkill | null } = { skill: null };
     if (!opts.plain && !(agent.provider === "anthropic" && agent.useTools)) {
-      messages = await withPickedSkill(agent, messages, onToolEvent);
+      messages = await withPickedSkill(agent, messages, onToolEvent, picked);
     }
+    // Build 7: tools called during this answer know which skill it follows (saved logins).
+    return await runWithSkill(picked.skill ? { id: picked.skill.id, name: picked.skill.name, loginVaultItemId: picked.skill.loginVaultItemId } : null, async () => {
     if (agent.provider === "copilot") {
       // Copilot takes no tools; the picked skill travels in its instructions.
       const systemMsg = messages.find((m) => m.role === "system")?.content ?? agent.systemPrompt;
@@ -426,6 +432,7 @@ export async function askAgent(
       return await askAnthropic(agent, messages, onToken, onToolEvent);
     }
     return await askOpenAI(agent, messages, onToken, onToolEvent);
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { agentId: agent.id, content: "", model: agent.model, latencyMs: 0, tokens: 0, costUsd: 0, energyWh: 0, error: msg };

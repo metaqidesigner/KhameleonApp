@@ -9,6 +9,9 @@ export interface VaultItem {
   owner: string;
   description: string;
   status: string;
+  /** Build 7: logins */
+  username?: string;
+  alwaysAsk?: boolean;
   createdAt: string;
 }
 
@@ -27,6 +30,8 @@ export interface CreateVaultItemInput {
   owner?: string;
   description?: string;
   secretValue: string;
+  username?: string;
+  alwaysAsk?: boolean;
 }
 
 export interface UpdateVaultItemInput {
@@ -37,6 +42,8 @@ export interface UpdateVaultItemInput {
   description?: string;
   status?: string;
   secretValue?: string;
+  username?: string;
+  alwaysAsk?: boolean;
 }
 
 /** Reads degrade to empty on failure - an empty vault and an unreachable backend look the same, honestly. */

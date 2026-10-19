@@ -19,6 +19,7 @@ import {
 } from "khameleon-window-agent";
 import { LocalDocumentAgent, extractDocumentText, dispatchLocalTool } from "@khameleon/integrations";
 import { apiBase, desktopCode, startDesktopLink } from "./desktopLink";
+import { typeSavedLogin } from "./signIn";
 import { CaptureSession } from "./capture";
 import { EmailWatcher } from "./emailWatch";
 
@@ -419,8 +420,15 @@ app.whenReady().then(() => {
 
   // ── Desktop link (src/desktopLink.ts; Build 7) ──────────────────────────
   ipcMain.handle("khameleon:desktop:code", () => desktopCode());
+  const loginGlowHandle = { id: "signin", backend: "external" as const, label: "Signing in" };
   startDesktopLink(apiBase(appUrl), async (action, input) => {
     if (action === "window_command" || action === "file_command") return dispatchLocalTool(action, input, runners);
+    if (action === "sign_in") {
+      return typeSavedLogin(
+        { loginName: String(input.loginName ?? "login"), username: String(input.username ?? ""), secret: String(input.secret ?? ""), app: String(input.app ?? "") },
+        { show: (b) => controlGlowBackend.show(loginGlowHandle, b, "working"), hide: () => controlGlowBackend.hide(loginGlowHandle) },
+      );
+    }
     throw new Error(`The desktop app doesn't know how to "${action}".`);
   });
 

@@ -9,6 +9,8 @@ import { briefForRequest } from "../../lib/meetingPrepService.js";
 import { listUnread, classifyMessages, describeInbox } from "../../lib/inboxTriage.js";
 import { isConnected } from "../../lib/oauthTokens.js";
 import { callDesktop } from "../../lib/desktopLink.js";
+import { signInWithSavedLogin } from "../../lib/savedLogins.js";
+import { currentSkill } from "../../lib/skillContext.js";
 
 export async function getCalendar(when?: string): Promise<string> {
   const { from, to, label } = rangeFor(when);
@@ -67,4 +69,13 @@ export function guardFalseSuccess(answer: string, toolResults: string[]): string
   if (!failures.length || toolResults.some(r => /^DONE -/i.test(r))) return answer;
   if (/\b(n'?t|not|fail|failed|unable|couldn|sorry|problem|error)\b/i.test(answer)) return answer;
   return `${answer}\n\n(Correction: that didn't actually work - ${failures[failures.length - 1].replace(/^FAILED - /i, "")})`;
+}
+
+/** Build 7: sign in with a saved login - asks the user first; the AI never sees the password. */
+export async function signIn(login: string, app?: string): Promise<string> {
+  try {
+    return await signInWithSavedLogin(login, app, currentSkill());
+  } catch (err) {
+    return `FAILED - ${err instanceof Error ? err.message : "the sign-in couldn't be done."}`;
+  }
 }

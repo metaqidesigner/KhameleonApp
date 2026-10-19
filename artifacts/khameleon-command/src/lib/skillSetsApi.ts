@@ -19,6 +19,8 @@ export interface SkillSet {
   installedAt: string | null;
   createdAt: string;
   workDomainIds: number[];
+  /** Build 7: the saved login this skill signs in with (Vault item id). */
+  loginVaultItemId?: number | null;
   /** Only set when status === 'pending' - the approval id to resolve on confirm. */
   pendingApprovalId: number | null;
 }

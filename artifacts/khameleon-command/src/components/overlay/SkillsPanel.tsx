@@ -7,6 +7,7 @@ import { SkillGuide } from "@/components/skills/SkillGuide";
 import type { CaptureDraft } from "@/components/skills/CaptureTask";
 import { CheckBadge, CheckDetails, useProcedureChecks } from "@/components/procedures/ProcedureCheckView";
 import { FromDocument, type DocumentDraft } from "@/components/procedures/FromDocument";
+import { SkillLoginPicker } from "@/components/skills/SkillLoginPicker";
 import type { ProcedureCheck } from "@/lib/proceduresApi";
 import type { SkillSet, CreateSkillSetInput, SkillSetSourceType } from "@/lib/skillSetsApi";
 import type { WorkDomain } from "@/lib/workDomainsApi";
@@ -115,6 +116,7 @@ function SkillRow({ skill, domains, lib, onRun, check, onRechecked }: {
       {open && (
         <div style={{ padding: "0 10px 10px 31px", display: "flex", flexDirection: "column", gap: 8 }}>
           <ConnectionBadges ids={skill.requestedIntegrationIds} />
+          {isInstalled && <SkillLoginPicker tone="overlay" skillId={skill.id} value={skill.loginVaultItemId} />}
           {editing ? (
             <textarea aria-label={`Steps for ${skill.name}`} value={draft} onChange={e => setDraft(e.target.value)} rows={8} style={{ ...input, resize: "vertical", lineHeight: 1.45 }} />
           ) : (

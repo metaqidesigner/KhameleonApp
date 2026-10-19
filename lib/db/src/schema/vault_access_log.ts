@@ -22,7 +22,7 @@ export const vaultAccessLogTable = pgTable("vault_access_log", {
   userId: integer("user_id"),
   vaultItemId: integer("vault_item_id").notNull(),
   itemName: text("item_name").notNull(),
-  action: text("action").notNull(), // 'created' | 'viewed' | 'updated' | 'deleted'
+  action: text("action").notNull(), // 'created' | 'viewed' | 'updated' | 'deleted' | 'used' (a skill signed in with it, Build 7)
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
