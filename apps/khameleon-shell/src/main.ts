@@ -21,6 +21,7 @@ import { LocalDocumentAgent, extractDocumentText, dispatchLocalTool } from "@kha
 import { apiBase, desktopCode, startDesktopLink } from "./desktopLink";
 import { typeSavedLogin } from "./signIn";
 import { replayStep, type CapturedAction } from "./inputHelper";
+import { DetectionService, DEFAULT_DETECTION, type DetectionPrefs } from "./detection";
 import { CaptureSession } from "./capture";
 import { EmailWatcher } from "./emailWatch";
 
@@ -66,8 +67,21 @@ interface DesktopPrefs {
   glowLabels: boolean;
   /** Offer help beside an open email (docs/build-review.md, Build 4 answers). */
   emailAssistant: boolean;
+  /** Automatic task detection (Build 6) - off by default. */
+  detection: DetectionPrefs;
 }
-const DEFAULT_PREFS: DesktopPrefs = { layout: "overlay", screen: "follow", glowLabels: true, emailAssistant: true };
+const DEFAULT_PREFS: DesktopPrefs = { layout: "overlay", screen: "follow", glowLabels: true, emailAssistant: true, detection: { ...DEFAULT_DETECTION } };
+
+/** Keeps detection settings sensible (history 30 days by default; 7-90 allowed). */
+function cleanDetection(d: Partial<DetectionPrefs> | undefined): DetectionPrefs {
+  const x = { ...DEFAULT_DETECTION, ...(d ?? {}) };
+  return {
+    enabled: x.enabled === true, watchContent: x.watchContent === true,
+    historyDays: Math.min(90, Math.max(7, Number(x.historyDays) || 30)),
+    defaultExclusions: x.defaultExclusions !== false,
+    excluded: Array.isArray(x.excluded) ? x.excluded.filter((s): s is string => typeof s === "string" && !!s.trim()).slice(0, 50) : [],
+  };
+}
 
 function prefsPath() {
   return path.join(app.getPath("userData"), "khameleon-prefs.json");
@@ -81,6 +95,7 @@ function loadPrefs(): DesktopPrefs {
       screen: saved.screen === "primary" ? "primary" : "follow",
       glowLabels: saved.glowLabels !== false,
       emailAssistant: saved.emailAssistant !== false,
+      detection: cleanDetection(saved.detection),
     };
   } catch {
     return { ...DEFAULT_PREFS };
@@ -338,6 +353,10 @@ app.whenReady().then(() => {
       prefs.glowLabels = p.glowLabels;
       for (const g of glowBackends) g.setShowLabels(p.glowLabels);
     }
+    if (p.detection && typeof p.detection === "object") {
+      prefs.detection = cleanDetection({ ...prefs.detection, ...p.detection });
+      detection.apply();
+    }
     if (typeof p.emailAssistant === "boolean" && p.emailAssistant !== prefs.emailAssistant) {
       prefs.emailAssistant = p.emailAssistant;
       if (p.emailAssistant) emailWatcher.start(); else emailWatcher.stop();
@@ -419,6 +438,25 @@ app.whenReady().then(() => {
     const body = (await res.json()) as { content?: string; error?: string };
     return { reply: body.content || body.error || "No answer.", toolCalls: [] };
   });
+
+  // ── Automatic task detection (src/detection.ts; Build 6) ────────────────
+  const watchGlowHandle = { id: "watch", backend: "external" as const, label: "Reading" };
+  const sendDetection = () => {
+    for (const w of [overlayWindow, mainWindow]) if (w && !w.isDestroyed()) w.webContents.send("khameleon:detection:update", detection.status());
+  };
+  const detection = new DetectionService(
+    () => prefs.detection,
+    async (kind, payload) => {
+      await fetch(`${apiBase(appUrl)}/desktop/offer`, { method: "POST", headers: { "Content-Type": "application/json", "x-khameleon-desktop": desktopCode() }, body: JSON.stringify({ kind, ...payload }) }).catch(() => undefined);
+    },
+    { show: (b, s) => controlGlowBackend.show(watchGlowHandle, b, s), hide: () => controlGlowBackend.hide(watchGlowHandle) },
+    sendDetection,
+  );
+  detection.apply();
+  ipcMain.handle("khameleon:detection:status", () => detection.status());
+  ipcMain.handle("khameleon:detection:pause", (_e, paused: unknown) => { detection.setPaused(paused === true); return detection.status(); });
+  ipcMain.handle("khameleon:detection:silence", (_e, id: unknown) => { if (typeof id === "string") detection.silence(id); });
+  ipcMain.handle("khameleon:detection:delete-history", () => { detection.deleteHistory(); return detection.status(); });
 
   // ── Desktop link (src/desktopLink.ts; Build 7) ──────────────────────────
   ipcMain.handle("khameleon:desktop:code", () => desktopCode());

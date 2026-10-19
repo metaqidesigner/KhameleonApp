@@ -48,6 +48,18 @@ contextBridge.exposeInMainWorld("khameleon", {
   desktopLink: {
     code: () => ipcRenderer.invoke("khameleon:desktop:code"),
   },
+  // Automatic task detection (src/detection.ts): status, Pause, "Not this one", Delete my history.
+  detection: {
+    status: () => ipcRenderer.invoke("khameleon:detection:status"),
+    pause: (paused: boolean) => ipcRenderer.invoke("khameleon:detection:pause", paused),
+    silence: (id: string) => ipcRenderer.invoke("khameleon:detection:silence", id),
+    deleteHistory: () => ipcRenderer.invoke("khameleon:detection:delete-history"),
+    onUpdate: (listener: (status: unknown) => void) => {
+      const handler = (_e: unknown, status: unknown) => listener(status);
+      ipcRenderer.on("khameleon:detection:update", handler);
+      return () => { ipcRenderer.removeListener("khameleon:detection:update", handler); };
+    },
+  },
   // Saved desktop choices: which layout starts, follow-me vs main screen.
   prefs: {
     get: () => ipcRenderer.invoke("khameleon:prefs:get"),

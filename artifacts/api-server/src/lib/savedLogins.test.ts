@@ -11,3 +11,10 @@ test("finds the saved login the skill or AI means", () => {
   assert.equal(matchLogin(items, "", 2)?.id, 2, "the skill's linked login when no name is given");
   assert.equal(matchLogin(items, "Netflix"), null);
 });
+
+test("reads Khami's task guess for content watching", async () => {
+  const { parseTaskGuess } = await import("./detectionOffers.js");
+  assert.equal(parseTaskGuess("TASK: Supplier statement reconciliation"), "Supplier statement reconciliation");
+  assert.equal(parseTaskGuess("NONE"), null);
+  assert.equal(parseTaskGuess("TASK: none"), null);
+});

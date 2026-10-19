@@ -12,3 +12,4 @@ export { WindowsNativeInputBackend } from "./backends/windowsNativeInputBackend"
 export { ElectronPointerBackend } from "./backends/electronPointerBackend";
 export { ElectronUserActivity } from "./backends/electronUserActivity";
 export * from "./emailWindow";
+export * from "./detection";

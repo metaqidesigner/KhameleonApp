@@ -16,6 +16,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { EmailAssistant } from "./EmailAssistant";
 import { SuggestionSlot } from "@/components/notices/SuggestionSlot";
 import { LoginRequests } from "@/components/notices/LoginRequests";
+import { DetectionBadge } from "@/components/notices/DetectionBadge";
 import { CaptureBar, useCaptureTask, type CaptureDraft } from "@/components/skills/CaptureTask";
 import { WorkspacePanel } from "./workspace/WorkspacePanel";
 import { KhamiSetup } from "@/components/khami/KhamiSetup";
@@ -153,6 +154,12 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   const [khamiPrompt, setKhamiPrompt] = useState(false);
   const [captureDraft, setCaptureDraft] = useState<CaptureDraft | null>(null);
   const capture = useCaptureTask(useCallback((d: CaptureDraft) => { setCaptureDraft(d); setSkillsOpen(true); }, []));
+  // Build 6: a detection offer's "Capture it" opens Capture here.
+  useEffect(() => {
+    const go = () => capture.open();
+    window.addEventListener('khameleon:start-capture', go);
+    return () => window.removeEventListener('khameleon:start-capture', go);
+  }, [capture.open]);
 
   // Build 7: let the chat's AI work in this computer's apps (pairs the desktop link).
   useEffect(() => { if (!locked) void pairDesktopLink().catch(() => {}); }, [locked]);
@@ -221,6 +228,7 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
       {!locked && (
         <div style={{ position: "fixed", top: 14, right: 84, zIndex: 58, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
           <LoginRequests tone="overlay" />
+          <DetectionBadge tone="overlay" />
           <SuggestionSlot tone="overlay" />
         </div>
       )}

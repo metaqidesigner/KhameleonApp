@@ -53,6 +53,11 @@ export default function Skills() {
   const [docDraft, setDocDraft] = useState<DocumentDraft | null>(null);
   const [docsDomain, setDocsDomain] = useState<number | null>(null);
   const capture = useCaptureTask(useCallback((d: CaptureDraft) => { setCaptureDraft(d); setGuiding(true); }, []));
+  // Build 6: opened from a detection offer ("Capture it") - see AppShell.
+  useEffect(() => {
+    const w = window as unknown as { __khameleonCaptureRequested?: boolean };
+    if (w.__khameleonCaptureRequested && capture.available) { w.__khameleonCaptureRequested = false; capture.open(); }
+  }, [capture.available, capture.open]);
   const [editDraft, setEditDraft] = useState('');
 
   const filtered = useMemo(

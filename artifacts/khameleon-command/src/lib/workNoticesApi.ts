@@ -1,6 +1,6 @@
 /** The suggestion slot and alert settings (artifacts/api-server/src/routes/workNotices.ts). */
 const BASE = import.meta.env.VITE_API_URL || '/api';
-export interface Suggestion { id: number; kind: 'meeting_brief' | 'urgent_mail' | string; title: string; body: string; why: string; createdAt: string }
+export interface Suggestion { id: number; kind: 'meeting_brief' | 'urgent_mail' | 'detected_task' | 'watch_task' | 'skill_match' | string; title: string; body: string; why: string; createdAt: string; ref?: Record<string, unknown> }
 export interface PrepSettings { enabled: boolean; leadMinutes: number }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {

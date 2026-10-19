@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { checkDesktopCode, nextRequest, finishRequest, desktopOnline, unpairDesktop, pairDesktop } from "../lib/desktopLink.js";
 import { isAdminRequest } from "../lib/adminCheck.js";
+import { handleOffer } from "../lib/detectionOffers.js";
 
 /** The desktop app's side of the link (lib/desktopLink.ts). */
 const router = Router();
@@ -30,6 +31,12 @@ router.get("/next", desktopOnly, async (req, res) => {
 router.post("/result/:id", desktopOnly, (req, res) => {
   const { ok, result } = req.body as { ok?: boolean; result?: string };
   res.json({ accepted: finishRequest(String(req.params.id), !!ok, String(result ?? "")) });
+});
+
+/** Build 6: the desktop app reports a repeat or the window being worked in; may become an offer. */
+router.post("/offer", desktopOnly, async (req, res) => {
+  try { res.json(await handleOffer(req.body ?? {})); }
+  catch (err) { req.log.warn({ err }, "detection offer failed"); res.json({ offered: false }); }
 });
 
 /** Settings: forget the paired desktop app (admin). */

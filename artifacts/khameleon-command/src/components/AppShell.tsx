@@ -6,6 +6,7 @@ import CommandPalette from './CommandPalette';
 import ChatWindow from './chatWindow/ChatWindow';
 import { SuggestionSlot } from '@/components/notices/SuggestionSlot';
 import { LoginRequests } from '@/components/notices/LoginRequests';
+import { DetectionBadge } from '@/components/notices/DetectionBadge';
 import { pairDesktopLink } from '@/lib/desktopBridge';
 import { LeftSidebar } from './LeftSidebar';
 import { JarvisOrbPortal } from './orb/JarvisOrbPortal';
@@ -69,6 +70,13 @@ function PageRouter() {
 export function AppShell() {
   // Build 7: let the chat's AI work in this computer's apps (pairs the desktop link; no-op in a browser).
   useEffect(() => { void pairDesktopLink().catch(() => {}); }, []);
+  // Build 6: a detection offer's "Capture it" - Capture lives on the Skill Sets page in Classic.
+  const setActiveTab = useJarvisStore(s => s.setActiveTab);
+  useEffect(() => {
+    const go = () => { (window as unknown as { __khameleonCaptureRequested?: boolean }).__khameleonCaptureRequested = true; setActiveTab('skills'); };
+    window.addEventListener('khameleon:start-capture', go);
+    return () => window.removeEventListener('khameleon:start-capture', go);
+  }, [setActiveTab]);
   return (
     <>
       <Background />
@@ -88,6 +96,7 @@ export function AppShell() {
       {/* Same suggestion slot as the Overlay (components/notices). */}
       <div style={{ position: "fixed", top: 52, right: 16, zIndex: 60, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
         <LoginRequests tone="classic" />
+        <DetectionBadge tone="classic" />
         <SuggestionSlot tone="classic" />
       </div>
 

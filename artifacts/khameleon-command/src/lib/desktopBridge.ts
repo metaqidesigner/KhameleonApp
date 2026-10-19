@@ -22,6 +22,26 @@ export interface DesktopPrefs {
   glowLabels: boolean;
   /** Offer help beside an open email. */
   emailAssistant: boolean;
+  /** Automatic task detection (Build 6) - off by default. */
+  detection?: DetectionPrefs;
+}
+
+export interface DetectionPrefs { enabled: boolean; watchContent: boolean; historyDays: number; defaultExclusions: boolean; excluded: string[] }
+export interface DetectionStatus { enabled: boolean; watching: boolean; paused: boolean; logged: number; historyDays: number }
+export interface KhameleonDetectionBridge {
+  status(): Promise<DetectionStatus>;
+  pause(paused: boolean): Promise<DetectionStatus>;
+  silence(id: string): Promise<void>;
+  deleteHistory(): Promise<DetectionStatus>;
+  onUpdate(listener: (s: DetectionStatus) => void): () => void;
+}
+export function detectionBridge(): KhameleonDetectionBridge | undefined {
+  return (window as unknown as { khameleon?: { detection?: KhameleonDetectionBridge } }).khameleon?.detection;
+}
+
+/** Asks the window's Capture bar to open (used by detection offers). */
+export function requestCapture(): void {
+  window.dispatchEvent(new CustomEvent('khameleon:start-capture'));
 }
 
 interface KhameleonDesktopBridge {

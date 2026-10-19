@@ -5,6 +5,7 @@ import { AboutLicences } from '@/components/about/AboutLicences';
 import { MicrosoftSignIn } from '@/components/settings/MicrosoftSignIn';
 import { EscalationSetting } from '@/components/settings/EscalationSetting';
 import { AlertSettings } from '@/components/settings/AlertSettings';
+import { DetectionSettings } from '@/components/settings/DetectionSettings';
 import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin, Music, Play, Pause, SkipForward, SkipBack, Mic } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useJarvisStore } from '@/store/jarvisStore';
@@ -22,8 +23,8 @@ import {
 import { getQuotaSnapshots, type QuotaSnapshots } from '@/lib/quotaApi';
 import { getTtsStatus, getElevenLabsVoices, previewVoice, type ElevenLabsVoice } from '@/lib/voiceApi';
 
-type Section = 'GENERAL' | 'ALERTS' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MICROSOFT SIGN-IN' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED' | 'ABOUT';
-const SECTIONS: Section[] = ['GENERAL', 'ALERTS', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MICROSOFT SIGN-IN', 'MEMORY', 'TELEMETRY', 'ADVANCED', 'ABOUT'];
+type Section = 'GENERAL' | 'ALERTS' | 'DETECTION' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MICROSOFT SIGN-IN' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED' | 'ABOUT';
+const SECTIONS: Section[] = ['GENERAL', 'ALERTS', 'DETECTION', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MICROSOFT SIGN-IN', 'MEMORY', 'TELEMETRY', 'ADVANCED', 'ABOUT'];
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -971,6 +972,7 @@ export default function Settings() {
         <div style={{ maxWidth: 520 }}>
           {active === 'GENERAL'    && <GeneralSection />}
           {active === 'ALERTS'     && <AlertSettings tone="classic" />}
+          {active === 'DETECTION'  && <DetectionSettings tone="classic" />}
           {active === 'ENGINE'     && <EngineSection />}
           {active === 'API KEYS'   && <ApiKeysSection />}
           {active === 'APPEARANCE' && <AppearanceSection />}
@@ -979,7 +981,7 @@ export default function Settings() {
           {/* Same section as the Overlay's Settings > Microsoft sign-in (components/settings). */}
           {active === 'MICROSOFT SIGN-IN' && <MicrosoftSignIn tone="classic" />}
           {active === 'ABOUT'      && <AboutLicences tone="classic" />}
-          {!['GENERAL', 'ALERTS', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MICROSOFT SIGN-IN', 'ABOUT'].includes(active) && <GenericSection section={active} />}
+          {!['GENERAL', 'ALERTS', 'DETECTION', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MICROSOFT SIGN-IN', 'ABOUT'].includes(active) && <GenericSection section={active} />}
         </div>
       </JPanel>
     </div>

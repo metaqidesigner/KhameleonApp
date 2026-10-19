@@ -51,4 +51,5 @@ This document is the technical record of what Khameleon uses from third parties 
 - [ ] Khameleon's own terms of use: users are responsible for the skills they install and the integrations they connect; connected services' own terms apply to data sent to them.
 - [ ] Public MCP directory (registry.modelcontextprotocol.io): check its terms of use for listing/showing its entries in a commercial product.
 - [ ] Azure OpenAI: confirm Khameleon's terms of use state that the organisation's own Azure agreement governs data sent to its Azure OpenAI deployment, and that confidential conversations are never sent (step 5 lock).
+- [ ] Privacy notice: automatic task detection (Build 6) - off by default; when on, keeps a local log of app/window switches (no typing/screens/clicks) for the chosen period; content watching reads window text on the device, judged only by the on-device AI; banking/password/private windows left out by default. Check workplace monitoring rules (e.g. GDPR/employee monitoring) for organisations that might switch it on for staff.
 - [ ] Legal review of this document and the licences page.

@@ -108,7 +108,7 @@ export async function appAuthGate(req: Request, res: Response, next: NextFunctio
     return;
   }
   // The paired desktop app's own requests: checked by its pairing code instead (routes/desktop.ts).
-  if (req.path === "/desktop/next" || req.path.startsWith("/desktop/result/")) {
+  if (req.path === "/desktop/next" || req.path.startsWith("/desktop/result/") || req.path === "/desktop/offer") {
     next();
     return;
   }
