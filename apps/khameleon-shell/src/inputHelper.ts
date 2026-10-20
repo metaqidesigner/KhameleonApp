@@ -17,9 +17,8 @@ export type CapturedAction =
 
 export function helperPath(): string | null {
   if (process.platform !== "darwin") return null;
-  const packaged = path.join(process.resourcesPath ?? "", "app.asar.unpacked", "dist", "native", "khameleon-input");
-  const dev = path.join(__dirname, "native", "khameleon-input");
-  const p = app.isPackaged ? packaged : dev;
+  // Next to the compiled app (dist/native) - the app ships as a plain folder, not an archive.
+  const p = path.join(__dirname.replace(/app\.asar([\\/])/, "app.asar.unpacked$1"), "native", "khameleon-input");
   return existsSync(p) ? p : null;
 }
 

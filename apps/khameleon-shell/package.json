@@ -45,9 +45,6 @@
     "files": [
       "dist/**/*"
     ],
-    "asarUnpack": [
-      "dist/native/**"
-    ],
     "extraResources": [
       {
         "from": "../../THIRD_PARTY_LICENSES.md",
@@ -76,6 +73,7 @@
         "nsis",
         "portable"
       ]
-    }
+    },
+    "asar": false
   }
 }
