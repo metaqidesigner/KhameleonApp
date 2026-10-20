@@ -34,27 +34,31 @@ export function MicrosoftSignIn({ tone }: { tone: Tone }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <Hint tone={tone}>
-        Lets people connect Outlook and Microsoft 365 Copilot. Your organisation registers Khameleon with Microsoft once
-        (portal.azure.com → Microsoft Entra ID → App registrations), then pastes the app's details here.
+        {status.source === 'built-in'
+          ? 'Khameleon has its own Microsoft sign-in built in - nothing to set up. If your organisation prefers its own registration, an admin can enter it below instead.'
+          : <>Lets people connect Outlook and Microsoft 365 Copilot. Your organisation registers Khameleon with Microsoft once
+            (portal.azure.com → Microsoft Entra ID → App registrations), then pastes the app's details here.</>}
       </Hint>
 
       <Group>
         <Label tone={tone}>Status</Label>
         <div style={{ fontSize: 12.5, color: status.configured ? t.good : t.warn }}>
           {status.configured
-            ? `Set up${status.source === 'server' ? ' on the server' : ''} - app ${status.clientId}${status.tenantId ? `, directory ${status.tenantId}` : ''}`
+            ? status.source === 'built-in'
+              ? 'Ready - Khameleon\'s built-in sign-in'
+              : `Set up${status.source === 'server' ? ' on the server' : ''} - app ${status.clientId}${status.tenantId ? `, directory ${status.tenantId}` : ''}`
             : 'Not set up yet - Outlook and Copilot sign-in won\'t work until it is.'}
         </div>
       </Group>
 
-      <Group>
+      {status.source !== 'built-in' && <Group>
         <Label tone={tone}>Address to give Microsoft</Label>
         <Hint tone={tone}>In the app registration, add this under Authentication → Web → Redirect URIs.</Hint>
         <div style={{ display: 'flex', gap: 6 }}>
           <input readOnly aria-label="Redirect address" value={status.redirectUri} style={{ ...input, fontFamily: 'var(--j-font-mono, monospace)', fontSize: 11.5 }} onFocus={e => e.currentTarget.select()} />
           <button type="button" style={btn()} onClick={() => { void navigator.clipboard?.writeText(status.redirectUri).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}>{copied ? 'Copied' : 'Copy'}</button>
         </div>
-      </Group>
+      </Group>}
 
       {!status.canEdit && <Hint tone={tone}>Only an admin can change these details.</Hint>}
 

@@ -28,7 +28,8 @@ import { accountsEnabled, createUser, verifyLogin, getUserById } from "../lib/ac
 import { db } from "@workspace/db";
 import { actionReceiptsTable } from "@workspace/db";
 import { safeReturnTo } from "../lib/returnTo.js";
-import { getMicrosoftApp } from "../lib/microsoftApp.js";
+import { getMicrosoftApp, secretParams, OUTLOOK_SCOPES, adminApprovalUrl, needsAdminApproval, type MicrosoftApp } from "../lib/microsoftApp.js";
+import { signedInPage, needsItPage, signInProblemPage } from "../lib/signInPages.js";
 import crypto from "node:crypto";
 
 const router = Router();
@@ -125,7 +126,11 @@ router.post("/session/logout", (req: Request, res: Response) => {
 });
 
 // ── CSRF state store (in-memory; single-user, short-lived) ───────────────────
-interface PendingState { provider: string; createdAt: number; returnTo: string; }
+interface PendingState {
+  provider: string; createdAt: number; returnTo: string;
+  /** Khameleon's built-in Microsoft sign-in (public client): the PKCE check and the redirect it used. */
+  codeVerifier?: string; redirectUri?: string;
+}
 const pendingStates = new Map<string, PendingState>();
 setInterval(() => {
   const cutoff = Date.now() - 10 * 60 * 1000;
@@ -139,12 +144,64 @@ export function getRedirectUri(req: Request): string {
   return `${proto}://${host}/api/auth/oauth/callback`;
 }
 
-function makeState(provider: string, req: Request): string {
+function makeState(provider: string, req: Request, extra: Pick<PendingState, "codeVerifier" | "redirectUri"> = {}): string {
   const state = crypto.randomBytes(16).toString("hex");
   const asked = typeof req.query.returnTo === "string" ? req.query.returnTo : req.get("referer");
   const host = (req.headers["x-forwarded-host"] as string | undefined) ?? req.headers.host;
-  pendingStates.set(state, { provider, createdAt: Date.now(), returnTo: safeReturnTo(asked, host) });
+  pendingStates.set(state, { provider, createdAt: Date.now(), returnTo: safeReturnTo(asked, host), ...extra });
   return state;
+}
+
+// ── Khameleon's built-in Microsoft sign-in (public client) ───────────────────
+// Registered with Microsoft as a desktop app: redirect http://localhost (any
+// port - Microsoft ignores it for localhost), so the browser comes back to
+// this computer's own Khameleon (app.ts forwards "/?code=..." to the callback).
+
+const pkceVerifier = () => crypto.randomBytes(32).toString("base64url");
+const pkceChallenge = (verifier: string) => crypto.createHash("sha256").update(verifier).digest("base64url");
+
+function isThisComputer(req: Request): boolean {
+  return /^localhost(:\d+)?$/i.test(String(req.headers.host ?? ""));
+}
+
+const BUILT_IN_ONLY_HERE = "Khameleon's built-in Microsoft sign-in works in the Khameleon desktop app. On a shared server, an admin adds your organisation's own Microsoft registration in Settings > Microsoft sign-in.";
+
+/** Starts a Microsoft sign-in - with PKCE and a localhost redirect for Khameleon's built-in registration. */
+function microsoftAuthorizeUrl(req: Request, msApp: MicrosoftApp, provider: "microsoft" | "copilot", tenant: string, scopes: string): string {
+  const redirectUri = msApp.public ? `http://${req.headers.host}` : getRedirectUri(req);
+  const codeVerifier = msApp.public ? pkceVerifier() : undefined;
+  const url = new URL(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize`);
+  url.searchParams.set("client_id", msApp.clientId);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", scopes);
+  url.searchParams.set("response_mode", "query");
+  url.searchParams.set("prompt", "select_account"); // usually one click: pick the account already signed in
+  if (codeVerifier) {
+    url.searchParams.set("code_challenge", pkceChallenge(codeVerifier));
+    url.searchParams.set("code_challenge_method", "S256");
+  }
+  url.searchParams.set("state", makeState(provider, req, { codeVerifier, redirectUri }));
+  return url.toString();
+}
+
+/** Swaps the sign-in code for tokens (no secret for the built-in registration; PKCE proves it's the same sign-in). */
+async function microsoftTokens(req: Request, msApp: MicrosoftApp, tenant: string, scopes: string, code: string, pending: PendingState) {
+  const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: msApp.clientId,
+      ...secretParams(msApp),
+      ...(pending.codeVerifier ? { code_verifier: pending.codeVerifier } : {}),
+      redirect_uri: pending.redirectUri ?? getRedirectUri(req),
+      grant_type: "authorization_code",
+      scope: scopes,
+    }),
+  });
+  if (!res.ok) throw new Error(`Microsoft sign-in failed: ${res.status} ${await res.text()}`);
+  return await res.json() as { access_token: string; refresh_token?: string; expires_in: number; scope: string };
 }
 
 // ── Google ────────────────────────────────────────────────────────────────────
@@ -200,14 +257,8 @@ async function exchangeGoogleCode(req: Request, code: string): Promise<void> {
 // ── Microsoft ─────────────────────────────────────────────────────────────────
 
 const MICROSOFT_TENANT = "common"; // works for personal Outlook + M365 accounts
-
-const MICROSOFT_SCOPES = [
-  "https://graph.microsoft.com/Mail.ReadWrite",
-  "https://graph.microsoft.com/Mail.Send",
-  "https://graph.microsoft.com/Calendars.ReadWrite",
-  "https://graph.microsoft.com/User.Read",
-  "offline_access",
-].join(" ");
+// One sign-in, asked once: read, sort and draft email, and the calendar - never "send" (download decisions, 2026-10-20).
+const MICROSOFT_SCOPES = OUTLOOK_SCOPES.join(" ");
 
 router.get("/oauth/microsoft/start", async (req: Request, res: Response) => {
   const msApp = await getMicrosoftApp();
@@ -215,39 +266,14 @@ router.get("/oauth/microsoft/start", async (req: Request, res: Response) => {
     res.status(503).json({ error: "Microsoft sign-in isn't set up yet - an admin adds the app details in Settings > Microsoft sign-in." });
     return;
   }
-  const clientId = msApp.clientId;
-  const url = new URL(`https://login.microsoftonline.com/${MICROSOFT_TENANT}/oauth2/v2.0/authorize`);
-  url.searchParams.set("client_id", clientId);
-  url.searchParams.set("redirect_uri", getRedirectUri(req));
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", MICROSOFT_SCOPES);
-  url.searchParams.set("response_mode", "query");
-  url.searchParams.set("state", makeState("microsoft", req));
-  res.redirect(url.toString());
+  if (msApp.public && !isThisComputer(req)) { res.status(503).json({ error: BUILT_IN_ONLY_HERE }); return; }
+  res.redirect(microsoftAuthorizeUrl(req, msApp, "microsoft", MICROSOFT_TENANT, MICROSOFT_SCOPES));
 });
 
-async function exchangeMicrosoftCode(req: Request, code: string): Promise<void> {
+async function exchangeMicrosoftCode(req: Request, code: string, pending: PendingState): Promise<void> {
   const msApp = await getMicrosoftApp();
   if (!msApp) throw new Error("Microsoft sign-in isn't set up");
-  const res = await fetch(
-    `https://login.microsoftonline.com/${MICROSOFT_TENANT}/oauth2/v2.0/token`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id:     msApp.clientId,
-        client_secret: msApp.clientSecret,
-        redirect_uri:  getRedirectUri(req),
-        grant_type:    "authorization_code",
-        scope:         MICROSOFT_SCOPES,
-      }),
-    }
-  );
-  if (!res.ok) throw new Error(`Microsoft exchange failed: ${res.status} ${await res.text()}`);
-  const json = await res.json() as {
-    access_token: string; refresh_token?: string; expires_in: number; scope: string;
-  };
+  const json = await microsoftTokens(req, msApp, MICROSOFT_TENANT, MICROSOFT_SCOPES, code, pending);
   await saveToken("microsoft", {
     accessToken:   json.access_token,
     refreshToken:  json.refresh_token ?? null,
@@ -266,34 +292,14 @@ router.get("/oauth/copilot/start", async (req: Request, res: Response) => {
     res.status(503).json({ error: "Microsoft sign-in isn't set up yet - an admin adds the app details in Settings > Microsoft sign-in." });
     return;
   }
-  const clientId = msApp.clientId;
-  const url = new URL(`https://login.microsoftonline.com/${COPILOT_TENANT}/oauth2/v2.0/authorize`);
-  url.searchParams.set("client_id", clientId);
-  url.searchParams.set("redirect_uri", getRedirectUri(req));
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", COPILOT_SCOPES);
-  url.searchParams.set("response_mode", "query");
-  url.searchParams.set("state", makeState("copilot", req));
-  res.redirect(url.toString());
+  if (msApp.public && !isThisComputer(req)) { res.status(503).json({ error: BUILT_IN_ONLY_HERE }); return; }
+  res.redirect(microsoftAuthorizeUrl(req, msApp, "copilot", COPILOT_TENANT, COPILOT_SCOPES));
 });
 
-async function exchangeCopilotCode(req: Request, code: string): Promise<void> {
+async function exchangeCopilotCode(req: Request, code: string, pending: PendingState): Promise<void> {
   const msApp = await getMicrosoftApp();
   if (!msApp) throw new Error("Microsoft sign-in isn't set up");
-  const res = await fetch(`https://login.microsoftonline.com/${COPILOT_TENANT}/oauth2/v2.0/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id:     msApp.clientId,
-      client_secret: msApp.clientSecret,
-      redirect_uri:  getRedirectUri(req),
-      grant_type:    "authorization_code",
-      scope:         COPILOT_SCOPES,
-    }),
-  });
-  if (!res.ok) throw new Error(`Copilot sign-in failed: ${res.status} ${await res.text()}`);
-  const json = await res.json() as { access_token: string; refresh_token?: string; expires_in: number; scope: string };
+  const json = await microsoftTokens(req, msApp, COPILOT_TENANT, COPILOT_SCOPES, code, pending);
   await saveToken("copilot", {
     accessToken:   json.access_token,
     refreshToken:  json.refresh_token ?? null,
@@ -352,11 +358,23 @@ async function exchangeSpotifyCode(req: Request, code: string): Promise<void> {
 // ── Generic callback (all providers redirect here) ────────────────────────────
 
 router.get("/oauth/callback", async (req: Request, res: Response) => {
-  const { code, state, error } = req.query as Record<string, string>;
+  const { code, state, error, error_description: errorDescription } = req.query as Record<string, string>;
 
   if (error) {
     req.log.warn({ error }, "OAuth callback error from provider");
-    const back = pendingStates.get(state ?? "")?.returnTo ?? "";
+    const pendingErr = pendingStates.get(state ?? "");
+    // Khameleon's built-in Microsoft sign-in happens in the person's web browser: show a page there.
+    if (pendingErr?.codeVerifier) {
+      pendingStates.delete(state);
+      const msApp = await getMicrosoftApp();
+      if (msApp && needsAdminApproval(error, errorDescription)) {
+        res.type("html").send(needsItPage(adminApprovalUrl(msApp.clientId, pendingErr.provider === "copilot" ? COPILOT_SCOPES.split(" ") : OUTLOOK_SCOPES), pendingErr.provider === "copilot"));
+        return;
+      }
+      res.type("html").send(signInProblemPage(error === "access_denied" ? "The sign-in was cancelled." : `Microsoft said: ${errorDescription ?? error}`));
+      return;
+    }
+    const back = pendingErr?.returnTo ?? "";
     res.redirect(`${back}/?oauth_error=${encodeURIComponent(error)}`);
     return;
   }
@@ -371,8 +389,8 @@ router.get("/oauth/callback", async (req: Request, res: Response) => {
 
   try {
     if (provider === "google")    await exchangeGoogleCode(req, code);
-    else if (provider === "microsoft") await exchangeMicrosoftCode(req, code);
-    else if (provider === "copilot")   await exchangeCopilotCode(req, code);
+    else if (provider === "microsoft") await exchangeMicrosoftCode(req, code, pending);
+    else if (provider === "copilot")   await exchangeCopilotCode(req, code, pending);
     else if (provider === "spotify")   await exchangeSpotifyCode(req, code);
     else throw new Error(`Unknown provider: ${provider}`);
 
@@ -393,9 +411,11 @@ router.get("/oauth/callback", async (req: Request, res: Response) => {
       req.log.warn({ receiptErr, provider }, "Failed to write connect receipt (non-fatal)");
     }
 
+    if (pending.codeVerifier) { res.type("html").send(signedInPage(provider === "copilot" ? "Copilot" : "Microsoft")); return; }
     res.redirect(`${returnTo}/?oauth_success=${provider}`);
   } catch (err) {
     req.log.error({ err, provider }, "OAuth exchange failed");
+    if (pending.codeVerifier) { res.type("html").send(signInProblemPage("Khameleon couldn't finish the sign-in. Please try again from Khameleon.")); return; }
     res.redirect(`${returnTo}/?oauth_error=exchange_failed`);
   }
 });

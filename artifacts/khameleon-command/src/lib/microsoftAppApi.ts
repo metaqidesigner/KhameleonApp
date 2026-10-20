@@ -3,7 +3,7 @@ const BASE = import.meta.env.VITE_API_URL || '/api';
 
 export interface MicrosoftAppStatus {
   configured: boolean;
-  source: 'settings' | 'server' | null;
+  source: 'settings' | 'server' | 'built-in' | null;
   clientId: string | null;
   tenantId: string | null;
   redirectUri: string;

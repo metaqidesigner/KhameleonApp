@@ -62,7 +62,7 @@ router.post("/test", async (req: Request, res: Response) => {
   if (body.clientId || body.clientSecret) {
     const problem = checkMicrosoftAppInput(body);
     if (problem) { res.json({ ok: false, message: problem }); return; }
-    app = { clientId: body.clientId, clientSecret: body.clientSecret, tenantId: body.tenantId || undefined, source: "settings" };
+    app = { clientId: body.clientId, clientSecret: body.clientSecret, tenantId: body.tenantId || undefined, source: "settings", public: false };
   }
   if (!app) { res.json({ ok: false, message: "Nothing to test yet - enter the app details first." }); return; }
   try {

@@ -32,8 +32,8 @@ export async function runOutlookDraftEmail(messageId: string): Promise<OutlookDr
   return asJson<OutlookDraft>(response, 'Draft request');
 }
 
-/** Step 5: the actual Mail.Send call — fired only on explicit confirmation. */
-export async function sendOutlookDraft(approvalId: number, editedBody?: string): Promise<{ ok: true; sentAt: string }> {
+/** Step 5: on confirmation, keeps the reviewed reply in Outlook's Drafts (Khameleon never sends Outlook email). */
+export async function sendOutlookDraft(approvalId: number, editedBody?: string): Promise<{ ok: true; savedAsDraft: true; message: string }> {
   const response = await fetch(`${BASE}/skills/outlook-draft-email/${approvalId}/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

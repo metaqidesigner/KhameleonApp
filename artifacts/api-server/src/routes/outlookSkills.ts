@@ -2,7 +2,7 @@
  * outlook-draft-email skill (design-spec.md §12.1) HTTP surface.
  *
  *   POST /api/skills/outlook-draft-email             — run steps 1-4, return the draft for review
- *   POST /api/skills/outlook-draft-email/:id/send     — step 5: the actual Mail.Send call, gated on confirmation
+ *   POST /api/skills/outlook-draft-email/:id/send     — step 5: on confirmation, the reviewed reply stays in Outlook's Drafts (Khameleon never sends)
  *   POST /api/skills/outlook-draft-email/:id/reject   — discard the draft without sending
  *
  * The `:id` in /send and /reject is an approvals row id (§6.5.2 action
@@ -109,17 +109,20 @@ router.post("/:id/send", async (req: Request, res: Response) => {
       await graph.updateDraftBody(payload.draftId, graph.stripSubjectPrefix(editedBody));
     }
 
-    await graph.sendDraft(payload.draftId);
-
+    // Khameleon never sends email (download decisions, 2026-10-20): it doesn't
+    // ask Microsoft for permission to send, so far more companies let staff
+    // sign in without IT. The reviewed reply stays in Outlook's Drafts for the
+    // person to send themselves.
     const now = new Date();
+    const summary = `Reply to ${payload.to} saved in your Outlook Drafts - open Outlook to send it`;
     await db.update(approvalsTable).set({ status: "approved", resolvedAt: now.toISOString() }).where(eq(approvalsTable.id, id));
     await db
       .update(taskRunsTable)
-      .set({ status: "completed", resultSummary: `Sent to ${payload.to}`, completedAt: now, updatedAt: now })
+      .set({ status: "completed", resultSummary: summary, completedAt: now, updatedAt: now })
       .where(eq(taskRunsTable.id, payload.taskRunId));
-    emitTaskEvent(payload.taskRunId, { type: "done", summary: `Sent to ${payload.to}` });
+    emitTaskEvent(payload.taskRunId, { type: "done", summary });
 
-    res.json({ ok: true, sentAt: now.toISOString() });
+    res.json({ ok: true, savedAsDraft: true, message: summary });
   } catch (err) {
     // Deliberately does NOT mark the approval resolved on failure - a failed
     // send must stay retryable, never silently recorded as sent.

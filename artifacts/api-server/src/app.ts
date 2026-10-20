@@ -46,6 +46,18 @@ app.use(express.urlencoded({ extended: true }));
 // AsyncLocalStorage rather than a parameter threaded through every function.
 app.use("/api", appAuthGate, withRequestContext, router);
 
+// Khameleon's built-in Microsoft sign-in is registered with the redirect
+// http://localhost (Microsoft ignores the port), so Microsoft sends the
+// browser back to "/?code=...&state=..." - hand that to the sign-in callback.
+app.get("/", (req, res, next) => {
+  if (typeof req.query.state === "string" && (req.query.code || req.query.error)) {
+    const query = new URLSearchParams(req.query as Record<string, string>).toString();
+    res.redirect(307, `/api/auth/oauth/callback?${query}`);
+    return;
+  }
+  next();
+});
+
 // Self-hosted single-container deployments (see /Dockerfile, /docker-compose.yml)
 // serve the built frontend from this same process instead of running a
 // separate Vite dev server - a no-op for every existing dev/prod-non-Docker

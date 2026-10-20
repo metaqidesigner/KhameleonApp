@@ -15,11 +15,22 @@ const KEY = "microsoft_app";
 
 export interface MicrosoftApp {
   clientId: string;
-  clientSecret: string;
+  /** Only for an organisation's own registration; Khameleon's built-in one has none. */
+  clientSecret?: string;
   /** Directory (tenant) ID - optional; lets "Test" check the secret too. */
   tenantId?: string;
-  source: "settings" | "server";
+  source: "settings" | "server" | "built-in";
+  /**
+   * Khameleon's own registration, built into the download (download decisions,
+   * 2026-10-20): a "public client" - no secret (an app people download can't
+   * keep one), sign-in protected by PKCE instead, redirecting to this computer
+   * (http://localhost, any port).
+   */
+  public: boolean;
 }
+
+/** Khameleon's own Microsoft registration (Application ID - public, not a secret). */
+export const BUILT_IN_MICROSOFT_CLIENT_ID = process.env.KHAMELEON_MICROSOFT_CLIENT_ID ?? "";
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const looksLikeMicrosoftId = (v: string) => GUID.test(v.trim());
@@ -29,12 +40,45 @@ export async function getMicrosoftApp(): Promise<MicrosoftApp | null> {
   if (row) {
     try {
       const s = JSON.parse(decrypt(row.value)) as Omit<MicrosoftApp, "source">;
-      if (s.clientId && s.clientSecret) return { ...s, source: "settings" };
+      if (s.clientId && s.clientSecret) return { ...s, source: "settings", public: false };
     } catch { /* unreadable - fall back to the server's own settings */ }
   }
   const id = process.env.MICROSOFT_CLIENT_ID;
   const secret = process.env.MICROSOFT_CLIENT_SECRET;
-  return id && secret ? { clientId: id, clientSecret: secret, tenantId: process.env.MICROSOFT_TENANT_ID, source: "server" } : null;
+  if (id && secret) return { clientId: id, clientSecret: secret, tenantId: process.env.MICROSOFT_TENANT_ID, source: "server", public: false };
+  return BUILT_IN_MICROSOFT_CLIENT_ID ? { clientId: BUILT_IN_MICROSOFT_CLIENT_ID, source: "built-in", public: true } : null;
+}
+
+/** The secret, for an organisation's own registration only (Khameleon's built-in one has none). */
+export function secretParams(app: MicrosoftApp): Record<string, string> {
+  return !app.public && app.clientSecret ? { client_secret: app.clientSecret } : {};
+}
+
+/** The Microsoft permissions Khameleon's one sign-in asks for: read, sort and draft email; the calendar. Never "send". */
+export const OUTLOOK_SCOPES = [
+  "openid", "profile", "offline_access",
+  "https://graph.microsoft.com/User.Read",
+  "https://graph.microsoft.com/Mail.ReadWrite",
+  "https://graph.microsoft.com/Calendars.ReadWrite",
+];
+
+/**
+ * The one link a company's IT clicks to approve Khameleon for everyone
+ * ("Send to IT"). Pure.
+ */
+export function adminApprovalUrl(clientId: string, scopes: string[] = OUTLOOK_SCOPES): string {
+  const u = new URL("https://login.microsoftonline.com/organizations/v2.0/adminconsent");
+  u.searchParams.set("client_id", clientId);
+  u.searchParams.set("scope", scopes.filter(s => s.startsWith("https://")).join(" "));
+  u.searchParams.set("redirect_uri", "http://localhost");
+  return u.toString();
+}
+
+/** Did Microsoft say this company needs IT to approve Khameleon first? Pure. */
+export function needsAdminApproval(error: string | undefined, description: string | undefined): boolean {
+  const d = description ?? "";
+  if (/AADSTS65004\b/.test(d)) return false; // the person chose "No" themselves
+  return /AADSTS(90094|90095|65001|900941)\b/.test(d) || (error === "access_denied" && /\badmin/i.test(d));
 }
 
 /** Checks what was typed before saving. Returns a plain-language problem, or null. Pure. */
@@ -67,6 +111,9 @@ export async function clearMicrosoftApp(): Promise<void> {
  * checked; the first sign-in confirms the rest.
  */
 export async function testMicrosoftApp(app: MicrosoftApp, fetchImpl: typeof fetch = fetch): Promise<{ ok: boolean; message: string }> {
+  if (app.public || !app.clientSecret) {
+    return { ok: true, message: "Khameleon's built-in Microsoft sign-in is used - nothing to check." };
+  }
   if (!app.tenantId) {
     return { ok: true, message: "The details look right. Add the Directory (tenant) ID to check the secret too - otherwise the first sign-in will confirm it." };
   }

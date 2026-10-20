@@ -323,16 +323,20 @@ function DraftReplyCard() {
     setStage('review');
   };
 
+  // Outlook: Khameleon never sends (it doesn't ask Microsoft for that) - the reply is kept in Outlook's Drafts.
+  const savesOnly = provider === 'outlook';
+
   const send = async () => {
     if (!draft) return;
     setStage('sending');
-    const scope = provider === 'outlook' ? 'mail.send' : 'gmail.send';
     try {
       await api.send(draft.approvalId, body !== draft.body ? body : undefined);
-      logActivity({ description: `Email sent to ${draft.to}`, category: 'email_sent', scope, outcome: 'success', target: draft.to, detail: draft.subject, canUndo: false });
+      logActivity(savesOnly
+        ? { description: `Reply to ${draft.to} saved in Outlook Drafts`, category: 'email_draft_saved', scope: 'mail.readwrite', outcome: 'success', target: draft.to, detail: draft.subject, canUndo: false }
+        : { description: `Email sent to ${draft.to}`, category: 'email_sent', scope: 'gmail.send', outcome: 'success', target: draft.to, detail: draft.subject, canUndo: false });
       setStage('sent');
     } catch (e) {
-      logActivity({ description: `Email to ${draft.to} wasn't sent`, category: 'email_sent', scope, outcome: 'failure', target: draft.to, detail: errText(e), canUndo: false });
+      logActivity({ description: savesOnly ? `Reply to ${draft.to} wasn't saved` : `Email to ${draft.to} wasn't sent`, category: savesOnly ? 'email_draft_saved' : 'email_sent', scope: savesOnly ? 'mail.readwrite' : 'gmail.send', outcome: 'failure', target: draft.to, detail: errText(e), canUndo: false });
       setError(errText(e));
       setStage('review');
     }
@@ -343,7 +347,7 @@ function DraftReplyCard() {
     setStage('discarded');
   };
 
-  if (stage === 'sent') return <div>Sent to {draft?.to}.</div>;
+  if (stage === 'sent') return <div>{savesOnly ? <>Saved in your Outlook Drafts - open Outlook to check and send it to {draft?.to}.</> : <>Sent to {draft?.to}.</>}</div>;
   if (stage === 'discarded') return <div style={mutedStyle}>Draft discarded - nothing was sent.</div>;
 
   return (
@@ -372,7 +376,9 @@ function DraftReplyCard() {
                 <Btn onClick={() => void rewrite()}>Rewrite</Btn>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <Btn primary onClick={() => setStage('confirm')}>Send…</Btn>
+                {savesOnly
+                  ? <Btn primary onClick={() => void send()}>Save to Outlook Drafts</Btn>
+                  : <Btn primary onClick={() => setStage('confirm')}>Send…</Btn>}
                 <Btn danger onClick={() => void discard()}>Discard</Btn>
               </div>
             </>
@@ -386,7 +392,7 @@ function DraftReplyCard() {
               </div>
             </div>
           )}
-          {stage === 'sending' && <Busy label="Sending…" />}
+          {stage === 'sending' && <Busy label={savesOnly ? 'Saving…' : 'Sending…'} />}
         </>
       )}
       {error && <ErrorLine message={error} />}

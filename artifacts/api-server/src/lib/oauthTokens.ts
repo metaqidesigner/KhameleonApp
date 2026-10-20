@@ -3,7 +3,7 @@
  * Add new provider refresh flows in REFRESHERS as connectors are added.
  */
 
-import { getMicrosoftApp } from "./microsoftApp.js";
+import { getMicrosoftApp, secretParams, OUTLOOK_SCOPES } from "./microsoftApp.js";
 import { db } from "@workspace/db";
 import { oauthTokensTable } from "@workspace/db";
 import { and, eq, isNull } from "drizzle-orm";
@@ -134,15 +134,15 @@ async function refreshMicrosoft(token: TokenRecord): Promise<TokenRecord> {
   if (!token.refreshToken) throw new Error("No refresh token for Microsoft");
   const msApp = await getMicrosoftApp();
   if (!msApp) throw new Error("Microsoft sign-in isn't set up - add the app details in Settings > Microsoft sign-in.");
-  const { clientId, clientSecret } = msApp;
 
+  // Renewed quietly in the background - the person signs in once (no secret for Khameleon's built-in registration).
   const res = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: clientId, client_secret: clientSecret,
+      client_id: msApp.clientId, ...secretParams(msApp),
       refresh_token: token.refreshToken, grant_type: "refresh_token",
-      scope: "https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Calendars.ReadWrite offline_access",
+      scope: OUTLOOK_SCOPES.join(" "),
     }),
   });
   if (!res.ok) throw new Error(`Microsoft refresh failed: ${res.status} ${await res.text()}`);
@@ -163,14 +163,13 @@ async function refreshCopilot(token: TokenRecord): Promise<TokenRecord> {
   if (!token.refreshToken) throw new Error("No refresh token for Copilot");
   const msApp = await getMicrosoftApp();
   if (!msApp) throw new Error("Microsoft sign-in isn't set up - add the app details in Settings > Microsoft sign-in.");
-  const { clientId, clientSecret } = msApp;
   // Same scopes and tenant as the sign-in (lib/copilotChat.ts) - kept literal
   // here to avoid a circular import.
   const res = await fetch("https://login.microsoftonline.com/organizations/oauth2/v2.0/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: clientId, client_secret: clientSecret,
+      client_id: msApp.clientId, ...secretParams(msApp),
       refresh_token: token.refreshToken, grant_type: "refresh_token",
       scope: token.scope ?? "offline_access",
     }),

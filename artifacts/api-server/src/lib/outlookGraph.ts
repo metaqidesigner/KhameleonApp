@@ -3,8 +3,8 @@
  * (design-spec.md §12.1). A thin, typed wrapper — no framework code, just
  * Graph calls authenticated via the stored Microsoft OAuth token
  * (oauthTokens.ts), following the same pattern as spotify.ts's
- * spotifyFetch. Scopes used: Mail.Read (implicit in Mail.ReadWrite),
- * Mail.ReadWrite (fetch/draft), Mail.Send (send only — see sendDraft).
+ * spotifyFetch. Scopes used: Mail.ReadWrite (read, sort, save drafts).
+ * Khameleon never sends email - it doesn't ask for Mail.Send at all.
  */
 
 import { getFreshToken } from "./oauthTokens.js";
@@ -113,16 +113,6 @@ export async function updateDraftBody(draftId: string, content: string): Promise
     body: JSON.stringify({ body: { contentType: "text", content } }),
   });
   await assertOk(res, "update draft body");
-}
-
-/**
- * The one and only Mail.Send call this skill ever makes — fired exclusively
- * from routes/outlookSkills.ts's /send endpoint, on explicit user
- * confirmation. Never called as part of the draft pipeline (§12.1).
- */
-export async function sendDraft(draftId: string): Promise<void> {
-  const res = await graphFetch(`/me/messages/${encodeURIComponent(draftId)}/send`, { method: "POST" });
-  await assertOk(res, "send draft");
 }
 
 /** Best-effort cleanup when a draft is rejected instead of sent. */

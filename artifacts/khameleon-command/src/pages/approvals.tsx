@@ -108,7 +108,9 @@ export default function Approvals() {
     setOutlookSending(true);
     setOutlookSendError(undefined);
     try {
-      const { sentAt } = await sendOutlookDraft(outlookDraft.approvalId, editedContent);
+      // Khameleon never sends Outlook email: confirming keeps the reply in Outlook's Drafts.
+      await sendOutlookDraft(outlookDraft.approvalId, editedContent);
+      const sentAt = new Date().toISOString();
       const detail = `Subject: ${outlookDraft.subject}\n\n${editedContent ?? outlookDraft.body}`;
       // Persist first (design-spec.md §6.5.2 - this must be a durable record,
       // not just local state that vanishes on reload, per the 2026-10-01
@@ -118,13 +120,13 @@ export default function Approvals() {
       let persistedId: string | null = null;
       try {
         const saved = await createActionReceipt({
-          description: `Email sent to ${outlookDraft.to}`,
-          category: 'email_sent',
-          scope: 'mail.send',
+          description: `Reply to ${outlookDraft.to} saved in Outlook Drafts`,
+          category: 'email_draft_saved',
+          scope: 'mail.readwrite',
           outcome: 'success',
           target: outlookDraft.to,
           detail,
-          canUndo: false, // real send, real irreversibility - no undo offered (§6.5.3)
+          canUndo: false,
         });
         persistedId = String(saved.id);
       } catch (err) {
@@ -132,9 +134,9 @@ export default function Approvals() {
       }
       setReceipts(r => [{
         id: persistedId ?? `outlook-${outlookDraft.approvalId}`,
-        description: `Email sent to ${outlookDraft.to}`,
-        category: 'email_sent',
-        scope: 'mail.send',
+        description: `Reply to ${outlookDraft.to} saved in Outlook Drafts`,
+        category: 'email_draft_saved',
+        scope: 'mail.readwrite',
         outcome: 'success' as const,
         timestamp: sentAt,
         target: outlookDraft.to,
@@ -821,12 +823,13 @@ export default function Approvals() {
       {/* ConfirmGate modal — real outlook-draft-email skill */}
       {outlookDraft && (
         <ConfirmGate
-          title="Send Email"
-          category="email_send"
+          title="Save reply to Outlook Drafts"
+          category="email_draft"
           target={outlookDraft.to}
-          scope="mail.send"
-          severity="critical"
-          confirmLabel="Confirm & Send"
+          scope="mail.readwrite"
+          severity="medium"
+          confirmLabel="Save to Outlook Drafts"
+          warning="Khameleon never sends Outlook email - the reply is kept in your Drafts for you to send from Outlook."
           confirming={outlookSending}
           error={outlookSendError}
           payload={`Subject: ${outlookDraft.subject}\n\n${outlookDraft.body}`}
