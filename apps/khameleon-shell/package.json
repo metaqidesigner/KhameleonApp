@@ -12,7 +12,7 @@
     "start": "pnpm build && electron .",
     "package:mac": "pnpm bundle && pnpm build && electron-builder --mac",
     "package:win": "pnpm bundle && pnpm build && electron-builder --win",
-    "bundle": "pnpm --filter @workspace/api-server run build && cd ../../artifacts/khameleon-command && PORT=5199 BASE_PATH=/ pnpm exec vite build"
+    "bundle": "node bundle.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.10",

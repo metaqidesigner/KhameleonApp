@@ -203,10 +203,19 @@ jobs:
       # a Windows code-signing certificate, so Windows SmartScreen will warn.
       # The all-in-one app carries Khameleon's server, its screens and the
       # built-in database's table set-up (apps/khameleon-shell/build.mjs).
-      - name: Build the server and screens into the desktop app
+      - name: Build the server and screens
+        run: pnpm --filter @khameleon/shell run bundle
+
+      - name: Build the desktop app with them inside
+        run: pnpm --filter @khameleon/shell run build
+
+      - name: Check the server and screens are inside
+        shell: pwsh
         run: |
-          pnpm --filter @khameleon/shell run bundle
-          pnpm --filter @khameleon/shell run build
+          foreach ($f in "server/index.mjs", "web/index.html", "migrations") {
+            if (-not (Test-Path "apps/khameleon-shell/dist/$f")) { throw "Missing from the desktop app: $f" }
+          }
+          Write-Host "OK: server, screens and table set-up are inside the desktop app"
 
       - name: Package the Windows installer (unsigned - no code-signing certificate yet)
         run: pnpm --filter @khameleon/shell exec electron-builder --win
