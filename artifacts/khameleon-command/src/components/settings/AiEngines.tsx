@@ -3,6 +3,7 @@ import { KhamiSetup } from '@/components/khami/KhamiSetup';
 import { saveApiKey, clearApiKey, type ApiKeyProvider } from '@/lib/khameleonApi';
 import { useUi, Label, Hint, Msg, Group, type Tone } from './ui';
 import { EscalationSetting } from './EscalationSetting';
+import { AiSpend } from './AiSpend';
 import { AzureOpenAI } from './AzureOpenAI';
 
 /**
@@ -91,6 +92,7 @@ export function AiEngines({ tone, onOpenIntegrations }: { tone: Tone; onOpenInte
         })}
       </Group>
       <EscalationSetting tone={tone} />
+      <AiSpend tone={tone} />
       {msg && <Msg tone={tone} ok={msg.ok}>{msg.text}</Msg>}
     </div>
   );

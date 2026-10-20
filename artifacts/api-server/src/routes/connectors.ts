@@ -49,7 +49,8 @@ export const ALL_CONNECTORS: { id: string; name: string }[] = [
   { id: "whatsapp",     name: "WhatsApp" },
   { id: "newsrss",      name: "News RSS" },
   { id: "granola",      name: "Granola" },
-];
+// Weather and Spotify are hidden for launch (see routes/integrations.ts) - their code stays.
+].filter((c) => c.id !== "weather" && c.id !== "spotify");
 
 /**
  * Real connected/not-connected status per connector id, checked against

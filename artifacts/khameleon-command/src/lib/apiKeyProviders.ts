@@ -31,7 +31,14 @@ export interface ProviderDef {
   credentials: string;
 }
 
-export const PROVIDERS: ProviderDef[] = [
+/**
+ * Hidden for launch (download decisions, 2026-10-20): Open-Meteo's free weather
+ * is non-commercial only, and Spotify limits unapproved apps to 25 users. Their
+ * code stays; take them out of this set to bring them back.
+ */
+export const HIDDEN_FOR_LAUNCH = new Set(['spotify', 'weather']);
+
+export const PROVIDERS: ProviderDef[] = ([
   {
     id: 'google',
     label: 'Google',
@@ -68,4 +75,4 @@ export const PROVIDERS: ProviderDef[] = [
     startPath: '/api/auth/oauth/spotify/start',
     credentials: 'SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET',
   },
-];
+] as ProviderDef[]).filter(p => !HIDDEN_FOR_LAUNCH.has(p.id));

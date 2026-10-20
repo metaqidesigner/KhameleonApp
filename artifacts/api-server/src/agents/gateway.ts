@@ -16,23 +16,16 @@ import { pickSkill, skillInstructions } from "../lib/skillPicker.js";
 import { loadInstalledSkills, buildSkillCatalogPrompt, useSkillResult, USE_SKILL_TOOL, USE_SKILL_TOOL_NAME, type InstalledSkill } from "../lib/installedSkills.js";
 import { getApiKey } from "../lib/apiKeys.js";
 import { trackingFetch } from "../lib/providerQuota.js";
+import { estimateCost, recordSpend, overSpendLimit, spendLimit, limitReachedMessage, PAY_PER_USE } from "../lib/aiSpend.js";
 
-// ── Cost tables (USD per 1k tokens) ──────────────────────────
-const COST_TABLE: Record<string, number> = {
-  "claude-sonnet-4-6": 0.009,
-  "claude-opus-4-8":   0.045,
-  "claude-haiku-4-5":  0.0005,
-  "gpt-4o":            0.0075,
-  "gpt-5.4":           0.010,
-  "gpt-4o-mini":       0.0003,
-  "gemini-2.0-flash":  0.00010,
-  "gemini-1.5-pro":    0.00175,
-};
+// ── Cost (lib/aiSpend.ts has the published prices) ───────────
 const ENERGY_PER_1K = 0.001;
 
+/** When only a total is known: priced as roughly 3 parts question to 1 part answer. */
 export function costForTokens(model: string, tokens: number): number {
-  return (tokens / 1000) * (COST_TABLE[model] ?? 0.002);
+  return estimateCost(model, tokens * 0.75, tokens * 0.25);
 }
+const roughTokens = (text: string) => Math.ceil(text.length / 4);
 function energyForTokens(tokens: number): number {
   return (tokens / 1000) * ENERGY_PER_1K;
 }
@@ -272,7 +265,9 @@ async function askAnthropic(
     model:    agent.model,
     latencyMs,
     tokens,
-    costUsd:  costForTokens(agent.model, tokens),
+    inputTokens,
+    outputTokens,
+    costUsd:  estimateCost(agent.model, inputTokens, outputTokens),
     energyWh: energyForTokens(tokens),
     toolCalls: toolCalls.length ? toolCalls : undefined,
   };
@@ -314,7 +309,10 @@ async function askOpenAI(
 
   const t0 = Date.now();
   let content = "";
-  let tokens  = 0;
+  // Question size, for when the provider doesn't say (streaming): a rough count of the text sent.
+  const promptTokens = roughTokens(msgs.map((m) => m.content).join("\n"));
+  let inputTokens = promptTokens;
+  let outputTokens = 0;
 
   // Step 5: the same safe tools as Khami and the chat (agents/tools/anyAiTools.ts),
   // unless this is a plain internal job (useTools false).
@@ -323,7 +321,9 @@ async function askOpenAI(
   if (tools.length) {
     const r = await runOpenAiToolLoop(client as unknown as ChatClient, agent.model, msgs, tools, onToolEvent);
     content = r.content;
-    tokens = r.tokens || Math.ceil(content.length / 4);
+    const total = r.tokens || promptTokens + roughTokens(content);
+    outputTokens = Math.max(roughTokens(content), total - promptTokens);
+    inputTokens = Math.max(promptTokens, total - outputTokens);
     onToken?.(content); // answered in one piece once the tools are done
   } else if (onToken) {
     const stream = await client.chat.completions.create({
@@ -333,15 +333,17 @@ async function askOpenAI(
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) { content += delta; onToken(delta); }
     }
-    tokens = Math.ceil(content.length / 4);
+    outputTokens = roughTokens(content);
   } else {
     const res = await client.chat.completions.create({
       model: agent.model, messages: msgs, max_completion_tokens: 8192,
     });
     content = res.choices[0]?.message?.content ?? "";
-    tokens  = res.usage?.total_tokens ?? Math.ceil(content.length / 4);
+    inputTokens = res.usage?.prompt_tokens ?? promptTokens;
+    outputTokens = res.usage?.completion_tokens ?? roughTokens(content);
   }
 
+  const tokens = inputTokens + outputTokens;
   const latencyMs = Date.now() - t0;
   return {
     agentId:  agent.id,
@@ -349,7 +351,9 @@ async function askOpenAI(
     model:    agent.model,
     latencyMs,
     tokens,
-    costUsd:  costForTokens(agent.model, tokens),
+    inputTokens,
+    outputTokens,
+    costUsd:  estimateCost(agent.model, inputTokens, outputTokens),
     energyWh: energyForTokens(tokens),
   };
 }
@@ -428,10 +432,15 @@ export async function askAgent(
       // The brain's own name stays on the Licences page, not in the product.
       return { agentId: agent.id, content: r.content, model: "Khami", latencyMs: r.latencyMs, tokens: r.tokens, costUsd: 0, energyWh: 0 };
     }
-    if (agent.provider === "anthropic") {
-      return await askAnthropic(agent, messages, onToken, onToolEvent);
+    // Pay-per-use AIs: respect the monthly limit, and add each answer to the estimate (lib/aiSpend.ts).
+    if (PAY_PER_USE.has(agent.provider) && (await overSpendLimit())) {
+      throw new Error(limitReachedMessage((await spendLimit())!));
     }
-    return await askOpenAI(agent, messages, onToken, onToolEvent);
+    const r = agent.provider === "anthropic"
+      ? await askAnthropic(agent, messages, onToken, onToolEvent)
+      : await askOpenAI(agent, messages, onToken, onToolEvent);
+    void recordSpend(agent.provider, r.model, r.inputTokens ?? r.tokens * 0.75, r.outputTokens ?? r.tokens * 0.25);
+    return r;
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -443,6 +452,8 @@ export async function isAgentAvailable(agent: AgentConfig): Promise<boolean> {
   if (!agent.enabled) return false;
   if (agent.provider === "khami") return (await khamiStatus()).available;
   if (agent.provider === "copilot") return !!(await getToken("copilot").catch(() => null));
+  // Past this month's spend limit, paid AIs sit out until next month (Khami answers instead).
+  if (PAY_PER_USE.has(agent.provider) && (await overSpendLimit())) return false;
   if (agent.provider === "azure") return !!(await getAzureConfig());
   return !!(await resolveKey(agent));
 }

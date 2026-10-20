@@ -59,6 +59,9 @@ export interface AgentResponse {
   model: string;
   latencyMs: number;
   tokens: number;
+  /** Split of `tokens` for pay-per-use pricing (lib/aiSpend.ts) - from the provider when it says, else estimated. */
+  inputTokens?: number;
+  outputTokens?: number;
   costUsd: number;
   energyWh: number;
   error?: string;

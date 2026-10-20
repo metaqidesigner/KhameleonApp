@@ -4,6 +4,7 @@ import { KhamiSetup } from '@/components/khami/KhamiSetup';
 import { AboutLicences } from '@/components/about/AboutLicences';
 import { MicrosoftSignIn } from '@/components/settings/MicrosoftSignIn';
 import { EscalationSetting } from '@/components/settings/EscalationSetting';
+import { AiSpend } from '@/components/settings/AiSpend';
 import { AlertSettings } from '@/components/settings/AlertSettings';
 import { DetectionSettings } from '@/components/settings/DetectionSettings';
 import { DataSettings } from '@/components/settings/DataSettings';
@@ -14,7 +15,7 @@ import { useKhameleonStore } from '@/store/khameleonStore';
 import { MIC_KEY } from '@/components/orb/VoiceController';
 import { ConnectIntegrationGate } from '@/components/ConnectIntegrationGate';
 import { ApiKeyRow } from '@/components/ApiKeyRow';
-import { API_KEY_PROVIDER_DEFS, PROVIDERS, type ProviderDef } from '@/lib/apiKeyProviders';
+import { API_KEY_PROVIDER_DEFS, PROVIDERS, HIDDEN_FOR_LAUNCH, type ProviderDef } from '@/lib/apiKeyProviders';
 import {
   getHealth, getSchedulerStatus, saveSchedulerConfig, type SchedulerStatus,
   getApiKeyStatus, type ApiKeyStatus,
@@ -239,7 +240,7 @@ function ConnectorsSection() {
         })}
       </div>
 
-      <WeatherLocationRow />
+      {!HIDDEN_FOR_LAUNCH.has('weather') && <WeatherLocationRow />}
 
       <div style={{ marginTop: 24, padding: '12px 14px', background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.2)' }}>
         <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 10, fontWeight: 700, color: '#c9a84c', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
@@ -247,8 +248,7 @@ function ConnectorsSection() {
         </div>
         <div style={{ fontFamily: 'var(--j-font-ui)', fontSize: 11, color: 'var(--j-text-muted)', lineHeight: 1.7 }}>
           <strong style={{ color: 'var(--j-text)' }}>Google:</strong> Create an OAuth Client ID at <span style={{ color: 'var(--j-cyan)' }}>console.cloud.google.com</span> → APIs &amp; Services → Credentials, then add GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET to the server's settings.<br />
-          <strong style={{ color: 'var(--j-text)' }}>Microsoft:</strong> Register an app at <span style={{ color: 'var(--j-cyan)' }}>portal.azure.com</span> → Microsoft Entra ID → App registrations, then enter its details in Settings → MICROSOFT SIGN-IN.<br />
-          <strong style={{ color: 'var(--j-text)' }}>Spotify:</strong> Create an app at <span style={{ color: 'var(--j-cyan)' }}>developer.spotify.com/dashboard</span>, then add SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET to the server's settings. Weather needs no credentials — just a location, below.
+          <strong style={{ color: 'var(--j-text)' }}>Microsoft:</strong> built into Khameleon - just choose Connect. Organisations can use their own registration in Settings → MICROSOFT SIGN-IN.
         </div>
       </div>
 
@@ -551,6 +551,10 @@ function EngineSection() {
       {/* Same setting as the Overlay's Settings > AI (components/settings/EscalationSetting). */}
       <Row>
         <EscalationSetting tone="classic" />
+      </Row>
+      {/* Same section as the Overlay's Settings > AI (components/settings/AiSpend) - shown only when a paid AI is set up. */}
+      <Row>
+        <AiSpend tone="classic" />
       </Row>
       <div style={{
         marginBottom: 16, padding: '10px 12px', fontFamily: 'var(--j-font-ui)', fontSize: 11,

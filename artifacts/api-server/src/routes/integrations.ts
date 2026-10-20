@@ -29,7 +29,11 @@ router.get("/", async (req, res) => {
       tagsByEntity.set(t.entityId, list);
     }
 
-    const result = rows.map((r) => ({
+    // Hidden for launch (download decisions, 2026-10-20): Open-Meteo's free
+    // weather is non-commercial only, and Spotify limits unapproved apps to 25
+    // users. Their code stays; remove them from this list to bring them back.
+    const HIDDEN_FOR_LAUNCH = new Set(["weather", "spotify"]);
+    const result = rows.filter((r) => !HIDDEN_FOR_LAUNCH.has(r.id)).map((r) => ({
       ...r,
       connected: statusMap[r.id] ?? false,
       workDomainIds: tagsByEntity.get(r.id) ?? [],
