@@ -29,8 +29,13 @@ export interface MicrosoftApp {
   public: boolean;
 }
 
-/** Khameleon's own Microsoft registration (Application ID - public, not a secret). */
-export const BUILT_IN_MICROSOFT_CLIENT_ID = process.env.KHAMELEON_MICROSOFT_CLIENT_ID ?? "";
+/**
+ * Khameleon's own Microsoft registration (Application ID - public, not a
+ * secret). Registered 2026-10-20 in Newton's personal Azure directory for
+ * building and testing; to be re-registered under the business's directory
+ * for publisher verification before customers (then swap this ID).
+ */
+export const BUILT_IN_MICROSOFT_CLIENT_ID = process.env.KHAMELEON_MICROSOFT_CLIENT_ID ?? "9ad02b1c-db4d-460e-97af-77568b850526";
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const looksLikeMicrosoftId = (v: string) => GUID.test(v.trim());
