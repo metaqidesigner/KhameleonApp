@@ -13,6 +13,9 @@ import type { OverlayPalette } from "./palettes";
 import { SkillsPanel } from "./SkillsPanel";
 import { pairDesktopLink } from "@/lib/desktopBridge";
 import { SettingsPanel } from "./SettingsPanel";
+import { OverlayTips, TIPS_DONE_KEY } from "./OverlayTips";
+import { KhamiProgress } from "./KhamiProgress";
+import { FirstRunSetup } from "@/components/setup/FirstRunSetup";
 import { EmailAssistant } from "./EmailAssistant";
 import { SuggestionSlot } from "@/components/notices/SuggestionSlot";
 import { LoginRequests } from "@/components/notices/LoginRequests";
@@ -22,10 +25,8 @@ import { WorkspacePanel } from "./workspace/WorkspacePanel";
 import { KhamiSetup } from "@/components/khami/KhamiSetup";
 import { AboutLicences } from "@/components/about/AboutLicences";
 import { GetIntegrations } from "@/components/integrations/GetIntegrations";
-import { getKhamiSetup } from "@/lib/khamiApi";
 import { KHAMI_HOME } from '@/lib/where';
 
-const KHAMI_LATER_KEY = "khami-setup-later";
 
 /**
  * The Overlay layout (docs/build-review.md, Builds 0-2): rendered inside the
@@ -121,27 +122,6 @@ function KhamiPanel({ palette, onClose }: { palette: OverlayPalette; onClose: ()
   );
 }
 
-/** One-time nudge when Khami isn't set up yet; "Later" hides it on this computer. */
-function KhamiPrompt({ palette, onSetUp, onLater, bottom }: { palette: OverlayPalette; onSetUp: () => void; onLater: () => void; bottom: number }) {
-  return (
-    <div data-overlay-hit role="status"
-      style={{
-        position: "fixed", right: 18, bottom, width: 270, zIndex: 420, padding: "12px 14px", borderRadius: 14,
-        background: palette.chatBg, border: `1px solid ${palette.chatBorder}`, boxShadow: palette.glassShadow,
-        backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", fontFamily: "var(--j-font-ui)",
-      }}>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: palette.text }}>Set up Khami?</div>
-      <div style={{ fontSize: 11.5, color: palette.textMuted, marginTop: 4, lineHeight: 1.45 }}>
-        Khami is Khameleon's own AI. It runs privately {KHAMI_HOME} and works offline. Takes a one-time download.
-      </div>
-      <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-        <button type="button" onClick={onSetUp} style={{ padding: "5px 11px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "inherit", background: palette.accentSoft, border: `1px solid ${palette.accent}`, color: palette.text }}>Set up</button>
-        <button type="button" onClick={onLater} style={{ padding: "5px 11px", borderRadius: 8, fontSize: 12, cursor: "pointer", fontFamily: "inherit", background: "transparent", border: `1px solid ${palette.glassBorder}`, color: palette.textMuted }}>Later</button>
-      </div>
-    </div>
-  );
-}
-
 export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   useClickThrough();
   useSyncAcrossWindows();
@@ -152,7 +132,7 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   const [khamiOpen, setKhamiOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
-  const [khamiPrompt, setKhamiPrompt] = useState(false);
+  const [tips, setTips] = useState(false);
   const [captureDraft, setCaptureDraft] = useState<CaptureDraft | null>(null);
   const capture = useCaptureTask(useCallback((d: CaptureDraft) => { setCaptureDraft(d); setSkillsOpen(true); }, []));
   // Build 6: a detection offer's "Capture it" opens Capture here.
@@ -165,14 +145,12 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
   // Build 7: let the chat's AI work in this computer's apps (pairs the desktop link).
   useEffect(() => { if (!locked) void pairDesktopLink().catch(() => {}); }, [locked]);
 
-  // Offer Khami setup once if it isn't set up and the user hasn't said "Later".
-  useEffect(() => {
-    if (locked) return;
-    let later = false;
-    try { later = localStorage.getItem(KHAMI_LATER_KEY) === "1"; } catch { /* storage blocked */ }
-    if (later) return;
-    getKhamiSetup().then(s => { if (!s.active && s.download.state !== "downloading") setKhamiPrompt(true); }).catch(() => {});
-  }, [locked]);
+  // Three quick tips after first-run setup, once per computer (also if setup finished in the Classic window).
+  const startTips = useCallback(() => {
+    let done = false;
+    try { done = localStorage.getItem(TIPS_DONE_KEY) === "1"; } catch { /* storage blocked */ }
+    if (!done) setTips(true);
+  }, []);
 
   // index.css paints html/body/#root with the dashboard background; the
   // overlay has to be genuinely transparent so the desktop shows through.
@@ -238,15 +216,13 @@ export function OverlayLayout({ locked = false }: { locked?: boolean }) {
       {integrationsOpen && !locked && <IntegrationsPanel palette={palette} onClose={() => setIntegrationsOpen(false)} />}
       {aboutOpen && <AboutPanel palette={palette} onClose={() => setAboutOpen(false)} />}
       {khamiOpen && !locked && <KhamiPanel palette={palette} onClose={() => setKhamiOpen(false)} />}
-      {khamiPrompt && !khamiOpen && !locked && (
-        <KhamiPrompt palette={palette} bottom={76 + bottomBar}
-          onSetUp={() => { setKhamiPrompt(false); setLookOpen(false); setWorkspaceOpen(false); setKhamiOpen(true); }}
-          onLater={() => { setKhamiPrompt(false); try { localStorage.setItem(KHAMI_LATER_KEY, "1"); } catch { /* storage blocked */ } }} />
-      )}
+      {!locked && <FirstRunSetup tone="overlay" onFinished={startTips} />}
+      {!locked && !tips && <KhamiProgress palette={palette} bottom={76 + bottomBar} />}
+      {tips && !locked && <OverlayTips palette={palette} bottomOffset={bottomBar} onDone={() => setTips(false)} />}
       {lookOpen && <SettingsPanel palette={palette} onClose={() => setLookOpen(false)} onOpenIntegrations={() => { setLookOpen(false); setIntegrationsOpen(true); }} />}
       <KhameleonHead palette={palette} locked={locked} bottom={18 + bottomBar} onOpenLook={locked ? undefined : () => { setWorkspaceOpen(false); setKhamiOpen(false); setLookOpen(true); }}
         onOpenWorkspace={locked ? undefined : () => { setLookOpen(false); setKhamiOpen(false); setWorkspaceOpen(true); }}
-        onOpenKhami={locked ? undefined : () => { setLookOpen(false); setWorkspaceOpen(false); setKhamiPrompt(false); setKhamiOpen(true); }}
+        onOpenKhami={locked ? undefined : () => { setLookOpen(false); setWorkspaceOpen(false); setKhamiOpen(true); }}
         onOpenAbout={() => { setLookOpen(false); setWorkspaceOpen(false); setKhamiOpen(false); setIntegrationsOpen(false); setAboutOpen(true); }}
         onOpenIntegrations={locked ? undefined : () => { setLookOpen(false); setWorkspaceOpen(false); setKhamiOpen(false); setAboutOpen(false); setIntegrationsOpen(true); }} />
     </>

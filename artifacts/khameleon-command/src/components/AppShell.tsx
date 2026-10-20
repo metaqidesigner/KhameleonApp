@@ -11,7 +11,7 @@ import { pairDesktopLink } from '@/lib/desktopBridge';
 import { LeftSidebar } from './LeftSidebar';
 import { KhameleonOrbPortal } from './orb/KhameleonOrbPortal';
 import { VoiceController } from './orb/VoiceController';
-import { OnboardingWizard } from './OnboardingWizard';
+import { FirstRunSetup } from './setup/FirstRunSetup';
 import { NeedsInputWatcher } from './NeedsInputWatcher';
 import { useKhameleonStore } from '@/store/khameleonStore';
 
@@ -107,7 +107,7 @@ export function AppShell() {
       <NeedsInputWatcher />
 
       <VoiceController />
-      <OnboardingWizard />
+      <FirstRunSetup tone="classic" />
     </>
   );
 }

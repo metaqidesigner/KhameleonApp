@@ -156,3 +156,14 @@ export interface KhameleonDataBridge {
 export function dataBridge(): KhameleonDataBridge | undefined {
   return (window as unknown as { khameleon?: { data?: KhameleonDataBridge } }).khameleon?.data;
 }
+
+/** Mac permissions for the first-run setup (desktop app only). */
+export interface KhameleonPermissionsBridge {
+  status(): Promise<{ platform: string; accessibility: boolean }>;
+  allowAccessibility(): Promise<boolean>;
+  openAccessibility(): Promise<void>;
+}
+
+export function permissionsBridge(): KhameleonPermissionsBridge | undefined {
+  return (window as unknown as { khameleon?: { permissions?: KhameleonPermissionsBridge } }).khameleon?.permissions;
+}

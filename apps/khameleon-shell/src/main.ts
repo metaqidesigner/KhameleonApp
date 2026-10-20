@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, screen, shell, type WebContents } from "electron";
+import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, screen, shell, systemPreferences, type WebContents } from "electron";
 import * as path from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
@@ -232,9 +232,8 @@ function failureHtml(url: string, reason: string): string {
 app.whenReady().then(async () => {
   if (!firstCopy) return;
   const externalBackend = new ExternalWindowBackend();
-  // Triggers the real macOS Accessibility permission dialog on first run if
-  // needed; a no-op on Windows (ExternalWindowBackend's own doc comment).
-  externalBackend.requestAccessibility();
+  // macOS Accessibility is asked for by the first-run setup (with an
+  // explanation), not the moment the app opens - see khameleon:permissions.
 
   const widgetBackend = new ElectronWidgetBackend();
   // "Simulate a user" (Phase 2): one browser backend (CDP, for Khameleon's
@@ -408,6 +407,21 @@ app.whenReady().then(async () => {
       fitOverlayToScreen();
     }
   };
+
+  // Mac permissions, asked for by the first-run setup and by features when first needed.
+  ipcMain.handle("khameleon:permissions:status", () => ({
+    platform: process.platform,
+    accessibility: process.platform !== "darwin" || systemPreferences.isTrustedAccessibilityClient(false),
+  }));
+  ipcMain.handle("khameleon:permissions:allow-accessibility", () => {
+    if (process.platform !== "darwin") return true;
+    // Shows macOS's own "Open System Settings" prompt and puts Khameleon in the list.
+    if (systemPreferences.isTrustedAccessibilityClient(true)) return true;
+    return false;
+  });
+  ipcMain.handle("khameleon:permissions:open-accessibility", () => {
+    if (process.platform === "darwin") void shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility");
+  });
 
   // A second copy was opened: show this one instead.
   app.on("second-instance", () => openClassicWindow());

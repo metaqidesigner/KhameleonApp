@@ -60,6 +60,12 @@ contextBridge.exposeInMainWorld("khameleon", {
       return () => { ipcRenderer.removeListener("khameleon:detection:update", handler); };
     },
   },
+  // Mac permissions (first-run setup).
+  permissions: {
+    status: () => ipcRenderer.invoke("khameleon:permissions:status"),
+    allowAccessibility: () => ipcRenderer.invoke("khameleon:permissions:allow-accessibility"),
+    openAccessibility: () => ipcRenderer.invoke("khameleon:permissions:open-accessibility"),
+  },
   // The all-in-one app's own data (src/localServer.ts): the recovery key and removing everything.
   data: {
     builtIn: () => ipcRenderer.invoke("khameleon:data:built-in"),

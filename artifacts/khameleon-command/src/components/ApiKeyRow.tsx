@@ -34,7 +34,7 @@ function QuotaLine({ quota }: { quota: QuotaSnapshot }) {
 
 /**
  * A single provider's API key entry row: status, input, save/clear.
- * Split out of pages/settings.tsx (lazy-loaded) so OnboardingWizard -
+ * Split out of pages/settings.tsx (lazy-loaded) so the first-run setup -
  * mounted eagerly at the app root - can reuse it without pulling the
  * whole Settings page bundle into the main chunk.
  */

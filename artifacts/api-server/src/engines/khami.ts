@@ -103,6 +103,7 @@ export function startBrainDownload(brain: BrainId): KhamiDownload {
       await saveBrain(brain);
       unloadBrain(); // pick up the new brain on the next answer
       download = { state: "done", brain, percent: 100 };
+      warmUpKhami(); // ready for the first question
     } catch (err) {
       download = { state: "error", brain, error: err instanceof Error ? err.message : String(err) };
     }
@@ -161,6 +162,19 @@ async function load(): Promise<Loaded> {
   const model = await llama.loadModel({ modelPath: file });
   const context = await model.createContext({ contextSize: 4096 });
   return { brain, model, context, LlamaChatSession };
+}
+
+/**
+ * Loads Khami's brain in the background (at start-up and after a download), so
+ * the first question doesn't wait for it - loading takes tens of seconds, an
+ * answer a couple. Does nothing if Khami isn't set up.
+ */
+export function warmUpKhami(): void {
+  void activeBrain().then(brain => {
+    if (!brain || loaded) return;
+    loaded = load();
+    loaded.catch(() => { loaded = null; });
+  }).catch(() => undefined);
 }
 
 let queue: Promise<unknown> = Promise.resolve();

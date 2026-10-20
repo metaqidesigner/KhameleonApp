@@ -9,6 +9,7 @@ import { startMeetingPrep } from "./lib/meetingPrepService";
 import { startUrgentAlerts } from "./lib/urgentAlerts";
 import { ensureSettingsTable } from "./ensure-settings-table";
 import { seedSkillSetsData } from "./seed-skill-sets-data";
+import { warmUpKhami } from "./engines/khami";
 import path from "node:path";
 import { prepareBuiltInDatabase, closeBuiltInDatabase } from "@workspace/db";
 
@@ -61,6 +62,8 @@ async function bootstrap() {
         return;
       }
       logger.info({ port, host: listenHost() }, "Server listening");
+      // The all-in-one desktop app: have Khami ready for the first question.
+      if (process.env.KHAMELEON_HOME) warmUpKhami();
       resolve();
     });
   });

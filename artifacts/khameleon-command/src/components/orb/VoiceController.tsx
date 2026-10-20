@@ -166,13 +166,10 @@ export function VoiceController() {
     return undefined;
   }, [orbStatus, wakeWordActive, wakeWordBlocked, startWakeListener]);
 
-  // Boot sequence on mount. Previously: an unset MIC_KEY (i.e. this browser
-  // has never been asked) silently fell into the same "blocked" branch as
-  // an explicit denial, and nothing anywhere ever called setShowModal(true)
-  // - MicPermissionModal was fully built (real onGranted/onSkipped wiring)
-  // but permanently unreachable, so voice/wake-word was inert by default
-  // for every user with no way to discover or enable it. Now a never-asked
-  // browser actually sees the modal; an explicit prior denial stays quiet.
+  // Boot sequence on mount. Voice is something people switch on in
+  // Settings → Voice (which opens the microphone prompt); it never pops up
+  // on first run (download decisions, step 2, 2026-10-20 - the first-run
+  // setup stays short, and on-device voice replaces browser speech later).
   useEffect(() => {
     if (!inputAvailable) return;
 
@@ -183,7 +180,7 @@ export function VoiceController() {
       setWakeWordBlocked(true);
       setWakeStatus('blocked');
     } else {
-      setShowModal(true);
+      setWakeStatus('blocked'); // not switched on yet
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
