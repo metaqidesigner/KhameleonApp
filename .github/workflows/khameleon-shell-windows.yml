@@ -228,10 +228,15 @@ jobs:
         run: |
           $exe = Get-ChildItem -Path "apps/khameleon-shell/release" -Recurse -Filter "Khameleon.exe" | Select-Object -First 1
           if (-not $exe) { throw "Khameleon.exe not found in release output" }
-          $proc = Start-Process -FilePath $exe.FullName -PassThru
+          $proc = Start-Process -FilePath $exe.FullName -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP\k-out.txt" -RedirectStandardError "$env:RUNNER_TEMP\k-err.txt"
           Start-Sleep -Seconds 6
           $alive = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
-          if (-not $alive) { throw "Khameleon.exe exited/crashed within 6 seconds of launch" }
+          if (-not $alive) {
+            Write-Host "--- app output"; Get-Content "$env:RUNNER_TEMP\k-out.txt", "$env:RUNNER_TEMP\k-err.txt" -ErrorAction SilentlyContinue
+            Write-Host "--- Khameleon folder"; Get-ChildItem (Join-Path $env:APPDATA "Khameleon") -ErrorAction SilentlyContinue
+            Write-Host "--- server log"; Get-Content (Join-Path $env:APPDATA "Khameleon\logs\server.log") -Tail 60 -ErrorAction SilentlyContinue
+            throw "Khameleon.exe exited/crashed within 6 seconds of launch (exit $($proc.ExitCode))"
+          }
           Write-Host "OK: Khameleon.exe is running, PID $($proc.Id)"
           # The all-in-one app starts its own server (built-in database) on this computer.
           $ok = $false
