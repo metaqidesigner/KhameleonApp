@@ -34,6 +34,7 @@ import { khameleonHome, needsRecoveryKey, recoveryKey, removeAllData, restartLoc
 // another server instead: development (Vite) or a shared company server.
 const sharedServerUrl = process.env.KHAMELEON_APP_URL;
 let usingBuiltInServer = false;
+let startingUp = true;
 
 // Only one copy of Khameleon at a time - two would share one database.
 const firstCopy = app.requestSingleInstanceLock();
@@ -616,6 +617,9 @@ app.whenReady().then(async () => {
     if (typeof filePath !== "string" || !filePath.trim()) throw new Error("A non-empty file path is required.");
     return localDocumentAgent.extractReceiptDetails(filePath);
   });
+
+  // Start-up is done and Khameleon's windows exist (see window-all-closed).
+  startingUp = false;
 });
 
 let removeDataOnQuit = false;
@@ -640,5 +644,7 @@ app.on("will-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  // Not while starting: the "Starting Khameleon…" window closes just before
+  // Khameleon's own windows open, which Windows would otherwise take as "quit".
+  if (process.platform !== "darwin" && !startingUp) app.quit();
 });
