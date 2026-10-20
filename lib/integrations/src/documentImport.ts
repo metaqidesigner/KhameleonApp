@@ -18,7 +18,8 @@ const HEIC_EXTENSIONS = new Set([".heic", ".heif"]);
 // the repo, matching node-llama-cpp's own ~/.node-llama-cpp/models
 // convention, so it downloads once and never pollutes wherever the process
 // happens to be running from.
-const OCR_CACHE_PATH = path.join(homedir(), ".khameleon", "ocr-cache");
+// KHAMELEON_HOME: the all-in-one app keeps everything in its own folder.
+const ocrCachePath = () => path.join(process.env.KHAMELEON_HOME ?? path.join(homedir(), ".khameleon"), "ocr-cache");
 
 /**
  * How a document's text was actually obtained - surfaced to callers (and
@@ -81,8 +82,8 @@ async function ocrImage(filePath: string): Promise<string> {
   // missing parent directories itself, and silently swallows the resulting
   // ENOENT (OCR still works, it just never caches, re-downloading the
   // trained-data file every single call - caught this for real).
-  await mkdir(OCR_CACHE_PATH, { recursive: true });
-  const worker = await createWorker("eng", undefined, { cachePath: OCR_CACHE_PATH });
+  await mkdir(ocrCachePath(), { recursive: true });
+  const worker = await createWorker("eng", undefined, { cachePath: ocrCachePath() });
   try {
     const { data } = await worker.recognize(filePath);
     return data.text;

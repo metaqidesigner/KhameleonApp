@@ -6,6 +6,8 @@ import { MicrosoftSignIn } from '@/components/settings/MicrosoftSignIn';
 import { EscalationSetting } from '@/components/settings/EscalationSetting';
 import { AlertSettings } from '@/components/settings/AlertSettings';
 import { DetectionSettings } from '@/components/settings/DetectionSettings';
+import { DataSettings } from '@/components/settings/DataSettings';
+import { dataBridge } from '@/lib/desktopBridge';
 import { Settings as SettingsIcon, Plug, CheckCircle, XCircle, Loader, Clock, KeyRound, MapPin, Music, Play, Pause, SkipForward, SkipBack, Mic } from 'lucide-react';
 import JPanel from '@/components/JPanel';
 import { useKhameleonStore } from '@/store/khameleonStore';
@@ -23,8 +25,8 @@ import {
 import { getQuotaSnapshots, type QuotaSnapshots } from '@/lib/quotaApi';
 import { getTtsStatus, getElevenLabsVoices, previewVoice, type ElevenLabsVoice } from '@/lib/voiceApi';
 
-type Section = 'GENERAL' | 'ALERTS' | 'DETECTION' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MICROSOFT SIGN-IN' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED' | 'ABOUT';
-const SECTIONS: Section[] = ['GENERAL', 'ALERTS', 'DETECTION', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MICROSOFT SIGN-IN', 'MEMORY', 'TELEMETRY', 'ADVANCED', 'ABOUT'];
+type Section = 'GENERAL' | 'ALERTS' | 'DETECTION' | 'YOUR DATA' | 'ENGINE' | 'API KEYS' | 'APPEARANCE' | 'VOICE' | 'CONNECTORS' | 'MICROSOFT SIGN-IN' | 'MEMORY' | 'TELEMETRY' | 'ADVANCED' | 'ABOUT';
+const SECTIONS: Section[] = ['GENERAL', 'ALERTS', 'DETECTION', 'YOUR DATA', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MICROSOFT SIGN-IN', 'MEMORY', 'TELEMETRY', 'ADVANCED', 'ABOUT'];
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -973,6 +975,7 @@ export default function Settings() {
           {active === 'GENERAL'    && <GeneralSection />}
           {active === 'ALERTS'     && <AlertSettings tone="classic" />}
           {active === 'DETECTION'  && <DetectionSettings tone="classic" />}
+          {active === 'YOUR DATA'  && (dataBridge() ? <DataSettings tone="classic" /> : <div style={{ fontSize: 12, color: 'var(--j-text-muted)' }}>Your data is on this Khameleon server. The recovery key and removing data are in the Khameleon desktop app.</div>)}
           {active === 'ENGINE'     && <EngineSection />}
           {active === 'API KEYS'   && <ApiKeysSection />}
           {active === 'APPEARANCE' && <AppearanceSection />}
@@ -981,7 +984,7 @@ export default function Settings() {
           {/* Same section as the Overlay's Settings > Microsoft sign-in (components/settings). */}
           {active === 'MICROSOFT SIGN-IN' && <MicrosoftSignIn tone="classic" />}
           {active === 'ABOUT'      && <AboutLicences tone="classic" />}
-          {!['GENERAL', 'ALERTS', 'DETECTION', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MICROSOFT SIGN-IN', 'ABOUT'].includes(active) && <GenericSection section={active} />}
+          {!['GENERAL', 'ALERTS', 'DETECTION', 'YOUR DATA', 'ENGINE', 'API KEYS', 'APPEARANCE', 'VOICE', 'CONNECTORS', 'MICROSOFT SIGN-IN', 'ABOUT'].includes(active) && <GenericSection section={active} />}
         </div>
       </JPanel>
     </div>

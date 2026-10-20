@@ -31,11 +31,13 @@ pnpm install
 cd artifacts/api-server && PORT=4001 pnpm run dev
 # Screens
 cd artifacts/khameleon-command && PORT=5173 BASE_PATH=/ VITE_API_URL=http://localhost:4001/api pnpm run dev
-# Desktop app
+# Desktop app, using the development server above
 cd apps/khameleon-shell && pnpm build && env -u ELECTRON_RUN_AS_NODE KHAMELEON_APP_URL=http://localhost:5173 npx electron .
 ```
 
-**Keep `KHAMELEON_ENCRYPTION_KEY` safe.** Saved keys and logins are locked with it; if it changes or is lost they can't be read and must be entered again. When restarting the server, start the new build on a spare port first and only stop the old one once the new one answers `/api/healthz`.
+**The all-in-one app** (what customers download): without `KHAMELEON_APP_URL`, the desktop app starts its **own** server inside itself (`apps/khameleon-shell/src/localServer.ts`) with a **built-in database** (PGlite - PostgreSQL running inside the app, no separate program, no network connection), keeping everything in Khameleon's own folder (`~/Library/Application Support/Khameleon` on a Mac, `%APPDATA%\Khameleon` on Windows). The encryption key is made on first run and locked by the computer's keychain; Settings → Security → Your data shows the recovery key. Try it in development with `cd apps/khameleon-shell && pnpm bundle && pnpm build && env -u ELECTRON_RUN_AS_NODE npx electron .`. New database tables: change `lib/db/src/schema`, then `pnpm --filter @workspace/db generate` (shared servers keep using `push`).
+
+**Keep `KHAMELEON_ENCRYPTION_KEY` safe** (shared servers). Saved keys and logins are locked with it; if it changes or is lost they can't be read and must be entered again. When restarting the server, start the new build on a spare port first and only stop the old one once the new one answers `/api/healthz`.
 
 ## Checks
 
@@ -52,7 +54,7 @@ pnpm run licenses:check                        # fails if a package's licence is
 
 ```sh
 pnpm run licenses                              # refresh THIRD_PARTY_LICENSES.md first
-cd apps/khameleon-shell && pnpm package:mac   # -> release/Khameleon-<version>-arm64.dmg
+cd apps/khameleon-shell && pnpm package:mac   # builds the server + screens into it -> release/Khameleon-<version>-arm64.dmg
 cd apps/khameleon-shell && pnpm package:win   # Windows (build on Windows or in CI)
 ```
 

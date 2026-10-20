@@ -9,6 +9,8 @@ import { startMeetingPrep } from "./lib/meetingPrepService";
 import { startUrgentAlerts } from "./lib/urgentAlerts";
 import { ensureSettingsTable } from "./ensure-settings-table";
 import { seedSkillSetsData } from "./seed-skill-sets-data";
+import path from "node:path";
+import { prepareBuiltInDatabase, closeBuiltInDatabase } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 
@@ -27,6 +29,10 @@ if (Number.isNaN(port) || port <= 0) {
 // Bootstrap: run all initialisation before accepting traffic.
 // Failure here aborts startup so stale data is never served.
 async function bootstrap() {
+  // 0. The all-in-one desktop app's built-in database: create/update its
+  //    tables (no-op on shared servers, which use drizzle-kit push).
+  await prepareBuiltInDatabase(process.env.KHAMELEON_MIGRATIONS_DIR ?? path.resolve(import.meta.dirname, "../../../lib/db/migrations"));
+
   // 1. Idempotent data migrations
   await migrateLegacyTaskValues();
 
@@ -59,6 +65,14 @@ async function bootstrap() {
     });
   });
 }
+
+// Close the built-in database cleanly when the server is stopped: a signal on
+// Mac/Linux, or a "shutdown" message from the desktop app (Windows has no
+// signals; the all-in-one app runs this server as an Electron utility process).
+const shutDown = () => { void closeBuiltInDatabase().finally(() => process.exit(0)); };
+for (const signal of ["SIGTERM", "SIGINT"] as const) process.on(signal, shutDown);
+const parentPort = (process as unknown as { parentPort?: { on(event: "message", cb: (e: { data: unknown }) => void): void } }).parentPort;
+parentPort?.on("message", (e) => { if ((e.data as { type?: string } | null)?.type === "shutdown") shutDown(); });
 
 bootstrap().catch((err) => {
   logger.error({ err }, "Fatal startup error — exiting");

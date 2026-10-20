@@ -142,3 +142,17 @@ export async function pairDesktopLink(): Promise<boolean> {
   const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/desktop/pair`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
   return res.ok;
 }
+
+/** The all-in-one app's own data (desktop app src/localServer.ts). Missing outside the desktop app or with a shared server. */
+export interface KhameleonDataBridge {
+  builtIn(): Promise<boolean>;
+  folder(): Promise<string | null>;
+  recoveryKey(): Promise<string | null>;
+  saveRecoveryKey(): Promise<boolean>;
+  useRecoveryKey(text: string): Promise<boolean>;
+  removeAll(): Promise<boolean>;
+}
+
+export function dataBridge(): KhameleonDataBridge | undefined {
+  return (window as unknown as { khameleon?: { data?: KhameleonDataBridge } }).khameleon?.data;
+}

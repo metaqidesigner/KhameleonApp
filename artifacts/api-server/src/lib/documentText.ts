@@ -11,7 +11,8 @@ import path from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 
-const OCR_CACHE_PATH = path.join(homedir(), ".khameleon", "ocr-cache");
+// KHAMELEON_HOME: the all-in-one app keeps everything in its own folder.
+const ocrCachePath = () => path.join(process.env.KHAMELEON_HOME ?? path.join(homedir(), ".khameleon"), "ocr-cache");
 const IMAGE = new Set([".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"]);
 
 export class UnsupportedDocumentError extends Error {
@@ -20,8 +21,8 @@ export class UnsupportedDocumentError extends Error {
 
 async function ocr(images: (string | Buffer)[]): Promise<string> {
   const { createWorker } = await import("tesseract.js");
-  await mkdir(OCR_CACHE_PATH, { recursive: true });
-  const worker = await createWorker("eng", undefined, { cachePath: OCR_CACHE_PATH });
+  await mkdir(ocrCachePath(), { recursive: true });
+  const worker = await createWorker("eng", undefined, { cachePath: ocrCachePath() });
   try {
     const out: string[] = [];
     for (const img of images) out.push((await worker.recognize(img)).data.text);

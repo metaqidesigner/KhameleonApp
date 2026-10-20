@@ -1,7 +1,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
-import { rm, mkdir, copyFile } from "node:fs/promises";
+import { rm, mkdir, copyFile, cp, readdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { createRequire as makeRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 
@@ -59,6 +60,23 @@ async function buildAll() {
   await mkdir(notices, { recursive: true });
   await copyFile(path.join(electronDir, "dist/LICENSES.chromium.html"), path.join(notices, "LICENSES.chromium.html"));
   await copyFile(path.join(electronDir, "dist/LICENSE"), path.join(notices, "LICENSE.electron.txt"));
+
+  // The all-in-one app (src/localServer.ts): Khameleon's server, its screens and
+  // the built-in database's table set-up travel inside the desktop app.
+  // Built first by `pnpm bundle` (the server's own build + the screens' build).
+  const repo = path.resolve(here, "../..");
+  const serverDist = path.join(repo, "artifacts/api-server/dist");
+  const webDist = path.join(repo, "artifacts/khameleon-command/dist/public");
+  if (existsSync(path.join(serverDist, "index.mjs")) && existsSync(path.join(webDist, "index.html"))) {
+    await mkdir(path.join(distDir, "server"), { recursive: true });
+    for (const f of await readdir(serverDist)) {
+      if (f.endsWith(".mjs")) await copyFile(path.join(serverDist, f), path.join(distDir, "server", f));
+    }
+    await cp(webDist, path.join(distDir, "web"), { recursive: true });
+    await cp(path.join(repo, "lib/db/migrations"), path.join(distDir, "migrations"), { recursive: true });
+  } else {
+    console.warn("Server or screens not built - run `pnpm bundle` first. This build can only use another server (KHAMELEON_APP_URL).");
+  }
 
   // Capture full recording (native/mac/KhameleonInput.swift): Khameleon's own
   // helper for watching clicks/typing and replaying them by element name.

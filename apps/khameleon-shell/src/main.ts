@@ -1,6 +1,7 @@
-import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, screen, shell, type WebContents } from "electron";
+import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, screen, shell, type WebContents } from "electron";
 import * as path from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { FileOps, CommandRunner as FileCommandRunner, MacAppLauncher, WindowsAppLauncher } from "khameleon-file-agent";
 import { JsonFileStorage, MemoryStore, CommandRunner as MemoryCommandRunner } from "khameleon-memory";
 import {
@@ -24,17 +25,64 @@ import { replayStep, type CapturedAction } from "./inputHelper";
 import { DetectionService, DEFAULT_DETECTION, type DetectionPrefs } from "./detection";
 import { CaptureSession } from "./capture";
 import { EmailWatcher } from "./emailWatch";
+import { khameleonHome, needsRecoveryKey, recoveryKey, removeAllData, restartLocalServer, startLocalServer, stopLocalServer, useRecoveryKey } from "./localServer";
 
-// The real product UI, not a side scaffold (khameleon-decisions-log.md,
-// 2026-10-03, Cross-App Control Phase 0). Khameleon is already a working
-// web app serving itself and its API from one origin (SELF_HOSTING.md) -
-// session cookies, accounts, and everything built in hosted/managed mode
-// already depend on that same-origin shape. Rather than re-host the built
-// frontend inside Electron (which would mean re-solving cookie/session
-// behavior from scratch), this shell is real app chrome around the real,
-// already-running instance: point a BrowserWindow at it, same as any
-// desktop wrapper (Slack, Linear) does for its own web app.
-const DEFAULT_APP_URL = "http://localhost:4001";
+// Where the app's screens and server come from (download decisions,
+// 2026-10-20): normally the all-in-one app starts its OWN server inside
+// itself (src/localServer.ts) and loads the screens from it - one origin, so
+// sign-in cookies work as on any server. KHAMELEON_APP_URL points it at
+// another server instead: development (Vite) or a shared company server.
+const sharedServerUrl = process.env.KHAMELEON_APP_URL;
+let usingBuiltInServer = false;
+
+// Only one copy of Khameleon at a time - two would share one database.
+const firstCopy = app.requestSingleInstanceLock();
+if (!firstCopy) app.quit();
+
+/** A small "Starting Khameleon…" window while the built-in server gets ready (first run takes a few seconds). */
+function startingWindow(): BrowserWindow {
+  const w = new BrowserWindow({ width: 360, height: 140, frame: false, resizable: false, show: false, center: true, backgroundColor: "#0a161a" });
+  w.loadURL(`data:text/html,${encodeURIComponent('<html><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#0a161a;color:#d6efee;font:15px -apple-system,Segoe UI,sans-serif">Starting Khameleon…</body></html>')}`);
+  w.once("ready-to-show", () => w.show());
+  return w;
+}
+
+/** Data from before but no key (e.g. restored onto a new computer): offer the recovery key. */
+async function askForRecoveryKey(): Promise<void> {
+  while (needsRecoveryKey()) {
+    const { response } = await dialog.showMessageBox({
+      type: "question",
+      message: "Khameleon found your data, but not the key that unlocks your saved logins and keys.",
+      detail: "If you saved your recovery key, copy it (the whole thing), then choose \"Use my copied recovery key\". Otherwise start without it - everything else stays, and you'll just enter saved logins and keys again.",
+      buttons: ["Use my copied recovery key", "Start without it", "Quit"],
+      defaultId: 0, cancelId: 2,
+    });
+    if (response === 2) { app.exit(0); return; }
+    if (response === 1) return; // a new key is made; old saved logins can't be read
+    if (!useRecoveryKey(clipboard.readText())) {
+      await dialog.showMessageBox({ type: "warning", message: "That isn't a recovery key.", detail: "Copy the whole recovery key - 8 groups of 8 letters and numbers - and try again." });
+    }
+  }
+}
+
+/** The address of the app's screens and server: the built-in server, unless another is set. */
+async function serverAddress(): Promise<string> {
+  if (sharedServerUrl) return sharedServerUrl;
+  await askForRecoveryKey();
+  const splash = startingWindow();
+  try {
+    const url = await startLocalServer();
+    usingBuiltInServer = true;
+    return url;
+  } catch (err) {
+    splash.destroy();
+    await dialog.showMessageBox({ type: "error", message: "Khameleon couldn't start.", detail: `${(err as Error).message}\n\nDetails are in ${path.join(khameleonHome(), "logs", "server.log")}.` });
+    app.exit(1);
+    throw err;
+  } finally {
+    if (!splash.isDestroyed()) splash.destroy();
+  }
+}
 
 // Two layouts, one app (docs/build-review.md, Builds 0-2). The desktop app
 // defaults to Overlay: a full-screen, see-through, always-on-top window that
@@ -180,7 +228,8 @@ function failureHtml(url: string, reason: string): string {
   </body></html>`;
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  if (!firstCopy) return;
   const externalBackend = new ExternalWindowBackend();
   // Triggers the real macOS Accessibility permission dialog on first run if
   // needed; a no-op on Windows (ExternalWindowBackend's own doc comment).
@@ -218,7 +267,7 @@ app.whenReady().then(() => {
     memory: new MemoryCommandRunner(memory),
   };
 
-  const appUrl = process.env.KHAMELEON_APP_URL ?? DEFAULT_APP_URL;
+  let appUrl = await serverAddress();
   // Khameleon's own page and its server (they differ in development).
   const trustedOrigins = [...new Set([new URL(appUrl).origin, new URL(apiBase(appUrl)).origin])];
 
@@ -358,6 +407,40 @@ app.whenReady().then(() => {
       fitOverlayToScreen();
     }
   };
+
+  // A second copy was opened: show this one instead.
+  app.on("second-instance", () => openClassicWindow());
+
+  // The all-in-one app's own data (Settings → Security in both layouts).
+  ipcMain.handle("khameleon:data:built-in", () => usingBuiltInServer);
+  ipcMain.handle("khameleon:data:folder", () => (usingBuiltInServer ? khameleonHome() : null));
+  ipcMain.handle("khameleon:data:recovery-key", () => (usingBuiltInServer ? recoveryKey() : null));
+  ipcMain.handle("khameleon:data:save-recovery-key", async () => {
+    if (!usingBuiltInServer) return false;
+    const { canceled, filePath } = await dialog.showSaveDialog({ title: "Save your Khameleon recovery key", defaultPath: path.join(app.getPath("documents"), "Khameleon recovery key.txt") });
+    if (canceled || !filePath) return false;
+    writeFileSync(filePath, `Khameleon recovery key\n\n${recoveryKey()}\n\nKeep this somewhere safe and private. On a new computer, Khameleon asks for it to unlock your saved logins and keys.\n`, { mode: 0o600 });
+    return true;
+  });
+  ipcMain.handle("khameleon:data:use-recovery-key", async (_e, text: unknown) => {
+    if (!usingBuiltInServer || typeof text !== "string" || !useRecoveryKey(text)) return false;
+    appUrl = await restartLocalServer();
+    for (const w of [mainWindow, overlayWindow]) if (w && !w.isDestroyed()) w.webContents.reload();
+    return true;
+  });
+  ipcMain.handle("khameleon:data:remove-all", async () => {
+    if (!usingBuiltInServer) return false;
+    const { response } = await dialog.showMessageBox({
+      type: "warning",
+      message: "Remove all your Khameleon data from this computer?",
+      detail: "This deletes your chats, tasks, skills, recordings, saved logins, Khami's brain and settings, then closes Khameleon. It can't be undone. (Khameleon itself stays installed.)",
+      buttons: ["Remove everything", "Cancel"], defaultId: 1, cancelId: 1,
+    });
+    if (response !== 0) return false;
+    removeDataOnQuit = true;
+    app.quit();
+    return true;
+  });
 
   ipcMain.handle("khameleon:prefs:get", () => ({ ...prefs }));
   ipcMain.handle("khameleon:prefs:set", (_event, patch: unknown) => {
@@ -535,7 +618,26 @@ app.whenReady().then(() => {
   });
 });
 
-app.on("will-quit", () => globalShortcut.unregisterAll());
+let removeDataOnQuit = false;
+let serverStopped = false;
+
+// Stop the built-in server cleanly (its database closes properly) before quitting.
+app.on("before-quit", event => {
+  if (!usingBuiltInServer || serverStopped) return;
+  event.preventDefault();
+  void stopLocalServer().finally(() => { serverStopped = true; app.quit(); });
+});
+
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
+  if (!removeDataOnQuit) return;
+  if (process.platform === "win32") {
+    // Windows keeps the app's own files locked until it has fully closed: delete just after.
+    spawn("cmd.exe", ["/c", "timeout", "/t", "3", "/nobreak", ">nul", "&", "rmdir", "/s", "/q", khameleonHome()], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+  } else {
+    removeAllData();
+  }
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

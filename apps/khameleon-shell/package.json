@@ -1,5 +1,6 @@
 {
   "name": "@khameleon/shell",
+  "productName": "Khameleon",
   "version": "0.1.0",
   "description": "Khameleon desktop app",
   "author": "Khameleon",
@@ -9,12 +10,15 @@
     "build": "node build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "pnpm build && electron .",
-    "package:mac": "pnpm build && electron-builder --mac",
-    "package:win": "pnpm build && electron-builder --win"
+    "package:mac": "pnpm bundle && pnpm build && electron-builder --mac",
+    "package:win": "pnpm bundle && pnpm build && electron-builder --win",
+    "bundle": "pnpm --filter @workspace/api-server run build && cd ../../artifacts/khameleon-command && PORT=5199 BASE_PATH=/ pnpm exec vite build"
   },
   "dependencies": {
+    "@electric-sql/pglite": "0.5.10",
     "@napi-rs/canvas": "0.1.80",
     "extract-file-icon": "^0.3.2",
+    "mammoth": "^1.13.0",
     "node-llama-cpp": "^3.22.1",
     "node-window-manager": "^2.2.4",
     "pdf-parse": "^2.4.5",

@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { Llama, LlamaModel, LlamaContext, LlamaChatSession as LlamaChatSessionType } from "node-llama-cpp";
 
 // node-llama-cpp is ESM-only. The Electron shell bundles its main process as
@@ -124,7 +125,9 @@ export class LocalDocumentAgent {
     const { getLlama, resolveModelFile } = await loadLlamaModule();
     this.llama ??= await getLlama();
     if (!this.context) {
-      const modelPath = await resolveModelFile(this.modelUri);
+      // Same brain file as Khami's standard brain - in Khameleon's own folder for the all-in-one app.
+      const home = process.env.KHAMELEON_HOME;
+      const modelPath = await resolveModelFile(this.modelUri, home ? { directory: path.join(home, "models") } : undefined);
       this.model ??= await this.llama.loadModel({ modelPath });
       this.context = await this.model.createContext();
     }

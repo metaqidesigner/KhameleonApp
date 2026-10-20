@@ -60,6 +60,15 @@ contextBridge.exposeInMainWorld("khameleon", {
       return () => { ipcRenderer.removeListener("khameleon:detection:update", handler); };
     },
   },
+  // The all-in-one app's own data (src/localServer.ts): the recovery key and removing everything.
+  data: {
+    builtIn: () => ipcRenderer.invoke("khameleon:data:built-in"),
+    folder: () => ipcRenderer.invoke("khameleon:data:folder"),
+    recoveryKey: () => ipcRenderer.invoke("khameleon:data:recovery-key"),
+    saveRecoveryKey: () => ipcRenderer.invoke("khameleon:data:save-recovery-key"),
+    useRecoveryKey: (text: string) => ipcRenderer.invoke("khameleon:data:use-recovery-key", text),
+    removeAll: () => ipcRenderer.invoke("khameleon:data:remove-all"),
+  },
   // Saved desktop choices: which layout starts, follow-me vs main screen.
   prefs: {
     get: () => ipcRenderer.invoke("khameleon:prefs:get"),

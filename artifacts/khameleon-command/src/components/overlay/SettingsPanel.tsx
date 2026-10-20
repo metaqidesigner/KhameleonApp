@@ -9,6 +9,7 @@ import { AiEngines } from "@/components/settings/AiEngines";
 import { MicrosoftSignIn } from "@/components/settings/MicrosoftSignIn";
 import { CredentialsSettings } from "@/components/settings/CredentialsSettings";
 import { SecuritySettings } from "@/components/settings/SecuritySettings";
+import { DataSettings } from "@/components/settings/DataSettings";
 import type { OverlayPalette } from "./palettes";
 
 /**
@@ -84,7 +85,7 @@ export function SettingsPanel({ palette, initialTab = "profile", onClose, onOpen
         {tab === "ai" && <AiEngines tone="overlay" onOpenIntegrations={onOpenIntegrations} />}
         {tab === "microsoft" && <MicrosoftSignIn tone="overlay" />}
         {tab === "credentials" && <CredentialsSettings tone="overlay" />}
-        {tab === "security" && <SecuritySettings tone="overlay" />}
+        {tab === "security" && <><DataSettings tone="overlay" /><SecuritySettings tone="overlay" /></>}
       </div>
     </div>
   );

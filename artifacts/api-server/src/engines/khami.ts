@@ -25,7 +25,10 @@ const loadModule = () => (llamaModule ??= import("node-llama-cpp"));
 
 // ── Saved choice ─────────────────────────────────────────────────────────────
 
-const SETTINGS_DIR = path.join(os.homedir(), ".khameleon");
+// KHAMELEON_HOME: the all-in-one app keeps everything in its own folder.
+const SETTINGS_DIR = process.env.KHAMELEON_HOME ?? path.join(os.homedir(), ".khameleon");
+// Brain files: inside that folder for the all-in-one app; node-llama-cpp's usual place otherwise.
+const MODELS_DIR = process.env.KHAMELEON_HOME ? path.join(process.env.KHAMELEON_HOME, "models") : undefined;
 const SETTINGS_FILE = path.join(SETTINGS_DIR, "khami.json");
 
 async function readSavedBrain(): Promise<BrainId | null> {
@@ -47,7 +50,7 @@ async function saveBrain(brain: BrainId): Promise<void> {
 async function brainFile(id: BrainId): Promise<string | null> {
   const { resolveModelFile } = await loadModule();
   try {
-    return await resolveModelFile(BRAINS[id].uri, { download: false, cli: false });
+    return await resolveModelFile(BRAINS[id].uri, { download: false, cli: false, directory: MODELS_DIR });
   } catch {
     return null;
   }
@@ -87,6 +90,7 @@ export function startBrainDownload(brain: BrainId): KhamiDownload {
       const { resolveModelFile } = await loadModule();
       await resolveModelFile(BRAINS[brain].uri, {
         cli: false,
+        directory: MODELS_DIR,
         onProgress: ({ totalSize, downloadedSize }) => {
           download = {
             state: "downloading", brain,
